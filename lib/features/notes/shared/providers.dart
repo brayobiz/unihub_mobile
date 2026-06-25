@@ -1,16 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rxdart/rxdart.dart';
 import '../../auth/shared/providers.dart';
 import '../data/repositories/notes_repository_impl.dart';
 import '../domain/models/note.dart';
 import '../domain/models/study_progress.dart';
 import '../domain/repositories/notes_repository.dart';
-import 'package:unihub_mobile/core/services/cache_service.dart';
 
 final notesRepositoryProvider = Provider<NotesRepository>((ref) {
   return NotesRepositoryImpl(
     ref.watch(firestoreProvider),
-    cacheService: ref.watch(cacheServiceProvider),
   );
 });
 
@@ -26,9 +23,8 @@ final notesListingsProvider = StreamProvider.family<List<NoteListing>, int>((ref
   final category = ref.watch(notesCategoryFilterProvider);
   final type = ref.watch(notesTypeFilterProvider);
   final year = ref.watch(notesYearFilterProvider);
-  final cache = ref.watch(cacheServiceProvider);
 
-  final stream = ref.watch(notesRepositoryProvider).watchNotes(
+  return ref.watch(notesRepositoryProvider).watchNotes(
     university: user?.university,
     subjectCategory: category,
     noteType: type,
@@ -36,17 +32,6 @@ final notesListingsProvider = StreamProvider.family<List<NoteListing>, int>((ref
     query: query,
     limit: limit,
   );
-
-  // Use cache only for initial 'All' load to avoid confusing filtered results
-  if (query.isEmpty && category == 'All' && type == 'All' && year == 'All' && limit >= 20) {
-    final cachedData = cache.getNotes();
-    if (cachedData != null) {
-      final cachedNotes = cachedData.map((e) => NoteListing.fromJson(e)).toList();
-      return stream.startWith(cachedNotes).distinct();
-    }
-  }
-
-  return stream;
 });
 
 final topNotesProvider = StreamProvider<List<NoteListing>>((ref) {
@@ -69,15 +54,7 @@ final bookmarksProvider = StreamProvider<List<StudyProgress>>((ref) {
 final noteProgressProvider = StreamProvider.family<StudyProgress?, String>((ref, noteId) {
   final user = ref.watch(authStateProvider).valueOrNull;
   if (user == null) return Stream.value(null);
-  final cache = ref.watch(cacheServiceProvider);
-  final stream = ref.watch(notesRepositoryProvider).watchNoteProgress(user.uid, noteId);
-
-  final cached = cache.getStudyProgress(noteId);
-  if (cached != null) {
-    return stream.startWith(StudyProgress.fromJson(cached)).distinct();
-  }
-
-  return stream;
+  return ref.watch(notesRepositoryProvider).watchNoteProgress(user.uid, noteId);
 });
 
 // Helper provider to resolve NoteListing from StudyProgress
@@ -121,9 +98,6 @@ class StudyController {
       progress: progress,
       lastAccessed: DateTime.now(),
     );
-
-    // Optimistic UI/Local Cache
-    _ref.read(cacheServiceProvider).saveStudyProgress(noteId, updated.toJson());
 
     await _ref.read(notesRepositoryProvider).updateStudyProgress(updated);
   }

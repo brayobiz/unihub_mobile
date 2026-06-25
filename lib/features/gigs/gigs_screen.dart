@@ -1,26 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:rxdart/rxdart.dart';
 import '../../models/feed_type.dart';
 import '../shared/feed_repository.dart';
 import '../../widgets/feed/feed_card.dart';
 import '../auth/shared/providers.dart';
 import '../shared/add_feed_item_screen.dart';
-import 'package:unihub_mobile/core/services/cache_service.dart';
 
 final gigsFeedProvider = StreamProvider<List<FeedItem>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
-  final cache = ref.watch(cacheServiceProvider);
-  final stream = ref.watch(feedRepositoryProvider).watchFeed(FeedType.gig, university: user?.university);
-
-  final cachedData = cache.getGigs();
-  if (cachedData != null) {
-    final cachedGigs = cachedData.map((e) => FeedItem.fromJson(e)).toList();
-    return stream.startWith(cachedGigs).distinct();
-  }
-
-  return stream;
+  return ref.watch(feedRepositoryProvider).watchFeed(FeedType.gig, university: user?.university);
 });
 
 class GigsScreen extends ConsumerStatefulWidget {

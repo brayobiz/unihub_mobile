@@ -3,14 +3,11 @@ import 'package:flutter/foundation.dart';
 import '../../domain/models/note.dart';
 import '../../domain/models/study_progress.dart';
 import '../../domain/repositories/notes_repository.dart';
-import 'package:unihub_mobile/core/services/cache_service.dart';
 
 class NotesRepositoryImpl implements NotesRepository {
   final FirebaseFirestore _firestore;
-  final CacheService? _cacheService;
 
-  NotesRepositoryImpl(this._firestore, {CacheService? cacheService})
-      : _cacheService = cacheService;
+  NotesRepositoryImpl(this._firestore);
 
   @override
   Stream<List<NoteListing>> watchNotes({
@@ -21,27 +18,28 @@ class NotesRepositoryImpl implements NotesRepository {
     String? query,
     int? limit,
   }) {
-    // Ultimate resilience: No orderBy on server, no where on server
-    int fetchLimit = (limit ?? 20) * 10;
-
     Query queryRef = _firestore.collection('notes')
-        .limit(fetchLimit);
+        .orderBy('createdAt', descending: true);
+
+    if (subjectCategory != null && subjectCategory != 'All') {
+      queryRef = queryRef.where('subjectCategory', isEqualTo: subjectCategory);
+    }
+
+    if (noteType != null && noteType != 'All') {
+      queryRef = queryRef.where('noteType', isEqualTo: noteType);
+    }
+
+    if (limit != null) {
+      queryRef = queryRef.limit(limit);
+    }
 
     return queryRef.snapshots().map((snapshot) {
       var items = snapshot.docs
           .map((doc) => NoteListing.fromJson(doc.data() as Map<String, dynamic>))
           .toList();
       
-      // Sort in memory first
-      items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      
-      // Secondary filtering
-      if (subjectCategory != null && subjectCategory != 'All') {
-        items = items.where((n) => n.subjectCategory == subjectCategory).toList();
-      }
-      
-      if (noteType != null && noteType != 'All') {
-        items = items.where((n) => n.noteType == noteType).toList();
+      if (university != null) {
+        items = items.where((n) => n.university == university).toList();
       }
 
       if (yearOfStudy != null && yearOfStudy != 'All') {
@@ -53,28 +51,8 @@ class NotesRepositoryImpl implements NotesRepository {
         items = items.where((note) {
           return note.title.toLowerCase().contains(q) || 
                  note.tags.any((tag) => tag.toLowerCase().contains(q)) ||
-                 note.unitCode.toLowerCase().contains(q) ||
-                 note.unitName.toLowerCase().contains(q);
+                 note.unitCode.toLowerCase().contains(q);
         }).toList();
-      }
-
-      // Priority sort for university
-      if (university != null) {
-        items.sort((a, b) {
-          if (a.university == university && b.university != university) return -1;
-          if (a.university != university && b.university == university) return 1;
-          return b.createdAt.compareTo(a.createdAt);
-        });
-      }
-
-      // Apply the final limit
-      if (limit != null && items.length > limit) {
-        items = items.take(limit).toList();
-      }
-
-      // Cache top results
-      if (limit == null || limit >= 20) {
-        _cacheService?.saveNotes(items.take(20).map((e) => e.toJson()).toList());
       }
 
       return items;
@@ -114,7 +92,15 @@ class NotesRepositoryImpl implements NotesRepository {
 
   @override
   Future<void> createNote(NoteListing note) async {
-    await _firestore.collection('notes').doc(note.id).set(note.toJson());
+    debugPrint('📝 Firestore: Creating note ${note.id}');
+    debugPrint('📝 Firestore: File URL: ${note.fileUrl}');
+    try {
+      await _firestore.collection('notes').doc(note.id).set(note.toJson());
+      debugPrint('✅ Firestore: Note created successfully');
+    } catch (e) {
+      debugPrint('❌ Firestore: Failed to create note: $e');
+      rethrow;
+    }
   }
 
   @override

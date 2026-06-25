@@ -25,7 +25,7 @@ if (flutterVersionName == null) {
 
 android {
     namespace "com.unihub.unihub_mobile"
-    compileSdkVersion 36
+    compileSdkVersion 35
     ndkVersion flutter.ndkVersion
 
     compileOptions {

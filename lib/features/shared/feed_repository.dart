@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/feed_type.dart';
 import '../../features/auth/shared/providers.dart';
-import 'package:unihub_mobile/core/services/cache_service.dart';
 
 final feedRepositoryProvider = Provider((ref) => FeedRepository(
   ref.watch(firestoreProvider),

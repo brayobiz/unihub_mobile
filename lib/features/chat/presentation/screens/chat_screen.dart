@@ -15,6 +15,7 @@ import '../../shared/providers.dart';
 import '../../../marketplace/domain/models/listing.dart';
 import '../../../marketplace/shared/providers.dart';
 import '../../../shared/storage_repository.dart';
+import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String conversationId;
@@ -255,7 +256,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           onTap: () => _openUrl(message.content),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: Image.network(message.content, fit: BoxFit.cover),
+            child: OptimizedImage(
+              imageUrl: message.content,
+              fit: BoxFit.cover,
+              thumbnailWidth: 500,
+            ),
           ),
         );
       case MessageType.file:

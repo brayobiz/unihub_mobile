@@ -9,7 +9,6 @@ import '../../domain/models/listing.dart';
 import 'package:unihub_mobile/features/marketplace/shared/providers.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/shared/storage_repository.dart';
-import 'package:unihub_mobile/shared/image_utils.dart';
 
 class AddListingState {
   final String id;
@@ -234,11 +233,10 @@ class AddListingController extends StateNotifier<AddListingState> {
       
       // Upload New Images
       for (var i = 0; i < state.selectedImages.length; i++) {
-        final compressedFile = await ImageUtils.compressImage(state.selectedImages[i]);
         final url = await _ref.read(storageRepositoryProvider).uploadFile(
           path: 'listings/${state.id}',
           id: 'image_${DateTime.now().millisecondsSinceEpoch}_$i',
-          file: compressedFile,
+          file: state.selectedImages[i],
           onProgress: (sent, total) {
              state = state.copyWith(
                uploadProgress: (i / state.selectedImages.length) + 

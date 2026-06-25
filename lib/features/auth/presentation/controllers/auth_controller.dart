@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../shared/providers.dart';
 import '../../domain/repositories/auth_repository.dart';
-import 'package:unihub_mobile/core/services/cache_service.dart';
 
 class AuthController extends StateNotifier<AsyncValue<void>> {
   final AuthRepository _authRepository;

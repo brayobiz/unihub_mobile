@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/cloudinary_service.dart';
 
@@ -16,6 +17,8 @@ class StorageRepository {
   }) async {
     // We map Firebase style path/id to Cloudinary folder structure
     final folder = path.replaceAll('/', '_');
+    
+    debugPrint('📦 StorageRepo: Prepared folder name: $folder');
     
     return await _cloudinaryService.uploadFile(
       file: file,

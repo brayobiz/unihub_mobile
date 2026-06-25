@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:cloudinary_public/cloudinary_public.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
@@ -43,25 +44,43 @@ class CloudinaryService {
     bool compress = true,
     Function(int, int)? onProgress,
   }) async {
+    final fileName = p.basename(file.path);
+    debugPrint('☁️ Cloudinary: Starting upload for $fileName to folder unihub/$folder');
+    
     try {
+      if (!await file.exists()) {
+        throw Exception('File does not exist at path: ${file.path}');
+      }
+
       File fileToUpload = file;
       final isImg = _isImage(file.path);
       
       if (compress && isImg) {
+        debugPrint('☁️ Cloudinary: Compressing image before upload...');
         fileToUpload = await compressImage(file);
+        debugPrint('☁️ Cloudinary: Compression complete.');
       }
 
+      final cloudinaryFile = CloudinaryFile.fromFile(
+        fileToUpload.path,
+        folder: 'unihub/$folder',
+        publicId: publicId,
+        resourceType: isImg ? CloudinaryResourceType.Image : CloudinaryResourceType.Auto,
+      );
+
+      debugPrint('☁️ Cloudinary: Requesting upload with resourceType: ${cloudinaryFile.resourceType}');
+
       CloudinaryResponse response = await _cloudinary.uploadFile(
-        CloudinaryFile.fromFile(
-          fileToUpload.path,
-          folder: 'unihub/$folder',
-          publicId: publicId,
-          resourceType: isImg ? CloudinaryResourceType.Image : CloudinaryResourceType.Auto,
-        ),
+        cloudinaryFile,
         onProgress: onProgress,
       );
+      
+      debugPrint('☁️ Cloudinary: Upload successful! URL: ${response.secureUrl}');
       return response.secureUrl;
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('❌ Cloudinary: Upload failed for $fileName');
+      debugPrint('Error: $e');
+      debugPrint('Stack: $stack');
       throw Exception('Cloudinary upload failed: $e');
     }
   }

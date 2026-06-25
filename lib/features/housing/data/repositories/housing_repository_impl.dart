@@ -17,33 +17,24 @@ class HousingRepositoryImpl implements HousingRepository {
     double? maxBudget,
     int limit = 30,
   }) {
-    // Ultimate Resilience: Remove orderBy from query
-    return _firestore.collection('housing_listings')
-        .limit(limit * 3)
-        .snapshots()
-        .map((snapshot) {
+    Query query = _firestore.collection('housing_listings')
+        .orderBy('createdAt', descending: true)
+        .limit(limit);
+
+    if (campus != null) {
+      query = query.where('campus', isEqualTo: campus);
+    }
+
+    if (type != null) {
+      query = query.where('type', isEqualTo: type.name);
+    }
+
+    return query.snapshots().map((snapshot) {
       var listings = snapshot.docs.map((doc) => HousingListing.fromFirestore(doc)).toList();
       
-      // Sort by freshness in memory
-      listings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-      // Filter by campus
-      if (campus != null) {
-        listings = listings.where((l) => l.campus == campus).toList();
-      }
-      
-      // Filter by type
-      if (type != null) {
-        listings = listings.where((l) => l.type == type).toList();
-      }
-
-      // Filter by budget
       if (maxBudget != null) {
         listings = listings.where((l) => l.price <= maxBudget).toList();
       }
-      
-      // Sort by freshness
-      listings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       
       return listings;
     });

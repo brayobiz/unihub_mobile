@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import '../../../auth/shared/providers.dart';
 import '../../../auth/domain/models/app_user.dart';
 import '../../domain/models/listing.dart';
@@ -231,7 +232,10 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                 }
                 return Hero(
                   tag: 'listing_img_${widget.listing.id}',
-                  child: Image.network(widget.listing.imageUrls[index], fit: BoxFit.cover),
+                  child: OptimizedImage(
+                    imageUrl: widget.listing.imageUrls[index],
+                    fit: BoxFit.cover,
+                  ),
                 );
               },
             ),

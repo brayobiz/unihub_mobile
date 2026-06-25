@@ -24,20 +24,16 @@ class SmartFeedItem {
 }
 
 final smartFeedProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
-  // Use limited fetches for the dashboard feed to ensure speed
-  final marketplaceAsync = ref.watch(listingsProvider(ListingFilter(itemsLimit: 15)));
-  final housingAsync = ref.watch(housingListingsProvider(15));
-  final notesAsync = ref.watch(notesListingsProvider(15));
+  final marketplaceAsync = ref.watch(listingsProvider(ListingFilter(itemsLimit: 10)));
+  final housingAsync = ref.watch(housingListingsProvider(10));
+  final notesAsync = ref.watch(notesListingsProvider(10));
   final gigsAsync = ref.watch(gigsFeedProvider);
   final communityAsync = ref.watch(communityFeedProvider);
-  final user = ref.watch(appUserProvider).valueOrNull;
 
-  // Check if everything is still loading
-  final isAnyLoading = marketplaceAsync.isLoading || 
-                        housingAsync.isLoading || 
-                        notesAsync.isLoading || 
-                        gigsAsync.isLoading || 
-                        communityAsync.isLoading;
+  if (marketplaceAsync.isLoading || housingAsync.isLoading || notesAsync.isLoading || 
+      gigsAsync.isLoading || communityAsync.isLoading) {
+    return const AsyncValue.loading();
+  }
 
   final listings = marketplaceAsync.valueOrNull ?? [];
   final housing = housingAsync.valueOrNull ?? [];
@@ -45,20 +41,12 @@ final smartFeedProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
   final gigs = gigsAsync.valueOrNull ?? [];
   final community = communityAsync.valueOrNull ?? [];
 
-  // If we have no data at all and we are still loading, show loading
-  // But if we have ANY data, show it immediately (Speed optimization)
-  final hasAnyData = listings.isNotEmpty || housing.isNotEmpty || notes.isNotEmpty || gigs.isNotEmpty || community.isNotEmpty;
-  
-  if (marketplaceAsync.isLoading && !hasAnyData) {
-    return const AsyncValue.loading();
-  }
-
   final List<SmartFeedItem> allItems = [];
 
-  // 1. Marketplace
+  // Add items from all sources
   for (var l in listings) {
     allItems.add(SmartFeedItem(
-      source: l.isFeatured ? SmartFeedSource.sponsored : (l.viewsCount > 50 ? SmartFeedSource.trending : SmartFeedSource.fresh),
+      source: SmartFeedSource.fresh,
       originalData: l,
       model: FeedItemModel(
         type: widgets.FeedType.marketplace,
@@ -69,10 +57,9 @@ final smartFeedProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
     ));
   }
 
-  // 2. Community
   for (var c in community) {
     allItems.add(SmartFeedItem(
-      source: c.likesCount > 10 ? SmartFeedSource.trending : SmartFeedSource.fresh,
+      source: SmartFeedSource.fresh,
       originalData: c,
       model: FeedItemModel(
         type: widgets.FeedType.community,
@@ -83,7 +70,6 @@ final smartFeedProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
     ));
   }
 
-  // 3. Housing
   for (var h in housing) {
     allItems.add(SmartFeedItem(
       source: SmartFeedSource.fresh,
@@ -97,10 +83,9 @@ final smartFeedProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
     ));
   }
 
-  // 4. Notes
   for (var n in notes) {
     allItems.add(SmartFeedItem(
-      source: n.downloadsCount > 20 ? SmartFeedSource.trending : SmartFeedSource.fresh,
+      source: SmartFeedSource.fresh,
       originalData: n,
       model: FeedItemModel(
         type: widgets.FeedType.notes,
@@ -111,16 +96,9 @@ final smartFeedProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
     ));
   }
 
-  // 5. Gigs
   for (var g in gigs) {
-    bool isPersonalized = false;
-    if (user != null && user.skills.isNotEmpty) {
-      final combined = (g.title + g.subtitle).toLowerCase();
-      isPersonalized = user.skills.any((skill) => combined.contains(skill.toLowerCase()));
-    }
-
     allItems.add(SmartFeedItem(
-      source: isPersonalized ? SmartFeedSource.personalized : SmartFeedSource.fresh,
+      source: SmartFeedSource.fresh,
       originalData: g,
       model: FeedItemModel(
         type: widgets.FeedType.gig,
@@ -131,30 +109,8 @@ final smartFeedProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
     ));
   }
 
-  // SHUFFLE & WEIGHTING
-  final personalized = allItems.where((i) => i.source == SmartFeedSource.personalized).toList();
-  final trending = allItems.where((i) => i.source == SmartFeedSource.trending).toList();
-  final fresh = allItems.where((i) => i.source == SmartFeedSource.fresh).toList();
-  final sponsored = allItems.where((i) => i.source == SmartFeedSource.sponsored).toList();
+  // Simple shuffle for variety
+  allItems.shuffle();
 
-  final List<SmartFeedItem> weightedFeed = [];
-  
-  int maxItems = 40;
-  for (int i = 0; i < maxItems; i++) {
-    if (i % 8 == 0 && sponsored.isNotEmpty) {
-      weightedFeed.add(sponsored.removeAt(0));
-    } else if (i % 2 == 0 && personalized.isNotEmpty) {
-      weightedFeed.add(personalized.removeAt(0));
-    } else if (i % 3 == 0 && trending.isNotEmpty) {
-      weightedFeed.add(trending.removeAt(0));
-    } else if (fresh.isNotEmpty) {
-      weightedFeed.add(fresh.removeAt(0));
-    }
-  }
-
-  if (weightedFeed.isEmpty && allItems.isNotEmpty) {
-    return AsyncValue.data(allItems);
-  }
-
-  return AsyncValue.data(weightedFeed);
+  return AsyncValue.data(allItems);
 });

@@ -2,18 +2,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
-import '../../domain/models/app_user.dart';
-import '../../domain/repositories/auth_repository.dart';
-import 'package:unihub_mobile/core/services/cache_service.dart';
+import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
+import 'package:unihub_mobile/features/auth/domain/repositories/auth_repository.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   final FirebaseAuth _firebaseAuth;
   final FirebaseFirestore _firestore;
-  final CacheService? _cacheService;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
-  AuthRepositoryImpl(this._firebaseAuth, this._firestore, {CacheService? cacheService})
-      : _cacheService = cacheService;
+  AuthRepositoryImpl(this._firebaseAuth, this._firestore);
 
   @override
   Stream<User?> get authStateChanges => _firebaseAuth.authStateChanges();
@@ -24,12 +21,21 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> signInWithEmailAndPassword(String email, String password) async {
     try {
+      debugPrint('🔑 Auth: Attempting sign in for $email');
       await _firebaseAuth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+      debugPrint('✅ Auth: Sign in successful');
     } on FirebaseAuthException catch (e) {
+      debugPrint('❌ Auth: FirebaseAuthException: ${e.code} - ${e.message}');
       throw _handleAuthException(e);
+    } catch (e) {
+      debugPrint('❌ Auth: General Exception: $e');
+      if (e.toString().contains('Connection reset by peer')) {
+        throw Exception('Network error: Connection reset by peer. Please check your internet connection or VPN.');
+      }
+      throw Exception('Authentication failed: $e');
     }
   }
 
@@ -121,7 +127,6 @@ class AuthRepositoryImpl implements AuthRepository {
       if (snapshot.exists && snapshot.data() != null) {
         final user = AppUser.fromJson(snapshot.data()!);
         debugPrint('Fetched AppUser: ${user.fullName} (${user.uid})');
-        _cacheService?.saveProfile(user.toJson());
         return user;
       }
       debugPrint('AppUser document does not exist for UID: $uid');
@@ -166,8 +171,14 @@ class AuthRepositoryImpl implements AuthRepository {
       if (fullName != null) data['fullName'] = fullName;
       if (username != null) data['username'] = username;
       if (bio != null) data['bio'] = bio;
-      if (photoUrl != null) data['photoUrl'] = photoUrl;
-      if (coverPhotoUrl != null) data['coverPhotoUrl'] = coverPhotoUrl;
+      if (photoUrl != null) {
+        data['photoUrl'] = photoUrl;
+        debugPrint('📝 Firestore: Updating photoUrl to $photoUrl');
+      }
+      if (coverPhotoUrl != null) {
+        data['coverPhotoUrl'] = coverPhotoUrl;
+        debugPrint('📝 Firestore: Updating coverPhotoUrl to $coverPhotoUrl');
+      }
       if (university != null) data['university'] = university;
       if (campus != null) data['campus'] = campus;
       if (course != null) data['course'] = course;
@@ -275,10 +286,13 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   Exception _handleAuthException(FirebaseAuthException e) {
+    debugPrint('🛑 Auth Error Code: ${e.code}');
     switch (e.code) {
-      case 'user-not-found': return Exception('No user found.');
-      case 'wrong-password': return Exception('Wrong password.');
-      default: return Exception(e.message ?? 'Error occurred.');
+      case 'user-not-found': return Exception('No user found with this email.');
+      case 'wrong-password': return Exception('Incorrect password.');
+      case 'network-request-failed': return Exception('Network error: Please check your internet connection or DNS settings.');
+      case 'too-many-requests': return Exception('Too many attempts. Please try again later.');
+      default: return Exception(e.message ?? 'An unknown authentication error occurred.');
     }
   }
 }

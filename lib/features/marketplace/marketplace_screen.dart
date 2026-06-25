@@ -21,24 +21,10 @@ class MarketplaceScreen extends ConsumerStatefulWidget {
 
 class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
   final _searchDebouncer = Debouncer(milliseconds: 500);
-  final ScrollController _scrollController = ScrollController();
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_onScroll);
-  }
-
-  void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 500) {
-      ref.read(marketplaceControllerProvider.notifier).loadMore();
-    }
-  }
 
   @override
   void dispose() {
     _searchDebouncer.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 
@@ -64,7 +50,6 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
           ref.invalidate(listingsProvider);
         },
         child: CustomScrollView(
-          controller: _scrollController,
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           slivers: [
             SliverAppBar(

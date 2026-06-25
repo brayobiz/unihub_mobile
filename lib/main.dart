@@ -12,7 +12,6 @@ import 'features/profile/settings_screen.dart';
 import 'services/notification_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'core/services/cache_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -26,7 +25,7 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Performance: Configure Firestore for fast startup and offline support
+  // Enable offline persistence for better network resilience
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true,
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
@@ -35,8 +34,6 @@ Future<void> main() async {
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   final sharedPreferences = await SharedPreferences.getInstance();
-  final cacheService = CacheService();
-  await cacheService.init();
 
   final container = ProviderContainer(
     overrides: [

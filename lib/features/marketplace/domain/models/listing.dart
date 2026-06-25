@@ -106,6 +106,13 @@ class Listing {
 
     final sId = safeString(json['sellerId'] ?? json['seller_id'], '');
     
+    final urls = (json['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? 
+                 (json['images'] as List?)?.map((e) => e.toString()).toList() ?? [];
+    
+    if (urls.isNotEmpty) {
+      // print('📖 Listing: Parsed URLs: $urls');
+    }
+
     return Listing(
       id: safeString(json['id'], ''),
       sellerId: sId,
@@ -116,8 +123,7 @@ class Listing {
       description: safeString(json['description'], ''),
       price: safeDouble(json['price'], 0.0),
       category: safeString(json['category'], 'Other'),
-      imageUrls: (json['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? 
-                 (json['images'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      imageUrls: urls,
       campusLocation: safeString(json['campusLocation'] ?? json['location'], ''),
       condition: ListingCondition.values.firstWhere(
         (e) => e.name == safeString(json['condition'], 'good'), 

@@ -2,8 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:rxdart/rxdart.dart';
-import 'package:unihub_mobile/core/services/cache_service.dart';
 import '../data/repositories/auth_repository_impl.dart';
 import '../domain/models/app_user.dart';
 import '../domain/repositories/auth_repository.dart';
@@ -24,7 +22,6 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepositoryImpl(
     ref.watch(firebaseAuthProvider),
     ref.watch(firestoreProvider),
-    cacheService: ref.watch(cacheServiceProvider),
   );
 });
 
@@ -37,19 +34,10 @@ final appUserProvider = StreamProvider<AppUser?>((ref) {
   final uid = authState.valueOrNull?.uid;
   if (uid == null) return Stream.value(null);
   
-  final cache = ref.watch(cacheServiceProvider);
-  final stream = ref.watch(authRepositoryProvider).watchUser(uid);
-
-  final cached = cache.getProfile();
-  if (cached != null) {
-    return stream.map((user) {
-      if (user != null) cache.saveProfile(user.toJson());
-      return user;
-    }).startWith(AppUser.fromJson(cached)).distinct();
-  }
-
-  return stream.map((user) {
-    if (user != null) cache.saveProfile(user.toJson());
+  return ref.watch(authRepositoryProvider).watchUser(uid).map((user) {
+    if (user != null) {
+      // debugPrint('👤 Current User: ${user.fullName}, Photo: ${user.photoUrl}');
+    }
     return user;
   });
 });

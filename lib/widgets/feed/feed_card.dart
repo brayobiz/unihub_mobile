@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../../features/shared/feed_repository.dart';
 import '../../models/feed_type.dart';
 import '../../features/auth/shared/providers.dart';
+import '../feed/feed_type.dart' as widgets;
+import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 
 class FeedCard extends ConsumerWidget {
   final FeedItem item;
@@ -144,6 +146,28 @@ class FeedCard extends ConsumerWidget {
                 style: TextStyle(color: color, fontWeight: FontWeight.bold),
               ),
             ],
+            
+            if (item.images.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 200,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: item.images.length,
+                  itemBuilder: (context, index) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: OptimizedImage(
+                      imageUrl: item.images[index],
+                      width: 300,
+                      height: 200,
+                      borderRadius: BorderRadius.circular(12),
+                      thumbnailWidth: 600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+
             const Divider(height: 24),
             Row(
               children: [

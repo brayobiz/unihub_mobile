@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../../domain/models/listing.dart';
 import '../../domain/repositories/marketplace_repository.dart';
 
@@ -43,6 +44,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     }
 
     return query.snapshots().map((snapshot) {
+      debugPrint('📖 Firestore: Received marketplace snapshot with ${snapshot.docs.length} docs');
       var items = snapshot.docs
           .map((doc) => Listing.fromJson(doc.data() as Map<String, dynamic>))
           .toList();
@@ -144,6 +146,9 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
   Future<void> createListing(Listing listing) async {
     if (listing.id.isEmpty) throw Exception('Listing ID cannot be empty');
     
+    debugPrint('📝 Firestore: Creating listing ${listing.id}');
+    debugPrint('📝 Firestore: Image URLs to save: ${listing.imageUrls}');
+
     final batch = _firestore.batch();
     
     // 1. Create the listing
@@ -158,7 +163,13 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       });
     }
 
-    await batch.commit();
+    try {
+      await batch.commit();
+      debugPrint('✅ Firestore: Listing created successfully');
+    } catch (e) {
+      debugPrint('❌ Firestore: Failed to create listing: $e');
+      rethrow;
+    }
   }
 
   @override

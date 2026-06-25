@@ -1,12 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:rxdart/rxdart.dart';
 import '../../auth/shared/providers.dart';
 import '../../auth/domain/models/app_user.dart';
 import '../data/repositories/marketplace_repository_impl.dart';
 import '../domain/models/listing.dart';
 import '../domain/repositories/marketplace_repository.dart';
-import 'package:unihub_mobile/core/services/cache_service.dart';
 
 import '../domain/models/listing_filter.dart';
 
@@ -35,7 +33,7 @@ final sellerListingsProvider = StreamProvider.family<List<Listing>, String>((ref
 });
 
 final topListingsProvider = StreamProvider<List<Listing>>((ref) {
-  return ref.watch(listingsProvider(ListingFilter(itemsLimit: 30)).stream);
+  return ref.watch(listingsProvider(ListingFilter()).stream);
 });
 
 final savedListingsProvider = StreamProvider<List<Listing>>((ref) {
@@ -59,7 +57,6 @@ final sellerReviewsProvider = StreamProvider.family<List<Map<String, dynamic>>, 
 final similarListingsProvider = Provider.family<AsyncValue<List<Listing>>, Listing>((ref, currentListing) {
   final allListingsAsync = ref.watch(listingsProvider(ListingFilter(
     selectedCategory: currentListing.category,
-    itemsLimit: 10,
   )));
   
   return allListingsAsync.whenData((listings) => listings

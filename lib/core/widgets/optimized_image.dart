@@ -25,19 +25,26 @@ class OptimizedImage extends StatelessWidget {
   });
 
   String _getOptimizedUrl() {
-    if (!useCloudinaryTransform || !imageUrl.contains('cloudinary.com')) {
-      return imageUrl;
+    var url = imageUrl;
+    
+    // Force HTTPS
+    if (url.startsWith('http://')) {
+      url = url.replaceFirst('http://', 'https://');
+    }
+
+    if (!useCloudinaryTransform || !url.contains('cloudinary.com')) {
+      return url;
     }
 
     // Cloudinary dynamic transformation: auto quality, auto format, and width constraint
     final String transformation = 'q_auto:$quality,f_auto${thumbnailWidth != null ? ',w_$thumbnailWidth' : ''}';
     
     // Insert transformation after /upload/
-    if (imageUrl.contains('/upload/')) {
-      return imageUrl.replaceFirst('/upload/', '/upload/$transformation/');
+    if (url.contains('/upload/')) {
+      return url.replaceFirst('/upload/', '/upload/$transformation/');
     }
 
-    return imageUrl;
+    return url;
   }
 
   @override
@@ -50,8 +57,10 @@ class OptimizedImage extends StatelessWidget {
       height: height,
       fit: fit,
       placeholder: (context, url) => _buildShimmer(),
-      errorWidget: (context, url, error) => _buildErrorWidget(),
-      // Use memCacheWidth/Height to reduce memory usage on low-end devices
+      errorWidget: (context, url, error) {
+        debugPrint('🖼️ OptimizedImage: Failed to load image: $url');
+        return _buildErrorWidget();
+      },
       memCacheWidth: thumbnailWidth ?? (width != null ? (width! * 2).toInt() : null),
     );
 

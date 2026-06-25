@@ -8,7 +8,6 @@ import '../../models/feed_type.dart';
 import '../auth/shared/providers.dart';
 import 'feed_repository.dart';
 import 'storage_repository.dart';
-import '../../shared/image_utils.dart';
 import '../marketplace/domain/models/marketplace_categories.dart';
 
 class AddFeedItemScreen extends ConsumerStatefulWidget {
@@ -56,11 +55,10 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
       
       // Upload images if any
       for (var i = 0; i < _selectedImages.length; i++) {
-        final compressedFile = await ImageUtils.compressImage(File(_selectedImages[i].path));
         final url = await ref.read(storageRepositoryProvider).uploadFile(
           path: 'feed/$itemId',
           id: 'img_$i',
-          file: compressedFile,
+          file: File(_selectedImages[i].path),
           onProgress: (sent, total) {
             // Since we have multiple images, we approximate the total progress
             setState(() {
