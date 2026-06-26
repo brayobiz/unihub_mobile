@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdfx/pdfx.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import 'package:path/path.dart' as p;
 import '../../domain/models/note.dart';
 import '../../shared/providers.dart';
 
@@ -23,30 +25,58 @@ class NoteReaderScreen extends ConsumerStatefulWidget {
 }
 
 class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
-  late PdfControllerPinch _pdfController;
+  // PDF Controls
+  PdfControllerPinch? _pdfController;
   int _totalPages = 0;
   int _currentPage = 0;
+  
+  // WebView Controls for Doc/PPT
+  WebViewController? _webViewController;
+  bool _isPdf = true;
+  bool _isWebLoading = true;
   Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
-    _currentPage = widget.initialPage;
-    _pdfController = PdfControllerPinch(
-      document: PdfDocument.openFile(widget.filePath),
-      initialPage: widget.initialPage + 1, // pdfx is 1-indexed
-    );
+    final extension = p.extension(widget.filePath).toLowerCase();
+    _isPdf = extension == '.pdf';
+
+    if (_isPdf) {
+      _currentPage = widget.initialPage;
+      _pdfController = PdfControllerPinch(
+        document: PdfDocument.openFile(widget.filePath),
+        initialPage: widget.initialPage + 1,
+      );
+    } else {
+      // For Docx/PPT, we use Google Docs Viewer via WebView
+      // Note: This requires an active internet connection even if the file is downloaded,
+      // as the viewer is a remote service.
+      final String viewerUrl = 'https://docs.google.com/gview?embedded=true&url=${Uri.encodeComponent(widget.note.fileUrl)}';
+      
+      _webViewController = WebViewController()
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setNavigationDelegate(
+          NavigationDelegate(
+            onPageStarted: (url) => setState(() => _isWebLoading = true),
+            onPageFinished: (url) => setState(() => _isWebLoading = false),
+            onWebResourceError: (error) {
+               debugPrint('🌐 WebView Error: ${error.description}');
+            },
+          ),
+        )
+        ..loadRequest(Uri.parse(viewerUrl));
+    }
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
-    _pdfController.dispose();
+    _pdfController?.dispose();
     super.dispose();
   }
 
   void _onPageChanged(int page) {
-    // page is 1-indexed
     setState(() {
       _currentPage = page - 1;
     });
@@ -71,9 +101,9 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
     final isBookmarked = progressAsync.valueOrNull?.isBookmarked ?? false;
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade900,
+      backgroundColor: _isPdf ? Colors.grey.shade900 : Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.black.withOpacity(0.8),
+        backgroundColor: _isPdf ? Colors.black.withOpacity(0.8) : Colors.indigo,
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -89,10 +119,15 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            if (_totalPages > 0)
+            if (_isPdf && _totalPages > 0)
               Text(
                 'Page ${_currentPage + 1} of $_totalPages',
                 style: const TextStyle(fontSize: 10, color: Colors.white70),
+              )
+            else if (!_isPdf)
+              Text(
+                'Document Viewer',
+                style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.7)),
               ),
           ],
         ),
@@ -100,28 +135,51 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
           IconButton(
             icon: Icon(
               isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-              color: isBookmarked ? Colors.indigoAccent : Colors.white,
+              color: isBookmarked ? Colors.amber : Colors.white,
             ),
             onPressed: () => ref.read(studyControllerProvider).toggleBookmark(widget.note.id),
           ),
         ],
       ),
-      body: PdfViewPinch(
-        controller: _pdfController,
-        onDocumentLoaded: (document) {
-          setState(() {
-            _totalPages = document.pagesCount;
-          });
-        },
-        onPageChanged: _onPageChanged,
-        onDocumentError: (error) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error opening document: $error')),
-          );
-          Navigator.pop(context);
-        },
-      ),
-      bottomNavigationBar: _totalPages > 0 ? _buildProgressSlider() : null,
+      body: _isPdf ? _buildPdfView() : _buildWebView(),
+      bottomNavigationBar: (_isPdf && _totalPages > 0) ? _buildProgressSlider() : null,
+    );
+  }
+
+  Widget _buildPdfView() {
+    return PdfViewPinch(
+      controller: _pdfController!,
+      onDocumentLoaded: (document) {
+        setState(() {
+          _totalPages = document.pagesCount;
+        });
+      },
+      onPageChanged: _onPageChanged,
+      onDocumentError: (error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error opening PDF: $error')),
+        );
+        Navigator.pop(context);
+      },
+    );
+  }
+
+  Widget _buildWebView() {
+    return Stack(
+      children: [
+        WebViewWidget(controller: _webViewController!),
+        if (_isWebLoading)
+          const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(color: Colors.indigo),
+                SizedBox(height: 16),
+                Text('Preparing document...', style: TextStyle(color: Colors.grey)),
+              ],
+            ),
+          ),
+      ],
     );
   }
 
@@ -144,7 +202,7 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
                 activeColor: Colors.indigoAccent,
                 inactiveColor: Colors.white24,
                 onChanged: (val) {
-                  _pdfController.jumpToPage(val.toInt() + 1);
+                  _pdfController?.jumpToPage(val.toInt() + 1);
                 },
               ),
             ),

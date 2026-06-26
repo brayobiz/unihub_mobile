@@ -9,7 +9,6 @@ class OptimizedImage extends StatelessWidget {
   final BoxFit fit;
   final BorderRadius? borderRadius;
   final bool useCloudinaryTransform;
-  final int? quality;
   final int? thumbnailWidth;
 
   const OptimizedImage({
@@ -20,7 +19,6 @@ class OptimizedImage extends StatelessWidget {
     this.fit = BoxFit.cover,
     this.borderRadius,
     this.useCloudinaryTransform = true,
-    this.quality = 60,
     this.thumbnailWidth,
   });
 
@@ -36,12 +34,24 @@ class OptimizedImage extends StatelessWidget {
       return url;
     }
 
-    // Cloudinary dynamic transformation: auto quality, auto format, and width constraint
-    final String transformation = 'q_auto:$quality,f_auto${thumbnailWidth != null ? ',w_$thumbnailWidth' : ''}';
+    // Cloudinary dynamic transformation: auto quality, auto format
+    // Removed q_auto:60 because numeric quality must be q_60 or just q_auto
+    String transformation = 'q_auto,f_auto';
+    
+    if (thumbnailWidth != null) {
+      transformation += ',w_$thumbnailWidth,c_scale';
+    }
     
     // Insert transformation after /upload/
     if (url.contains('/upload/')) {
-      return url.replaceFirst('/upload/', '/upload/$transformation/');
+      final parts = url.split('/upload/');
+      final String baseUrl = parts[0];
+      String remaining = parts[1];
+      
+      // If the URL already has a transformation (e.g. /upload/w_100/v1/id), 
+      // we need to handle it. For simplicity, we prepend ours.
+      // Cloudinary allows multiple transformation segments separated by slashes.
+      return '$baseUrl/upload/$transformation/$remaining';
     }
 
     return url;
@@ -49,29 +59,32 @@ class OptimizedImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (imageUrl.isEmpty) {
+      return _buildErrorWidget();
+    }
+    
     final optimizedUrl = _getOptimizedUrl();
 
-    Widget image = CachedNetworkImage(
+    return CachedNetworkImage(
       imageUrl: optimizedUrl,
       width: width,
       height: height,
       fit: fit,
+      imageBuilder: (context, imageProvider) {
+        Widget result = Image(image: imageProvider, fit: fit);
+        if (borderRadius != null) {
+          result = ClipRRect(borderRadius: borderRadius!, child: result);
+        }
+        return result;
+      },
       placeholder: (context, url) => _buildShimmer(),
       errorWidget: (context, url, error) {
         debugPrint('🖼️ OptimizedImage: Failed to load image: $url');
         return _buildErrorWidget();
       },
-      memCacheWidth: thumbnailWidth ?? (width != null ? (width! * 2).toInt() : null),
+      // Increase memCache for high density screens if width is provided
+      memCacheWidth: thumbnailWidth != null ? (thumbnailWidth! * 2).toInt() : (width != null ? (width! * 2).toInt() : null),
     );
-
-    if (borderRadius != null) {
-      image = ClipRRect(
-        borderRadius: borderRadius!,
-        child: image,
-      );
-    }
-
-    return image;
   }
 
   Widget _buildShimmer() {
@@ -81,7 +94,10 @@ class OptimizedImage extends StatelessWidget {
       child: Container(
         width: width ?? double.infinity,
         height: height ?? double.infinity,
-        color: Colors.white,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: borderRadius,
+        ),
       ),
     );
   }
@@ -90,7 +106,10 @@ class OptimizedImage extends StatelessWidget {
     return Container(
       width: width,
       height: height,
-      color: Colors.grey[200],
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: borderRadius,
+      ),
       child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
     );
   }

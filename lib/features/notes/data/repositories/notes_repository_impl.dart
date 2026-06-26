@@ -18,9 +18,11 @@ class NotesRepositoryImpl implements NotesRepository {
     String? query,
     int? limit,
   }) {
-    Query queryRef = _firestore.collection('notes')
-        .orderBy('createdAt', descending: true);
+    debugPrint('📖 Firestore: Watching notes. Category: $subjectCategory, Type: $noteType');
+    
+    Query queryRef = _firestore.collection('notes');
 
+    // Add filters first, then orderBy
     if (subjectCategory != null && subjectCategory != 'All') {
       queryRef = queryRef.where('subjectCategory', isEqualTo: subjectCategory);
     }
@@ -29,11 +31,15 @@ class NotesRepositoryImpl implements NotesRepository {
       queryRef = queryRef.where('noteType', isEqualTo: noteType);
     }
 
+    // Always sort by newest
+    queryRef = queryRef.orderBy('createdAt', descending: true);
+
     if (limit != null) {
       queryRef = queryRef.limit(limit);
     }
 
     return queryRef.snapshots().map((snapshot) {
+      debugPrint('📖 Firestore: Received notes snapshot with ${snapshot.docs.length} docs');
       var items = snapshot.docs
           .map((doc) => NoteListing.fromJson(doc.data() as Map<String, dynamic>))
           .toList();

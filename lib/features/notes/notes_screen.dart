@@ -134,10 +134,29 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
                   ],
                 ),
               ),
-              error: (err, _) => Center(
-                key: const ValueKey('error'),
-                child: Text('Error: $err'),
-              ),
+              error: (err, stack) {
+                debugPrint('❌ Notes Error: $err');
+                debugPrint('Stack: $stack');
+                return Center(
+                  key: const ValueKey('error'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                        const SizedBox(height: 16),
+                        Text('Error loading notes: $err'),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () => ref.invalidate(notesListingsProvider),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ),
@@ -266,19 +285,15 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
 
       if (isDownloaded) {
         final progress = await ref.read(noteProgressProvider(note.id).future);
-        final extension = p.extension(savePath).toLowerCase();
         if (mounted) {
-          if (extension == '.pdf') {
-            context.push('/note-reader', extra: {
-              'note': note,
-              'filePath': savePath,
-              'initialPage': progress?.lastPage ?? 0,
-            });
-          } else {
-            await OpenFilex.open(savePath);
-          }
+          context.push('/note-reader', extra: {
+            'note': note,
+            'filePath': savePath,
+            'initialPage': progress?.lastPage ?? 0,
+          });
         }
       } else {
+        // If not downloaded, take them to detail page where they can initiate download
         if (mounted) context.push('/note-detail', extra: note);
       }
     } catch (e) {

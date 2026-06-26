@@ -287,8 +287,8 @@ class NoteDetailScreen extends ConsumerWidget {
       final savePath = await downloadService.getSavePath(fileName);
 
       if (isDownloaded) {
-        // Open internal reader
         final progress = await ref.read(noteProgressProvider(note.id).future);
+
         if (context.mounted) {
           context.push('/note-reader', extra: {
             'note': note,
