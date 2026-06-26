@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import '../../domain/models/note.dart';
 import '../../shared/providers.dart';
+import '../../../auth/shared/providers.dart';
 
 import '../../../../services/download_service.dart';
 import 'package:path/path.dart' as p;
@@ -86,6 +87,9 @@ class NoteDetailScreen extends ConsumerWidget {
   }
 
   Widget _buildSliverAppBar(BuildContext context, WidgetRef ref, bool isBookmarked) {
+    final currentUser = ref.watch(firebaseAuthProvider).currentUser;
+    final isAuthor = currentUser?.uid == note.authorId;
+
     return SliverAppBar(
       expandedHeight: 120,
       floating: false,
@@ -103,6 +107,16 @@ class NoteDetailScreen extends ConsumerWidget {
       ),
       centerTitle: true,
       actions: [
+        if (isAuthor) ...[
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, color: Colors.indigo),
+            onPressed: () => context.push('/add-note', extra: note),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: Colors.red),
+            onPressed: () => _confirmDeletion(context, ref),
+          ),
+        ],
         IconButton(
           icon: Icon(
             isBookmarked ? Icons.bookmark : Icons.bookmark_border,
@@ -111,6 +125,32 @@ class NoteDetailScreen extends ConsumerWidget {
           onPressed: () => ref.read(studyControllerProvider).toggleBookmark(note.id),
         ),
       ],
+    );
+  }
+
+  void _confirmDeletion(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Resource?'),
+        content: const Text('This will permanently remove this study resource from UniHub. This action cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context); // Close dialog
+              await ref.read(notesRepositoryProvider).deleteNote(note.id);
+              if (context.mounted) {
+                context.pop(); // Go back to list
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Resource deleted successfully')),
+                );
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 

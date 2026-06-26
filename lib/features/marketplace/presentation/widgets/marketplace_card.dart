@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -15,6 +16,8 @@ class MarketplaceCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final currentUserId = ref.watch(firebaseAuthProvider).currentUser?.uid;
+    final isOwner = currentUserId == listing.sellerId;
     final user = ref.watch(appUserProvider).valueOrNull;
 
     return TweenAnimationBuilder<double>(
@@ -102,25 +105,42 @@ class MarketplaceCard extends ConsumerWidget {
                     Positioned(
                       top: 8,
                       right: 8,
-                      child: Material(
-                        color: Colors.white.withOpacity(0.9),
-                        shape: const CircleBorder(),
-                        child: IconButton(
-                          icon: const Icon(Icons.favorite_rounded, size: 18),
-                          color: Colors.grey.shade400,
-                          onPressed: () {
-                            if (user != null) {
-                              ref.read(marketplaceRepositoryProvider).toggleSaveListing(user.uid, listing.id);
-                            }
-                          },
-                        ),
-                      ),
+                      child: isOwner 
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildActionIcon(
+                                icon: Icons.edit_outlined,
+                                color: Colors.indigo,
+                                onTap: () => context.push('/add-listing', extra: listing),
+                              ),
+                              const SizedBox(width: 6),
+                              _buildActionIcon(
+                                icon: Icons.delete_outline,
+                                color: Colors.red,
+                                onTap: () => _confirmDelete(context, ref),
+                              ),
+                            ],
+                          )
+                        : Material(
+                            color: Colors.white.withOpacity(0.9),
+                            shape: const CircleBorder(),
+                            child: IconButton(
+                              icon: const Icon(Icons.favorite_rounded, size: 18),
+                              color: Colors.grey.shade400,
+                              onPressed: () {
+                                if (user != null) {
+                                  ref.read(marketplaceRepositoryProvider).toggleSaveListing(user.uid, listing.id);
+                                }
+                              },
+                            ),
+                          ),
                     ),
                   ],
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -131,6 +151,7 @@ class MarketplaceCard extends ConsumerWidget {
                       style: GoogleFonts.plusJakartaSans(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
+                        color: Colors.black87,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -138,28 +159,47 @@ class MarketplaceCard extends ConsumerWidget {
                       'KES ${NumberFormat('#,###').format(listing.price)}',
                       style: GoogleFonts.plusJakartaSans(
                         color: Colors.indigo,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
-                            shape: BoxShape.circle,
+                        CircleAvatar(
+                          radius: 8,
+                          backgroundColor: Colors.indigo.shade50,
+                          child: Text(
+                            listing.sellerName.isNotEmpty ? listing.sellerName[0].toUpperCase() : 'S',
+                            style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.indigo),
                           ),
-                          child: const Icon(Icons.verified_rounded, size: 10, color: Colors.blue),
                         ),
                         const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            listing.sellerName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 10,
+                              color: Colors.grey.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.shield_rounded, size: 10, color: Colors.green.shade400),
+                        const SizedBox(width: 4),
                         Text(
                           'Trust ${listing.sellerTrustScore.toInt()}%',
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 10,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 9,
+                            color: Colors.grey.shade500,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
@@ -170,6 +210,47 @@ class MarketplaceCard extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildActionIcon({required IconData icon, required Color color, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white.withOpacity(0.2)),
+            ),
+            child: Icon(icon, color: color, size: 16),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Listing?'),
+        content: const Text('This will permanently remove this item from the marketplace.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await ref.read(marketplaceRepositoryProvider).deleteListing(listing.id);
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
   }

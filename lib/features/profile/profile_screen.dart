@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../auth/presentation/controllers/auth_controller.dart';
 import '../auth/shared/providers.dart';
 import '../auth/domain/models/app_user.dart';
 
@@ -28,7 +29,7 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
-class _ProfileContent extends StatelessWidget {
+class _ProfileContent extends ConsumerWidget {
   final AppUser user;
   const _ProfileContent({required this.user});
 
@@ -36,7 +37,7 @@ class _ProfileContent extends StatelessWidget {
   static const double coverHeight = 180.0;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
       slivers: [
@@ -80,7 +81,7 @@ class _ProfileContent extends StatelessWidget {
                 const SizedBox(height: 16),
                 _buildSocialLinks(),
                 const SizedBox(height: 16),
-                _buildActionButtons(context),
+                _buildActionButtons(context, ref),
               ],
             ),
           ),
@@ -189,13 +190,27 @@ class _ProfileContent extends StatelessWidget {
   }
 
   Widget _buildStatsSection() {
-    return Row(
+    return Column(
       children: [
-        _buildStatCard('Listings', user.activeListingsCount.toString(), Colors.blue),
-        const SizedBox(width: 12),
-        _buildStatCard('Seller', user.sellerRating > 0 ? user.sellerRating.toStringAsFixed(1) : 'N/A', Colors.green),
-        const SizedBox(width: 12),
-        _buildStatCard('Buyer', user.buyerRating > 0 ? user.buyerRating.toStringAsFixed(1) : 'N/A', Colors.purple),
+        Row(
+          children: [
+            _buildStatCard('Market', user.activeListingsCount.toString(), Colors.blue),
+            const SizedBox(width: 12),
+            _buildStatCard('Study', user.resourcesSharedCount.toString(), Colors.indigo),
+            const SizedBox(width: 12),
+            _buildStatCard('Trust', '${user.trustScore.toInt()}%', Colors.green),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            _buildStatCard('Housing', user.housingListingsCount.toString(), Colors.purple),
+            const SizedBox(width: 12),
+            _buildStatCard('Gigs', user.gigsPostedCount.toString(), Colors.amber.shade700),
+            const SizedBox(width: 12),
+            _buildStatCard('Sales', user.completedSalesCount.toString(), Colors.orange),
+          ],
+        ),
       ],
     );
   }
@@ -286,16 +301,41 @@ class _ProfileContent extends StatelessWidget {
     ));
   }
 
-  Widget _buildActionButtons(BuildContext context) {
+  Widget _buildActionButtons(BuildContext context, WidgetRef ref) {
     return Column(
       children: [
+        _buildActionButton(Icons.favorite_outline_rounded, 'Saved Items', () => context.push('/saved')),
+        const SizedBox(height: 12),
         _buildActionButton(Icons.history_rounded, 'Activity History', () {}),
         const SizedBox(height: 12),
         _buildActionButton(Icons.emoji_events_outlined, 'Achievements', () {
-          // Future: Navigate to dedicated Achievements screen
           _showAchievementsDialog(context);
         }),
+        const SizedBox(height: 12),
+        _buildActionButton(Icons.logout_rounded, 'Log Out', () {
+          _showLogoutConfirm(context, ref);
+        }, isDestructive: true),
       ],
+    );
+  }
+
+  void _showLogoutConfirm(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Log Out?'),
+        content: const Text('Are you sure you want to log out of UniHub?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ref.read(authControllerProvider.notifier).signOut();
+            },
+            child: const Text('Log Out', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -424,7 +464,7 @@ class _ProfileContent extends StatelessWidget {
     );
   }
 
-  Widget _buildActionButton(IconData icon, String title, VoidCallback onTap) {
+  Widget _buildActionButton(IconData icon, String title, VoidCallback onTap, {bool isDestructive = false}) {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
@@ -434,8 +474,12 @@ class _ProfileContent extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         child: ListTile(
-          leading: Icon(icon, color: Colors.blueGrey.shade800, size: 20),
-          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+          leading: Icon(icon, color: isDestructive ? Colors.red : Colors.blueGrey.shade800, size: 20),
+          title: Text(title, style: TextStyle(
+            fontWeight: FontWeight.w700, 
+            fontSize: 15,
+            color: isDestructive ? Colors.red : Colors.black87,
+          )),
           trailing: const Icon(Icons.chevron_right_rounded),
           onTap: onTap,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),

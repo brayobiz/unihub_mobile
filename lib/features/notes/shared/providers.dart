@@ -38,6 +38,12 @@ final topNotesProvider = StreamProvider<List<NoteListing>>((ref) {
   return ref.watch(notesListingsProvider(40).stream);
 });
 
+final userNotesProvider = StreamProvider<List<NoteListing>>((ref) {
+  final user = ref.watch(authStateProvider).valueOrNull;
+  if (user == null) return Stream.value([]);
+  return ref.watch(notesRepositoryProvider).watchNotesByAuthor(user.uid);
+});
+
 // Study Specific Providers
 final studyHistoryProvider = StreamProvider<List<StudyProgress>>((ref) {
   final user = ref.watch(authStateProvider).valueOrNull;
@@ -100,6 +106,24 @@ class StudyController {
     );
 
     await _ref.read(notesRepositoryProvider).updateStudyProgress(updated);
+  }
+
+  Future<void> removeFromHistory(String noteId) async {
+    final user = _ref.read(authStateProvider).valueOrNull;
+    if (user == null) return;
+    await _ref.read(notesRepositoryProvider).deleteStudyProgress(user.uid, noteId);
+  }
+
+  Future<void> clearHistory() async {
+    final user = _ref.read(authStateProvider).valueOrNull;
+    if (user == null) return;
+    
+    // For simplicity, we can fetch and delete, or just implement a more robust 
+    // clear in the repository. Let's do a simple clear for now.
+    final history = await _ref.read(notesRepositoryProvider).watchStudyHistory(user.uid).first;
+    for (var item in history) {
+      await _ref.read(notesRepositoryProvider).deleteStudyProgress(user.uid, item.noteId);
+    }
   }
 
   Future<void> toggleBookmark(String noteId) async {

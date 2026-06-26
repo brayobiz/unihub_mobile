@@ -225,7 +225,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/add-note',
-        builder: (context, state) => const AddNoteScreen(),
+        builder: (context, state) {
+          final note = state.extra as NoteListing?;
+          return AddNoteScreen(note: note);
+        },
       ),
       GoRoute(
         path: '/note-detail',

@@ -95,12 +95,15 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     return _firestore
         .collection('listings')
         .where('sellerId', isEqualTo: sellerId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs
+          var items = snapshot.docs
               .map((doc) => Listing.fromJson(doc.data() as Map<String, dynamic>))
               .toList();
+          
+          // Sort in-memory to avoid needing a composite index for (sellerId + createdAt)
+          items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return items;
         });
   }
 
@@ -146,28 +149,31 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
   Future<void> createListing(Listing listing) async {
     if (listing.id.isEmpty) throw Exception('Listing ID cannot be empty');
     
-    debugPrint('📝 Firestore: Creating listing ${listing.id}');
-    debugPrint('📝 Firestore: Image URLs to save: ${listing.imageUrls}');
+    debugPrint('📝 Firestore: Processing listing ${listing.id}');
+
+    final listingRef = _firestore.collection('listings').doc(listing.id);
+    final doc = await listingRef.get();
+    final isNew = !doc.exists;
 
     final batch = _firestore.batch();
     
-    // 1. Create the listing
-    final listingRef = _firestore.collection('listings').doc(listing.id);
-    batch.set(listingRef, listing.toJson());
+    // 1. Create/Update the listing
+    batch.set(listingRef, listing.toJson(), SetOptions(merge: true));
     
-    // 2. Increment user's active listings count
-    if (listing.sellerId.isNotEmpty) {
+    // 2. Increment counters only for NEW listings
+    if (isNew && listing.sellerId.isNotEmpty) {
       final userRef = _firestore.collection('users').doc(listing.sellerId);
       batch.update(userRef, {
         'activeListingsCount': FieldValue.increment(1),
+        'trustScore': FieldValue.increment(2.0),
       });
     }
 
     try {
       await batch.commit();
-      debugPrint('✅ Firestore: Listing created successfully');
+      debugPrint('✅ Firestore: Listing ${isNew ? 'created' : 'updated'} successfully');
     } catch (e) {
-      debugPrint('❌ Firestore: Failed to create listing: $e');
+      debugPrint('❌ Firestore: Failed to process listing: $e');
       rethrow;
     }
   }

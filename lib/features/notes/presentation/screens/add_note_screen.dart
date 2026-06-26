@@ -11,7 +11,8 @@ import '../../shared/providers.dart';
 import '../../../shared/storage_repository.dart';
 
 class AddNoteScreen extends ConsumerStatefulWidget {
-  const AddNoteScreen({super.key});
+  final NoteListing? note;
+  const AddNoteScreen({super.key, this.note});
 
   @override
   ConsumerState<AddNoteScreen> createState() => _AddNoteScreenState();
@@ -19,23 +20,43 @@ class AddNoteScreen extends ConsumerStatefulWidget {
 
 class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _courseController = TextEditingController();
-  final _unitCodeController = TextEditingController();
-  final _unitNameController = TextEditingController();
-  final _tagController = TextEditingController();
-  final _priceController = TextEditingController();
-  final _descriptionController = TextEditingController();
+  late final TextEditingController _titleController;
+  late final TextEditingController _courseController;
+  late final TextEditingController _unitCodeController;
+  late final TextEditingController _unitNameController;
+  late final TextEditingController _tagController;
+  late final TextEditingController _priceController;
+  late final TextEditingController _descriptionController;
   
-  String _selectedCategory = 'Computer Science';
-  String _selectedNoteType = 'Lecture Note';
-  String _selectedYear = '1';
+  late String _selectedCategory;
+  late String _selectedNoteType;
+  late String _selectedYear;
   final List<String> _tags = [];
   
   File? _selectedFile;
   String? _fileName;
   bool _isLoading = false;
   double _uploadProgress = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.note?.title);
+    _courseController = TextEditingController(text: widget.note?.course);
+    _unitCodeController = TextEditingController(text: widget.note?.unitCode);
+    _unitNameController = TextEditingController(text: widget.note?.unitName);
+    _tagController = TextEditingController();
+    _priceController = TextEditingController(text: widget.note?.price != null && widget.note!.price > 0 ? widget.note!.price.toInt().toString() : '');
+    _descriptionController = TextEditingController(text: widget.note?.description);
+    
+    _selectedCategory = widget.note?.subjectCategory ?? 'Computer Science';
+    _selectedNoteType = widget.note?.noteType ?? 'Lecture Note';
+    _selectedYear = widget.note?.yearOfStudy ?? '1';
+    
+    if (widget.note != null) {
+      _tags.addAll(widget.note!.tags);
+    }
+  }
 
   final List<String> _categories = [
     'Computer Science', 'Business', 'Law', 'Medicine', 
@@ -87,7 +108,7 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedFile == null) {
+    if (_selectedFile == null && widget.note == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a file')));
       return;
     }
@@ -105,22 +126,25 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     });
 
     try {
-      final noteId = const Uuid().v4();
+      final noteId = widget.note?.id ?? const Uuid().v4();
+      String fileUrl = widget.note?.fileUrl ?? '';
       
-      final fileUrl = await ref.read(storageRepositoryProvider).uploadFile(
-        path: 'notes/$noteId',
-        id: 'document',
-        file: _selectedFile!,
-        onProgress: (sent, total) {
-          setState(() => _uploadProgress = sent / total);
-        },
-      );
+      if (_selectedFile != null) {
+        fileUrl = await ref.read(storageRepositoryProvider).uploadFile(
+          path: 'notes/$noteId',
+          id: 'document',
+          file: _selectedFile!,
+          onProgress: (sent, total) {
+            setState(() => _uploadProgress = sent / total);
+          },
+        );
+      }
 
       final note = NoteListing(
         id: noteId,
-        authorId: user.uid,
-        authorName: user.fullName,
-        university: user.university ?? 'Unknown',
+        authorId: widget.note?.authorId ?? user.uid,
+        authorName: widget.note?.authorName ?? user.fullName,
+        university: widget.note?.university ?? user.university ?? 'Unknown',
         course: _courseController.text.trim(),
         unitCode: _unitCodeController.text.trim().toUpperCase(),
         unitName: _unitNameController.text.trim(),
@@ -132,13 +156,15 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
         noteType: _selectedNoteType,
         yearOfStudy: _selectedYear,
         price: double.tryParse(_priceController.text) ?? 0.0,
-        createdAt: DateTime.now(),
+        createdAt: widget.note?.createdAt ?? DateTime.now(),
       );
 
       await ref.read(notesRepositoryProvider).createNote(note);
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Note uploaded successfully!')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(widget.note == null ? 'Note uploaded successfully!' : 'Note updated successfully!'))
+        );
         context.pop();
       }
     } catch (e) {

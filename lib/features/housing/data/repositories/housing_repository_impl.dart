@@ -83,7 +83,22 @@ class HousingRepositoryImpl implements HousingRepository {
 
   @override
   Future<void> createListing(HousingListing listing) async {
-    await _firestore.collection('housing_listings').doc(listing.id).set(listing.toFirestore());
+    final batch = _firestore.batch();
+    
+    // 1. Create the listing
+    final listingRef = _firestore.collection('housing_listings').doc(listing.id);
+    batch.set(listingRef, listing.toFirestore());
+    
+    // 2. Increment user counter
+    if (listing.ownerId!.isNotEmpty) {
+      final userRef = _firestore.collection('users').doc(listing.ownerId);
+      batch.update(userRef, {
+        'housingListingsCount': FieldValue.increment(1),
+        'trustScore': FieldValue.increment(5.0), // High reward for housing info
+      });
+    }
+
+    await batch.commit();
   }
 
   @override

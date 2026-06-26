@@ -1,6 +1,9 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
+import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import '../../domain/models/note.dart';
 import '../../shared/providers.dart';
 
@@ -20,10 +23,12 @@ class NoteCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final currentUserId = ref.watch(firebaseAuthProvider).currentUser?.uid;
+    final isAuthor = currentUserId == note.authorId;
+    
     final isSameUni = userUniversity != null && note.university == userUniversity;
     final isRecent = DateTime.now().difference(note.createdAt).inDays < 3;
     final isPopular = note.downloadsCount > 50;
-    final isRelated = !isSameUni && userUniversity != null;
     
     final progressAsync = ref.watch(noteProgressProvider(note.id));
 
@@ -82,15 +87,33 @@ class NoteCard extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    icon: Icon(
-                      progressAsync.valueOrNull?.isBookmarked == true ? Icons.bookmark : Icons.bookmark_border,
-                      size: 18,
-                      color: progressAsync.valueOrNull?.isBookmarked == true ? Colors.indigo : Colors.grey,
+                  if (isAuthor)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildActionIcon(
+                          icon: Icons.edit_outlined,
+                          color: Colors.indigo,
+                          onTap: () => context.push('/add-note', extra: note),
+                        ),
+                        const SizedBox(width: 6),
+                        _buildActionIcon(
+                          icon: Icons.delete_outline,
+                          color: Colors.red,
+                          onTap: () => _confirmDelete(context, ref),
+                        ),
+                      ],
+                    )
+                  else
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      icon: Icon(
+                        progressAsync.valueOrNull?.isBookmarked == true ? Icons.bookmark : Icons.bookmark_border,
+                        size: 18,
+                        color: progressAsync.valueOrNull?.isBookmarked == true ? Colors.indigo : Colors.grey,
+                      ),
+                      onPressed: () => ref.read(studyControllerProvider).toggleBookmark(note.id),
                     ),
-                    onPressed: () => ref.read(studyControllerProvider).toggleBookmark(note.id),
-                  ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -124,10 +147,30 @@ class NoteCard extends ConsumerWidget {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.indigo.shade50,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            note.unitCode,
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.indigo.shade700),
+                          ),
+                        ),
                         const SizedBox(height: 4),
                         Text(
-                          '${note.subjectCategory} • ${note.unitCode}',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo.shade400),
+                          note.unitName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                        ),
+                        Text(
+                          note.course,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                         ),
                       ],
                     ),
@@ -166,7 +209,7 @@ class NoteCard extends ConsumerWidget {
                     radius: 14,
                     backgroundColor: Colors.indigo.shade50,
                     child: Text(
-                      note.authorName[0].toUpperCase(),
+                      note.authorName.isNotEmpty ? note.authorName[0].toUpperCase() : 'U',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo),
                     ),
                   ),
@@ -203,6 +246,47 @@ class NoteCard extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildActionIcon({required IconData icon, required Color color, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white.withOpacity(0.2)),
+            ),
+            child: Icon(icon, color: color, size: 16),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Resource?'),
+        content: const Text('This will permanently remove this study resource from UniHub.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await ref.read(notesRepositoryProvider).deleteNote(note.id);
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
   }

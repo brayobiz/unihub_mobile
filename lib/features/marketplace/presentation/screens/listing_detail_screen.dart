@@ -92,6 +92,27 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     );
   }
 
+  void _confirmDelete() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Listing?'),
+        content: const Text('This will permanently remove this item from the marketplace. This action cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await ref.read(marketplaceRepositoryProvider).deleteListing(widget.listing.id);
+              if (mounted) context.pop();
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _submitReport(String reason) {
     final user = ref.read(appUserProvider).valueOrNull;
     if (user != null) {
@@ -144,7 +165,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
           CustomScrollView(
             physics: const BouncingScrollPhysics(),
             slivers: [
-              _buildSliverAppBar(),
+              _buildSliverAppBar(isOwner),
               SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -173,7 +194,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     );
   }
 
-  Widget _buildSliverAppBar() {
+  Widget _buildSliverAppBar(bool isOwner) {
     return SliverAppBar(
       expandedHeight: 450,
       pinned: true,
@@ -207,13 +228,22 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        CircleAvatar(
-          backgroundColor: Colors.white.withOpacity(0.9),
-          child: IconButton(
-            icon: const Icon(Icons.more_horiz_rounded, color: Colors.black),
-            onPressed: _reportListing,
+        if (isOwner)
+          CircleAvatar(
+            backgroundColor: Colors.white.withOpacity(0.9),
+            child: IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              onPressed: () => _confirmDelete(),
+            ),
+          )
+        else
+          CircleAvatar(
+            backgroundColor: Colors.white.withOpacity(0.9),
+            child: IconButton(
+              icon: const Icon(Icons.more_horiz_rounded, color: Colors.black),
+              onPressed: _reportListing,
+            ),
           ),
-        ),
         const SizedBox(width: 16),
       ],
       flexibleSpace: FlexibleSpaceBar(

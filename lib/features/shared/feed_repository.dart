@@ -93,15 +93,17 @@ class FeedRepository {
   FeedRepository(this._firestore);
 
   Stream<List<FeedItem>> watchFeed(FeedType type, {String? university, int limit = 20}) {
+    // Basic query to avoid complex index requirements
     Query query = _firestore.collection('feed')
-        .where('type', isEqualTo: type.name)
-        .orderBy('createdAt', descending: true)
-        .limit(limit);
+        .where('type', isEqualTo: type.name);
     
     return query.snapshots().map((snapshot) {
       final items = snapshot.docs
           .map((doc) => FeedItem.fromJson(doc.data() as Map<String, dynamic>))
           .toList();
+      
+      // Sort in-memory to avoid the "The query requires an index" error
+      items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       
       var filteredItems = items;
       
@@ -154,7 +156,22 @@ class FeedRepository {
   }
 
   Future<void> postToFeed(FeedItem item) async {
-    await _firestore.collection('feed').doc(item.id).set(item.toJson());
+    final batch = _firestore.batch();
+    
+    // 1. Post to feed
+    final feedRef = _firestore.collection('feed').doc(item.id);
+    batch.set(feedRef, item.toJson());
+    
+    // 2. If it's a gig, increment counter
+    if (item.type == FeedType.gig && item.authorId.isNotEmpty) {
+      final userRef = _firestore.collection('users').doc(item.authorId);
+      batch.update(userRef, {
+        'gigsPostedCount': FieldValue.increment(1),
+        'trustScore': FieldValue.increment(3.0),
+      });
+    }
+
+    await batch.commit();
   }
 
   Future<void> deleteFeedItem(String id) async {

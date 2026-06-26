@@ -19,25 +19,50 @@ class MarketplaceScreen extends ConsumerStatefulWidget {
   ConsumerState<MarketplaceScreen> createState() => _MarketplaceScreenState();
 }
 
-class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
+class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with SingleTickerProviderStateMixin {
   final _searchDebouncer = Debouncer(milliseconds: 500);
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
 
   @override
   void dispose() {
     _searchDebouncer.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final listingsAsync = ref.watch(scoredListingsProvider);
-    final filterState = ref.watch(marketplaceControllerProvider);
-    final controller = ref.read(marketplaceControllerProvider.notifier);
-
-    final List<String> categories = MarketplaceCategories.mainFilters;
-
     return Scaffold(
       backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: Text(
+          'Marketplace',
+          style: GoogleFonts.plusJakartaSans(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+          ),
+        ),
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: Colors.indigo,
+          unselectedLabelColor: Colors.grey,
+          indicatorColor: Colors.indigo,
+          labelStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14),
+          tabs: const [
+            Tab(text: 'Discover'),
+            Tab(text: 'My Listings'),
+          ],
+        ),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/add-listing'),
         icon: const Icon(Icons.add_shopping_cart_rounded),
@@ -45,169 +70,162 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(listingsProvider);
-        },
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-          slivers: [
-            SliverAppBar(
-              pinned: true,
-              floating: true,
-              backgroundColor: Colors.white,
-              elevation: 0,
-              title: Text(
-                'Marketplace',
-                style: GoogleFonts.plusJakartaSans(
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 22,
-                ),
-              ),
-              actions: [
-                IconButton(
-                  onPressed: () => _showFilterSheet(context, filterState, controller), 
-                  icon: const Icon(Icons.tune_rounded, color: Colors.black),
-                ),
-              ],
-            ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildDiscoverTab(),
+          _buildMyListingsTab(),
+        ],
+      ),
+    );
+  }
 
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Hero(
-                      tag: 'marketplace_search',
-                      child: Material(
-                        color: Colors.transparent,
-                        child: TextField(
-                          onChanged: (value) {
-                            _searchDebouncer.run(() {
-                              controller.setSearchQuery(value);
-                            });
-                          },
-                          decoration: InputDecoration(
-                            hintText: 'What are you looking for?',
-                            hintStyle: GoogleFonts.plusJakartaSans(color: Colors.grey.shade400),
-                            prefixIcon: const Icon(Icons.search_rounded, color: Colors.indigo),
-                            filled: true,
-                            fillColor: Colors.grey.shade50,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: BorderSide(color: Colors.grey.shade100),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: BorderSide(color: Colors.grey.shade100),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: const BorderSide(color: Colors.indigo, width: 1.5),
+  Widget _buildDiscoverTab() {
+    final listingsAsync = ref.watch(scoredListingsProvider);
+    final filterState = ref.watch(marketplaceControllerProvider);
+    final controller = ref.read(marketplaceControllerProvider.notifier);
+    final List<String> categories = MarketplaceCategories.mainFilters;
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(listingsProvider);
+      },
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Hero(
+                          tag: 'marketplace_search',
+                          child: Material(
+                            color: Colors.transparent,
+                            child: TextField(
+                              onChanged: (value) {
+                                _searchDebouncer.run(() {
+                                  controller.setSearchQuery(value);
+                                });
+                              },
+                              decoration: InputDecoration(
+                                hintText: 'What are you looking for?',
+                                hintStyle: GoogleFonts.plusJakartaSans(color: Colors.grey.shade400),
+                                prefixIcon: const Icon(Icons.search_rounded, color: Colors.indigo),
+                                filled: true,
+                                fillColor: Colors.grey.shade50,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  borderSide: BorderSide(color: Colors.grey.shade100),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  borderSide: BorderSide(color: Colors.grey.shade100),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  borderSide: const BorderSide(color: Colors.indigo, width: 1.5),
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      height: 44,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        itemCount: categories.length,
-                        itemBuilder: (context, index) {
-                          final cat = categories[index];
-                          final isSelected = filterState.selectedCategory == cat || (cat == 'All' && filterState.selectedCategory == null);
-                          
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 10),
-                            child: ChoiceChip(
-                              label: Text(
-                                cat,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 13,
-                                  color: isSelected ? Colors.white : Colors.black87,
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                ),
-                              ),
-                              selected: isSelected,
-                              onSelected: (selected) {
-                                if (selected) {
-                                  controller.setCategory(cat);
-                                }
-                              },
-                              backgroundColor: Colors.grey.shade50,
-                              selectedColor: Colors.indigo,
-                              showCheckmark: false,
-                              pressElevation: 0,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                side: BorderSide(
-                                  color: isSelected ? Colors.indigo : Colors.grey.shade200,
-                                ),
+                      const SizedBox(width: 10),
+                      IconButton(
+                        onPressed: () => _showFilterSheet(context, filterState, controller), 
+                        icon: const Icon(Icons.tune_rounded, color: Colors.black),
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.grey.shade50,
+                          padding: const EdgeInsets.all(12),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    height: 44,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      itemCount: categories.length,
+                      itemBuilder: (context, index) {
+                        final cat = categories[index];
+                        final isSelected = filterState.selectedCategory == cat || (cat == 'All' && filterState.selectedCategory == null);
+                        
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: ChoiceChip(
+                            label: Text(
+                              cat,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 13,
+                                color: isSelected ? Colors.white : Colors.black87,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                               ),
                             ),
-                          );
-                        },
-                      ),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              if (selected) {
+                                controller.setCategory(cat);
+                              }
+                            },
+                            backgroundColor: Colors.grey.shade50,
+                            selectedColor: Colors.indigo,
+                            showCheckmark: false,
+                            pressElevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              side: BorderSide(
+                                color: isSelected ? Colors.indigo : Colors.grey.shade200,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                    const SizedBox(height: 24),
-                    Text(
-                      '🔥 Trending Items',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: -0.5,
-                      ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    '🔥 Trending Items',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.5,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
+          ),
 
-            listingsAsync.when(
-              data: (listings) {
-                if (listings.isEmpty) {
-                  return SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.search_off_rounded, size: 64, color: Colors.grey.shade200),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No items found',
-                            style: GoogleFonts.plusJakartaSans(color: Colors.grey, fontSize: 16),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-                return SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
-                  sliver: SliverGrid(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      childAspectRatio: 0.75,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) => MarketplaceCard(listing: listings[index], index: index),
-                      childCount: listings.length,
-                      addAutomaticKeepAlives: true,
+          listingsAsync.when(
+            data: (listings) {
+              if (listings.isEmpty) {
+                return SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.search_off_rounded, size: 64, color: Colors.grey.shade200),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No items found',
+                          style: GoogleFonts.plusJakartaSans(color: Colors.grey, fontSize: 16),
+                        ),
+                      ],
                     ),
                   ),
                 );
-              },
-              loading: () => SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+              }
+              return SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
                 sliver: SliverGrid(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
@@ -216,18 +234,76 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                     childAspectRatio: 0.75,
                   ),
                   delegate: SliverChildBuilderDelegate(
-                    (context, index) => const SkeletonLoader(width: double.infinity, height: 250),
-                    childCount: 4,
+                    (context, index) => MarketplaceCard(listing: listings[index], index: index),
+                    childCount: listings.length,
+                    addAutomaticKeepAlives: true,
                   ),
                 ),
-              ),
-              error: (err, _) => SliverToBoxAdapter(
-                child: Center(child: Text('Error: $err')),
+              );
+            },
+            loading: () => SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 16,
+                  childAspectRatio: 0.75,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => const SkeletonLoader(width: double.infinity, height: 250),
+                  childCount: 4,
+                ),
               ),
             ),
-          ],
-        ),
+            error: (err, _) => SliverToBoxAdapter(
+              child: Center(child: Text('Error: $err')),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildMyListingsTab() {
+    final user = ref.watch(authStateProvider).valueOrNull;
+    if (user == null) return const Center(child: Text('Please log in to see your listings'));
+
+    final myListingsAsync = ref.watch(sellerListingsProvider(user.uid));
+
+    return myListingsAsync.when(
+      data: (listings) {
+        if (listings.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.shopping_bag_outlined, size: 64, color: Colors.grey.shade200),
+                const SizedBox(height: 16),
+                const Text('You haven\'t posted any listings yet', style: TextStyle(color: Colors.grey)),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () => context.push('/add-listing'),
+                  child: const Text('Add Your First Listing'),
+                ),
+              ],
+            ),
+          );
+        }
+        return GridView.builder(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 16,
+            childAspectRatio: 0.75,
+          ),
+          itemCount: listings.length,
+          itemBuilder: (context, index) => MarketplaceCard(listing: listings[index], index: index),
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, _) => Center(child: Text('Error: $err')),
     );
   }
 

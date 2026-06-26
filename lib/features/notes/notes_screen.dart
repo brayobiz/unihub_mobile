@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +7,7 @@ import '../auth/shared/providers.dart';
 import 'shared/providers.dart';
 import 'presentation/widgets/note_card.dart';
 import 'domain/models/study_progress.dart';
+import 'domain/models/note.dart';
 import '../../services/download_service.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path/path.dart' as p;
@@ -93,13 +95,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
     final notesAsync = ref.watch(notesListingsProvider(50));
     final user = ref.watch(appUserProvider).valueOrNull;
     final selectedCategory = ref.watch(notesCategoryFilterProvider);
-    final studyHistory = ref.watch(studyHistoryProvider).valueOrNull ?? [];
 
     return Column(
       children: [
         _buildSearchBar(),
-        if (studyHistory.isNotEmpty && _searchController.text.isEmpty && selectedCategory == 'All')
-          _buildContinueStudying(studyHistory),
         _buildCategoryList(selectedCategory),
         Expanded(
           child: AnimatedSwitcher(
@@ -166,31 +165,214 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
 
   Widget _buildMyLibraryTab() {
     final history = ref.watch(studyHistoryProvider);
+    final uploads = ref.watch(userNotesProvider);
     final bookmarks = ref.watch(bookmarksProvider);
 
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(vertical: 20),
       children: [
-        _buildSectionHeader('Recently Studied', Icons.history),
-        const SizedBox(height: 16),
+        // Continue Studying (History)
         history.when(
           data: (data) => data.isEmpty 
-            ? _buildLibraryEmpty('Your history is empty. Start studying to see it here!')
-            : Column(children: data.map((p) => _buildProgressTile(p)).toList()),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Text('Error: $e'),
+            ? const SizedBox.shrink()
+            : _buildHorizontalSection('Continue Studying', data, isHistory: true),
+          loading: () => const SizedBox(height: 140, child: Center(child: CircularProgressIndicator())),
+          error: (e, _) => const SizedBox.shrink(),
         ),
-        const SizedBox(height: 32),
-        _buildSectionHeader('Bookmarks', Icons.bookmark_border),
+
+        // My Uploads
+        uploads.when(
+          data: (data) => data.isEmpty
+            ? const SizedBox.shrink()
+            : _buildHorizontalSection('My Uploads', data, isUploads: true),
+          loading: () => const SizedBox(height: 140, child: Center(child: CircularProgressIndicator())),
+          error: (e, _) => const SizedBox.shrink(),
+        ),
+
         const SizedBox(height: 16),
-        bookmarks.when(
-          data: (data) => data.isEmpty 
-            ? _buildLibraryEmpty('No bookmarks yet. Tap the bookmark icon on any note to save it.')
-            : Column(children: data.map((p) => _buildProgressTile(p)).toList()),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Text('Error: $e'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: _buildSectionHeader('Bookmarks', Icons.bookmark_border),
+        ),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: bookmarks.when(
+            data: (data) => data.isEmpty 
+              ? _buildLibraryEmpty('No bookmarks yet. Tap the bookmark icon on any note to save it.')
+              : Column(children: data.map((p) => _buildProgressTile(p)).toList()),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Text('Error: $e'),
+          ),
         ),
       ],
+    );
+  }
+
+  Widget _buildHorizontalSection(String title, List<dynamic> items, {bool isHistory = false, bool isUploads = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              if (isHistory)
+                TextButton(
+                  onPressed: () => _showClearHistoryDialog(),
+                  child: Text('Clear All', style: TextStyle(color: Colors.indigo.shade400, fontSize: 12)),
+                ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 140,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              final item = items[index];
+              
+              if (isHistory) {
+                final progress = item as StudyProgress;
+                final noteAsync = ref.watch(noteByIdProvider(progress.noteId));
+                return noteAsync.when(
+                  data: (note) => note != null ? _buildContinueCard(note, progress) : const SizedBox.shrink(),
+                  loading: () => const SizedBox(width: 200),
+                  error: (e, _) => const SizedBox.shrink(),
+                );
+              } else {
+                final note = item as NoteListing;
+                // Reuse a similar style card for uploads but maybe without progress
+                return _buildSimpleNoteCard(note);
+              }
+            },
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildSimpleNoteCard(NoteListing note) {
+    return GestureDetector(
+      onTap: () => context.push('/note-detail', extra: note),
+      child: Container(
+        width: 220,
+        margin: const EdgeInsets.only(left: 4, right: 12, bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))
+          ],
+          border: Border.all(color: Colors.grey.shade100),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.indigo.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.description_rounded, color: Colors.indigo, size: 18),
+                ),
+                const Spacer(),
+                _buildActionIcon(
+                  icon: Icons.edit_outlined,
+                  color: Colors.indigo,
+                  onTap: () => context.push('/add-note', extra: note),
+                ),
+                const SizedBox(width: 4),
+                _buildActionIcon(
+                  icon: Icons.delete_outline,
+                  color: Colors.red,
+                  onTap: () => _confirmDelete(context, ref, note),
+                ),
+              ],
+            ),
+            const Spacer(),
+            Text(
+              note.title,
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13, height: 1.2),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Text(
+                  note.unitCode,
+                  style: TextStyle(color: Colors.indigo.shade400, fontSize: 10, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(width: 6),
+                const CircleAvatar(radius: 1.5, backgroundColor: Colors.grey),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    note.authorName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 10, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionIcon({required IconData icon, required Color color, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white.withOpacity(0.2)),
+            ),
+            child: Icon(icon, color: color, size: 14),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, WidgetRef ref, NoteListing note) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Resource?'),
+        content: const Text('This will permanently remove this study resource from UniHub.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await ref.read(notesRepositoryProvider).deleteNote(note.id);
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -239,40 +421,63 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildContinueStudying(List<StudyProgress> history) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          child: Text(
-            'Continue Studying',
-            style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-        ),
-        SizedBox(
-          height: 140,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: history.take(5).length,
-            itemBuilder: (context, index) {
-              final progress = history[index];
-              final noteAsync = ref.watch(noteByIdProvider(progress.noteId));
-
-              return noteAsync.when(
-                data: (note) {
-                  if (note == null) return const SizedBox.shrink();
-                  return _buildContinueCard(note, progress);
-                },
-                loading: () => const SizedBox(width: 200),
-                error: (e, _) => const SizedBox.shrink(),
-              );
+  void _showClearHistoryDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear History?'),
+        content: const Text('This will remove all recently studied documents from your library. Your bookmarks will be kept.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              ref.read(studyControllerProvider).clearHistory();
+              Navigator.pop(context);
             },
+            child: const Text('Clear All', style: TextStyle(color: Colors.red)),
           ),
+        ],
+      ),
+    );
+  }
+
+  void _showRemoveFromHistoryDialog(dynamic note) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 20),
+            Text(
+              note.title,
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 12),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              title: const Text('Remove from Library', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+              subtitle: const Text('This will clear your study progress for this document.'),
+              onTap: () {
+                ref.read(studyControllerProvider).removeFromHistory(note.id);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Removed "${note.title}" from your library')),
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
         ),
-        const SizedBox(height: 16),
-      ],
+      ),
     );
   }
 
@@ -304,6 +509,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
   Widget _buildContinueCard(dynamic note, StudyProgress progress) {
     return GestureDetector(
       onTap: () => _resumeNote(note),
+      onLongPress: () => _showRemoveFromHistoryDialog(note),
       child: Container(
         width: 240,
         margin: const EdgeInsets.only(left: 4, right: 12, bottom: 8),
@@ -318,11 +524,19 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              note.title,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    note.title,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Icon(Icons.more_vert, color: Colors.white.withOpacity(0.5), size: 16),
+              ],
             ),
             const SizedBox(height: 4),
             Text(

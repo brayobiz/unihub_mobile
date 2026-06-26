@@ -28,6 +28,9 @@ class AppUser {
   final String? whatsappNumber;
   final String? phoneNumber;
   final int activeListingsCount;
+  final int resourcesSharedCount;
+  final int housingListingsCount;
+  final int gigsPostedCount;
   final int completedSalesCount;
   final String responseRate;
   final int listingsPostedToday; 
@@ -70,6 +73,9 @@ class AppUser {
     this.whatsappNumber,
     this.phoneNumber,
     this.activeListingsCount = 0,
+    this.resourcesSharedCount = 0,
+    this.housingListingsCount = 0,
+    this.gigsPostedCount = 0,
     this.completedSalesCount = 0,
     this.responseRate = '95%',
     this.listingsPostedToday = 0,
@@ -135,6 +141,9 @@ class AppUser {
     String? whatsappNumber,
     String? phoneNumber,
     int? activeListingsCount,
+    int? resourcesSharedCount,
+    int? housingListingsCount,
+    int? gigsPostedCount,
     int? completedSalesCount,
     String? responseRate,
     int? listingsPostedToday,
@@ -174,6 +183,9 @@ class AppUser {
       whatsappNumber: whatsappNumber ?? this.whatsappNumber,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       activeListingsCount: activeListingsCount ?? this.activeListingsCount,
+      resourcesSharedCount: resourcesSharedCount ?? this.resourcesSharedCount,
+      housingListingsCount: housingListingsCount ?? this.housingListingsCount,
+      gigsPostedCount: gigsPostedCount ?? this.gigsPostedCount,
       completedSalesCount: completedSalesCount ?? this.completedSalesCount,
       responseRate: responseRate ?? this.responseRate,
       listingsPostedToday: listingsPostedToday ?? this.listingsPostedToday,
@@ -216,6 +228,9 @@ class AppUser {
       'whatsappNumber': whatsappNumber,
       'phoneNumber': phoneNumber,
       'activeListingsCount': activeListingsCount,
+      'resourcesSharedCount': resourcesSharedCount,
+      'housingListingsCount': housingListingsCount,
+      'gigsPostedCount': gigsPostedCount,
       'completedSalesCount': completedSalesCount,
       'responseRate': responseRate,
       'listingsPostedToday': listingsPostedToday,
@@ -278,6 +293,9 @@ class AppUser {
       whatsappNumber: json['whatsappNumber']?.toString(),
       phoneNumber: json['phoneNumber']?.toString(),
       activeListingsCount: safeInt(json['activeListingsCount'], 0),
+      resourcesSharedCount: safeInt(json['resourcesSharedCount'], 0),
+      housingListingsCount: safeInt(json['housingListingsCount'], 0),
+      gigsPostedCount: safeInt(json['gigsPostedCount'], 0),
       completedSalesCount: safeInt(json['completedSalesCount'], 0),
       responseRate: safeString(json['responseRate'], '95%'),
       listingsPostedToday: safeInt(json['listingsPostedToday'], 0),

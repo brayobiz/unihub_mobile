@@ -92,6 +92,8 @@ class HousingListing {
     );
   }
 
+  String? get ownerId => null;
+
   Map<String, dynamic> toFirestore() {
     return {
       'title': title,

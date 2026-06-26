@@ -75,7 +75,7 @@ class _DashboardAppBar extends ConsumerWidget {
       elevation: 0,
       leading: Builder(
         builder: (context) => IconButton(
-          icon: const Icon(Icons.menu, color: Colors.black),
+          icon: const Icon(Icons.menu_rounded, color: Colors.black),
           onPressed: () => Scaffold.of(context).openDrawer(),
         ),
       ),
