@@ -1,60 +1,99 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum HousingType { hostel, rental, tenantReplacement }
-enum GenderRestriction { mixed, maleOnly, femaleOnly }
+enum HousingType { 
+  hostel, 
+  bedsitter, 
+  singleRoom, 
+  oneBedroom, 
+  twoBedroom, 
+  airbnb, 
+  shortStay 
+}
+
+enum HousingStatus { 
+  draft,
+  published,
+  available, 
+  taken,
+  pendingReview,
+  reported,
+  archived
+}
+
+enum PropertySource {
+  plugDiscovery,
+  landlord,
+  caretaker,
+  hostelManagement,
+  studentMovingOut,
+  other
+}
+
+enum GenderRestriction { 
+  mixed, 
+  maleOnly, 
+  femaleOnly 
+}
 
 class HousingListing {
   final String id;
   final String title;
   final String description;
-  final double price;
+  final double rent;
+  final double deposit;
   final HousingType type;
   final String university;
   final String campus;
   final String location;
   final String distance; // e.g., "5 mins walk", "2km"
   final List<String> images;
+  final String? videoUrl;
   final List<String> amenities;
-  final double rating;
-  final int reviewCount;
-  final bool isVerified;
-  final String landlordId;
-  final String landlordName;
   final DateTime createdAt;
-  final double deposit;
+  final DateTime updatedAt;
+  final HousingStatus status;
+  final PropertySource source;
+  
+  // Plug Info
+  final String plugId;
+  final String plugName;
+  final String? plugPhotoUrl;
+  final bool plugIsVerified;
+
   final bool isFurnished;
   final GenderRestriction genderRestriction;
-  final Map<String, dynamic> contactInfo;
-  final bool hasWater;
-  final bool hasWifi;
-  final bool hasSecurity;
+  
+  // Analytics
+  final int views;
+  final int saves;
 
   HousingListing({
     required this.id,
     required this.title,
     required this.description,
-    required this.price,
+    required this.rent,
+    required this.deposit,
     required this.type,
     required this.university,
     required this.campus,
     required this.location,
     required this.distance,
     required this.images,
+    this.videoUrl,
     required this.amenities,
-    this.rating = 0.0,
-    this.reviewCount = 0,
-    this.isVerified = false,
-    required this.landlordId,
-    required this.landlordName,
     required this.createdAt,
-    this.deposit = 0.0,
+    DateTime? updatedAt,
+    this.status = HousingStatus.available,
+    this.source = PropertySource.plugDiscovery,
+    required this.plugId,
+    required this.plugName,
+    this.plugPhotoUrl,
+    this.plugIsVerified = false,
     this.isFurnished = false,
     this.genderRestriction = GenderRestriction.mixed,
-    required this.contactInfo,
-    this.hasWater = true,
-    this.hasWifi = false,
-    this.hasSecurity = true,
-  });
+    this.views = 0,
+    this.saves = 0,
+  }) : updatedAt = updatedAt ?? createdAt;
 
   factory HousingListing.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -62,7 +101,8 @@ class HousingListing {
       id: doc.id,
       title: data['title'] ?? '',
       description: data['description'] ?? '',
-      price: (data['price'] ?? 0).toDouble(),
+      rent: (data['rent'] ?? 0).toDouble(),
+      deposit: (data['deposit'] ?? 0).toDouble(),
       type: HousingType.values.firstWhere(
         (e) => e.name == data['type'],
         orElse: () => HousingType.hostel,
@@ -71,54 +111,109 @@ class HousingListing {
       campus: data['campus'] ?? '',
       location: data['location'] ?? '',
       distance: data['distance'] ?? '',
-      images: List<String>.from(data['images'] ?? []),
-      amenities: List<String>.from(data['amenities'] ?? []),
-      rating: (data['rating'] ?? 0).toDouble(),
-      reviewCount: data['reviewCount'] ?? 0,
-      isVerified: data['isVerified'] ?? false,
-      landlordId: data['landlordId'] ?? '',
-      landlordName: data['landlordName'] ?? '',
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      deposit: (data['deposit'] ?? 0).toDouble(),
+      images: List<String>.from(data['images'] ?? <String>[]),
+      videoUrl: data['videoUrl'],
+      amenities: List<String>.from(data['amenities'] ?? <String>[]),
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
+      status: HousingStatus.values.firstWhere(
+        (e) => e.name == data['status'],
+        orElse: () => HousingStatus.available,
+      ),
+      source: PropertySource.values.firstWhere(
+        (e) => e.name == (data['source'] ?? ''),
+        orElse: () => PropertySource.plugDiscovery,
+      ),
+      plugId: data['plugId'] ?? '',
+      plugName: data['plugName'] ?? '',
+      plugPhotoUrl: data['plugPhotoUrl'],
+      plugIsVerified: data['plugIsVerified'] ?? false,
       isFurnished: data['isFurnished'] ?? false,
       genderRestriction: GenderRestriction.values.firstWhere(
         (e) => e.name == data['genderRestriction'],
         orElse: () => GenderRestriction.mixed,
       ),
-      contactInfo: data['contactInfo'] ?? {},
-      hasWater: data['hasWater'] ?? true,
-      hasWifi: data['hasWifi'] ?? false,
-      hasSecurity: data['hasSecurity'] ?? true,
+      views: data['views'] ?? 0,
+      saves: data['saves'] ?? 0,
     );
   }
-
-  String? get ownerId => null;
 
   Map<String, dynamic> toFirestore() {
     return {
       'title': title,
       'description': description,
-      'price': price,
+      'rent': rent,
+      'deposit': deposit,
       'type': type.name,
       'university': university,
       'campus': campus,
       'location': location,
       'distance': distance,
       'images': images,
+      'videoUrl': videoUrl,
       'amenities': amenities,
-      'rating': rating,
-      'reviewCount': reviewCount,
-      'isVerified': isVerified,
-      'landlordId': landlordId,
-      'landlordName': landlordName,
       'createdAt': Timestamp.fromDate(createdAt),
-      'deposit': deposit,
+      'updatedAt': FieldValue.serverTimestamp(),
+      'status': status.name,
+      'source': source.name,
+      'plugId': plugId,
+      'plugName': plugName,
+      'plugPhotoUrl': plugPhotoUrl,
+      'plugIsVerified': plugIsVerified,
       'isFurnished': isFurnished,
       'genderRestriction': genderRestriction.name,
-      'contactInfo': contactInfo,
-      'hasWater': hasWater,
-      'hasWifi': hasWifi,
-      'hasSecurity': hasSecurity,
+      'views': views,
+      'saves': saves,
     };
+  }
+
+  HousingListing copyWith({
+    String? title,
+    String? description,
+    double? rent,
+    double? deposit,
+    HousingType? type,
+    String? university,
+    String? campus,
+    String? location,
+    String? distance,
+    List<String>? images,
+    String? videoUrl,
+    List<String>? amenities,
+    HousingStatus? status,
+    PropertySource? source,
+    bool? isFurnished,
+    GenderRestriction? genderRestriction,
+    int? views,
+    int? saves,
+    DateTime? updatedAt,
+  }) {
+    return HousingListing(
+      id: id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      rent: rent ?? this.rent,
+      deposit: deposit ?? this.deposit,
+      type: type ?? this.type,
+      university: university ?? this.university,
+      campus: campus ?? this.campus,
+      location: location ?? this.location,
+      distance: distance ?? this.distance,
+      images: images ?? this.images,
+      videoUrl: videoUrl ?? this.videoUrl,
+      amenities: amenities ?? this.amenities,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      status: status ?? this.status,
+      source: source ?? this.source,
+      plugId: plugId,
+      plugName: plugName,
+      plugPhotoUrl: plugPhotoUrl,
+      plugIsVerified: plugIsVerified,
+      isFurnished: isFurnished ?? this.isFurnished,
+      genderRestriction: genderRestriction ?? this.genderRestriction,
+      views: views ?? this.views,
+      saves: saves ?? this.saves,
+    );
   }
 }

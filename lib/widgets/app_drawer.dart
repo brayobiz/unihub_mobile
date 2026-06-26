@@ -77,13 +77,29 @@ class AppDrawer extends ConsumerWidget {
             context.pop();
             context.push('/employer-dashboard');
           }),
-          _drawerItem(Icons.assignment_outlined, 'My Gig Applications', onTap: () {
+          
+          _sectionHeader('Housing'),
+          appUserAsync.when(
+            data: (user) {
+              final isPlug = user?.isHousingPlug ?? false;
+              if (isPlug) {
+                return _drawerItem(Icons.dashboard_customize_outlined, 'Plug Dashboard', onTap: () {
+                  context.pop();
+                  context.push('/plug-dashboard');
+                });
+              } else {
+                return _drawerItem(Icons.add_home_work_outlined, 'Become a Housing Plug', onTap: () {
+                  context.pop();
+                  context.push('/become-plug');
+                });
+              }
+            },
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
+          _drawerItem(Icons.favorite_border, 'Saved Housing', onTap: () {
             context.pop();
-            context.push('/my-gig-applications');
-          }),
-          _drawerItem(Icons.favorite_border, 'Saved Items', onTap: () {
-            context.pop();
-            context.push('/saved');
+            context.push('/saved-housing');
           }),
           
           _sectionHeader('Campus Life'),

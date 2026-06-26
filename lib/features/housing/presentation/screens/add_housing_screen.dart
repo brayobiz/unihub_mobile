@@ -7,11 +7,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
 import '../../../auth/shared/providers.dart';
 import '../../domain/models/housing_listing.dart';
+import '../../domain/models/vacancy_request.dart';
 import '../../shared/providers.dart';
 import '../../../shared/storage_repository.dart';
 
 class AddHousingScreen extends ConsumerStatefulWidget {
-  const AddHousingScreen({super.key});
+  final HousingListing? listing;
+  final VacancyRequest? opportunity;
+  const AddHousingScreen({super.key, this.listing, this.opportunity});
 
   @override
   ConsumerState<AddHousingScreen> createState() => _AddHousingScreenState();
@@ -19,28 +22,56 @@ class AddHousingScreen extends ConsumerStatefulWidget {
 
 class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _priceController = TextEditingController();
-  final _depositController = TextEditingController();
-  final _locationController = TextEditingController();
-  final _distanceController = TextEditingController();
-  final _descriptionController = TextEditingController();
+  late final TextEditingController _titleController;
+  late final TextEditingController _rentController;
+  late final TextEditingController _depositController;
+  late final TextEditingController _locationController;
+  late final TextEditingController _distanceController;
+  late final TextEditingController _descriptionController;
   
   HousingType _selectedType = HousingType.hostel;
   GenderRestriction _selectedGender = GenderRestriction.mixed;
+  PropertySource _selectedSource = PropertySource.plugDiscovery;
   bool _isLoading = false;
   double _uploadProgress = 0;
   final List<File> _selectedImages = [];
+  List<String> _existingImages = [];
+  File? _selectedVideo;
+  String? _existingVideo;
 
-  bool _hasWater = true;
-  bool _hasWifi = false;
-  bool _hasSecurity = true;
-  bool _isFurnished = false;
+  final List<String> _selectedAmenities = [];
+  final List<String> _allAmenities = [
+    '24/7 Water', 'WiFi', 'Security', 'Furnished', 'Tokens', 'Laundry', 'Parking', 'Borehole'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.listing?.title);
+    _rentController = TextEditingController(text: widget.listing?.rent.toInt().toString());
+    _depositController = TextEditingController(text: widget.listing?.deposit.toInt().toString());
+    _locationController = TextEditingController(text: widget.listing?.location ?? widget.opportunity?.location);
+    _distanceController = TextEditingController(text: widget.listing?.distance);
+    _descriptionController = TextEditingController(text: widget.listing?.description ?? widget.opportunity?.description);
+    
+    if (widget.listing != null) {
+      _selectedType = widget.listing!.type;
+      _selectedGender = widget.listing!.genderRestriction;
+      _selectedSource = widget.listing!.source;
+      _selectedAmenities.addAll(widget.listing!.amenities);
+      _existingImages = List<String>.from(widget.listing!.images);
+      _existingVideo = widget.listing!.videoUrl;
+    } else if (widget.opportunity != null) {
+      _selectedType = widget.opportunity!.type;
+      _selectedSource = PropertySource.landlord; // Assumption for leads
+      _rentController.text = widget.opportunity!.expectedRent.toInt().toString();
+    }
+  }
 
   @override
   void dispose() {
     _titleController.dispose();
-    _priceController.dispose();
+    _rentController.dispose();
     _depositController.dispose();
     _locationController.dispose();
     _distanceController.dispose();
@@ -56,9 +87,17 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
     }
   }
 
+  Future<void> _pickVideo() async {
+    final picker = ImagePicker();
+    final video = await picker.pickVideo(source: ImageSource.gallery);
+    if (video != null) {
+      setState(() => _selectedVideo = File(video.path));
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedImages.isEmpty) {
+    if (_selectedImages.isEmpty && _existingImages.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please add at least one photo')));
       return;
     }
@@ -66,58 +105,105 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
     final user = ref.read(appUserProvider).valueOrNull;
     if (user == null) return;
 
+    // Duplicate Check only for new listings
+    if (widget.listing == null) {
+      final isDuplicate = await ref.read(housingRepositoryProvider).checkPossibleDuplicate(
+        location: _locationController.text.trim(),
+        rent: double.tryParse(_rentController.text.trim()) ?? 0.0,
+        type: _selectedType,
+      );
+
+      if (isDuplicate && mounted) {
+        final proceed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Possible Duplicate'),
+            content: const Text('A similar listing already exists in this area with the same rent. Are you sure you want to post this?'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+              TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Post Anyway')),
+            ],
+          ),
+        );
+        if (proceed != true) return;
+      }
+    }
+
     setState(() {
       _isLoading = true;
       _uploadProgress = 0;
     });
 
     try {
-      final housingId = const Uuid().v4();
-      final imageUrls = <String>[];
+      final housingId = widget.listing?.id ?? const Uuid().v4();
+      final imageUrls = List<String>.from(_existingImages);
+      String? videoUrl = _existingVideo;
 
+      // Upload Images
       for (var i = 0; i < _selectedImages.length; i++) {
         final url = await ref.read(storageRepositoryProvider).uploadFile(
           path: 'housing/$housingId',
-          id: 'img_$i',
+          id: 'img_${DateTime.now().millisecondsSinceEpoch}_$i',
           file: _selectedImages[i],
           onProgress: (sent, total) {
             setState(() {
-              _uploadProgress = (i / _selectedImages.length) + 
-                               ((sent / total) / _selectedImages.length);
+              _uploadProgress = (i / (_selectedImages.length + (_selectedVideo != null ? 1 : 0))) + 
+                               ((sent / total) / (_selectedImages.length + (_selectedVideo != null ? 1 : 0)));
             });
           },
         );
         imageUrls.add(url);
       }
 
+      // Upload Video
+      if (_selectedVideo != null) {
+        videoUrl = await ref.read(storageRepositoryProvider).uploadFile(
+          path: 'housing/$housingId',
+          id: 'video_${DateTime.now().millisecondsSinceEpoch}',
+          file: _selectedVideo!,
+          onProgress: (sent, total) {
+             setState(() {
+              _uploadProgress = (_selectedImages.length / (_selectedImages.length + 1)) + 
+                               ((sent / total) / (_selectedImages.length + 1));
+            });
+          }
+        );
+      }
+
       final listing = HousingListing(
         id: housingId,
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim(),
-        price: double.tryParse(_priceController.text.trim()) ?? 0.0,
+        rent: double.tryParse(_rentController.text.trim()) ?? 0.0,
+        deposit: double.tryParse(_depositController.text.trim()) ?? 0.0,
         type: _selectedType,
         university: user.university ?? 'Unknown University',
         campus: user.campus ?? 'Main Campus',
         location: _locationController.text.trim(),
         distance: _distanceController.text.trim(),
         images: imageUrls,
-        amenities: [],
-        landlordId: user.uid,
-        landlordName: user.fullName,
-        createdAt: DateTime.now(),
-        deposit: double.tryParse(_depositController.text.trim()) ?? 0.0,
-        isFurnished: _isFurnished,
+        videoUrl: videoUrl,
+        amenities: _selectedAmenities,
+        createdAt: widget.listing?.createdAt ?? DateTime.now(),
+        updatedAt: DateTime.now(),
+        status: widget.listing?.status ?? HousingStatus.available,
+        source: _selectedSource,
+        plugId: user.uid,
+        plugName: user.fullName,
+        plugPhotoUrl: user.photoUrl,
+        plugIsVerified: user.isVerified,
+        isFurnished: _selectedAmenities.contains('Furnished'),
         genderRestriction: _selectedGender,
-        contactInfo: {'phone': user.phoneNumber ?? ''},
-        hasWater: _hasWater,
-        hasWifi: _hasWifi,
-        hasSecurity: _hasSecurity,
       );
 
-      await ref.read(housingRepositoryProvider).createListing(listing);
+      if (widget.listing != null) {
+        await ref.read(housingRepositoryProvider).updateListing(listing);
+      } else {
+        await ref.read(housingRepositoryProvider).createListing(listing);
+      }
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Housing listed successfully!')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.listing != null ? 'Listing updated!' : 'Housing listed successfully!')));
         context.pop();
       }
     } catch (e) {
@@ -129,6 +215,33 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(appUserProvider).valueOrNull;
+    if (user == null) return const Scaffold(body: Center(child: Text('Please log in')));
+
+    if (!user.isHousingPlug) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Access Denied')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.lock_person_rounded, size: 64, color: Color(0xFF64748B)),
+              const SizedBox(height: 24),
+              const Text('Only Housing Plugs can list properties.', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 8),
+              const Text('Activate the Plug role to get started.', style: TextStyle(color: Color(0xFF64748B))),
+              const SizedBox(height: 32),
+              FilledButton(
+                onPressed: () => context.pushReplacement('/become-plug'),
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF1677F2)),
+                child: const Text('Become a Housing Plug'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -144,12 +257,12 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildImageSelector(),
+              _buildMediaSelector(),
               const SizedBox(height: 32),
-              _buildSectionLabel('Basic Info'),
+              _buildSectionLabel('Basic Details'),
               _buildTextField(
                 controller: _titleController,
-                label: 'Listing Title',
+                label: 'Property Title',
                 hint: 'e.g. Modern Hostel near Main Gate',
                 validator: (v) => v!.isEmpty ? 'Required' : null,
               ),
@@ -162,24 +275,35 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
                 ],
               ),
               const SizedBox(height: 20),
+              _buildSourceDropdown(),
+              const SizedBox(height: 20),
               Row(
                 children: [
                   Expanded(
                     child: _buildTextField(
-                      controller: _priceController,
-                      label: 'Rent / Month',
-                      hint: '8000',
+                      controller: _rentController,
+                      label: 'Rent per Month (KES)',
+                      hint: '8500',
                       keyboardType: TextInputType.number,
                       prefixIcon: Icons.payments_outlined,
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Required';
+                        if (double.tryParse(v) == null || double.parse(v) <= 0) return 'Invalid amount';
+                        return null;
+                      },
                     ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: _buildTextField(
                       controller: _depositController,
-                      label: 'Deposit',
-                      hint: '8000',
+                      label: 'Deposit (KES)',
+                      hint: '8500',
                       keyboardType: TextInputType.number,
+                      validator: (v) {
+                        if (v != null && v.isNotEmpty && double.tryParse(v) == null) return 'Invalid';
+                        return null;
+                      },
                     ),
                   ),
                 ],
@@ -193,13 +317,14 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
                       label: 'Location / Area',
                       hint: 'e.g. Juja South',
                       prefixIcon: Icons.location_on_outlined,
+                      validator: (v) => v!.isEmpty ? 'Required' : null,
                     ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: _buildTextField(
                       controller: _distanceController,
-                      label: 'Distance to Campus',
+                      label: 'Distance from Campus',
                       hint: 'e.g. 5 mins walk',
                       prefixIcon: Icons.directions_walk,
                     ),
@@ -207,16 +332,26 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
                 ],
               ),
               const SizedBox(height: 32),
-              _buildSectionLabel('Amenities & Features'),
-              _buildAmenitiesSwitches(),
+              _buildSectionLabel('Amenities'),
+              _buildAmenitiesWrap(),
               const SizedBox(height: 32),
+              _buildSectionLabel('Description'),
               _buildTextField(
                 controller: _descriptionController,
-                label: 'Description',
-                hint: 'Describe house rules, nearby shops, etc...',
+                label: 'About the property',
+                hint: 'Describe house rules, nearby features, availability...',
                 maxLines: 4,
               ),
               const SizedBox(height: 40),
+              if (_isLoading)
+                Column(
+                  children: [
+                    LinearProgressIndicator(value: _uploadProgress, color: const Color(0xFF1677F2)),
+                    const SizedBox(height: 8),
+                    Text('Uploading media... ${(100 * _uploadProgress).toInt()}%'),
+                    const SizedBox(height: 16),
+                  ],
+                ),
               _buildSubmitButton(),
             ],
           ),
@@ -225,54 +360,123 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
     );
   }
 
-  Widget _buildImageSelector() {
+  Widget _buildMediaSelector() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionLabel('Photos'),
+        _buildSectionLabel('Photos & Video Walkthrough'),
+        const SizedBox(height: 8),
         SizedBox(
-          height: 120,
+          height: 140,
           child: ListView(
             scrollDirection: Axis.horizontal,
             children: [
-              GestureDetector(
-                onTap: _isLoading ? null : _pickImages,
-                child: Container(
-                  width: 120,
-                  decoration: BoxDecoration(
-                    color: Colors.indigo.shade50,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.indigo.shade100, width: 2),
-                  ),
-                  child: const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.add_a_photo_outlined, color: Colors.indigo),
-                      SizedBox(height: 8),
-                      Text('Add Photos', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo)),
-                    ],
-                  ),
-                ),
+              _buildAddMediaButton(
+                onTap: _pickImages,
+                icon: Icons.add_a_photo_rounded,
+                label: 'Add Photos',
+                subtitle: '${_selectedImages.length + _existingImages.length} total',
               ),
+              const SizedBox(width: 16),
+              _buildAddMediaButton(
+                onTap: _pickVideo,
+                icon: Icons.videocam_rounded,
+                label: 'Add Video',
+                subtitle: (_selectedVideo != null || _existingVideo != null) ? 'Selected' : 'Optional',
+                isDone: _selectedVideo != null || _existingVideo != null,
+              ),
+              ..._existingImages.map((url) => Container(
+                width: 120,
+                margin: const EdgeInsets.only(left: 16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  image: DecorationImage(image: NetworkImage(url), fit: BoxFit.cover),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: GestureDetector(
+                        onTap: () => setState(() => _existingImages.remove(url)),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                          child: const Icon(Icons.close, color: Colors.white, size: 16),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
               ..._selectedImages.map((file) => Container(
                 width: 120,
-                margin: const EdgeInsets.only(left: 12),
+                margin: const EdgeInsets.only(left: 16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   image: DecorationImage(image: FileImage(file), fit: BoxFit.cover),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))
+                  ],
                 ),
-                child: Align(
-                  alignment: Alignment.topRight,
-                  child: IconButton(
-                    icon: const Icon(Icons.cancel, color: Colors.white),
-                    onPressed: () => setState(() => _selectedImages.remove(file)),
-                  ),
+                child: Stack(
+                  children: [
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: GestureDetector(
+                        onTap: () => setState(() => _selectedImages.remove(file)),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                          child: const Icon(Icons.close, color: Colors.white, size: 16),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               )),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildAddMediaButton({
+    required VoidCallback onTap, 
+    required IconData icon, 
+    required String label, 
+    required String subtitle,
+    bool isDone = false,
+  }) {
+    return GestureDetector(
+      onTap: _isLoading ? null : onTap,
+      child: Container(
+        width: 120,
+        decoration: BoxDecoration(
+          color: isDone ? const Color(0xFF10B981).withOpacity(0.05) : const Color(0xFF1677F2).withOpacity(0.05),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDone ? const Color(0xFF10B981).withOpacity(0.2) : const Color(0xFF1677F2).withOpacity(0.2), 
+            width: 2,
+            style: BorderStyle.solid,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: isDone ? const Color(0xFF10B981) : const Color(0xFF1677F2), size: 28),
+            const SizedBox(height: 8),
+            Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: isDone ? const Color(0xFF10B981) : const Color(0xFF1677F2))),
+            const SizedBox(height: 4),
+            Text(subtitle, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDone ? const Color(0xFF10B981).withOpacity(0.7) : const Color(0xFF1677F2).withOpacity(0.7))),
+          ],
+        ),
+      ),
     );
   }
 
@@ -300,7 +504,7 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Gender', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+        const Text('Gender Restrictions', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         DropdownButtonFormField<GenderRestriction>(
           value: _selectedGender,
@@ -316,33 +520,76 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
     );
   }
 
-  Widget _buildAmenitiesSwitches() {
+  Widget _buildSourceDropdown() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSwitchTile('24/7 Water Supply', _hasWater, (v) => setState(() => _hasWater = v)),
-        _buildSwitchTile('High Speed WiFi', _hasWifi, (v) => setState(() => _hasWifi = v)),
-        _buildSwitchTile('Security / CCTV', _hasSecurity, (v) => setState(() => _hasSecurity = v)),
-        _buildSwitchTile('Fully Furnished', _isFurnished, (v) => setState(() => _isFurnished = v)),
+        const Text('Property Source (Internal)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<PropertySource>(
+          value: _selectedSource,
+          isExpanded: true,
+          items: PropertySource.values.map((s) {
+            String label = switch(s) {
+              PropertySource.plugDiscovery => 'Plug Discovery',
+              PropertySource.landlord => 'Landlord Lead',
+              PropertySource.caretaker => 'Caretaker Lead',
+              PropertySource.hostelManagement => 'Hostel Management',
+              PropertySource.studentMovingOut => 'Student Moving Out',
+              PropertySource.other => 'Other Source',
+            };
+            return DropdownMenuItem(value: s, child: Text(label, style: const TextStyle(fontSize: 13)));
+          }).toList(),
+          onChanged: (v) => setState(() => _selectedSource = v!),
+          decoration: _inputDecoration(),
+        ),
       ],
     );
   }
 
-  Widget _buildSwitchTile(String title, bool value, Function(bool) onChanged) {
-    return SwitchListTile(
-      title: Text(title, style: const TextStyle(fontSize: 14)),
-      value: value,
-      onChanged: onChanged,
-      activeColor: Colors.indigo,
-      contentPadding: EdgeInsets.zero,
+  Widget _buildAmenitiesWrap() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _allAmenities.map((a) {
+        final isSelected = _selectedAmenities.contains(a);
+        return FilterChip(
+          label: Text(a, style: TextStyle(fontSize: 12, color: isSelected ? Colors.white : Colors.black87)),
+          selected: isSelected,
+          onSelected: (val) {
+            setState(() {
+              if (val) _selectedAmenities.add(a);
+              else _selectedAmenities.remove(a);
+            });
+          },
+          selectedColor: const Color(0xFF1677F2),
+          checkmarkColor: Colors.white,
+        );
+      }).toList(),
     );
   }
 
   InputDecoration _inputDecoration() {
     return InputDecoration(
       filled: true,
-      fillColor: const Color(0xFFF8F9FB),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+      fillColor: const Color(0xFFF8FAFC),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16), 
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16), 
+        borderSide: const BorderSide(color: Color(0xFFF1F5F9), width: 1),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16), 
+        borderSide: const BorderSide(color: Color(0xFF1677F2), width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16), 
+        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1),
+      ),
     );
   }
 
@@ -352,9 +599,9 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
       child: Text(
         label,
         style: GoogleFonts.plusJakartaSans(
-          fontSize: 14,
-          fontWeight: FontWeight.w800,
-          color: Colors.indigo,
+          fontSize: 15,
+          fontWeight: FontWeight.w900,
+          color: const Color(0xFF1A1C1E),
         ),
       ),
     );
@@ -381,7 +628,7 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
           validator: validator,
           decoration: _inputDecoration().copyWith(
             hintText: hint,
-            prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20, color: Colors.indigo.shade300) : null,
+            prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20, color: const Color(0xFF1677F2).withOpacity(0.5)) : null,
           ),
         ),
       ],
@@ -391,12 +638,12 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
   Widget _buildSubmitButton() {
     return SizedBox(
       width: double.infinity,
-      height: 56,
+      height: 58,
       child: FilledButton(
         onPressed: _isLoading ? null : _submit,
         style: FilledButton.styleFrom(
-          backgroundColor: Colors.indigo,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: const Color(0xFF1677F2),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         ),
         child: _isLoading
             ? const CircularProgressIndicator(color: Colors.white)

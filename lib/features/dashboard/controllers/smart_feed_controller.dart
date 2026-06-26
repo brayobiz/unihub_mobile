@@ -77,7 +77,7 @@ final smartFeedProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
       model: FeedItemModel(
         type: widgets.FeedType.housing,
         title: h.title,
-        subtitle: 'KES ${h.price.toInt()}/mo • ${h.type.name}',
+        subtitle: 'KES ${h.rent.toInt()}/mo • ${h.type.name}',
         time: h.university,
       ),
     ));

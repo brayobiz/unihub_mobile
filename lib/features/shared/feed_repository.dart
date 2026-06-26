@@ -61,9 +61,9 @@ class FeedItem {
       university: json['university'],
       createdAt: parseDate(json['createdAt']),
       deadline: json['deadline'] != null ? parseDate(json['deadline']) : null,
-      images: List<String>.from(json['images'] ?? []),
+      images: List<String>.from(json['images'] ?? <String>[]),
       likesCount: json['likesCount'] ?? 0,
-      likedBy: List<String>.from(json['likedBy'] ?? []),
+      likedBy: List<String>.from(json['likedBy'] ?? <String>[]),
       category: json['category'],
     );
   }

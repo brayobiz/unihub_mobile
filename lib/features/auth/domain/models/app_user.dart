@@ -41,6 +41,8 @@ class AppUser {
   final List<String> achievements;
   final Map<String, String> socialLinks;
   
+  final List<String> roles; // 'student', 'housing_plug', 'seller', etc.
+  
   final Map<String, String> privacySettings;
   final Map<String, bool> notificationSettings;
   final String? fcmToken;
@@ -84,6 +86,7 @@ class AppUser {
     this.interests = const [],
     this.achievements = const [],
     this.socialLinks = const {},
+    this.roles = const ['student'],
     this.privacySettings = const {
       'profile_visibility': 'university', // 'public', 'university', 'private'
       'show_socials': 'university',
@@ -99,6 +102,8 @@ class AppUser {
     this.isOnboardingCompleted = false,
     this.createdAt,
   });
+
+  bool get isHousingPlug => roles.contains('housing_plug');
 
   double get profileCompletion {
     int score = 0;
@@ -152,6 +157,7 @@ class AppUser {
     List<String>? interests,
     List<String>? achievements,
     Map<String, String>? socialLinks,
+    List<String>? roles,
     Map<String, String>? privacySettings,
     Map<String, bool>? notificationSettings,
     String? fcmToken,
@@ -194,6 +200,7 @@ class AppUser {
       interests: interests ?? this.interests,
       achievements: achievements ?? this.achievements,
       socialLinks: socialLinks ?? this.socialLinks,
+      roles: roles ?? this.roles,
       privacySettings: privacySettings ?? this.privacySettings,
       notificationSettings: notificationSettings ?? this.notificationSettings,
       fcmToken: fcmToken ?? this.fcmToken,
@@ -239,6 +246,7 @@ class AppUser {
       'interests': interests,
       'achievements': achievements,
       'socialLinks': socialLinks,
+      'roles': roles,
       'privacySettings': privacySettings,
       'notificationSettings': notificationSettings,
       'fcmToken': fcmToken,
@@ -302,21 +310,22 @@ class AppUser {
       lastPostDate: json['lastPostDate'] != null 
           ? (json['lastPostDate'] as Timestamp).toDate() 
           : null,
-      skills: (json['skills'] as List?)?.map((e) => e.toString()).toList() ?? [],
-      interests: (json['interests'] as List?)?.map((e) => e.toString()).toList() ?? [],
-      achievements: (json['achievements'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      skills: (json['skills'] as List?)?.map((e) => e.toString()).toList() ?? <String>[],
+      interests: (json['interests'] as List?)?.map((e) => e.toString()).toList() ?? <String>[],
+      achievements: (json['achievements'] as List?)?.map((e) => e.toString()).toList() ?? <String>[],
       socialLinks: Map<String, String>.from(
-        (json['socialLinks'] as Map?)?.map((k, v) => MapEntry(k.toString(), v?.toString() ?? '')) ?? {}
+        (json['socialLinks'] as Map?)?.map((k, v) => MapEntry(k.toString(), v?.toString() ?? '')) ?? <String, String>{}
       ),
+      roles: (json['roles'] as List?)?.map((e) => e.toString()).toList() ?? <String>['student'],
       privacySettings: Map<String, String>.from(
-        (json['privacySettings'] as Map?)?.map((k, v) => MapEntry(k.toString(), v?.toString() ?? '')) ?? {
+        (json['privacySettings'] as Map?)?.map((k, v) => MapEntry(k.toString(), v?.toString() ?? '')) ?? <String, String>{
           'profile_visibility': 'university',
           'show_socials': 'university',
           'show_listings': 'public',
         }
       ),
       notificationSettings: Map<String, bool>.from(
-        (json['notificationSettings'] as Map?)?.map((k, v) => MapEntry(k.toString(), v is bool ? v : true)) ?? {
+        (json['notificationSettings'] as Map?)?.map((k, v) => MapEntry(k.toString(), v is bool ? v : true)) ?? <String, bool>{
           'new_messages': true,
           'listing_updates': true,
           'price_drops': true,

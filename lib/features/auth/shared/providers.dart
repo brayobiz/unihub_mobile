@@ -42,6 +42,10 @@ final appUserProvider = StreamProvider<AppUser?>((ref) {
   });
 });
 
+final userByIdProvider = StreamProvider.family<AppUser?, String>((ref, uid) {
+  return ref.watch(authRepositoryProvider).watchUser(uid);
+});
+
 // To track if the device has seen the initial introduction
 final deviceOnboardingCompletedProvider = StateProvider<bool>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);

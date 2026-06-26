@@ -129,11 +129,14 @@ class _DashboardAppBar extends ConsumerWidget {
   }
 }
 
-class _QuickActions extends StatelessWidget {
+class _QuickActions extends ConsumerWidget {
   const _QuickActions();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(appUserProvider).valueOrNull;
+    final isPlug = user?.isHousingPlug ?? false;
+
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(vertical: 20),
@@ -145,7 +148,10 @@ class _QuickActions extends StatelessWidget {
             _item(context, 'Sell', Icons.add_shopping_cart, Colors.orange, '/add-listing'),
             _item(context, 'Post Gig', Icons.add_task_rounded, Colors.indigo, '/gigs'),
             _item(context, 'Notes', Icons.upload_file_rounded, Colors.blue, '/add-note'),
-            _item(context, 'Housing', Icons.add_home_work_rounded, Colors.purple, '/add-housing'),
+            if (isPlug)
+              _item(context, 'Plug', Icons.dashboard_customize_rounded, Colors.purple, '/plug-dashboard')
+            else
+              _item(context, 'Become Plug', Icons.add_home_work_rounded, Colors.purple, '/become-plug'),
             _item(context, 'Confess', Icons.favorite_rounded, Colors.pink, '/confessions'),
           ],
         ),
@@ -260,12 +266,12 @@ class _HousingPreviewSection extends ConsumerWidget {
             data: (listings) => listings.isEmpty 
               ? const Text('No listings nearby yet.', style: TextStyle(fontSize: 12, color: Colors.grey))
               : SizedBox(
-                  height: 260,
+                  height: 440,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     itemCount: listings.length > 5 ? 5 : listings.length,
                     itemBuilder: (context, index) => SizedBox(
-                      width: 280,
+                      width: 300,
                       child: Padding(
                         padding: const EdgeInsets.only(right: 16),
                         child: HousingCard(
@@ -276,7 +282,10 @@ class _HousingPreviewSection extends ConsumerWidget {
                     ),
                   ),
                 ),
-            loading: () => const Center(child: SkeletonLoader(width: double.infinity, height: 200)),
+                loading: () => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: SkeletonLoader(width: double.infinity, height: 200),
+                ),
             error: (e, _) => const SizedBox.shrink(),
           ),
         ],

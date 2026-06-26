@@ -48,7 +48,7 @@ class RoommateProfile {
       budget: (data['budget'] ?? 0).toDouble(),
       preferredLocation: data['preferredLocation'] ?? '',
       gender: data['gender'] ?? '',
-      lifestyle: List<String>.from(data['lifestyle'] ?? []),
+      lifestyle: List<String>.from(data['lifestyle'] ?? <String>[]),
       bio: data['bio'] ?? '',
       profileImage: data['profileImage'] ?? '',
       createdAt: (data['createdAt'] as Timestamp).toDate(),

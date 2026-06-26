@@ -23,7 +23,14 @@ import '../../features/housing/presentation/screens/add_housing_screen.dart';
 import '../../features/housing/presentation/screens/housing_details_screen.dart';
 import '../../features/housing/presentation/screens/housing_screen.dart';
 import '../../features/housing/presentation/screens/add_roommate_screen.dart';
+import '../../features/housing/presentation/screens/plug_dashboard_screen.dart';
+import '../../features/housing/presentation/screens/plug_profile_screen.dart';
+import '../../features/housing/presentation/screens/saved_housing_screen.dart';
+import '../../features/housing/presentation/screens/become_plug_screen.dart';
+import '../../features/housing/presentation/screens/submit_vacancy_screen.dart';
+import '../../features/housing/presentation/screens/opportunity_feed_screen.dart';
 import '../../features/housing/domain/models/housing_listing.dart';
+import '../../features/housing/domain/models/vacancy_request.dart';
 import '../../features/notes/presentation/screens/add_note_screen.dart';
 import '../../features/notes/presentation/screens/note_detail_screen.dart';
 import '../../features/notes/presentation/screens/note_reader_screen.dart';
@@ -206,7 +213,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/add-housing',
-        builder: (context, state) => const AddHousingScreen(),
+        builder: (context, state) {
+          if (state.extra is HousingListing) {
+            return AddHousingScreen(listing: state.extra as HousingListing);
+          } else if (state.extra is VacancyRequest) {
+            return AddHousingScreen(opportunity: state.extra as VacancyRequest);
+          }
+          return const AddHousingScreen();
+        },
       ),
       GoRoute(
         path: '/housing',
@@ -218,6 +232,33 @@ final routerProvider = Provider<GoRouter>((ref) {
           final housing = state.extra as HousingListing;
           return HousingDetailsScreen(listing: housing);
         },
+      ),
+      GoRoute(
+        path: '/plug-dashboard',
+        builder: (context, state) => const PlugDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/plug-profile/:plugId',
+        builder: (context, state) {
+          final plugId = state.pathParameters['plugId']!;
+          return PlugProfileScreen(plugId: plugId);
+        },
+      ),
+      GoRoute(
+        path: '/become-plug',
+        builder: (context, state) => const BecomePlugScreen(),
+      ),
+      GoRoute(
+        path: '/submit-vacancy',
+        builder: (context, state) => const SubmitVacancyScreen(),
+      ),
+      GoRoute(
+        path: '/opportunities',
+        builder: (context, state) => const OpportunityFeedScreen(),
+      ),
+      GoRoute(
+        path: '/saved-housing',
+        builder: (context, state) => const SavedHousingScreen(),
       ),
       GoRoute(
         path: '/add-roommate',
