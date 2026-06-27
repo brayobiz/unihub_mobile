@@ -1,130 +1,29 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../features/auth/shared/providers.dart';
-import '../../services/notification_service.dart';
+import 'package:unihub_mobile/features/auth/shared/providers.dart';
+import 'package:unihub_mobile/features/shared/domain/models/uni_notification.dart';
+import 'package:unihub_mobile/features/shared/domain/repositories/notification_repository.dart' as domain;
+import 'package:unihub_mobile/features/shared/data/repositories/notification_repository_impl.dart';
 
-final notificationRepositoryProvider = Provider((ref) => NotificationRepository(ref.watch(firestoreProvider), ref));
+export 'package:unihub_mobile/features/shared/domain/models/uni_notification.dart';
+export 'package:unihub_mobile/features/shared/domain/repositories/notification_repository.dart';
 
-class AppNotification {
-  final String id;
-  final String title;
-  final String body;
-  final String? type; // 'chat', 'listing', 'community', 'gig', 'support'
-  final String? relatedId;
-  final DateTime createdAt;
-  final bool isRead;
+// Alias for backward compatibility if needed, but we'll update usages
+typedef AppNotification = UniNotification;
 
-  AppNotification({
-    required this.id,
-    required this.title,
-    required this.body,
-    this.type,
-    this.relatedId,
-    required this.createdAt,
-    this.isRead = false,
-  });
+final notificationRepositoryProvider = Provider<domain.NotificationRepository>((ref) {
+  return NotificationRepositoryImpl(ref.watch(firestoreProvider));
+});
 
-  factory AppNotification.fromJson(Map<String, dynamic> json) {
-    return AppNotification(
-      id: json['id'] ?? '',
-      title: json['title'] ?? '',
-      body: json['body'] ?? '',
-      type: json['type'],
-      relatedId: json['relatedId'],
-      createdAt: json['createdAt'] != null 
-          ? (json['createdAt'] as Timestamp).toDate() 
-          : DateTime.now(),
-      isRead: json['isRead'] ?? false,
-    );
-  }
+final notificationsProvider = StreamProvider<List<UniNotification>>((ref) {
+  final user = ref.watch(authStateProvider).valueOrNull;
+  if (user == null) return Stream.value([]);
+  
+  return ref.watch(notificationRepositoryProvider).watchNotifications(user.uid);
+});
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'title': title,
-    'body': body,
-    'type': type,
-    'relatedId': relatedId,
-    'createdAt': Timestamp.fromDate(createdAt),
-    'isRead': isRead,
-  };
-}
-
-class NotificationRepository {
-  final FirebaseFirestore _firestore;
-  final Ref _ref;
-  NotificationRepository(this._firestore, this._ref);
-
-  Stream<List<AppNotification>> watchNotifications(String userId) {
-    return _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('notifications')
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) => 
-          snapshot.docs.map((doc) => AppNotification.fromJson(doc.data())).toList());
-  }
-
-  Future<void> markAsRead(String userId, String notificationId) async {
-    await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('notifications')
-        .doc(notificationId)
-        .update({'isRead': true});
-  }
-
-  Future<void> markAllAsRead(String userId) async {
-    final batch = _firestore.batch();
-    final snapshot = await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('notifications')
-        .where('isRead', isEqualTo: false)
-        .get();
-
-    for (var doc in snapshot.docs) {
-      batch.update(doc.reference, {'isRead': true});
-    }
-    await batch.commit();
-  }
-
-  Future<void> deleteNotification(String userId, String notificationId) async {
-    await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('notifications')
-        .doc(notificationId)
-        .delete();
-  }
-
-  Future<void> sendNotification({
-    required String userId,
-    required String title,
-    required String body,
-    String? type,
-    String? relatedId,
-  }) async {
-    final ref = _firestore.collection('users').doc(userId).collection('notifications').doc();
-    final notification = AppNotification(
-      id: ref.id,
-      title: title,
-      body: body,
-      type: type,
-      relatedId: relatedId,
-      createdAt: DateTime.now(),
-    );
-    await ref.set(notification.toJson());
-
-    // Trigger Real Push Notification (handled by NotificationService & backend)
-    await _ref.read(notificationServiceProvider).triggerPushNotification(
-      recipientId: userId,
-      title: title,
-      body: body,
-      data: {
-        'type': type,
-        'relatedId': relatedId,
-      },
-    );
-  }
-}
+final unreadNotificationsCountProvider = StreamProvider<int>((ref) {
+  final user = ref.watch(authStateProvider).valueOrNull;
+  if (user == null) return Stream.value(0);
+  
+  return ref.watch(notificationRepositoryProvider).watchUnreadCount(user.uid);
+});

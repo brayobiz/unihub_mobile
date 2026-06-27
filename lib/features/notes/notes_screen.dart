@@ -9,9 +9,9 @@ import 'presentation/widgets/note_card.dart';
 import 'domain/models/study_progress.dart';
 import 'domain/models/note.dart';
 import '../../services/download_service.dart';
-import 'package:open_filex/open_filex.dart';
 import 'package:path/path.dart' as p;
 import '../../core/utils/debouncer.dart';
+import '../../widgets/notification_badge.dart';
 
 class NotesScreen extends ConsumerStatefulWidget {
   const NotesScreen({super.key});
@@ -69,6 +69,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
           ],
         ),
         actions: [
+          const NotificationBadge(),
           IconButton(
             icon: const Icon(Icons.tune, color: Colors.black87),
             onPressed: () => _showFilterSheet(),

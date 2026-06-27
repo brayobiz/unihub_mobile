@@ -6,10 +6,12 @@ import '../domain/repositories/chat_repository.dart';
 import '../domain/models/conversation.dart';
 import '../domain/models/message.dart';
 
+import 'package:unihub_mobile/services/notification_service.dart';
+
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   return ChatRepositoryImpl(
     ref.watch(firestoreProvider),
-    ref.watch(notificationRepositoryProvider),
+    ref.watch(notificationServiceProvider),
   );
 });
 

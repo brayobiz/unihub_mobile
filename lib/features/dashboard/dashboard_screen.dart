@@ -12,6 +12,7 @@ import '../../widgets/app_drawer.dart';
 import '../../widgets/feed/feed_item_card.dart';
 import '../../widgets/feed/feed_type.dart';
 import '../../widgets/skeleton_loader.dart';
+import '../../widgets/notification_badge.dart';
 import 'controllers/smart_feed_controller.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -80,10 +81,7 @@ class _DashboardAppBar extends ConsumerWidget {
         ),
       ),
       actions: [
-        IconButton(
-          onPressed: () => context.push('/notifications'),
-          icon: const Icon(Icons.notifications_none_rounded, color: Colors.black),
-        ),
+        const NotificationBadge(),
         const SizedBox(width: 8),
       ],
       flexibleSpace: FlexibleSpaceBar(
@@ -282,8 +280,8 @@ class _HousingPreviewSection extends ConsumerWidget {
                     ),
                   ),
                 ),
-                loading: () => const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
+                loading: () => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
                   child: SkeletonLoader(width: double.infinity, height: 200),
                 ),
             error: (e, _) => const SizedBox.shrink(),
@@ -321,7 +319,7 @@ class _SmartFeedSection extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20),
         sliver: SliverList(
           delegate: SliverChildBuilderDelegate(
-            (context, index) => const SkeletonFeedItem(),
+            (context, index) => SkeletonFeedItem(),
             childCount: 5,
           ),
         ),

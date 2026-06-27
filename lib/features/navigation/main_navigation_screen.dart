@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:unihub_mobile/features/shared/notification_repository.dart';
 import '../../services/notification_service.dart';
 
 import '../dashboard/dashboard_screen.dart';
@@ -42,44 +43,59 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
       drawer: const AppDrawer(),
       body: pages[currentIndex],
 
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: currentIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            currentIndex = index;
-          });
+      bottomNavigationBar: Consumer(
+        builder: (context, ref, child) {
+          final unreadCount = ref.watch(unreadNotificationsCountProvider).valueOrNull ?? 0;
+          return NavigationBar(
+            selectedIndex: currentIndex,
+            onDestinationSelected: (index) {
+              setState(() {
+                currentIndex = index;
+              });
+            },
+            destinations: [
+              NavigationDestination(
+                icon: unreadCount > 0 
+                  ? Badge(
+                      label: Text(unreadCount > 9 ? '9+' : '$unreadCount'),
+                      child: const Icon(Icons.home_outlined),
+                    )
+                  : const Icon(Icons.home_outlined),
+                selectedIcon: unreadCount > 0
+                  ? Badge(
+                      label: Text(unreadCount > 9 ? '9+' : '$unreadCount'),
+                      child: const Icon(Icons.home),
+                    )
+                  : const Icon(Icons.home),
+                label: 'Home',
+              ),
+
+              const NavigationDestination(
+                icon: Icon(Icons.storefront_outlined),
+                selectedIcon: Icon(Icons.storefront),
+                label: 'Marketplace',
+              ),
+
+              const NavigationDestination(
+                icon: Icon(Icons.home_work_outlined),
+                selectedIcon: Icon(Icons.home_work),
+                label: 'Housing',
+              ),
+
+              const NavigationDestination(
+                icon: Icon(Icons.menu_book_outlined),
+                selectedIcon: Icon(Icons.menu_book),
+                label: 'Notes',
+              ),
+
+              const NavigationDestination(
+                icon: Icon(Icons.person_outline),
+                selectedIcon: Icon(Icons.person),
+                label: 'Profile',
+              ),
+            ],
+          );
         },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-
-          NavigationDestination(
-            icon: Icon(Icons.storefront_outlined),
-            selectedIcon: Icon(Icons.storefront),
-            label: 'Marketplace',
-          ),
-
-          NavigationDestination(
-            icon: Icon(Icons.home_work_outlined),
-            selectedIcon: Icon(Icons.home_work),
-            label: 'Housing',
-          ),
-
-          NavigationDestination(
-            icon: Icon(Icons.menu_book_outlined),
-            selectedIcon: Icon(Icons.menu_book),
-            label: 'Notes',
-          ),
-
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
       ),
     );
   }

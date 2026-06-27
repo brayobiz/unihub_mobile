@@ -5,12 +5,12 @@ import 'package:google_fonts/google_fonts.dart';
 import '../auth/shared/providers.dart';
 import 'domain/models/marketplace_categories.dart';
 import 'presentation/controllers/marketplace_controller.dart';
-import 'domain/models/listing.dart';
 import 'shared/providers.dart';
 import 'domain/models/listing_filter.dart';
 import 'presentation/widgets/marketplace_card.dart';
 import '../../core/utils/debouncer.dart';
 import '../../widgets/skeleton_loader.dart';
+import '../../widgets/notification_badge.dart';
 
 class MarketplaceScreen extends ConsumerStatefulWidget {
   const MarketplaceScreen({super.key});
@@ -51,6 +51,10 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
             fontSize: 22,
           ),
         ),
+        actions: [
+          const NotificationBadge(),
+          const SizedBox(width: 8),
+        ],
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.indigo,
@@ -84,7 +88,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
     final listingsAsync = ref.watch(scoredListingsProvider);
     final filterState = ref.watch(marketplaceControllerProvider);
     final controller = ref.read(marketplaceControllerProvider.notifier);
-    final List<String> categories = MarketplaceCategories.mainFilters;
+    const List<String> categories = MarketplaceCategories.mainFilters;
 
     return RefreshIndicator(
       onRefresh: () async {

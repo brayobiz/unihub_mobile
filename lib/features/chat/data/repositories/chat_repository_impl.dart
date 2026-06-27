@@ -1,14 +1,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../domain/models/conversation.dart';
-import '../../domain/models/message.dart';
-import '../../domain/repositories/chat_repository.dart';
-import '../../../shared/notification_repository.dart';
+import 'package:unihub_mobile/features/chat/domain/models/conversation.dart';
+import 'package:unihub_mobile/features/chat/domain/models/message.dart';
+import 'package:unihub_mobile/features/chat/domain/repositories/chat_repository.dart';
+import 'package:unihub_mobile/services/notification_service.dart';
+import 'package:unihub_mobile/features/shared/notification_repository.dart';
 
 class ChatRepositoryImpl implements ChatRepository {
   final FirebaseFirestore _firestore;
-  final NotificationRepository _notificationRepository;
+  final NotificationService _notificationService;
 
-  ChatRepositoryImpl(this._firestore, this._notificationRepository);
+  ChatRepositoryImpl(this._firestore, this._notificationService);
 
   @override
   Stream<List<Conversation>> watchConversations(String userId) {
@@ -67,12 +68,12 @@ class ChatRepositoryImpl implements ChatRepository {
       final recipientId = participants.firstWhere((id) => id != message.senderId, orElse: () => '');
       
       if (recipientId.isNotEmpty) {
-        await _notificationRepository.sendNotification(
-          userId: recipientId,
+        await _notificationService.sendNotification(
+          recipientId: recipientId,
           title: 'New Message',
           body: message.content,
-          type: 'chat',
-          relatedId: conversationId,
+          type: NotificationType.chat,
+          targetId: conversationId,
         );
       }
     }

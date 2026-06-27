@@ -4,9 +4,11 @@ import '../../shared/notification_repository.dart';
 import '../data/repositories/gigs_repository_impl.dart';
 import '../domain/repositories/gigs_repository.dart';
 
+import 'package:unihub_mobile/services/notification_service.dart';
+
 final gigsRepositoryProvider = Provider<GigsRepository>((ref) {
   return GigsRepositoryImpl(
     ref.watch(firestoreProvider),
-    ref.watch(notificationRepositoryProvider),
+    ref.watch(notificationServiceProvider),
   );
 });

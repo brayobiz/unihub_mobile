@@ -1,16 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
-import '../../../chat/domain/models/conversation.dart';
-import '../../../chat/domain/models/message.dart';
-import '../../../shared/notification_repository.dart';
-import '../../domain/models/gig_application.dart';
-import '../../domain/repositories/gigs_repository.dart';
+import 'package:unihub_mobile/features/chat/domain/models/conversation.dart';
+import 'package:unihub_mobile/features/chat/domain/models/message.dart';
+import 'package:unihub_mobile/services/notification_service.dart';
+import 'package:unihub_mobile/features/gigs/domain/models/gig_application.dart';
+import 'package:unihub_mobile/features/gigs/domain/repositories/gigs_repository.dart';
+import 'package:unihub_mobile/features/shared/notification_repository.dart';
 
 class GigsRepositoryImpl implements GigsRepository {
   final FirebaseFirestore _firestore;
-  final NotificationRepository _notificationRepository;
+  final NotificationService _notificationService;
 
-  GigsRepositoryImpl(this._firestore, this._notificationRepository);
+  GigsRepositoryImpl(this._firestore, this._notificationService);
 
   @override
   Future<void> submitApplication(GigApplication application) async {
@@ -81,12 +82,12 @@ class GigsRepositoryImpl implements GigsRepository {
     await batch.commit();
     
     // 3. Send in-app notification to employer
-    await _notificationRepository.sendNotification(
-      userId: application.employerId,
+    await _notificationService.sendNotification(
+      recipientId: application.employerId,
       title: 'New Gig Application!',
       body: '${application.fullName} applied for "${application.gigTitle}"',
-      type: 'gig',
-      relatedId: application.gigId,
+      type: NotificationType.gig,
+      targetId: application.gigId,
     );
 
     // 4. Send email (mock)
@@ -161,12 +162,12 @@ class GigsRepositoryImpl implements GigsRepository {
       final gigTitle = appDoc.data()?['gigTitle'];
       
       if (freelancerId != null) {
-        await _notificationRepository.sendNotification(
-          userId: freelancerId,
+        await _notificationService.sendNotification(
+          recipientId: freelancerId,
           title: 'Application Update',
           body: 'Your application for "$gigTitle" was ${status.name}.',
-          type: 'gig',
-          relatedId: applicationId,
+          type: NotificationType.gig,
+          targetId: applicationId,
         );
       }
     }

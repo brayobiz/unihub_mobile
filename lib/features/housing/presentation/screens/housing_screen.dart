@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import 'package:unihub_mobile/widgets/skeleton_loader.dart';
+import 'package:unihub_mobile/widgets/notification_badge.dart';
 import '../../../auth/shared/providers.dart';
 import '../../shared/providers.dart';
 import '../widgets/housing_card.dart';
@@ -146,6 +146,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
         ),
       ),
       actions: [
+        const NotificationBadge(),
         if (!isPlug)
           IconButton(
             icon: const Icon(Icons.add_business_outlined, color: Color(0xFF1A1C1E)),
@@ -220,8 +221,8 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF1F5F9),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.add_business_rounded, color: Color(0xFF1677F2), size: 24),
@@ -601,8 +602,8 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
           const SizedBox(height: 60),
           Container(
             padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF1F5F9),
               shape: BoxShape.circle,
             ),
             child: Icon(Icons.house_siding_rounded, size: 64, color: const Color(0xFF94A3B8)),
