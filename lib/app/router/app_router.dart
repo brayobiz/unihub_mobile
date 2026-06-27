@@ -42,6 +42,8 @@ import '../../features/marketplace/presentation/screens/saved_listings_screen.da
 import '../../features/shared/help_centre_screen.dart';
 import '../../features/shared/notifications_screen.dart';
 import '../../features/shared/feed_item_detail_screen.dart';
+import '../../features/shared/global_search_screen.dart';
+import '../../features/shared/campus_pulse_screen.dart';
 import '../../features/community/community_screen.dart';
 import '../../features/gigs/gigs_screen.dart';
 import '../../features/confessions/confessions_screen.dart';
@@ -170,6 +172,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/complete-profile',
         builder: (context, state) => const CompleteProfileScreen(),
+      ),
+      GoRoute(
+        path: '/global-search',
+        name: 'global-search',
+        builder: (context, state) => const GlobalSearchScreen(),
+      ),
+      GoRoute(
+        path: '/campus-pulse',
+        builder: (context, state) => const CampusPulseScreen(),
       ),
       GoRoute(
         path: '/main',

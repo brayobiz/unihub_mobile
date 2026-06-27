@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'feed_item_model.dart';
 import 'feed_type.dart';
@@ -82,43 +83,74 @@ class FeedItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 1,
+      elevation: 0,
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200, width: 1),
+      ),
       child: ListTile(
         onTap: onTap,
-        leading: CircleAvatar(
-          backgroundColor: color.withOpacity(0.1),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        leading: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
           child: Icon(
             icon,
             color: color,
+            size: 24,
           ),
         ),
         title: Text(
           item.title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.w700,
+            fontSize: 15,
+            color: const Color(0xFF1A1C1E),
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
-        subtitle: Text(item.subtitle),
+        subtitle: Text(
+          item.subtitle,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 13,
+            color: const Color(0xFF64748B),
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                label.toUpperCase(),
+                style: GoogleFonts.plusJakartaSans(
+                  color: color,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                ),
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 6),
             Text(
               item.time,
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.grey.shade600,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 11,
+                color: const Color(0xFF94A3B8),
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],

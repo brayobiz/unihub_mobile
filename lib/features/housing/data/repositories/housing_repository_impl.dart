@@ -3,6 +3,7 @@ import '../../domain/models/housing_listing.dart';
 import '../../domain/models/housing_review.dart';
 import '../../domain/models/roommate_profile.dart';
 import '../../domain/models/vacancy_request.dart';
+import '../../domain/models/housing_plug_application.dart';
 import '../../domain/repositories/housing_repository.dart';
 import '../../../../services/notification_service.dart';
 
@@ -391,8 +392,10 @@ class HousingRepositoryImpl implements HousingRepository {
       query = query.where('university', isEqualTo: campus);
     }
 
-    return query.orderBy('createdAt', descending: true).snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => VacancyRequest.fromFirestore(doc)).toList();
+    return query.snapshots().map((snapshot) {
+      final requests = snapshot.docs.map((doc) => VacancyRequest.fromFirestore(doc)).toList();
+      requests.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return requests;
     });
   }
 
@@ -403,5 +406,20 @@ class HousingRepositoryImpl implements HousingRepository {
       'claimedByPlugId': plugId,
       'claimedByPlugName': plugName,
     });
+  }
+
+  @override
+  Future<void> submitPlugApplication(HousingPlugApplication application) async {
+    await _firestore.collection('housing_plug_applications').doc(application.userId).set(
+      application.toFirestore(),
+    );
+  }
+
+  @override
+  Stream<HousingPlugApplication?> watchPlugApplication(String userId) {
+    return _firestore.collection('housing_plug_applications')
+        .doc(userId)
+        .snapshots()
+        .map((doc) => doc.exists ? HousingPlugApplication.fromFirestore(doc) : null);
   }
 }

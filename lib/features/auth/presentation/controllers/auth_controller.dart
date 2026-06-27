@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../shared/providers.dart';
 import '../../domain/repositories/auth_repository.dart';
+import '../../../../services/notification_service.dart';
 
 class AuthController extends StateNotifier<AsyncValue<void>> {
   final AuthRepository _authRepository;
@@ -17,7 +18,10 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
 
   Future<void> signIn(String email, String password) async {
     state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _authRepository.signInWithEmailAndPassword(email, password));
+    state = await AsyncValue.guard(() async {
+      await _authRepository.signInWithEmailAndPassword(email, password);
+      await _ref.read(notificationServiceProvider).init(); // Refresh token/permission
+    });
     if (!state.hasError) {
       resetState();
     }
@@ -25,7 +29,10 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
 
   Future<void> signInWithGoogle() async {
     state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _authRepository.signInWithGoogle());
+    state = await AsyncValue.guard(() async {
+      await _authRepository.signInWithGoogle();
+      await _ref.read(notificationServiceProvider).init(); // Refresh token/permission
+    });
     if (!state.hasError) {
       resetState();
     }
@@ -37,11 +44,14 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
     required String fullName,
   }) async {
     state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _authRepository.signUpWithEmailAndPassword(
-      email: email,
-      password: password,
-      fullName: fullName,
-    ));
+    state = await AsyncValue.guard(() async {
+      await _authRepository.signUpWithEmailAndPassword(
+        email: email,
+        password: password,
+        fullName: fullName,
+      );
+      await _ref.read(notificationServiceProvider).init(); // Refresh token/permission
+    });
     // Reset state after a short delay or upon completion to prevent "sticky" loading states on next screen
     if (!state.hasError) {
       resetState();
@@ -51,6 +61,7 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
   Future<void> signOut() async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
+      await _ref.read(notificationServiceProvider).deleteToken();
       await _authRepository.signOut();
       // Additional cleanup if needed
     });

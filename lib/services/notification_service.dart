@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../features/auth/shared/providers.dart';
 import '../app/router/app_router.dart';
 import 'package:unihub_mobile/features/shared/notification_repository.dart';
@@ -12,10 +14,18 @@ class NotificationService {
   final Ref _ref;
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  
+  bool _isInitialized = false;
+  StreamSubscription? _tokenSubscription;
 
   NotificationService(this._ref);
 
   Future<void> init() async {
+    if (_isInitialized) {
+      await _saveToken();
+      return;
+    }
+
     // 1. Init Local Notifications for Foreground
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosInit = DarwinInitializationSettings();
@@ -25,14 +35,7 @@ class NotificationService {
       initSettings,
       onDidReceiveNotificationResponse: (details) {
         if (details.payload != null) {
-          if (details.payload!.startsWith('open_file:')) {
-            // Tapping download complete notification takes user to detail screen 
-            // where they can "Resume Studying" internally.
-            // This is safer than trying to find the note object here.
-            _ref.read(routerProvider).push('/main'); // Go to notes tab essentially
-          } else {
-            _ref.read(routerProvider).push(details.payload!);
-          }
+          _handleNotificationTap(details.payload!);
         }
       },
     );
@@ -44,47 +47,113 @@ class NotificationService {
 
     // 3. Handle Background/Terminated Taps
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      final route = message.data['route'];
-      if (route != null) {
-        _ref.read(routerProvider).push(route);
-      }
+      _handleRemoteMessageTap(message);
     });
 
+    // Check if app was opened from a terminated state via a notification
+    RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null) {
+      _handleRemoteMessageTap(initialMessage);
+    }
+
     // 4. Save Token if already logged in
-    _saveToken();
-    _messaging.onTokenRefresh.listen((token) => _updateTokenInFirestore(token));
+    await _saveToken();
+    
+    _tokenSubscription?.cancel();
+    _tokenSubscription = _messaging.onTokenRefresh.listen((token) => _updateTokenInFirestore(token));
+    
+    _isInitialized = true;
   }
 
   Future<bool> requestPermission() async {
-    NotificationSettings settings = await _messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
+    try {
+      NotificationSettings settings = await _messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false,
+      );
 
-    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      print('User granted notification permission');
-      _saveToken();
-      return true;
+      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+        debugPrint('User granted notification permission');
+        await _saveToken();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Error requesting notification permission: $e');
     }
     return false;
   }
 
   Future<void> _saveToken() async {
-    String? token = await _messaging.getToken();
-    if (token != null) {
-      await _updateTokenInFirestore(token);
+    try {
+      String? token = await _messaging.getToken();
+      if (token != null) {
+        await _updateTokenInFirestore(token);
+      }
+    } catch (e) {
+      debugPrint('Error getting FCM token: $e');
     }
   }
 
   Future<void> _updateTokenInFirestore(String token) async {
     final user = _ref.read(authStateProvider).valueOrNull;
     if (user != null) {
+      // Store token in a sub-collection for multi-device support
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
-          .update({'fcmToken': token});
+          .collection('tokens')
+          .doc(token)
+          .set({
+        'token': token,
+        'createdAt': FieldValue.serverTimestamp(),
+        'platform': defaultTargetPlatform.name,
+        'lastActive': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+  }
+
+  Future<void> deleteToken() async {
+    try {
+      final user = _ref.read(authStateProvider).valueOrNull;
+      String? token = await _messaging.getToken();
+      
+      if (user != null && token != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('tokens')
+            .doc(token)
+            .delete();
+      }
+      
+      await _messaging.deleteToken();
+      _isInitialized = false;
+    } catch (e) {
+      debugPrint('Error deleting FCM token: $e');
+    }
+  }
+
+  void _handleRemoteMessageTap(RemoteMessage message) {
+    final notificationId = message.data['notificationId'];
+    final route = message.data['route'];
+    final userId = _ref.read(authStateProvider).valueOrNull?.uid;
+
+    if (userId != null && notificationId != null) {
+      markAsRead(userId, notificationId);
+    }
+
+    if (route != null) {
+      _handleNotificationTap(route);
+    }
+  }
+
+  void _handleNotificationTap(String payload) {
+    if (payload.startsWith('open_file:')) {
+      _ref.read(routerProvider).push('/main'); // Go to notes tab/main
+    } else {
+      _ref.read(routerProvider).push(payload);
     }
   }
 
@@ -146,18 +215,22 @@ class NotificationService {
     required String body,
     Map<String, dynamic>? data,
   }) async {
-    // We add to a 'notifications_queue' which the backend processes
-    await FirebaseFirestore.instance.collection('notifications_queue').add({
-      'recipientId': recipientId,
-      'title': title,
-      'body': body,
-      'data': data ?? {},
-      'status': 'pending',
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      // We add to a 'notifications_queue' which the backend processes
+      await FirebaseFirestore.instance.collection('notifications_queue').add({
+        'recipientId': recipientId,
+        'title': title,
+        'body': body,
+        'data': data ?? {},
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('Error triggering push notification: $e');
+    }
   }
 
-  // --- Notification Foundation (Phase 1) ---
+  // --- Notification Foundation ---
 
   Stream<List<UniNotification>> watchNotifications(String userId) {
     return _ref.read(notificationRepositoryProvider).watchNotifications(userId);
@@ -200,18 +273,41 @@ class NotificationService {
       metadata: metadata ?? {},
     );
 
-    await _ref.read(notificationRepositoryProvider).createNotification(notification);
+    final savedNotification = await _ref.read(notificationRepositoryProvider).createNotification(notification);
 
     // Also trigger push notification if needed
+    // Build route for push data
+    String? route;
+    if (deepLink != null) {
+      route = deepLink;
+    } else if (targetId != null) {
+      switch (type) {
+        case NotificationType.chat:
+        case NotificationType.support:
+          route = '/chat'; 
+          break;
+        case NotificationType.listing:
+          route = '/marketplace-detail';
+          break;
+        case NotificationType.gig:
+          route = '/gig-detail';
+          break;
+        default:
+          break;
+      }
+    }
+
     await triggerPushNotification(
       recipientId: recipientId,
       title: title,
       body: body,
       data: {
+        'notificationId': savedNotification.id,
         'type': type.name,
         'targetId': targetId,
         'targetType': targetType,
         'deepLink': deepLink,
+        'route': route,
       },
     );
   }

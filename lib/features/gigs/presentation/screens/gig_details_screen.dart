@@ -5,13 +5,37 @@ import 'package:intl/intl.dart';
 import '../../../auth/shared/providers.dart';
 import '../../../shared/feed_repository.dart';
 
-class GigDetailsScreen extends ConsumerWidget {
+import 'package:intl/intl.dart';
+import '../../../auth/shared/providers.dart';
+import '../../../shared/feed_repository.dart';
+import '../../../../services/history_service.dart';
+
+class GigDetailsScreen extends ConsumerStatefulWidget {
   final FeedItem gig;
 
   const GigDetailsScreen({super.key, required this.gig});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GigDetailsScreen> createState() => _GigDetailsScreenState();
+}
+
+class _GigDetailsScreenState extends ConsumerState<GigDetailsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(recentHistoryProvider.notifier).addItem(HistoryItem(
+        id: widget.gig.id,
+        type: 'gig',
+        title: widget.gig.title,
+        timestamp: DateTime.now(),
+      ));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final gig = widget.gig;
     final user = ref.watch(appUserProvider).valueOrNull;
     final isOwner = user != null && gig.authorId == user.uid;
 

@@ -12,12 +12,39 @@ import '../../../../services/download_service.dart';
 import 'package:path/path.dart' as p;
 import 'package:open_filex/open_filex.dart';
 
-class NoteDetailScreen extends ConsumerWidget {
+import '../../shared/providers.dart';
+import '../../../auth/shared/providers.dart';
+import '../../../../services/history_service.dart';
+
+import '../../../../services/download_service.dart';
+import 'package:path/path.dart' as p;
+import 'package:open_filex/open_filex.dart';
+
+class NoteDetailScreen extends ConsumerStatefulWidget {
   final NoteListing note;
   const NoteDetailScreen({super.key, required this.note});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NoteDetailScreen> createState() => _NoteDetailScreenState();
+}
+
+class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(recentHistoryProvider.notifier).addItem(HistoryItem(
+        id: widget.note.id,
+        type: 'note',
+        title: widget.note.title,
+        timestamp: DateTime.now(),
+      ));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final note = widget.note;
     final progressAsync = ref.watch(noteProgressProvider(note.id));
 
     return Scaffold(
@@ -87,6 +114,7 @@ class NoteDetailScreen extends ConsumerWidget {
   }
 
   Widget _buildSliverAppBar(BuildContext context, WidgetRef ref, bool isBookmarked) {
+    final note = widget.note;
     final currentUser = ref.watch(firebaseAuthProvider).currentUser;
     final isAuthor = currentUser?.uid == note.authorId;
 
@@ -139,7 +167,7 @@ class NoteDetailScreen extends ConsumerWidget {
           TextButton(
             onPressed: () async {
               Navigator.pop(context); // Close dialog
-              await ref.read(notesRepositoryProvider).deleteNote(note.id);
+              await ref.read(notesRepositoryProvider).deleteNote(widget.note.id);
               if (context.mounted) {
                 context.pop(); // Go back to list
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -155,6 +183,7 @@ class NoteDetailScreen extends ConsumerWidget {
   }
 
   Widget _buildHeaderCard(double progress) {
+    final note = widget.note;
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -290,7 +319,7 @@ class NoteDetailScreen extends ConsumerWidget {
             onPressed: () => _openFile(context, ref),
             icon: Icon(progress > 0 ? Icons.play_arrow_rounded : Icons.menu_book_rounded),
             label: Text(
-              progress > 0 ? 'Resume Studying' : (note.price == 0 ? 'Start Studying' : 'Buy & Study'), 
+              progress > 0 ? 'Resume Studying' : (widget.note.price == 0 ? 'Start Studying' : 'Buy & Study'), 
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)
             ),
             style: FilledButton.styleFrom(
@@ -305,6 +334,7 @@ class NoteDetailScreen extends ConsumerWidget {
   }
 
   Future<void> _openFile(BuildContext context, WidgetRef ref) async {
+    final note = widget.note;
     if (note.fileUrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('File not available')));
       return;

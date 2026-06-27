@@ -6,6 +6,7 @@ import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import '../../../auth/shared/providers.dart';
 import '../../shared/providers.dart';
 import '../../domain/models/housing_listing.dart';
+import '../../domain/models/housing_plug_application.dart';
 
 class PlugDashboardScreen extends ConsumerWidget {
   const PlugDashboardScreen({super.key});
@@ -16,22 +17,26 @@ class PlugDashboardScreen extends ConsumerWidget {
     if (user == null) return const Scaffold(body: Center(child: Text('Please log in')));
     
     if (!user.isHousingPlug) {
+      final applicationAsync = ref.watch(plugApplicationProvider);
+
       return Scaffold(
-        appBar: AppBar(title: const Text('Access Denied')),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text('You must be a Housing Plug to access this dashboard.'),
-              const SizedBox(height: 16),
-              ElevatedButton(onPressed: () => context.pushReplacement('/become-plug'), child: const Text('Become a Plug')),
-            ],
-          ),
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: Text('Plug Access', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
+          elevation: 0,
+        ),
+        body: applicationAsync.when(
+          data: (application) => _buildNoAccessBody(context, application),
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => _buildNoAccessBody(context, null),
         ),
       );
     }
 
     final listingsAsync = ref.watch(plugListingsProvider(user.uid));
+    final applicationAsync = ref.watch(plugApplicationProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -40,12 +45,6 @@ class PlugDashboardScreen extends ConsumerWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -54,7 +53,11 @@ class PlugDashboardScreen extends ConsumerWidget {
           children: [
             _buildProfileSummary(user),
             const SizedBox(height: 16),
-            if (!user.isVerified) _buildVerificationBanner(context),
+            applicationAsync.when(
+              data: (application) => _buildVerificationStatusCard(context, user, application),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, __) => const SizedBox.shrink(),
+            ),
             const SizedBox(height: 24),
             _buildOpportunityCTA(context),
             const SizedBox(height: 24),
@@ -75,6 +78,78 @@ class PlugDashboardScreen extends ConsumerWidget {
             _buildListingsList(context, listingsAsync, ref),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildNoAccessBody(BuildContext context, HousingPlugApplication? application) {
+    final hasPendingApp = application?.status == PlugApplicationStatus.pending;
+    final isRejected = application?.status == PlugApplicationStatus.rejected;
+
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: (isRejected ? Colors.red : const Color(0xFF1677F2)).withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isRejected 
+                  ? Icons.error_outline_rounded 
+                  : hasPendingApp 
+                      ? Icons.hourglass_empty_rounded 
+                      : Icons.lock_person_rounded, 
+              color: isRejected ? Colors.red : const Color(0xFF1677F2), 
+              size: 64
+            ),
+          ),
+          const SizedBox(height: 32),
+          Text(
+            isRejected 
+                ? 'Application Rejected' 
+                : hasPendingApp 
+                    ? 'Application Pending' 
+                    : 'Plug Access Required',
+            style: GoogleFonts.plusJakartaSans(fontSize: 24, fontWeight: FontWeight.w800),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            isRejected
+                ? 'Unfortunately, your application to join the Housing Plug Network was not approved at this time.'
+                : hasPendingApp
+                    ? 'Your application is currently being reviewed. You will gain access to this dashboard once approved.'
+                    : 'You must be a verified Housing Plug to access the professional dashboard and manage listings.',
+            style: GoogleFonts.plusJakartaSans(fontSize: 16, color: const Color(0xFF64748B), height: 1.5),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 40),
+          if (!hasPendingApp)
+            SizedBox(
+              width: double.infinity,
+              height: 58,
+              child: FilledButton(
+                onPressed: () => context.pushReplacement('/become-plug'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF1677F2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                ),
+                child: Text(
+                  isRejected ? 'Re-apply Now' : 'Apply to Join Network',
+                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16),
+                ),
+              ),
+            ),
+          const SizedBox(height: 16),
+          TextButton(
+            onPressed: () => context.go('/main'),
+            child: Text('Return Home', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700)),
+          ),
+        ],
       ),
     );
   }
@@ -192,33 +267,132 @@ class PlugDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildVerificationBanner(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.amber.shade50,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.amber.shade200),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.info_outline, color: Colors.amber),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildVerificationStatusCard(BuildContext context, dynamic user, HousingPlugApplication? application) {
+    // If the user is fully verified in their profile, show the Verified state
+    if (user.isVerified) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFF10B981).withOpacity(0.2)),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
+        ),
+        child: Column(
+          children: [
+            Row(
               children: [
-                const Text('Get Verified', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
-                Text('Verified plugs get 3x more views and trust.', style: TextStyle(fontSize: 12, color: Colors.amber.shade900)),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: const Color(0xFF10B981).withOpacity(0.1), shape: BoxShape.circle),
+                  child: const Icon(Icons.verified_user_rounded, color: Color(0xFF10B981), size: 24),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Verified Housing Plug', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16)),
+                      Text('Your identity and status are confirmed.', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                    ],
+                  ),
+                ),
               ],
             ),
+            const Divider(height: 32),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildVerificationBadge(Icons.check_circle_rounded, 'Identity'),
+                _buildVerificationBadge(Icons.check_circle_rounded, 'Phone'),
+                _buildVerificationBadge(Icons.check_circle_rounded, 'Active'),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Otherwise, use the application status
+    if (application == null) return const SizedBox.shrink();
+
+    return switch (application.status) {
+      PlugApplicationStatus.pending => Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
-          TextButton(
-            onPressed: () {},
-            child: const Text('Apply Now'),
+          child: Row(
+            children: [
+              const Icon(Icons.hourglass_top_rounded, color: Color(0xFF64748B), size: 28),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Application Under Review', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16)),
+                    const SizedBox(height: 4),
+                    Text(
+                      'We have received your application. You\'ll be notified once our team completes the review.',
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12, height: 1.4),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      PlugApplicationStatus.rejected => Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFEF2F2),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFFEE2E2)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 28),
+                  const SizedBox(width: 16),
+                  Text('Application Rejected', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16, color: const Color(0xFF991B1B))),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Unfortunately, your application was not approved. This is usually due to missing documents or unclear professional information.',
+                style: TextStyle(color: Color(0xFFB91C1C), fontSize: 12, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => context.push('/become-plug'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFEF4444),
+                    side: const BorderSide(color: Color(0xFFFCA5A5)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Update & Resubmit', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      PlugApplicationStatus.approved => const SizedBox.shrink(), // Should be handled by user.isVerified check
+    };
+  }
+
+  Widget _buildVerificationBadge(IconData icon, String label) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: const Color(0xFF10B981)),
+        const SizedBox(width: 6),
+        Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
+      ],
     );
   }
 

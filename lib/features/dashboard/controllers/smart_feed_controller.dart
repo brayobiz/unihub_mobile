@@ -8,6 +8,7 @@ import '../../community/community_screen.dart'; // For communityFeedProvider
 import '../../../widgets/feed/feed_item_model.dart';
 import '../../../widgets/feed/feed_type.dart' as widgets;
 import '../../auth/shared/providers.dart';
+import '../../../services/history_service.dart';
 
 enum SmartFeedSource { personalized, trending, fresh, sponsored }
 
@@ -114,3 +115,138 @@ final smartFeedProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
 
   return AsyncValue.data(allItems);
 });
+
+final campusPulseProvider = Provider<AsyncValue<Map<String, int>>>((ref) {
+  final marketplaceAsync = ref.watch(listingsProvider(ListingFilter(itemsLimit: 20)));
+  final housingAsync = ref.watch(housingListingsProvider(20));
+  final notesAsync = ref.watch(notesListingsProvider(20));
+  final gigsAsync = ref.watch(gigsFeedProvider);
+
+  if (marketplaceAsync.isLoading || housingAsync.isLoading || notesAsync.isLoading || gigsAsync.isLoading) {
+    return const AsyncValue.loading();
+  }
+
+  return AsyncValue.data({
+    'listings': marketplaceAsync.valueOrNull?.length ?? 0,
+    'housing': housingAsync.valueOrNull?.length ?? 0,
+    'notes': notesAsync.valueOrNull?.length ?? 0,
+    'gigs': gigsAsync.valueOrNull?.length ?? 0,
+  });
+});
+
+final personalizedRecommendationsProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
+  final user = ref.watch(appUserProvider).valueOrNull;
+  final allFeedAsync = ref.watch(smartFeedProvider);
+
+  return allFeedAsync.whenData((items) {
+    if (user == null) return items;
+
+    // Filter items based on user's campus or university
+    final personalizedItems = items.where((item) {
+      final data = item.originalData;
+      if (data == null) return true;
+
+      // Check if it's housing and near campus
+      if (item.model.type == widgets.FeedType.housing) {
+        return data.university == user.university || data.location.contains(user.campus ?? '');
+      }
+
+      // Check if it's notes and same course/uni
+      if (item.model.type == widgets.FeedType.notes) {
+        return data.university == user.university || data.course == user.course;
+      }
+
+      // Check if it's marketplace and same uni
+      if (item.model.type == widgets.FeedType.marketplace) {
+        return data.sellerUniversity == user.university;
+      }
+
+      return true;
+    }).toList();
+
+    // If we have personalized items, return them, otherwise fallback to general items
+    return personalizedItems.isNotEmpty ? personalizedItems : items;
+  });
+});
+
+final trendingFeedProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
+  final allFeedAsync = ref.watch(smartFeedProvider);
+
+  return allFeedAsync.whenData((items) {
+    // Ranking logic: combination of source and engagement signals if available
+    // For now, let's sort by some mock popularity signals
+    final sorted = List<SmartFeedItem>.from(items);
+    sorted.sort((a, b) {
+      int getScore(SmartFeedItem item) {
+        final data = item.originalData;
+        int score = 0;
+        if (data == null) return 0;
+        
+        // Use available signals from models
+        try {
+          if (item.model.type == widgets.FeedType.marketplace) {
+            score = (data.viewsCount ?? 0) + (data.savesCount ?? 0) * 2;
+          } else if (item.model.type == widgets.FeedType.housing) {
+            score = (data.views ?? 0) + (data.saves ?? 0) * 2;
+          } else if (item.model.type == widgets.FeedType.notes) {
+            score = (data.downloadsCount ?? 0) * 3;
+          } else if (item.model.type == widgets.FeedType.gig) {
+            score = (data.likesCount ?? 0) * 2;
+          }
+        } catch (_) {}
+        
+        return score;
+      }
+      return getScore(b).compareTo(getScore(a));
+    });
+    return sorted.take(10).toList();
+  });
+});
+
+final newItemsSummaryProvider = Provider<AsyncValue<Map<String, int>>>((ref) {
+  final lastVisit = ref.watch(lastVisitProvider);
+  if (lastVisit == null) return const AsyncValue.data({});
+
+  final marketplaceAsync = ref.watch(listingsProvider(ListingFilter(itemsLimit: 50)));
+  final housingAsync = ref.watch(housingListingsProvider(50));
+  final notesAsync = ref.watch(notesListingsProvider(50));
+  final gigsAsync = ref.watch(gigsFeedProvider);
+
+  if (marketplaceAsync.isLoading || housingAsync.isLoading || notesAsync.isLoading || gigsAsync.isLoading) {
+    return const AsyncValue.loading();
+  }
+
+  int countNew(List<dynamic> items) {
+    return items.where((item) {
+      final createdAt = item.createdAt as DateTime;
+      return createdAt.isAfter(lastVisit);
+    }).length;
+  }
+
+  final summary = {
+    'Marketplace': countNew(marketplaceAsync.valueOrNull ?? []),
+    'Housing': countNew(housingAsync.valueOrNull ?? []),
+    'Notes': countNew(notesAsync.valueOrNull ?? []),
+    'Gigs': countNew(gigsAsync.valueOrNull ?? []),
+  };
+
+  summary.removeWhere((key, value) => value == 0);
+  return AsyncValue.data(summary);
+});
+
+final recentActivityProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
+  final allFeedAsync = ref.watch(smartFeedProvider);
+  
+  return allFeedAsync.whenData((items) {
+    final sorted = List<SmartFeedItem>.from(items);
+    sorted.sort((a, b) {
+      final dateA = a.originalData?.createdAt as DateTime? ?? DateTime(2000);
+      final dateB = b.originalData?.createdAt as DateTime? ?? DateTime(2000);
+      return dateB.compareTo(dateA);
+    });
+    return sorted.take(10).toList();
+  });
+});
+
+
+

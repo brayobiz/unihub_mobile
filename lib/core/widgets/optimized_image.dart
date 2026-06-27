@@ -83,7 +83,9 @@ class OptimizedImage extends StatelessWidget {
         return _buildErrorWidget();
       },
       // Increase memCache for high density screens if width is provided
-      memCacheWidth: thumbnailWidth != null ? (thumbnailWidth! * 2).toInt() : (width != null ? (width! * 2).toInt() : null),
+      memCacheWidth: (thumbnailWidth != null && thumbnailWidth!.isFinite) 
+          ? (thumbnailWidth! * 2).toInt() 
+          : ((width != null && width!.isFinite) ? (width! * 2).toInt() : null),
     );
   }
 

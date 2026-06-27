@@ -11,12 +11,36 @@ import '../../domain/models/housing_review.dart';
 import '../../shared/providers.dart';
 import 'package:intl/intl.dart';
 
-class HousingDetailsScreen extends ConsumerWidget {
+import '../../shared/providers.dart';
+import 'package:intl/intl.dart';
+import '../../../../services/history_service.dart';
+
+class HousingDetailsScreen extends ConsumerStatefulWidget {
   final HousingListing listing;
   const HousingDetailsScreen({super.key, required this.listing});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HousingDetailsScreen> createState() => _HousingDetailsScreenState();
+}
+
+class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(recentHistoryProvider.notifier).addItem(HistoryItem(
+        id: widget.listing.id,
+        type: 'housing',
+        title: widget.listing.title,
+        imageUrl: widget.listing.images.isNotEmpty ? widget.listing.images.first : null,
+        timestamp: DateTime.now(),
+      ));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final listing = widget.listing;
     final currencyFormat = NumberFormat.currency(symbol: 'KES ', decimalDigits: 0);
     final reviewsAsync = ref.watch(plugReviewsProvider(listing.plugId));
     final savedListingsAsync = ref.watch(savedHousingProvider);
@@ -56,6 +80,7 @@ class HousingDetailsScreen extends ConsumerWidget {
   }
 
   Widget _buildSliverAppBar(BuildContext context, WidgetRef ref, bool isSaved) {
+    final listing = widget.listing;
     return SliverAppBar(
       expandedHeight: 400,
       pinned: true,
@@ -142,6 +167,7 @@ class HousingDetailsScreen extends ConsumerWidget {
   }
 
   Widget _buildHeaderSection(NumberFormat format) {
+    final listing = widget.listing;
     final isTaken = listing.status == HousingStatus.taken;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -212,6 +238,7 @@ class HousingDetailsScreen extends ConsumerWidget {
   }
 
   Widget _buildPlugInfo(BuildContext context) {
+    final listing = widget.listing;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -290,7 +317,7 @@ class HousingDetailsScreen extends ConsumerWidget {
             icon: Icons.phone_rounded,
             label: 'Call',
             onTap: () async {
-              final url = Uri.parse('tel:${listing.plugId}'); // Note: Should be plug's phone, but we use ID as fallback for now if phone is missing in listing
+              final url = Uri.parse('tel:${widget.listing.plugId}'); // Note: Should be plug's phone, but we use ID as fallback for now if phone is missing in listing
               if (await canLaunchUrl(url)) {
                 await launchUrl(url);
               }
@@ -316,16 +343,16 @@ class HousingDetailsScreen extends ConsumerWidget {
     // For now, we need to create or get conversation ID.
     // Simplifying for Phase 1 polish: use a common route.
     context.push('/chat', extra: {
-      'otherUserId': listing.plugId,
-      'otherUserName': listing.plugName,
-      'title': listing.title,
+      'otherUserId': widget.listing.plugId,
+      'otherUserName': widget.listing.plugName,
+      'title': widget.listing.title,
     });
   }
 
   void _showReportDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => _HousingReportDialog(listing: listing),
+      builder: (context) => _HousingReportDialog(listing: widget.listing),
     );
   }
 
@@ -363,7 +390,7 @@ class HousingDetailsScreen extends ConsumerWidget {
         const Text('About this property', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1A1C1E))),
         const SizedBox(height: 16),
         Text(
-          listing.description,
+          widget.listing.description,
           style: const TextStyle(height: 1.6, color: Color(0xFF475569), fontSize: 15, fontWeight: FontWeight.w500),
         ),
       ],
@@ -379,7 +406,7 @@ class HousingDetailsScreen extends ConsumerWidget {
         Wrap(
           spacing: 12,
           runSpacing: 12,
-          children: listing.amenities.map((a) => _buildAmenityChip(a)).toList(),
+          children: widget.listing.amenities.map((a) => _buildAmenityChip(a)).toList(),
         ),
       ],
     );
@@ -471,7 +498,7 @@ class HousingDetailsScreen extends ConsumerWidget {
     // We'll need a stateful widget for the dialog to handle star selection
     showDialog(
       context: context,
-      builder: (context) => _HousingReviewDialog(listing: listing),
+      builder: (context) => _HousingReviewDialog(listing: widget.listing),
     );
   }
 
@@ -514,6 +541,7 @@ class HousingDetailsScreen extends ConsumerWidget {
   }
 
   Widget _buildBottomBar(BuildContext context, NumberFormat format) {
+    final listing = widget.listing;
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
       decoration: BoxDecoration(

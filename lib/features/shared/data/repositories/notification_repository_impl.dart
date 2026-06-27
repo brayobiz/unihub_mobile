@@ -31,7 +31,7 @@ class NotificationRepositoryImpl implements NotificationRepository {
   }
 
   @override
-  Future<void> createNotification(UniNotification notification) async {
+  Future<UniNotification> createNotification(UniNotification notification) async {
     final ref = _firestore
         .collection('users')
         .doc(notification.recipientId)
@@ -43,6 +43,7 @@ class NotificationRepositoryImpl implements NotificationRepository {
       : notification;
 
     await ref.set(finalNotification.toFirestore());
+    return finalNotification;
   }
 
   @override

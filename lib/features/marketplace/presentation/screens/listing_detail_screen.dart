@@ -12,6 +12,7 @@ import '../../domain/models/listing.dart';
 import '../../shared/providers.dart';
 import '../../../chat/shared/providers.dart';
 import '../widgets/marketplace_card.dart';
+import '../../../../services/history_service.dart';
 
 class ListingDetailScreen extends ConsumerStatefulWidget {
   final Listing listing;
@@ -34,6 +35,14 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     // Record a view
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(marketplaceRepositoryProvider).recordView(widget.listing.id);
+      
+      ref.read(recentHistoryProvider.notifier).addItem(HistoryItem(
+        id: widget.listing.id,
+        type: 'listing',
+        title: widget.listing.title,
+        imageUrl: widget.listing.imageUrls.isNotEmpty ? widget.listing.imageUrls.first : null,
+        timestamp: DateTime.now(),
+      ));
     });
   }
 

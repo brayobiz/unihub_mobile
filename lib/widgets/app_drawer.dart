@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../features/auth/presentation/controllers/auth_controller.dart';
 import '../features/auth/shared/providers.dart';
+import '../features/housing/shared/providers.dart';
+import '../features/housing/domain/models/housing_plug_application.dart';
 
 class AppDrawer extends ConsumerWidget {
   const AppDrawer({super.key});
@@ -88,10 +90,26 @@ class AppDrawer extends ConsumerWidget {
                   context.push('/plug-dashboard');
                 });
               } else {
-                return _drawerItem(Icons.add_home_work_outlined, 'Become a Housing Plug', onTap: () {
-                  context.pop();
-                  context.push('/become-plug');
-                });
+                final applicationAsync = ref.watch(plugApplicationProvider);
+                return applicationAsync.when(
+                  data: (app) {
+                    if (app?.status == PlugApplicationStatus.pending) {
+                      return _drawerItem(Icons.hourglass_empty_rounded, 'Plug App Pending', color: Colors.indigo, onTap: () {
+                        context.pop();
+                        context.push('/plug-dashboard');
+                      });
+                    }
+                    return _drawerItem(Icons.add_home_work_outlined, 'Become a Housing Plug', onTap: () {
+                      context.pop();
+                      context.push('/become-plug');
+                    });
+                  },
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => _drawerItem(Icons.add_home_work_outlined, 'Become a Housing Plug', onTap: () {
+                    context.pop();
+                    context.push('/become-plug');
+                  }),
+                );
               }
             },
             loading: () => const SizedBox.shrink(),

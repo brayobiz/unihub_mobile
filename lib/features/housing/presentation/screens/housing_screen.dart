@@ -9,6 +9,7 @@ import '../../../auth/shared/providers.dart';
 import '../../shared/providers.dart';
 import '../widgets/housing_card.dart';
 import '../../domain/models/housing_listing.dart';
+import '../../domain/models/housing_plug_application.dart';
 
 class HousingScreen extends ConsumerStatefulWidget {
   const HousingScreen({super.key});
@@ -58,6 +59,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
   Widget build(BuildContext context) {
     final user = ref.watch(appUserProvider).valueOrNull;
     final isPlug = user?.isHousingPlug ?? false;
+    final applicationAsync = ref.watch(plugApplicationProvider);
     
     final locationFilter = ref.watch(housingLocationFilterProvider);
     final hasActiveFilters = ref.watch(housingTypeFilterProvider) != null || 
@@ -88,7 +90,11 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
                   ],
                   const SizedBox(height: 24),
                   if (!isPlug) ...[
-                    _buildBecomePlugCTA(),
+                    applicationAsync.when(
+                      data: (application) => _buildBecomePlugCTA(application),
+                      loading: () => const SkeletonLoader(width: double.infinity, height: 150, borderRadius: 24),
+                      error: (_, __) => _buildBecomePlugCTA(null),
+                    ),
                     const SizedBox(height: 16),
                     _buildReportVacancyCTA(),
                     const SizedBox(height: 32),
@@ -166,43 +172,69 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
     );
   }
 
-  Widget _buildBecomePlugCTA() {
+  Widget _buildBecomePlugCTA(HousingPlugApplication? application) {
+    final hasPendingApp = application?.status == PlugApplicationStatus.pending;
+    final isRejected = application?.status == PlugApplicationStatus.rejected;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1677F2), Color(0xFF19D3C5)],
+        gradient: LinearGradient(
+          colors: isRejected 
+              ? [const Color(0xFFEF4444), const Color(0xFF991B1B)]
+              : hasPendingApp 
+                  ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+                  : [const Color(0xFF1677F2), const Color(0xFF19D3C5)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: const Color(0xFF1677F2).withOpacity(0.2), blurRadius: 20, offset: const Offset(0, 10))
+          BoxShadow(
+            color: (isRejected ? Colors.red : const Color(0xFF1677F2)).withOpacity(0.2), 
+            blurRadius: 20, 
+            offset: const Offset(0, 10)
+          )
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Helping students find houses?',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
+          Text(
+            isRejected 
+                ? 'Application Update' 
+                : hasPendingApp 
+                    ? 'Application Pending' 
+                    : 'Helping students find houses?',
+            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 8),
           Text(
-            'List hostels and houses, manage enquiries and build your reputation as a trusted Housing Plug.',
+            isRejected
+                ? 'Your application was not approved. You can review our guidelines and try again.'
+                : hasPendingApp
+                    ? 'Your application to join the Plug Network is currently under review. We\'ll notify you soon.'
+                    : 'List hostels and houses, manage enquiries and build your reputation as a trusted Housing Plug.',
             style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13, height: 1.4),
           ),
           const SizedBox(height: 20),
           ElevatedButton(
-            onPressed: () => context.push('/become-plug'),
+            onPressed: hasPendingApp ? null : () => context.push('/become-plug'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white,
-              foregroundColor: const Color(0xFF1677F2),
+              foregroundColor: isRejected ? Colors.red : const Color(0xFF1677F2),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 0,
             ),
-            child: const Text('Become a Housing Plug', style: TextStyle(fontWeight: FontWeight.w900)),
+            child: Text(
+              isRejected 
+                  ? 'Re-apply Now' 
+                  : hasPendingApp 
+                      ? 'In Review...' 
+                      : 'Become a Housing Plug', 
+              style: const TextStyle(fontWeight: FontWeight.w900)
+            ),
           ),
         ],
       ),

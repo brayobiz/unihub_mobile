@@ -3,7 +3,7 @@ import 'package:unihub_mobile/features/shared/domain/models/uni_notification.dar
 abstract class NotificationRepository {
   Stream<List<UniNotification>> watchNotifications(String userId);
   Stream<int> watchUnreadCount(String userId);
-  Future<void> createNotification(UniNotification notification);
+  Future<UniNotification> createNotification(UniNotification notification);
   Future<void> markAsRead(String userId, String notificationId);
   Future<void> markAllAsRead(String userId);
   Future<void> deleteNotification(String userId, String notificationId);

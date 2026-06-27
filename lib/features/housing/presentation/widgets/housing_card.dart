@@ -7,24 +7,37 @@ import 'package:intl/intl.dart';
 class HousingCard extends StatelessWidget {
   final HousingListing listing;
   final VoidCallback onTap;
+  final EdgeInsetsGeometry? margin;
+  final bool isCompact;
 
-  const HousingCard({super.key, required this.listing, required this.onTap});
+  const HousingCard({
+    super.key,
+    required this.listing,
+    required this.onTap,
+    this.margin,
+    this.isCompact = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final currencyFormat = NumberFormat.currency(symbol: 'KES ', decimalDigits: 0);
     final isTaken = listing.status == HousingStatus.taken;
 
+    if (isCompact) {
+      return _buildCompact(context, currencyFormat, isTaken);
+    }
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 20),
+        margin: margin ?? const EdgeInsets.only(bottom: 20),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFF1F5F9)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -32,6 +45,7 @@ class HousingCard extends StatelessWidget {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Stack(
               children: [
@@ -41,7 +55,7 @@ class HousingCard extends StatelessWidget {
                     imageUrl: listing.images.isNotEmpty 
                         ? listing.images.first 
                         : 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=2070&auto=format&fit=crop',
-                    height: 220,
+                    height: 180, // Reduced from 200 to prevent vertical overflow
                     width: double.infinity,
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                     thumbnailWidth: 600,
@@ -49,62 +63,63 @@ class HousingCard extends StatelessWidget {
                 ),
                 // Badges Row
                 Positioned(
-                  top: 16,
-                  left: 16,
-                  right: 16,
+                  top: 12,
+                  left: 12,
+                  right: 12,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       if (listing.plugIsVerified)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: const Color(0xFF1677F2),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(8),
                             boxShadow: [
-                              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)
+                              BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4)
                             ],
                           ),
                           child: const Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.verified, color: Colors.white, size: 12),
+                              Icon(Icons.verified, color: Colors.white, size: 10),
                               SizedBox(width: 4),
-                              Text('VERIFIED', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                              Text('VERIFIED', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
                             ],
                           ),
                         ),
                       const Spacer(),
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withValues(alpha: 0.9),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.favorite_border, size: 18, color: Color(0xFF1677F2)),
+                        child: const Icon(Icons.favorite_border, size: 16, color: Color(0xFF1677F2)),
                       ),
                     ],
                   ),
                 ),
                 // Availability Badge
                 Positioned(
-                  bottom: 16,
-                  left: 16,
+                  bottom: 12,
+                  left: 12,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: isTaken ? Colors.red.withOpacity(0.9) : Colors.black.withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(10),
+                      color: isTaken ? Colors.red.withValues(alpha: 0.9) : Colors.black.withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       isTaken ? 'TAKEN' : listing.type.name.replaceAll(RegExp(r'(?=[A-Z])'), ' ').toUpperCase(),
-                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                      style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5),
                     ),
                   ),
                 ),
               ],
             ),
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -118,22 +133,22 @@ class HousingCard extends StatelessWidget {
                             Text(
                               listing.title,
                               style: GoogleFonts.plusJakartaSans(
-                                fontSize: 18,
+                                fontSize: 16,
                                 fontWeight: FontWeight.w800,
                                 color: const Color(0xFF1A1C1E),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 6),
+                            const SizedBox(height: 4),
                             Row(
                               children: [
-                                const Icon(Icons.location_on_rounded, size: 14, color: Color(0xFF1677F2)),
+                                const Icon(Icons.location_on_rounded, size: 12, color: Color(0xFF1677F2)),
                                 const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
                                     '${listing.university} • ${listing.location}',
-                                    style: const TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500),
+                                    style: const TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.w500),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -143,34 +158,34 @@ class HousingCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
                             currencyFormat.format(listing.rent),
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 18,
+                              fontSize: 16,
                               fontWeight: FontWeight.w900,
                               color: const Color(0xFF1677F2),
                             ),
                           ),
                           const Text(
                             '/month',
-                            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600),
+                            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10, fontWeight: FontWeight.w600),
                           ),
                         ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Container(
-                        width: 28,
-                        height: 28,
+                        width: 24,
+                        height: 24,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: const Color(0xFFF1F5F9),
@@ -179,14 +194,14 @@ class HousingCard extends StatelessWidget {
                               : null,
                         ),
                         child: listing.plugPhotoUrl == null 
-                            ? Center(child: Text(listing.plugName[0], style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold))) 
+                            ? Center(child: Text(listing.plugName.isNotEmpty ? listing.plugName[0] : '?', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold))) 
                             : null,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           listing.plugName,
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -198,14 +213,106 @@ class HousingCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.directions_walk_rounded, size: 12, color: Color(0xFF64748B)),
+                            const Icon(Icons.directions_walk_rounded, size: 10, color: Color(0xFF64748B)),
                             const SizedBox(width: 4),
                             Text(
                               listing.distance,
-                              style: const TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.w700),
+                              style: const TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.w700),
                             ),
                           ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompact(BuildContext context, NumberFormat currencyFormat, bool isTaken) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: margin,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFF1F5F9)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              child: OptimizedImage(
+                imageUrl: listing.images.isNotEmpty 
+                    ? listing.images.first 
+                    : 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=2070&auto=format&fit=crop',
+                height: 120,
+                width: double.infinity,
+                thumbnailWidth: 400,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    listing.title,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF1A1C1E),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${listing.type.name} • ${listing.location}',
+                    style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        currencyFormat.format(listing.rent),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: const Color(0xFF1677F2),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isTaken ? Colors.red.shade50 : Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          isTaken ? 'TAKEN' : 'AVAIL',
+                          style: TextStyle(
+                            color: isTaken ? Colors.red.shade700 : Colors.blue.shade700,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                     ],
