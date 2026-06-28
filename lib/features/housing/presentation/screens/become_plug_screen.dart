@@ -21,13 +21,33 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
   late PageController _pageController;
   
   final _introController = TextEditingController();
-  final _areasController = TextEditingController();
   final _additionalInfoController = TextEditingController();
 
-  final _professionalFormKey = GlobalKey<FormState>();
-  final _experienceFormKey = GlobalKey<FormState>();
-
+  final _identityFormKey = GlobalKey<FormState>();
+  
   bool _isSubmitting = false;
+
+  final List<String> _housingSpecialties = [
+    'Hostels',
+    'Bedsitters',
+    'Single Rooms',
+    'One Bedrooms',
+    'Two Bedrooms',
+    'Shared Apartments',
+    'Short Stay / Airbnb',
+    'Student Houses',
+  ];
+
+  final List<String> _commonAreas = [
+    'Main Campus',
+    'Gate A Area',
+    'Gate B Area',
+    'Gate C Area',
+    'Town Center',
+    'Upper Suburbs',
+    'Lower Suburbs',
+    'Student Village',
+  ];
 
   @override
   void initState() {
@@ -36,7 +56,6 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
     _pageController = PageController(initialPage: appState.currentStep);
     
     _introController.text = appState.intro;
-    _areasController.text = appState.areasServed;
     _additionalInfoController.text = appState.additionalInfo;
   }
 
@@ -44,7 +63,6 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
   void dispose() {
     _pageController.dispose();
     _introController.dispose();
-    _areasController.dispose();
     _additionalInfoController.dispose();
     super.dispose();
   }
@@ -54,13 +72,8 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
     final notifier = ref.read(plugApplicationControllerProvider.notifier);
     
     if (step == 1) {
-      notifier.updateProfessional(
+      notifier.updateBasicInfo(
         intro: _introController.text.trim(),
-        areas: _areasController.text.trim(),
-      );
-    } else if (step == 2) {
-      notifier.updateExperience(
-        additionalInfo: _additionalInfoController.text.trim(),
       );
     }
   }
@@ -69,8 +82,27 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
     _syncState();
     final currentStep = ref.read(plugApplicationControllerProvider).currentStep;
 
-    if (currentStep == 1 && !_professionalFormKey.currentState!.validate()) return;
-    if (currentStep == 2 && !_experienceFormKey.currentState!.validate()) return;
+    if (currentStep == 1 && !_identityFormKey.currentState!.validate()) return;
+    
+    // For step 2 and 3, validation could be done on selection count if needed
+    if (currentStep == 2) {
+      final state = ref.read(plugApplicationControllerProvider);
+      if (state.serviceAreas.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select at least one service area'))
+        );
+        return;
+      }
+    }
+    if (currentStep == 3) {
+      final state = ref.read(plugApplicationControllerProvider);
+      if (state.specialties.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select at least one accommodation specialty'))
+        );
+        return;
+      }
+    }
 
     if (currentStep < 4) {
       ref.read(plugApplicationControllerProvider.notifier).updateStep(currentStep + 1);
@@ -101,12 +133,6 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
       final user = ref.read(appUserProvider).valueOrNull!;
       final state = ref.read(plugApplicationControllerProvider);
       
-      final areas = state.areasServed
-          .split(',')
-          .map((e) => e.trim())
-          .where((e) => e.isNotEmpty)
-          .toList();
-
       final application = VerificationApplication(
         id: '${user.uid}_housing_plug',
         userId: user.uid,
@@ -119,11 +145,13 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
           'type': 'role_activation',
           'professionalIntro': state.intro,
           'primaryCampus': state.selectedCampus ?? user.campus ?? 'Unknown',
-          'areasServed': areas,
-          'hasExperience': state.hasExperience,
-          'experienceLevel': state.experienceLevel,
+          'serviceAreas': state.serviceAreas,
+          'accommodationSpecialties': state.specialties,
+          'availabilityStatus': state.availability,
+          'preferredContactMethod': state.preferredContact,
           'additionalInfo': state.additionalInfo,
-          'platformVerified': user.isStudentVerified,
+          'identityVerified': user.isIdentityVerified,
+          'studentVerified': user.isStudentVerified,
         },
       );
 
@@ -144,105 +172,96 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('🛠 Building BecomePlugScreen');
     final appUserAsync = ref.watch(appUserProvider);
     final appState = ref.watch(plugApplicationControllerProvider);
     final currentStep = appState.currentStep;
 
     return appUserAsync.when(
       data: (user) {
-        try {
-          if (user == null) {
-            return const Scaffold(body: Center(child: Text('Please log in to apply.')));
-          }
+        if (user == null) {
+          return const Scaffold(body: Center(child: Text('Please log in to apply.')));
+        }
 
-          if (currentStep == 5) return _buildSuccessScreen();
+        if (currentStep == 5) return _buildSuccessScreen();
 
-          return WillPopScope(
-            onWillPop: () async {
-              if (currentStep == 0) return true;
-              final result = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Discard Application?'),
-                  content: const Text('You are leaving the Housing Plug application. Your progress will be reset.'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep Editing')),
-                    TextButton(
-                      onPressed: () {
-                        ref.read(plugApplicationControllerProvider.notifier).reset();
-                        Navigator.pop(context, true);
-                      }, 
-                      child: const Text('Exit', style: TextStyle(color: Colors.red))
-                    ),
-                  ],
-                ),
-              );
-              return result ?? false;
-            },
-            child: Scaffold(
-              backgroundColor: Colors.white,
-              appBar: AppBar(
-                backgroundColor: Colors.white,
-                elevation: 0,
-                leading: currentStep > 0 
-                  ? IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.black),
-                      onPressed: _prevPage,
-                    )
-                  : IconButton(
-                      icon: const Icon(Icons.close, color: Colors.black),
-                      onPressed: () {
-                         ref.read(plugApplicationControllerProvider.notifier).reset();
-                         context.pop();
-                      },
-                    ),
-                title: currentStep > 0
-                  ? Text(
-                      'Step $currentStep of 4',
-                      style: const TextStyle(
-                        color: Colors.grey,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    )
-                  : null,
-                centerTitle: true,
-              ),
-              body: Column(
-                children: [
-                  if (currentStep > 0)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: LinearProgressIndicator(
-                        value: currentStep / 4,
-                        backgroundColor: const Color(0xFFF1F5F9),
-                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1677F2)),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  Expanded(
-                    child: PageView(
-                      controller: _pageController,
-                      physics: const NeverScrollableScrollPhysics(),
-                      children: [
-                        _buildIntroStep(user),
-                        _buildProfessionalStep(user),
-                        _buildExperienceStep(),
-                        _buildReviewStep(user),
-                        const SizedBox.shrink(), // Success placeholder
-                      ],
-                    ),
+        return WillPopScope(
+          onWillPop: () async {
+            if (currentStep == 0) return true;
+            final result = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Exit Onboarding?'),
+                content: const Text('Your professional profile progress will be saved for this session.'),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep Editing')),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true), 
+                    child: const Text('Exit', style: TextStyle(color: Colors.red))
                   ),
                 ],
               ),
-              bottomNavigationBar: _buildBottomBar(currentStep),
+            );
+            return result ?? false;
+          },
+          child: Scaffold(
+            backgroundColor: Colors.white,
+            appBar: AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              leading: currentStep > 0 
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.black),
+                    onPressed: _prevPage,
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.close, color: Colors.black),
+                    onPressed: () {
+                       ref.read(plugApplicationControllerProvider.notifier).reset();
+                       context.pop();
+                    },
+                  ),
+              title: currentStep > 0
+                ? Text(
+                    'Step $currentStep of 4',
+                    style: GoogleFonts.plusJakartaSans(
+                      color: Colors.grey,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  )
+                : null,
+              centerTitle: true,
             ),
-          );
-        } catch (e, stack) {
-          debugPrint('❌ Error in BecomePlugScreen: $e\n$stack');
-          return Scaffold(body: Center(child: SelectableText('Internal Error: $e\n$stack')));
-        }
+            body: Column(
+              children: [
+                if (currentStep > 0)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: LinearProgressIndicator(
+                      value: currentStep / 4,
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1677F2)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                Expanded(
+                  child: PageView(
+                    controller: _pageController,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: [
+                      _buildWelcomeStep(user),
+                      _buildProfessionalIdentityStep(user),
+                      _buildServiceCoverageStep(),
+                      _buildSpecialtiesStep(),
+                      _buildFinalReviewStep(user),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            bottomNavigationBar: _buildBottomBar(currentStep),
+          ),
+        );
       },
       loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
@@ -269,7 +288,7 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
           width: double.infinity,
           height: 56,
           child: FilledButton(
-            onPressed: _isSubmitting ? null : (currentStep == 3 ? _submit : _nextPage),
+            onPressed: _isSubmitting ? null : (currentStep == 4 ? _submit : _nextPage),
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF1677F2),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -277,7 +296,7 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
             child: _isSubmitting
                 ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                 : Text(
-                    currentStep == 3 ? 'Submit Application' : 'Continue',
+                    currentStep == 4 ? 'Complete Onboarding' : 'Continue',
                     style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
           ),
@@ -286,11 +305,11 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
     );
   }
 
-  // --- Step 0: Intro & Prerequisite Check ---
-  Widget _buildIntroStep(AppUser user) {
-    final isStudentVerified = user.isStudentVerified;
-    final isIdentityVerified = user.isIdentityVerified;
-    final isVerified = isStudentVerified && isIdentityVerified;
+  // --- Step 0: Welcome & Prerequisite Check ---
+  Widget _buildWelcomeStep(AppUser user) {
+    final isVerified = user.isIdentityVerified && user.isStudentVerified;
+    
+    final bool identityPending = user.identityStatus == 'pending';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -308,7 +327,7 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
           ),
           const SizedBox(height: 24),
           Text(
-            'Housing Plug Network',
+            'Welcome to the\nHousing Plug Network',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 28,
               fontWeight: FontWeight.w800,
@@ -317,7 +336,7 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Join our professional network of housing specialists and help students find their perfect home away from home.',
+            'You\'re about to join UniHub\'s community of trusted housing specialists. Let\'s build your professional profile to help students find you.',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 16,
               color: const Color(0xFF64748B),
@@ -326,19 +345,25 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
           ),
           const SizedBox(height: 32),
           _buildInfoTile(
-            Icons.verified_user_outlined,
-            'Role Activation',
-            'This application activates your professional role. Identity verification is managed by the UniHub Trust Engine.',
+            Icons.person_pin_outlined,
+            'Professional Identity',
+            'Tell students who you are and which campus you primarily serve.',
           ),
           const SizedBox(height: 20),
           _buildInfoTile(
-            Icons.business_center_outlined,
-            'Professional Tools',
-            'Manage property listings, track leads, and build your reputation as a trusted provider.',
+            Icons.map_outlined,
+            'Service Coverage',
+            'Indicate which areas you cover and whether you\'re currently available.',
+          ),
+          const SizedBox(height: 20),
+          _buildInfoTile(
+            Icons.house_siding_outlined,
+            'Accommodation Specialties',
+            'Select the types of student housing you specialize in.',
           ),
           const SizedBox(height: 32),
           
-          // Prerequisite Notice
+          // Trust Status Check
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -349,17 +374,15 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
             child: Row(
               children: [
                 Icon(
-                  isVerified ? Icons.check_circle : Icons.warning_rounded,
+                  isVerified ? Icons.check_circle : Icons.lock_person_outlined,
                   color: isVerified ? Colors.green : Colors.red,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     isVerified
-                        ? 'Universal Platform Verification complete. You are ready to apply for the Housing Plug role.'
-                        : !isIdentityVerified 
-                          ? 'UniHub Identity Verification is required before joining the Housing Plug Network.'
-                          : 'UniHub Student Verification is required before joining the Housing Plug Network.',
+                        ? 'Universal Platform Trust verified. You\'re eligible for professional onboarding.'
+                        : 'Universal Platform Verification is required before you can join the professional network.',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -378,13 +401,13 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
             child: FilledButton(
               onPressed: isVerified 
                 ? _nextPage 
-                : () => context.push(!isIdentityVerified ? '/verify-identity' : '/trust-center'),
+                : (identityPending ? null : () => context.push('/trust-center')),
               style: FilledButton.styleFrom(
                 backgroundColor: isVerified ? const Color(0xFF1677F2) : const Color(0xFF0F172A),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
               ),
               child: Text(
-                isVerified ? 'Apply for Role' : 'Complete Verification First',
+                isVerified ? 'Start Professional Onboarding' : identityPending ? 'Verification Pending...' : 'Go to Trust Center',
                 style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16),
               ),
             ),
@@ -414,169 +437,265 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
     );
   }
 
-  // --- Step 1: Professional Profile ---
-  Widget _buildProfessionalStep(AppUser user) {
+  // --- Step 1: Professional Identity ---
+  Widget _buildProfessionalIdentityStep(AppUser user) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Form(
-        key: _professionalFormKey,
+        key: _identityFormKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Professional Profile', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800)),
+            Text('Professional Identity', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800)),
             const SizedBox(height: 8),
-            Text('Tell students about your professional focus and service areas.', 
+            Text('Introduce yourself to the student community and set your primary campus.', 
               style: GoogleFonts.plusJakartaSans(color: const Color(0xFF64748B))),
             const SizedBox(height: 32),
             _buildTextField(
               controller: _introController,
               label: 'Professional Introduction',
-              hint: 'e.g. Dedicated housing specialist helping students find affordable hostels since 2021.',
-              maxLines: 4,
+              hint: 'Introduce yourself... (e.g., "Hi! I\'m ${user.fullName.split(' ').first}, a housing specialist dedicated to helping students find affordable hostels near Main Campus since 2021.")',
+              maxLines: 5,
               validator: (v) {
-                if (v!.trim().length < 20) return 'Please provide a more detailed introduction (min 20 chars)';
+                if (v!.trim().length < 30) return 'A more detailed introduction helps build trust (min 30 chars)';
                 return null;
               },
             ),
-            const SizedBox(height: 24),
-            _buildCampusDropdown(user),
-            const SizedBox(height: 24),
-            _buildTextField(
-              controller: _areasController,
-              label: 'Areas Served',
-              hint: 'e.g. Juja South, Gate C, Bypass (separate with commas)',
-              validator: (v) => v!.trim().isEmpty ? 'Please list at least one area' : null,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // --- Step 2: Experience ---
-  Widget _buildExperienceStep() {
-    final appState = ref.watch(plugApplicationControllerProvider);
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Form(
-        key: _experienceFormKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Experience', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 8),
-            Text('Optional professional information to help students trust your expertise.', 
-              style: GoogleFonts.plusJakartaSans(color: const Color(0xFF64748B))),
             const SizedBox(height: 32),
-            Text('Have you previously helped students find accommodation?', 
-              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14)),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: appState.hasExperience,
-              items: ['Yes', 'No'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-              onChanged: (v) {
-                if (v != null) {
-                  ref.read(plugApplicationControllerProvider.notifier).updateExperience(hasExperience: v);
-                }
-              },
-              decoration: _inputDecoration(),
-            ),
-            const SizedBox(height: 24),
-            Text('Experience Level', 
-              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14)),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: appState.experienceLevel,
-              items: ['Newcomer', '1-2 years', '3+ years'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-              onChanged: (v) {
-                if (v != null) {
-                  ref.read(plugApplicationControllerProvider.notifier).updateExperience(level: v);
-                }
-              },
-              decoration: _inputDecoration(),
-            ),
-            const SizedBox(height: 24),
-            _buildTextField(
-              controller: _additionalInfoController,
-              label: 'Additional Information',
-              hint: 'Anything else students may find helpful to know about you.',
-              maxLines: 3,
-            ),
+            _buildCampusDropdown(user),
           ],
         ),
       ),
     );
   }
 
-  // --- Step 3: Review ---
-  Widget _buildReviewStep(AppUser user) {
+  // --- Step 2: Service Coverage ---
+  Widget _buildServiceCoverageStep() {
+    final state = ref.watch(plugApplicationControllerProvider);
+    final notifier = ref.read(plugApplicationControllerProvider.notifier);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Review Application', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800)),
+          Text('Service Coverage', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
-          Text('Review your professional profile before submitting.', 
+          Text('Select the areas where you actively help students find housing.', 
             style: GoogleFonts.plusJakartaSans(color: const Color(0xFF64748B))),
           const SizedBox(height: 32),
-          
-          // Platform Trust Section
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.verified_user_rounded, color: Color(0xFF10B981)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Platform Verification', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13)),
-                      Text(user.isStudentVerified == true ? 'Verified as ${user.fullName}' : 'Verification Incomplete', style: GoogleFonts.plusJakartaSans(fontSize: 12, color: const Color(0xFF64748B))),
-                    ],
-                  ),
+          Text('Primary Service Areas', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14)),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _commonAreas.map((area) {
+              final isSelected = state.serviceAreas.contains(area);
+              return ChoiceChip(
+                label: Text(area),
+                selected: isSelected,
+                onSelected: (_) => notifier.toggleArea(area),
+                selectedColor: const Color(0xFF1677F2).withOpacity(0.1),
+                labelStyle: TextStyle(
+                  color: isSelected ? const Color(0xFF1677F2) : Colors.black87,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
-              ],
-            ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: isSelected ? const Color(0xFF1677F2) : const Color(0xFFE2E8F0)),
+                ),
+              );
+            }).toList(),
           ),
-          
-          const SizedBox(height: 24),
-          _buildReviewCard(),
-          const SizedBox(height: 24),
-          Text(
-            'By submitting, you agree to UniHub\'s Professional Conduct Guidelines for Housing Plugs.',
-            style: GoogleFonts.plusJakartaSans(fontSize: 12, color: const Color(0xFF94A3B8), height: 1.5),
+          const SizedBox(height: 40),
+          Text('Current Availability', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14)),
+          const SizedBox(height: 8),
+          Text('Let students know if you\'re actively taking inquiries.', 
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+          const SizedBox(height: 16),
+          _buildChoiceTile(
+            title: 'Accepting Inquiries',
+            subtitle: 'You are actively helping students find housing right now.',
+            icon: Icons.check_circle_outline,
+            isSelected: state.availability == 'Available',
+            onTap: () => notifier.setAvailability('Available'),
+          ),
+          const SizedBox(height: 12),
+          _buildChoiceTile(
+            title: 'Currently Unavailable',
+            subtitle: 'You are not taking new student requests at this time.',
+            icon: Icons.do_not_disturb_on_outlined,
+            isSelected: state.availability == 'Unavailable',
+            onTap: () => notifier.setAvailability('Unavailable'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildReviewCard() {
-    final appState = ref.watch(plugApplicationControllerProvider);
+  // --- Step 3: Specialties & Contact ---
+  Widget _buildSpecialtiesStep() {
+    final state = ref.watch(plugApplicationControllerProvider);
+    final notifier = ref.read(plugApplicationControllerProvider.notifier);
 
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Specialties & Contact', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          Text('What types of housing do you specialize in, and how should students reach you?', 
+            style: GoogleFonts.plusJakartaSans(color: const Color(0xFF64748B))),
+          const SizedBox(height: 32),
+          Text('Accommodation Specialties', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14)),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _housingSpecialties.map((type) {
+              final isSelected = state.specialties.contains(type);
+              return ChoiceChip(
+                label: Text(type),
+                selected: isSelected,
+                onSelected: (_) => notifier.toggleSpecialty(type),
+                selectedColor: const Color(0xFF1677F2).withOpacity(0.1),
+                labelStyle: TextStyle(
+                  color: isSelected ? const Color(0xFF1677F2) : Colors.black87,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: isSelected ? const Color(0xFF1677F2) : const Color(0xFFE2E8F0)),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 40),
+          Text('Preferred Contact Method', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14)),
+          const SizedBox(height: 16),
+          _buildChoiceTile(
+            title: 'In-App Chat',
+            subtitle: 'Receive messages directly through UniHub Messenger.',
+            icon: Icons.chat_bubble_outline_rounded,
+            isSelected: state.preferredContact == 'In-App Chat',
+            onTap: () => notifier.setPreferredContact('In-App Chat'),
+          ),
+          const SizedBox(height: 12),
+          _buildChoiceTile(
+            title: 'WhatsApp',
+            subtitle: 'Students can initiate a WhatsApp chat with you.',
+            icon: Icons.phone_android_rounded,
+            isSelected: state.preferredContact == 'WhatsApp',
+            onTap: () => notifier.setPreferredContact('WhatsApp'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Step 4: Final Review ---
+  Widget _buildFinalReviewStep(AppUser user) {
+    final state = ref.watch(plugApplicationControllerProvider);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Review Your Profile', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          Text('Take a moment to review how your profile will appear to the community.', 
+            style: GoogleFonts.plusJakartaSans(color: const Color(0xFF64748B))),
+          const SizedBox(height: 32),
+          
+          _buildReviewSection(
+            'Professional Identity',
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildReviewItem('Introduction', state.intro),
+                const SizedBox(height: 16),
+                _buildReviewItem('Campus', state.selectedCampus ?? user.university ?? 'Not set'),
+              ],
+            ),
+            onEdit: () => _goToStep(1),
+          ),
+          const SizedBox(height: 24),
+          _buildReviewSection(
+            'Service Coverage',
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildReviewItem('Service Areas', state.serviceAreas.join(', ')),
+                const SizedBox(height: 16),
+                _buildReviewItem('Availability', state.availability),
+              ],
+            ),
+            onEdit: () => _goToStep(2),
+          ),
+          const SizedBox(height: 24),
+          _buildReviewSection(
+            'Specialties & Contact',
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildReviewItem('Specialties', state.specialties.join(', ')),
+                const SizedBox(height: 16),
+                _buildReviewItem('Contact via', state.preferredContact),
+              ],
+            ),
+            onEdit: () => _goToStep(3),
+          ),
+          
+          const SizedBox(height: 32),
+          Text(
+            'By completing onboarding, you agree to provide accurate housing information and maintain a professional standard of service.',
+            style: GoogleFonts.plusJakartaSans(fontSize: 12, color: const Color(0xFF94A3B8), height: 1.5),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewSection(String title, Widget content, {required VoidCallback onEdit}) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildReviewItem('Introduction', appState.intro.isNotEmpty ? appState.intro : 'Not set', onEdit: () => _goToStep(1)),
-          _buildReviewItem('Campus', appState.selectedCampus ?? 'Default Campus', onEdit: () => _goToStep(1)),
-          _buildReviewItem('Areas Served', appState.areasServed.isNotEmpty ? appState.areasServed : 'Not set', onEdit: () => _goToStep(1)),
-          _buildReviewItem('Experience', '${appState.experienceLevel} (${appState.hasExperience == 'Yes' ? 'Has experience' : 'Newcomer'})', isLast: true, onEdit: () => _goToStep(2)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(title, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF64748B))),
+              GestureDetector(
+                onTap: onEdit,
+                child: const Text('Edit', style: TextStyle(color: Color(0xFF1677F2), fontWeight: FontWeight.bold, fontSize: 13)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          content,
         ],
       ),
+    );
+  }
+
+  Widget _buildReviewItem(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey.shade500, letterSpacing: 0.5)),
+        const SizedBox(height: 4),
+        Text(value, style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B))),
+      ],
     );
   }
 
@@ -589,34 +708,7 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
     );
   }
 
-  Widget _buildReviewItem(String label, String value, {bool isLast = false, VoidCallback? onEdit}) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF94A3B8))),
-                const SizedBox(height: 4),
-                Text(value, style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B))),
-              ],
-            ),
-          ),
-          if (onEdit != null)
-            IconButton(
-              icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF1677F2)),
-              onPressed: onEdit,
-              visualDensity: VisualDensity.compact,
-            ),
-        ],
-      ),
-    );
-  }
-
-  // --- Step 5: Success Screen ---
+  // --- Success Screen ---
   Widget _buildSuccessScreen() {
     return Scaffold(
       backgroundColor: Colors.white,
@@ -637,13 +729,13 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
               ),
               const SizedBox(height: 32),
               Text(
-                'Application Submitted',
+                'Onboarding Complete',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.plusJakartaSans(fontSize: 26, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 16),
               Text(
-                'Your request to join the Housing Plug Network is now being reviewed. Since you are already verified, this process will be quick.',
+                'Your Housing Plug profile is being processed. Students will soon be able to find you and your housing specialties.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.plusJakartaSans(fontSize: 16, color: const Color(0xFF64748B), height: 1.5),
               ),
@@ -661,7 +753,7 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                   ),
                   child: Text(
-                    'Return to Home',
+                    'Go to Dashboard',
                     style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16),
                   ),
                 ),
@@ -727,12 +819,61 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
               .toList(),
           onChanged: (String? v) {
             if (v != null) {
-              ref.read(plugApplicationControllerProvider.notifier).updateProfessional(campus: v);
+              ref.read(plugApplicationControllerProvider.notifier).updateBasicInfo(campus: v);
             }
           },
           decoration: _inputDecoration(),
         ),
       ],
+    );
+  }
+
+  Widget _buildChoiceTile({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF1677F2).withOpacity(0.05) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF1677F2) : const Color(0xFFE2E8F0),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xFF1677F2).withOpacity(0.1) : const Color(0xFFF1F5F9),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: isSelected ? const Color(0xFF1677F2) : const Color(0xFF64748B), size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 15, color: const Color(0xFF1E293B))),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: GoogleFonts.plusJakartaSans(fontSize: 12, color: const Color(0xFF64748B))),
+                ],
+              ),
+            ),
+            if (isSelected)
+              const Icon(Icons.check_circle_rounded, color: Color(0xFF1677F2)),
+          ],
+        ),
+      ),
     );
   }
 

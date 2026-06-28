@@ -17,6 +17,7 @@ class StudentVerificationScreen extends ConsumerStatefulWidget {
 class _StudentVerificationScreenState extends ConsumerState<StudentVerificationScreen> {
   File? _imageFile;
   bool _isSubmitting = false;
+  double _uploadProgress = 0;
   final _picker = ImagePicker();
 
   Future<void> _pickImage() async {
@@ -37,6 +38,7 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
 
     setState(() {
       _isSubmitting = true;
+      _uploadProgress = 0;
     });
 
     try {
@@ -48,6 +50,9 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
         path: 'verifications/student',
         id: 'student_id_${user.uid}_${DateTime.now().millisecondsSinceEpoch}',
         file: _imageFile!,
+        onProgress: (sent, total) {
+          setState(() => _uploadProgress = sent / total);
+        },
       );
 
       // 2. Submit to repository
@@ -151,7 +156,7 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
                             top: 12,
                             right: 12,
                             child: CircleAvatar(
-                              backgroundColor: Colors.black.withOpacity(0.5),
+                              backgroundColor: Colors.black.withValues(alpha: 0.5),
                               child: IconButton(
                                 icon: const Icon(Icons.edit, color: Colors.white),
                                 onPressed: _pickImage,
@@ -192,6 +197,23 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
             _buildRequirementItem(Icons.check_circle_outline, 'ID card should be valid/not expired'),
             
             const SizedBox(height: 48),
+
+            if (_isSubmitting) ...[
+              LinearProgressIndicator(
+                value: _uploadProgress,
+                backgroundColor: const Color(0xFFF1F5F9),
+                valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              const SizedBox(height: 12),
+              Center(
+                child: Text(
+                  'Uploading Document: ${(_uploadProgress * 100).toInt()}%',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.blueGrey.shade700),
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
             
             SizedBox(
               width: double.infinity,
@@ -200,10 +222,16 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
                 onPressed: (_imageFile == null || _isSubmitting) ? null : _submit,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 0,
                 ),
                 child: _isSubmitting
-                    ? const CircularProgressIndicator(color: Colors.white)
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
                     : const Text(
                         'Submit for Review',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),

@@ -22,12 +22,18 @@ class TrustRepositoryImpl implements TrustRepository {
     final snapshot = await _firestore.collection('verification_applications')
         .where('userId', isEqualTo: userId)
         .where('role', isEqualTo: role.name)
-        .orderBy('createdAt', descending: true)
-        .limit(1)
         .get();
         
     if (snapshot.docs.isEmpty) return null;
-    return VerificationApplication.fromFirestore(snapshot.docs.first);
+    
+    final apps = snapshot.docs
+        .map((doc) => VerificationApplication.fromFirestore(doc))
+        .toList();
+        
+    // Sort in memory to avoid requiring a composite index
+    apps.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    
+    return apps.first;
   }
 
   @override

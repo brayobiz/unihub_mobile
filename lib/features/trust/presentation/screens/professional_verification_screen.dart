@@ -234,10 +234,16 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
                         onPressed: _isSubmitting ? null : _submit,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryColor,
+                          foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          elevation: 0,
                         ),
                         child: _isSubmitting
-                            ? const CircularProgressIndicator(color: Colors.white)
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              )
                             : const Text(
                                 'Submit Application',
                                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),

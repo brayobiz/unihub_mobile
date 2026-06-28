@@ -139,6 +139,8 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
     if (user == null) return const SizedBox.shrink();
 
     final isVerified = user.isVerified;
+    final isIdentityPending = user.identityStatus == 'pending';
+    final isIdentityRejected = user.identityStatus == 'rejected';
 
     // Roles most relevant to Gigs
     final roles = [
@@ -154,42 +156,48 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      color: Colors.indigo.shade50,
+      color: (isIdentityRejected) ? Colors.red.shade50 : Colors.indigo.shade50,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Icon(
-                !isVerified ? Icons.lock_outline_rounded : Icons.verified_user_outlined, 
+                isIdentityRejected ? Icons.error_outline_rounded : (!isVerified ? Icons.lock_outline_rounded : Icons.verified_user_outlined), 
                 size: 20, 
-                color: Colors.indigo.shade700
+                color: isIdentityRejected ? Colors.red.shade700 : Colors.indigo.shade700
               ),
               const SizedBox(width: 8),
               Text(
-                !isVerified ? 'Verification Required' : 'Professional Profiles',
-                style: TextStyle(fontWeight: FontWeight.w800, color: Colors.indigo.shade900, fontSize: 13),
+                isIdentityRejected ? 'Identity Rejected' : (!isVerified ? 'Verification Required' : 'Professional Profiles'),
+                style: TextStyle(fontWeight: FontWeight.w800, color: isIdentityRejected ? Colors.red.shade900 : Colors.indigo.shade900, fontSize: 13),
               ),
             ],
           ),
-          if (!isVerified) ...[
+          if (!isVerified || isIdentityPending || isIdentityRejected) ...[
             const SizedBox(height: 8),
             Text(
-              'Verify your platform identity to apply for professional badges.',
-              style: TextStyle(fontSize: 12, color: Colors.indigo.shade700),
+              isIdentityRejected 
+                ? 'Your identity verification was not approved. Please fix it in the Trust Center.'
+                : (isIdentityPending 
+                    ? 'Your identity is under review. You can apply for these roles once approved.'
+                    : 'Verify your platform identity to apply for professional badges.'),
+              style: TextStyle(fontSize: 12, color: isIdentityRejected ? Colors.red.shade700 : Colors.indigo.shade700),
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () => context.push('/trust-center'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.indigo,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            if (!isIdentityPending) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => context.push(isIdentityRejected ? '/trust-center' : '/verify-identity'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: isIdentityRejected ? Colors.red : Colors.indigo,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: Text(isIdentityRejected ? 'Fix Identity Issues' : 'Verify Identity'),
                 ),
-                child: const Text('Verify Identity'),
               ),
-            ),
+            ],
           ] else ...[
             const SizedBox(height: 12),
             SingleChildScrollView(

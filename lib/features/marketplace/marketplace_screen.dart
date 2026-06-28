@@ -332,16 +332,22 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
   Widget _buildSellerVerificationCTA(VerificationApplication? app) {
     final user = ref.watch(appUserProvider).valueOrNull;
     final isVerified = user?.isVerified ?? false;
-    final isPending = app?.status == VerificationStatus.pending;
-    final isRejected = app?.status == VerificationStatus.rejected;
+    final isIdentityPending = user?.identityStatus == 'pending';
+    final isIdentityRejected = user?.identityStatus == 'rejected';
+    
+    final isRolePending = app?.status == VerificationStatus.pending;
+    final isRoleRejected = app?.status == VerificationStatus.rejected;
+
+    // Determine the most relevant state to show
+    final bool showIdentityIssue = !isVerified || isIdentityPending || isIdentityRejected;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isRejected ? Colors.red.shade50 : Colors.indigo.shade50,
+        color: (isRoleRejected || isIdentityRejected) ? Colors.red.shade50 : Colors.indigo.shade50,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: isRejected ? Colors.red.shade100 : Colors.indigo.shade100),
+        border: Border.all(color: (isRoleRejected || isIdentityRejected) ? Colors.red.shade100 : Colors.indigo.shade100),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -349,15 +355,17 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
           Row(
             children: [
               Icon(
-                isRejected ? Icons.error_outline : (isPending ? Icons.access_time : Icons.verified_user_outlined),
-                color: isRejected ? Colors.red : Colors.indigo,
+                (isRoleRejected || isIdentityRejected) ? Icons.error_outline : ((isRolePending || isIdentityPending) ? Icons.access_time : Icons.verified_user_outlined),
+                color: (isRoleRejected || isIdentityRejected) ? Colors.red : Colors.indigo,
               ),
               const SizedBox(width: 12),
               Text(
-                !isVerified ? 'Verification Required' : (isRejected ? 'Application Rejected' : (isPending ? 'Review Pending' : 'Apply as Trusted Seller')),
+                showIdentityIssue 
+                  ? (isIdentityRejected ? 'Identity Rejected' : (isIdentityPending ? 'Identity Reviewing' : 'Identity Required'))
+                  : (isRoleRejected ? 'Seller Application Rejected' : (isRolePending ? 'Review Pending' : 'Apply as Trusted Seller')),
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: isRejected ? Colors.red.shade900 : Colors.indigo.shade900,
+                  color: (isRoleRejected || isIdentityRejected) ? Colors.red.shade900 : Colors.indigo.shade900,
                   fontSize: 16,
                 ),
               ),
@@ -365,29 +373,33 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
           ),
           const SizedBox(height: 8),
           Text(
-            !isVerified 
-                ? 'You must verify your platform identity before applying for a seller badge.'
-                : (isRejected
+            showIdentityIssue
+                ? (isIdentityRejected 
+                    ? 'Your identity verification was not approved. Please update it in the Trust Center.' 
+                    : (isIdentityPending 
+                        ? 'We are currently verifying your platform identity. You can apply as a seller once approved.' 
+                        : 'You must verify your platform identity before applying for a seller badge.'))
+                : (isRoleRejected
                     ? 'Your seller application was not approved. Review the guidelines and try again.'
-                    : (isPending 
+                    : (isRolePending 
                         ? 'Our team is reviewing your application. You\'ll get a badge once approved.'
                         : 'Get a verification badge next to your items and build trust with buyers.')),
             style: TextStyle(
               fontSize: 13,
-              color: isRejected ? Colors.red.shade700 : Colors.indigo.shade700,
+              color: (isRoleRejected || isIdentityRejected) ? Colors.red.shade700 : Colors.indigo.shade700,
             ),
           ),
-          if (!isPending) ...[
+          if (!isRolePending && !isIdentityPending) ...[
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: () => context.push(isVerified ? '/verify-professional/seller' : '/trust-center'),
+                onPressed: () => context.push(isVerified ? '/verify-professional/seller' : (isIdentityRejected ? '/trust-center' : '/verify-identity')),
                 style: FilledButton.styleFrom(
-                  backgroundColor: isRejected ? Colors.red : Colors.indigo,
+                  backgroundColor: (isRoleRejected || isIdentityRejected) ? Colors.red : Colors.indigo,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: Text(!isVerified ? 'Verify Identity' : (isRejected ? 'Re-apply Now' : 'Apply Now')),
+                child: Text(showIdentityIssue ? (isIdentityRejected ? 'Go to Trust Center' : 'Verify Identity') : (isRoleRejected ? 'Re-apply Now' : 'Apply Now')),
               ),
             ),
           ],

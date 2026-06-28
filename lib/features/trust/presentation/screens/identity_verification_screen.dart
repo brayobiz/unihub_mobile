@@ -18,6 +18,7 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
   File? _idFile;
   File? _selfieFile;
   bool _isSubmitting = false;
+  double _uploadProgress = 0;
   final _picker = ImagePicker();
 
   Future<void> _pickImage(bool isSelfie) async {
@@ -37,7 +38,10 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
   Future<void> _submit() async {
     if (_idFile == null || _selfieFile == null) return;
 
-    setState(() => _isSubmitting = true);
+    setState(() {
+      _isSubmitting = true;
+      _uploadProgress = 0;
+    });
 
     try {
       final user = ref.read(appUserProvider).valueOrNull;
@@ -50,6 +54,9 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
         path: 'verifications/identity/ids',
         id: 'id_${user.uid}_${DateTime.now().millisecondsSinceEpoch}',
         file: _idFile!,
+        onProgress: (sent, total) {
+          setState(() => _uploadProgress = (sent / total) * 0.5);
+        },
       );
 
       // 2. Upload Selfie
@@ -57,6 +64,9 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
         path: 'verifications/identity/selfies',
         id: 'selfie_${user.uid}_${DateTime.now().millisecondsSinceEpoch}',
         file: _selfieFile!,
+        onProgress: (sent, total) {
+          setState(() => _uploadProgress = 0.5 + (sent / total) * 0.5);
+        },
       );
 
       // 3. Submit to repository
@@ -136,6 +146,23 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
             _buildRequirements(),
             const SizedBox(height: 48),
             
+            if (_isSubmitting) ...[
+              LinearProgressIndicator(
+                value: _uploadProgress,
+                backgroundColor: const Color(0xFFF1F5F9),
+                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1677F2)),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              const SizedBox(height: 12),
+              Center(
+                child: Text(
+                  'Uploading Documents: ${(_uploadProgress * 100).toInt()}%',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.blueGrey.shade700),
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+            
             SizedBox(
               width: double.infinity,
               height: 56,
@@ -183,7 +210,7 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
               width: 60,
               height: 60,
               decoration: BoxDecoration(
-                color: (file != null ? const Color(0xFF10B981) : const Color(0xFF1677F2)).withOpacity(0.1),
+                color: (file != null ? const Color(0xFF10B981) : const Color(0xFF1677F2)).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: file != null

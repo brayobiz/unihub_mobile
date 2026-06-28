@@ -34,6 +34,10 @@ final applicationByRoleProvider = StreamProvider.family<VerificationApplication?
   );
 });
 
+final userApplicationByRoleProvider = FutureProvider.family<VerificationApplication?, ({String userId, ProfessionalRole role})>((ref, arg) {
+  return ref.watch(trustRepositoryProvider).getLatestApplication(arg.userId, arg.role);
+});
+
 final studentVerificationProvider = StreamProvider<StudentVerification?>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
   if (user == null) return Stream.value(null);
