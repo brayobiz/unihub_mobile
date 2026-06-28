@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unihub_mobile/features/trust/domain/models/professional_role.dart';
+import 'package:unihub_mobile/features/trust/domain/models/verification_application.dart';
+import 'package:unihub_mobile/features/trust/presentation/providers/trust_providers.dart';
 import '../auth/shared/providers.dart';
 import 'domain/models/marketplace_categories.dart';
 import 'presentation/controllers/marketplace_controller.dart';
@@ -270,44 +273,126 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
   }
 
   Widget _buildMyListingsTab() {
-    final user = ref.watch(authStateProvider).valueOrNull;
+    final user = ref.watch(appUserProvider).valueOrNull;
     if (user == null) return const Center(child: Text('Please log in to see your listings'));
+
+    final isVerifiedSeller = user.verifiedRoles.contains('seller');
+    final applicationAsync = ref.watch(applicationByRoleProvider(ProfessionalRole.seller));
 
     final myListingsAsync = ref.watch(sellerListingsProvider(user.uid));
 
-    return myListingsAsync.when(
-      data: (listings) {
-        if (listings.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.shopping_bag_outlined, size: 64, color: Colors.grey.shade200),
-                const SizedBox(height: 16),
-                const Text('You haven\'t posted any listings yet', style: TextStyle(color: Colors.grey)),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () => context.push('/add-listing'),
-                  child: const Text('Add Your First Listing'),
-                ),
-              ],
-            ),
-          );
-        }
-        return GridView.builder(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 0.75,
+    return Column(
+      children: [
+        if (!isVerifiedSeller)
+          applicationAsync.when(
+            data: (app) => _buildSellerVerificationCTA(app),
+            loading: () => const LinearProgressIndicator(),
+            error: (_, __) => const SizedBox.shrink(),
           ),
-          itemCount: listings.length,
-          itemBuilder: (context, index) => MarketplaceCard(listing: listings[index], index: index),
-        );
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, _) => Center(child: Text('Error: $err')),
+        Expanded(
+          child: myListingsAsync.when(
+            data: (listings) {
+              if (listings.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.shopping_bag_outlined, size: 64, color: Colors.grey.shade200),
+                      const SizedBox(height: 16),
+                      const Text('You haven\'t posted any listings yet', style: TextStyle(color: Colors.grey)),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: () => context.push('/add-listing'),
+                        child: const Text('Add Your First Listing'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return GridView.builder(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 16,
+                  childAspectRatio: 0.75,
+                ),
+                itemCount: listings.length,
+                itemBuilder: (context, index) => MarketplaceCard(listing: listings[index], index: index),
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (err, _) => Center(child: Text('Error: $err')),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSellerVerificationCTA(VerificationApplication? app) {
+    final user = ref.watch(appUserProvider).valueOrNull;
+    final isVerified = user?.isVerified ?? false;
+    final isPending = app?.status == VerificationStatus.pending;
+    final isRejected = app?.status == VerificationStatus.rejected;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isRejected ? Colors.red.shade50 : Colors.indigo.shade50,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: isRejected ? Colors.red.shade100 : Colors.indigo.shade100),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isRejected ? Icons.error_outline : (isPending ? Icons.access_time : Icons.verified_user_outlined),
+                color: isRejected ? Colors.red : Colors.indigo,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                !isVerified ? 'Verification Required' : (isRejected ? 'Application Rejected' : (isPending ? 'Review Pending' : 'Apply as Trusted Seller')),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isRejected ? Colors.red.shade900 : Colors.indigo.shade900,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            !isVerified 
+                ? 'You must verify your platform identity before applying for a seller badge.'
+                : (isRejected
+                    ? 'Your seller application was not approved. Review the guidelines and try again.'
+                    : (isPending 
+                        ? 'Our team is reviewing your application. You\'ll get a badge once approved.'
+                        : 'Get a verification badge next to your items and build trust with buyers.')),
+            style: TextStyle(
+              fontSize: 13,
+              color: isRejected ? Colors.red.shade700 : Colors.indigo.shade700,
+            ),
+          ),
+          if (!isPending) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => context.push(isVerified ? '/verify-professional/seller' : '/trust-center'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: isRejected ? Colors.red : Colors.indigo,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text(!isVerified ? 'Verify Identity' : (isRejected ? 'Re-apply Now' : 'Apply Now')),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 

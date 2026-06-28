@@ -288,7 +288,9 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
 
   // --- Step 0: Intro & Prerequisite Check ---
   Widget _buildIntroStep(AppUser user) {
-    final isVerified = user.isStudentVerified;
+    final isStudentVerified = user.isStudentVerified;
+    final isIdentityVerified = user.isIdentityVerified;
+    final isVerified = isStudentVerified && isIdentityVerified;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -355,7 +357,9 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
                   child: Text(
                     isVerified
                         ? 'Universal Platform Verification complete. You are ready to apply for the Housing Plug role.'
-                        : 'UniHub Platform Verification is required before joining the Housing Plug Network.',
+                        : !isIdentityVerified 
+                          ? 'UniHub Identity Verification is required before joining the Housing Plug Network.'
+                          : 'UniHub Student Verification is required before joining the Housing Plug Network.',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -372,7 +376,9 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
             width: double.infinity,
             height: 58,
             child: FilledButton(
-              onPressed: isVerified ? _nextPage : () => context.push('/trust-center'),
+              onPressed: isVerified 
+                ? _nextPage 
+                : () => context.push(!isIdentityVerified ? '/verify-identity' : '/trust-center'),
               style: FilledButton.styleFrom(
                 backgroundColor: isVerified ? const Color(0xFF1677F2) : const Color(0xFF0F172A),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),

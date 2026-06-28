@@ -68,7 +68,13 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_idDocumentFile == null || _selfieFile == null) {
+    
+    final user = ref.read(appUserProvider).valueOrNull;
+    if (user == null) return;
+    
+    final bool needsIdentity = !user.isVerified;
+
+    if (needsIdentity && (_idDocumentFile == null || _selfieFile == null)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please upload both ID and selfie'),
@@ -81,23 +87,24 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
     setState(() => _isSubmitting = true);
 
     try {
-      final user = ref.read(appUserProvider).valueOrNull;
-      if (user == null) throw Exception('User not logged in');
-
       final storage = ref.read(storageRepositoryProvider);
+      String? idUrl;
+      String? selfieUrl;
       
-      // Upload images using Platform Storage Repository
-      final idUrl = await storage.uploadFile(
-        path: 'verifications/${widget.role.name}/docs',
-        id: 'id_${user.uid}_${DateTime.now().millisecondsSinceEpoch}',
-        file: _idDocumentFile!,
-      );
+      if (needsIdentity) {
+        // Upload images using Platform Storage Repository
+        idUrl = await storage.uploadFile(
+          path: 'verifications/${widget.role.name}/docs',
+          id: 'id_${user.uid}_${DateTime.now().millisecondsSinceEpoch}',
+          file: _idDocumentFile!,
+        );
 
-      final selfieUrl = await storage.uploadFile(
-        path: 'verifications/${widget.role.name}/selfies',
-        id: 'selfie_${user.uid}_${DateTime.now().millisecondsSinceEpoch}',
-        file: _selfieFile!,
-      );
+        selfieUrl = await storage.uploadFile(
+          path: 'verifications/${widget.role.name}/selfies',
+          id: 'selfie_${user.uid}_${DateTime.now().millisecondsSinceEpoch}',
+          file: _selfieFile!,
+        );
+      }
 
       final application = VerificationApplication(
         id: const Uuid().v4(),
@@ -143,11 +150,13 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).primaryColor;
+    final user = ref.watch(appUserProvider).valueOrNull;
+    final bool isVerified = user?.isVerified ?? false;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Text('Role Verification', 
+        title: Text('Role Application', 
           style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
       ),
       body: SingleChildScrollView(
@@ -185,34 +194,36 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
                       primaryColor: primaryColor,
                     ),
                     
-                    const SizedBox(height: 32),
-                    const Text(
-                      'Identity Verification',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'We need to verify your identity to grant you the ${widget.role.label} badge.',
-                      style: TextStyle(color: Colors.blueGrey.shade600, fontSize: 14),
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    _buildUploadTile(
-                      title: 'National ID / Driver\'s License',
-                      subtitle: 'Upload a clear photo of your official ID',
-                      file: _idDocumentFile,
-                      onTap: () => _pickImage(false),
-                      primaryColor: primaryColor,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildUploadTile(
-                      title: 'Live Selfie',
-                      subtitle: 'Take a clear photo of your face',
-                      file: _selfieFile,
-                      onTap: () => _pickImage(true),
-                      isCamera: true,
-                      primaryColor: primaryColor,
-                    ),
+                    if (!isVerified) ...[
+                      const SizedBox(height: 32),
+                      const Text(
+                        'Identity Verification',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'We need to verify your identity to grant you the ${widget.role.label} badge.',
+                        style: TextStyle(color: Colors.blueGrey.shade600, fontSize: 14),
+                      ),
+                      const SizedBox(height: 20),
+                      
+                      _buildUploadTile(
+                        title: 'National ID / Driver\'s License',
+                        subtitle: 'Upload a clear photo of your official ID',
+                        file: _idDocumentFile,
+                        onTap: () => _pickImage(false),
+                        primaryColor: primaryColor,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildUploadTile(
+                        title: 'Live Selfie',
+                        subtitle: 'Take a clear photo of your face',
+                        file: _selfieFile,
+                        onTap: () => _pickImage(true),
+                        isCamera: true,
+                        primaryColor: primaryColor,
+                      ),
+                    ],
                     
                     const SizedBox(height: 48),
                     
@@ -245,6 +256,9 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
   }
 
   Widget _buildExplanationHeader(Color primaryColor) {
+    final roleName = widget.role.name == 'housePlug' ? 'House Plug' : 
+                     widget.role.name[0].toUpperCase() + widget.role.name.substring(1);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -267,7 +281,7 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
           ),
           const SizedBox(height: 16),
           Text(
-            'Become a ${widget.role.label}',
+            'Apply for $roleName Role',
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 20,
@@ -277,7 +291,7 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
           ),
           const SizedBox(height: 8),
           Text(
-            'Verification adds a badge to your profile, increasing your trust score and credibility across the UniHub community.',
+            'Trusted roles unlock specialized platform features. Applying as a $roleName helps verify your business activity to other students.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,

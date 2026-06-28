@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../domain/models/verification_application.dart';
 import '../../domain/models/professional_role.dart';
 import '../../domain/models/student_verification.dart';
+import '../../domain/models/identity_verification.dart';
 import '../../domain/repositories/trust_repository.dart';
 
 class TrustRepositoryImpl implements TrustRepository {
@@ -67,6 +68,37 @@ class TrustRepositoryImpl implements TrustRepository {
         .doc(userId)
         .snapshots()
         .map((doc) => doc.exists ? StudentVerification.fromFirestore(doc) : null);
+  }
+
+  @override
+  Future<void> submitIdentityVerification(String userId, String idUrl, String selfieUrl) async {
+    await _firestore.collection('identity_verifications').doc(userId).set({
+      'userId': userId,
+      'idDocumentUrl': idUrl,
+      'selfieUrl': selfieUrl,
+      'status': IdentityVerificationStatus.pending.name,
+      'submittedAt': FieldValue.serverTimestamp(),
+    });
+    
+    // Also update the user document status for immediate UI feedback if needed
+    await _firestore.collection('users').doc(userId).update({
+      'identityStatus': 'pending',
+    });
+  }
+
+  @override
+  Future<IdentityVerification?> getIdentityVerification(String userId) async {
+    final doc = await _firestore.collection('identity_verifications').doc(userId).get();
+    if (!doc.exists) return null;
+    return IdentityVerification.fromFirestore(doc);
+  }
+
+  @override
+  Stream<IdentityVerification?> watchIdentityVerification(String userId) {
+    return _firestore.collection('identity_verifications')
+        .doc(userId)
+        .snapshots()
+        .map((doc) => doc.exists ? IdentityVerification.fromFirestore(doc) : null);
   }
 
   @override

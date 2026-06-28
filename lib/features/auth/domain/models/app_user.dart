@@ -23,6 +23,8 @@ class AppUser {
   final bool isEmailVerified;
   final bool isPhoneVerified;
   final bool isStudentVerified;
+  final bool isIdentityVerified;
+  final String identityStatus; // 'none' | 'pending' | 'approved' | 'rejected'
   final List<String> verifiedRoles; // List of ProfessionalRole names
   
   final String tier; // 'free' | 'pro'
@@ -72,6 +74,8 @@ class AppUser {
     this.isEmailVerified = false,
     this.isPhoneVerified = false,
     this.isStudentVerified = false,
+    this.isIdentityVerified = false,
+    this.identityStatus = 'none',
     this.verifiedRoles = const [],
     this.tier = 'free',
     this.whatsappNumber,
@@ -109,7 +113,7 @@ class AppUser {
   bool get isVerifiedPlug => verifiedRoles.contains('housePlug');
   bool get isVerifiedSeller => verifiedRoles.contains('seller');
   bool get isAnyRoleVerified => verifiedRoles.isNotEmpty;
-  bool get isVerified => isAnyRoleVerified;
+  bool get isVerified => isIdentityVerified || isAnyRoleVerified;
 
   double get profileCompletion {
     int score = 0;
@@ -148,6 +152,8 @@ class AppUser {
     bool? isEmailVerified,
     bool? isPhoneVerified,
     bool? isStudentVerified,
+    bool? isIdentityVerified,
+    String? identityStatus,
     List<String>? verifiedRoles,
     String? tier,
     String? whatsappNumber,
@@ -192,6 +198,8 @@ class AppUser {
       isEmailVerified: isEmailVerified ?? this.isEmailVerified,
       isPhoneVerified: isPhoneVerified ?? this.isPhoneVerified,
       isStudentVerified: isStudentVerified ?? this.isStudentVerified,
+      isIdentityVerified: isIdentityVerified ?? this.isIdentityVerified,
+      identityStatus: identityStatus ?? this.identityStatus,
       verifiedRoles: verifiedRoles ?? this.verifiedRoles,
       tier: tier ?? this.tier,
       whatsappNumber: whatsappNumber ?? this.whatsappNumber,
@@ -239,6 +247,8 @@ class AppUser {
       'isEmailVerified': isEmailVerified,
       'isPhoneVerified': isPhoneVerified,
       'isStudentVerified': isStudentVerified,
+      'isIdentityVerified': isIdentityVerified,
+      'identityStatus': identityStatus,
       'verifiedRoles': verifiedRoles,
       'tier': tier,
       'whatsappNumber': whatsappNumber,
@@ -306,6 +316,8 @@ class AppUser {
       isEmailVerified: json['isEmailVerified'] ?? false,
       isPhoneVerified: json['isPhoneVerified'] ?? false,
       isStudentVerified: json['isStudentVerified'] ?? false,
+      isIdentityVerified: json['isIdentityVerified'] ?? false,
+      identityStatus: json['identityStatus']?.toString() ?? 'none',
       verifiedRoles: (json['verifiedRoles'] as List?)?.map((e) => e.toString()).toList() ?? <String>[],
       tier: safeString(json['tier'], 'free'),
       whatsappNumber: json['whatsappNumber']?.toString(),

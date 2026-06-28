@@ -32,9 +32,9 @@ class PlugDashboardScreen extends ConsumerWidget {
           elevation: 0,
         ),
         body: applicationAsync.when(
-          data: (application) => _buildNoAccessBody(context, application),
+          data: (application) => _buildNoAccessBody(context, ref, application),
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => _buildNoAccessBody(context, null),
+          error: (e, _) => _buildNoAccessBody(context, ref, null),
         ),
       );
     }
@@ -86,7 +86,9 @@ class PlugDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildNoAccessBody(BuildContext context, VerificationApplication? application) {
+  Widget _buildNoAccessBody(BuildContext context, WidgetRef ref, VerificationApplication? application) {
+    final user = ref.watch(appUserProvider).valueOrNull;
+    final isVerified = user?.isVerified ?? false;
     final hasPendingApp = application?.status == VerificationStatus.pending;
     final isRejected = application?.status == VerificationStatus.rejected;
 
@@ -102,32 +104,38 @@ class PlugDashboardScreen extends ConsumerWidget {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              isRejected 
-                  ? Icons.error_outline_rounded 
-                  : hasPendingApp 
-                      ? Icons.hourglass_empty_rounded 
-                      : Icons.lock_person_rounded, 
+              !isVerified 
+                  ? Icons.verified_user_rounded
+                  : (isRejected 
+                      ? Icons.error_outline_rounded 
+                      : hasPendingApp 
+                          ? Icons.hourglass_empty_rounded 
+                          : Icons.lock_person_rounded), 
               color: isRejected ? Colors.red : const Color(0xFF1677F2), 
               size: 64
             ),
           ),
           const SizedBox(height: 32),
           Text(
-            isRejected 
-                ? 'Application Rejected' 
-                : hasPendingApp 
-                    ? 'Application Pending' 
-                    : 'Plug Access Required',
+            !isVerified 
+                ? 'Identity Verification Required'
+                : (isRejected 
+                    ? 'Application Rejected' 
+                    : hasPendingApp 
+                        ? 'Application Pending' 
+                        : 'Plug Access Required'),
             style: GoogleFonts.plusJakartaSans(fontSize: 24, fontWeight: FontWeight.w800),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
           Text(
-            isRejected
-                ? 'Unfortunately, your application to join the Housing Plug Network was not approved at this time.'
-                : hasPendingApp
-                    ? 'Your application is currently being reviewed. You will gain access to this dashboard once approved.'
-                    : 'You must be a verified Housing Plug to access the professional dashboard and manage listings.',
+            !isVerified
+                ? 'To join the Housing Plug Network, you must first verify your identity with the platform Trust Engine.'
+                : (isRejected
+                    ? 'Unfortunately, your application to join the Housing Plug Network was not approved at this time.'
+                    : hasPendingApp
+                        ? 'Your application is currently being reviewed. You will gain access to this dashboard once approved.'
+                        : 'You must be a verified Housing Plug to access the professional dashboard and manage listings.'),
             style: GoogleFonts.plusJakartaSans(fontSize: 16, color: const Color(0xFF64748B), height: 1.5),
             textAlign: TextAlign.center,
           ),
@@ -137,13 +145,15 @@ class PlugDashboardScreen extends ConsumerWidget {
               width: double.infinity,
               height: 58,
               child: FilledButton(
-                onPressed: () => context.pushReplacement('/trust-center'),
+                onPressed: () => context.pushReplacement(isVerified ? '/verify-professional/housePlug' : '/trust-center'),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF1677F2),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                 ),
                 child: Text(
-                  isRejected ? 'Check Status in Trust Center' : 'Go to Trust Center',
+                  !isVerified 
+                      ? 'Verify Identity' 
+                      : (isRejected ? 'Update Application' : 'Apply for Plug Access'),
                   style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16),
                 ),
               ),

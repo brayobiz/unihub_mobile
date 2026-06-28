@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:unihub_mobile/features/trust/domain/models/professional_role.dart';
+import 'package:unihub_mobile/features/trust/domain/models/verification_application.dart';
+import 'package:unihub_mobile/features/trust/presentation/providers/trust_providers.dart';
 import '../../models/feed_type.dart';
 import '../shared/feed_repository.dart';
 import '../../widgets/feed/feed_card.dart';
@@ -56,58 +59,65 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
           ),
         ),
       ),
-      body: feedAsync.when(
-        data: (items) {
-          final filteredItems = items.where((i) => 
-            i.title.toLowerCase().contains(_searchQuery) || 
-            i.subtitle.toLowerCase().contains(_searchQuery)
-          ).toList();
+      body: Column(
+        children: [
+          _buildRoleApplicationBanner(context, ref),
+          Expanded(
+            child: feedAsync.when(
+              data: (items) {
+                final filteredItems = items.where((i) => 
+                  i.title.toLowerCase().contains(_searchQuery) || 
+                  i.subtitle.toLowerCase().contains(_searchQuery)
+                ).toList();
 
-          if (filteredItems.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.work_off_outlined, size: 64, color: Colors.grey.shade300),
-                  const SizedBox(height: 16),
-                  Text('No gigs found matching your search.', style: TextStyle(color: Colors.grey.shade600)),
-                ],
-              ),
-            );
-          }
+                if (filteredItems.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.work_off_outlined, size: 64, color: Colors.grey.shade300),
+                        const SizedBox(height: 16),
+                        Text('No gigs found matching your search.', style: TextStyle(color: Colors.grey.shade600)),
+                      ],
+                    ),
+                  );
+                }
 
-          return ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: filteredItems.length,
-            itemBuilder: (context, index) {
-              final item = filteredItems[index];
-              final isLiked = user != null && item.likedBy.contains(user.uid);
-              final isOwner = user != null && item.authorId == user.uid;
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: filteredItems.length,
+                  itemBuilder: (context, index) {
+                    final item = filteredItems[index];
+                    final isLiked = user != null && item.likedBy.contains(user.uid);
+                    final isOwner = user != null && item.authorId == user.uid;
 
-              return Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: GestureDetector(
-                  onTap: () => context.push('/gig-detail', extra: item),
-                  child: FeedCard(
-                    item: _truncateGigDescription(item),
-                    isLiked: isLiked,
-                    showDelete: isOwner,
-                    onLike: () {
-                      if (user != null) {
-                        ref.read(feedRepositoryProvider).toggleLike(item.id, user.uid);
-                      }
-                    },
-                    onDelete: () {
-                      ref.read(feedRepositoryProvider).deleteFeedItem(item.id);
-                    },
-                  ),
-                ),
-              );
-            },
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: $err')),
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: GestureDetector(
+                        onTap: () => context.push('/gig-detail', extra: item),
+                        child: FeedCard(
+                          item: _truncateGigDescription(item),
+                          isLiked: isLiked,
+                          showDelete: isOwner,
+                          onLike: () {
+                            if (user != null) {
+                              ref.read(feedRepositoryProvider).toggleLike(item.id, user.uid);
+                            }
+                          },
+                          onDelete: () {
+                            ref.read(feedRepositoryProvider).deleteFeedItem(item.id);
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, _) => Center(child: Text('Error: $err')),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
@@ -120,6 +130,109 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
         icon: const Icon(Icons.add_task_rounded),
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
+      ),
+    );
+  }
+
+  Widget _buildRoleApplicationBanner(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(appUserProvider).valueOrNull;
+    if (user == null) return const SizedBox.shrink();
+
+    final isVerified = user.isVerified;
+
+    // Roles most relevant to Gigs
+    final roles = [
+      ProfessionalRole.tutor,
+      ProfessionalRole.serviceProvider,
+      ProfessionalRole.technician,
+    ];
+
+    // Filter to roles not yet verified
+    final pendingRoles = roles.where((r) => !user.verifiedRoles.contains(r.name)).toList();
+    if (pendingRoles.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      color: Colors.indigo.shade50,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                !isVerified ? Icons.lock_outline_rounded : Icons.verified_user_outlined, 
+                size: 20, 
+                color: Colors.indigo.shade700
+              ),
+              const SizedBox(width: 8),
+              Text(
+                !isVerified ? 'Verification Required' : 'Professional Profiles',
+                style: TextStyle(fontWeight: FontWeight.w800, color: Colors.indigo.shade900, fontSize: 13),
+              ),
+            ],
+          ),
+          if (!isVerified) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Verify your platform identity to apply for professional badges.',
+              style: TextStyle(fontSize: 12, color: Colors.indigo.shade700),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => context.push('/trust-center'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.indigo,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Verify Identity'),
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 12),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: pendingRoles.map((role) {
+                  final appAsync = ref.watch(applicationByRoleProvider(role));
+                  
+                  return appAsync.when(
+                    data: (app) {
+                      final isPending = app?.status == VerificationStatus.pending;
+                      final isRejected = app?.status == VerificationStatus.rejected;
+                      
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 10),
+                        child: ActionChip(
+                          onPressed: isPending ? null : () => context.push('/verify-professional/${role.name}'),
+                          backgroundColor: isRejected ? Colors.red.shade100 : (isPending ? Colors.grey.shade200 : Colors.white),
+                          side: BorderSide(color: isRejected ? Colors.red.shade200 : Colors.indigo.shade100),
+                          label: Text(
+                            isRejected ? 'Apply ${role.label} (Rejected)' : (isPending ? '${role.label} (Pending)' : 'Apply as ${role.label}'),
+                            style: TextStyle(
+                              fontSize: 12, 
+                              fontWeight: FontWeight.bold,
+                              color: isRejected ? Colors.red.shade900 : (isPending ? Colors.grey.shade600 : Colors.indigo.shade700),
+                            ),
+                          ),
+                          avatar: Icon(
+                            isRejected ? Icons.error_outline : (isPending ? Icons.access_time : Icons.add_circle_outline),
+                            size: 14,
+                            color: isRejected ? Colors.red.shade700 : (isPending ? Colors.grey.shade600 : Colors.indigo.shade700),
+                          ),
+                        ),
+                      );
+                    },
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

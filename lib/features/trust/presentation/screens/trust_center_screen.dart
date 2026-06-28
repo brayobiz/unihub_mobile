@@ -3,10 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
-import 'package:unihub_mobile/features/trust/domain/models/professional_role.dart';
 import 'package:unihub_mobile/features/trust/presentation/providers/trust_providers.dart';
-import 'package:unihub_mobile/features/trust/domain/models/verification_application.dart';
 import 'package:unihub_mobile/features/trust/domain/models/student_verification.dart';
+import 'package:unihub_mobile/features/trust/domain/models/identity_verification.dart';
 
 class TrustCenterScreen extends ConsumerWidget {
   const TrustCenterScreen({super.key});
@@ -15,7 +14,7 @@ class TrustCenterScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final appUserAsync = ref.watch(appUserProvider);
     final studentVerificationAsync = ref.watch(studentVerificationProvider);
-    final applicationsAsync = ref.watch(userApplicationsProvider);
+    final identityVerificationAsync = ref.watch(identityVerificationProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -39,31 +38,23 @@ class TrustCenterScreen extends ConsumerWidget {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _buildTrustOverview(user),
-                ),
-              ),
-
-              // 3. Student Verification Status
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-                  child: studentVerificationAsync.when(
-                    data: (v) => _buildStudentVerificationCard(context, user, v),
-                    loading: () => const Center(child: CircularProgressIndicator()),
-                    error: (e, _) => Text('Error: $e'),
+                  child: InkWell(
+                    onTap: () => _showTrustBreakdown(context, user),
+                    borderRadius: BorderRadius.circular(24),
+                    child: _buildTrustOverview(user),
                   ),
                 ),
               ),
 
-              // 4. Professional Roles
+              // 3. Platform Verification
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 32, 16, 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Verified Roles',
+                        'Platform Verification',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
@@ -73,7 +64,7 @@ class TrustCenterScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Unlock specialized features by verifying your role in the community.',
+                        'These verifications establish your identity across all of UniHub.',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.blueGrey.shade600,
@@ -84,32 +75,39 @@ class TrustCenterScreen extends ConsumerWidget {
                 ),
               ),
 
-              applicationsAsync.when(
-                data: (apps) {
-                  return SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final role = ProfessionalRole.values[index];
-                          final app = apps.firstWhere(
-                            (a) => a.role == role,
-                            orElse: () => _emptyApplication(user.uid, role),
-                          );
-                          final isActuallyVerified = user.verifiedRoles.contains(role.name);
-                          
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _buildRoleCard(context, role, app, isActuallyVerified),
-                          );
-                        },
-                        childCount: ProfessionalRole.values.length,
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: [
+                      studentVerificationAsync.when(
+                        data: (v) => _buildStudentVerificationCard(context, user, v),
+                        loading: () => const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                        error: (e, _) => _buildErrorCard('Student Status Error: $e'),
                       ),
-                    ),
-                  );
-                },
-                loading: () => const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator())),
-                error: (e, _) => SliverToBoxAdapter(child: Text('Error: $e')),
+                      const SizedBox(height: 12),
+                      identityVerificationAsync.when(
+                        data: (v) => _buildIdentityVerificationCard(context, user, v),
+                        loading: () => const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                        error: (e, _) => _buildErrorCard('Identity Verification Error: $e'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // 4. Educational Section
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: _buildEducationSection(),
+                ),
               ),
 
               const SliverToBoxAdapter(child: SizedBox(height: 40)),
@@ -122,15 +120,14 @@ class TrustCenterScreen extends ConsumerWidget {
     );
   }
 
-  VerificationApplication _emptyApplication(String userId, ProfessionalRole role) {
-    return VerificationApplication(
-      id: '',
-      userId: userId,
-      role: role,
-      status: VerificationStatus.expired, // Using expired as "none"
-      createdAt: DateTime.now(),
-      fullName: '',
-      phoneNumber: '',
+  Widget _buildErrorCard(String message) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(message, style: const TextStyle(color: Colors.red)),
     );
   }
 
@@ -156,7 +153,7 @@ class TrustCenterScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Build Your Reputation',
+            'Single Identity, Total Trust',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 22,
@@ -167,7 +164,7 @@ class TrustCenterScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Verification builds trust across UniHub and helps keep the campus community safe for everyone.',
+            'Verify your identity once and unlock professional roles across the entire platform.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 15,
@@ -182,7 +179,6 @@ class TrustCenterScreen extends ConsumerWidget {
 
   Widget _buildTrustOverview(user) {
     return Container(
-      margin: const EdgeInsets.only(top: 24),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -208,7 +204,7 @@ class TrustCenterScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Your Trust Score',
+                    'Platform Trust Score',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 16,
@@ -217,7 +213,7 @@ class TrustCenterScreen extends ConsumerWidget {
                   ),
                   SizedBox(height: 4),
                   Text(
-                    'Based on your activity',
+                    'Overall reputation on UniHub',
                     style: TextStyle(
                       color: Colors.white70,
                       fontSize: 12,
@@ -250,6 +246,157 @@ class TrustCenterScreen extends ConsumerWidget {
               minHeight: 8,
               backgroundColor: Colors.white.withOpacity(0.2),
               valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIdentityVerificationCard(BuildContext context, user, IdentityVerification? v) {
+    final bool isVerified = user.isIdentityVerified;
+    final bool isPending = v?.status == IdentityVerificationStatus.pending;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isVerified ? const Color(0xFF10B981) : Colors.transparent,
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: (isVerified ? const Color(0xFF10B981) : const Color(0xFF1677F2)).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  isVerified ? Icons.badge_rounded : Icons.badge_outlined,
+                  color: isVerified ? const Color(0xFF10B981) : const Color(0xFF1677F2),
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Identity Verification',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                    Text(
+                      isVerified 
+                        ? 'Your identity is confirmed' 
+                        : isPending 
+                          ? 'Review in progress' 
+                          : 'Verify your ID and face to build trust',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.blueGrey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isVerified)
+                const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981))
+              else if (isPending)
+                _buildStatusBadge('Pending', Colors.orange)
+            ],
+          ),
+          if (isPending) ...[
+            const SizedBox(height: 16),
+            _buildInfoBox('Our team is verifying your government ID. This usually takes 12-24 hours.'),
+          ],
+          if (!isVerified && !isPending) ...[
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => context.push('/verify-identity'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1677F2),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Verify Identity', style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.access_time_rounded, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            text, 
+            style: TextStyle(
+              fontSize: 11, 
+              fontWeight: FontWeight.w800, 
+              color: color
+            )
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoBox(String message) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1677F2).withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF1677F2).withOpacity(0.1)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF1677F2)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: 12, 
+                color: Colors.blueGrey.shade700, 
+                fontWeight: FontWeight.w500,
+                height: 1.4,
+              ),
             ),
           ),
         ],
@@ -301,7 +448,7 @@ class TrustCenterScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Student Verification',
+                      'Student Status',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
@@ -310,10 +457,10 @@ class TrustCenterScreen extends ConsumerWidget {
                     ),
                     Text(
                       isVerified 
-                        ? 'Your student status is verified' 
+                        ? 'Confirmed Student' 
                         : isPending 
-                          ? 'Verification in review' 
-                          : 'Verify your university enrollment',
+                          ? 'Review in progress' 
+                          : 'Verify your campus enrollment',
                       style: TextStyle(
                         fontSize: 13,
                         color: Colors.blueGrey.shade500,
@@ -325,13 +472,13 @@ class TrustCenterScreen extends ConsumerWidget {
               if (isVerified)
                 const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981))
               else if (isPending)
-                const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
+                _buildStatusBadge('Pending', Colors.orange)
             ],
           ),
+          if (isPending) ...[
+            const SizedBox(height: 16),
+            _buildInfoBox('Our team is verifying your student ID. This usually takes 12-24 hours.'),
+          ],
           if (!isVerified && !isPending) ...[
             const SizedBox(height: 20),
             SizedBox(
@@ -354,101 +501,137 @@ class TrustCenterScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildRoleCard(BuildContext context, ProfessionalRole role, VerificationApplication app, bool isActuallyVerified) {
-    final bool isPending = app.status == VerificationStatus.pending;
-    final bool isRejected = app.status == VerificationStatus.rejected;
-    
-    Color statusColor = Colors.blueGrey;
-    String statusText = 'Not Verified';
-    IconData statusIcon = Icons.add_circle_outline_rounded;
-
-    if (isActuallyVerified) {
-      statusColor = const Color(0xFF10B981);
-      statusText = 'Verified';
-      statusIcon = Icons.verified_rounded;
-    } else if (isPending) {
-      statusColor = Colors.orange;
-      statusText = 'Pending Review';
-      statusIcon = Icons.access_time_rounded;
-    } else if (isRejected) {
-      statusColor = Colors.red;
-      statusText = 'Action Required';
-      statusIcon = Icons.error_outline_rounded;
-    }
-
-    return InkWell(
-      onTap: isActuallyVerified ? null : () => context.push('/verify-professional/${role.name}'),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+  Widget _buildEducationSection() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'How Trust Works',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF1E293B),
             ),
-          ],
+          ),
+          const SizedBox(height: 16),
+          _buildEduItem(
+            Icons.verified_user_outlined,
+            'Universal Identity',
+            'Your identity is verified once. This confirmation carries across all roles on UniHub, from Selling to Professional Gigs.',
+          ),
+          const SizedBox(height: 20),
+          _buildEduItem(
+            Icons.insights_rounded,
+            'Dynamic Trust Score',
+            'Your score grows as you complete successful transactions, receive positive ratings, and maintain professional behavior.',
+          ),
+          const SizedBox(height: 20),
+          _buildEduItem(
+            Icons.security_rounded,
+            'Safe Community',
+            'Verified badges help students identify legitimate providers and build a safer campus marketplace for everyone.',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEduItem(IconData icon, String title, String description) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: const Color(0xFF1677F2), size: 20),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.blueGrey.shade500,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
         ),
-        child: Row(
+      ],
+    );
+  }
+
+  void _showTrustBreakdown(BuildContext context, dynamic user) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Icon(_getRoleIcon(role), color: statusColor, size: 24),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    role.label,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF1E293B),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Icon(statusIcon, size: 12, color: statusColor),
-                      const SizedBox(width: 4),
-                      Text(
-                        statusText,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: statusColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            if (!isActuallyVerified)
-              const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+            Text('Trust Score Breakdown', 
+              style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 8),
+            Text('Your score reflects your reputation within the UniHub ecosystem.', 
+              style: TextStyle(color: Colors.blueGrey.shade600, fontSize: 14)),
+            const SizedBox(height: 32),
+            _buildBreakdownItem(Icons.school_rounded, 'Student Status', user.isStudentVerified ? 'Verified (+30%)' : 'Not Verified', user.isStudentVerified),
+            const Divider(height: 32),
+            _buildBreakdownItem(Icons.badge_rounded, 'Identity Check', user.isIdentityVerified ? 'Confirmed (+30%)' : 'Not Verified', user.isIdentityVerified),
+            const Divider(height: 32),
+            _buildBreakdownItem(Icons.star_rounded, 'Community Ratings', user.ratingsCount > 0 ? '${user.averageRating} Avg Rating' : 'No ratings yet', user.ratingsCount > 0),
+            const Divider(height: 32),
+            _buildBreakdownItem(Icons.history_rounded, 'Account Age', 'Member since ${user.createdAt?.year ?? 2024}', true),
+            const SizedBox(height: 40),
           ],
         ),
       ),
     );
   }
 
-  IconData _getRoleIcon(ProfessionalRole role) {
-    switch (role) {
-      case ProfessionalRole.seller: return Icons.shopping_bag_rounded;
-      case ProfessionalRole.housePlug: return Icons.home_work_rounded;
-      case ProfessionalRole.tutor: return Icons.menu_book_rounded;
-      case ProfessionalRole.serviceProvider: return Icons.handyman_rounded;
-      case ProfessionalRole.technician: return Icons.memory_rounded;
-      case ProfessionalRole.business: return Icons.business_center_rounded;
-    }
+  Widget _buildBreakdownItem(IconData icon, String title, String subtitle, bool isPositive) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: (isPositive ? const Color(0xFF10B981) : Colors.blueGrey).withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: isPositive ? const Color(0xFF10B981) : Colors.blueGrey, size: 20),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+              Text(subtitle, style: TextStyle(color: isPositive ? const Color(0xFF059669) : Colors.blueGrey.shade500, fontSize: 13, fontWeight: FontWeight.w500)),
+            ],
+          ),
+        ),
+        if (isPositive)
+          const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 18),
+      ],
+    );
   }
 }

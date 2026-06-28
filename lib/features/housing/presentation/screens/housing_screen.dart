@@ -175,6 +175,8 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
   }
 
   Widget _buildBecomePlugCTA(VerificationApplication? application) {
+    final user = ref.watch(appUserProvider).valueOrNull;
+    final isVerified = user?.isVerified ?? false;
     final hasPendingApp = application?.status == VerificationStatus.pending;
     final isRejected = application?.status == VerificationStatus.rejected;
 
@@ -203,25 +205,23 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isRejected 
-                ? 'Application Update' 
-                : hasPendingApp 
-                    ? 'Application Pending' 
-                    : 'Helping students find houses?',
+            !isVerified ? 'Verification Required' : (isRejected ? 'Application Update' : (hasPendingApp ? 'Application Pending' : 'Helping students find houses?')),
             style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 8),
           Text(
-            isRejected
-                ? 'Your application was not approved. You can review our guidelines and try again.'
-                : hasPendingApp
-                    ? 'Your application to join the Plug Network is currently under review. We\'ll notify you soon.'
-                    : 'List hostels and houses, manage enquiries and build your reputation as a trusted Housing Plug.',
+            !isVerified 
+                ? 'You must verify your platform identity before joining the Plug Network.'
+                : (isRejected
+                    ? 'Your application was not approved. You can review our guidelines and try again.'
+                    : (hasPendingApp
+                        ? 'Your application to join the Plug Network is currently under review. We\'ll notify you soon.'
+                        : 'List hostels and houses, manage enquiries and build your reputation as a trusted Housing Plug.')),
             style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13, height: 1.4),
           ),
           const SizedBox(height: 20),
           ElevatedButton(
-            onPressed: hasPendingApp ? null : () => context.push('/trust-center'),
+            onPressed: hasPendingApp ? null : () => context.push(isVerified ? '/verify-professional/housePlug' : '/trust-center'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white,
               foregroundColor: isRejected ? Colors.red : const Color(0xFF1677F2),
@@ -230,11 +230,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
               elevation: 0,
             ),
             child: Text(
-              isRejected 
-                  ? 'Check Trust Status'
-                  : hasPendingApp 
-                      ? 'In Review...' 
-                      : 'Become a Housing Plug', 
+              !isVerified ? 'Verify Identity' : (isRejected ? 'Update & Resubmit' : (hasPendingApp ? 'In Review...' : 'Become a Housing Plug')),
               style: const TextStyle(fontWeight: FontWeight.w900)
             ),
           ),

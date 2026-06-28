@@ -56,6 +56,7 @@ import '../../features/gigs/presentation/screens/freelancer_applications_screen.
 
 import '../../features/trust/presentation/screens/trust_center_screen.dart';
 import '../../features/trust/presentation/screens/student_verification_screen.dart';
+import '../../features/trust/presentation/screens/identity_verification_screen.dart';
 import '../../features/trust/presentation/screens/professional_verification_screen.dart';
 import '../../features/trust/domain/models/professional_role.dart';
 
@@ -377,6 +378,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/verify-student',
         builder: (context, state) => const StudentVerificationScreen(),
+      ),
+      GoRoute(
+        path: '/verify-identity',
+        builder: (context, state) => const IdentityVerificationScreen(),
       ),
       GoRoute(
         path: '/verify-professional/:role',

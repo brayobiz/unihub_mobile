@@ -219,11 +219,12 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
 
     // Strictly consume the platform's professional role verification
     final isVerifiedPlug = user.verifiedRoles.contains('housePlug');
+    final isVerified = user.isVerified;
 
     if (!isVerifiedPlug) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Verification Required'),
+          title: Text(!isVerified ? 'Verification Required' : 'Role Application Required'),
           backgroundColor: Colors.white,
           elevation: 0,
           foregroundColor: Colors.black,
@@ -239,18 +240,20 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
                   color: const Color(0xFF1677F2).withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.verified_user_rounded, size: 64, color: Color(0xFF1677F2)),
+                child: Icon(!isVerified ? Icons.verified_user_rounded : Icons.home_work_rounded, size: 64, color: const Color(0xFF1677F2)),
               ),
               const SizedBox(height: 32),
-              const Text(
-                'Verified Role Required',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: -0.5),
+              Text(
+                !isVerified ? 'Identity Verification Required' : 'Housing Plug Role Required',
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: -0.5),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
-              const Text(
-                'To list properties on UniHub, you must verify your identity and activate the Housing Plug role via the platform Trust Engine.',
-                style: TextStyle(color: Color(0xFF64748B), fontSize: 16, height: 1.5),
+              Text(
+                !isVerified 
+                    ? 'To list properties on UniHub, you must first verify your platform identity via the Trust Center.'
+                    : 'To list properties on UniHub, you must activate the Housing Plug role for your account.',
+                style: const TextStyle(color: Color(0xFF64748B), fontSize: 16, height: 1.5),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 40),
@@ -258,12 +261,12 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
                 width: double.infinity,
                 height: 58,
                 child: FilledButton(
-                  onPressed: () => context.push('/trust-center'),
+                  onPressed: () => context.push(isVerified ? '/verify-professional/housePlug' : '/trust-center'),
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFF1677F2),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                   ),
-                  child: const Text('Go to Trust Center', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                  child: Text(!isVerified ? 'Go to Trust Center' : 'Apply for Role', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                 ),
               ),
               const SizedBox(height: 16),

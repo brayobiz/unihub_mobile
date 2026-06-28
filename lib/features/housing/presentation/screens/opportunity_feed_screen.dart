@@ -39,8 +39,8 @@ class OpportunityFeedScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 32),
               FilledButton(
-                onPressed: () => context.push('/trust-center'),
-                child: const Text('Go to Trust Center'),
+                onPressed: () => context.push('/verify-professional/housePlug'),
+                child: const Text('Apply for Access'),
               ),
             ],
           ),
