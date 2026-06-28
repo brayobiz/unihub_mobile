@@ -5,11 +5,13 @@ import 'package:go_router/go_router.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import 'package:unihub_mobile/widgets/skeleton_loader.dart';
 import 'package:unihub_mobile/widgets/notification_badge.dart';
-import '../../../auth/shared/providers.dart';
-import '../../shared/providers.dart';
-import '../widgets/housing_card.dart';
-import '../../domain/models/housing_listing.dart';
-import '../../domain/models/housing_plug_application.dart';
+import 'package:unihub_mobile/features/auth/shared/providers.dart';
+import 'package:unihub_mobile/features/housing/shared/providers.dart';
+import 'package:unihub_mobile/features/trust/domain/models/professional_role.dart';
+import 'package:unihub_mobile/features/trust/domain/models/verification_application.dart';
+import 'package:unihub_mobile/features/trust/presentation/providers/trust_providers.dart';
+import 'package:unihub_mobile/features/housing/presentation/widgets/housing_card.dart';
+import 'package:unihub_mobile/features/housing/domain/models/housing_listing.dart';
 
 class HousingScreen extends ConsumerStatefulWidget {
   const HousingScreen({super.key});
@@ -58,8 +60,8 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(appUserProvider).valueOrNull;
-    final isPlug = user?.isHousingPlug ?? false;
-    final applicationAsync = ref.watch(plugApplicationProvider);
+    final isVerifiedPlug = user?.verifiedRoles.contains('housePlug') ?? false;
+    final applicationAsync = ref.watch(applicationByRoleProvider(ProfessionalRole.housePlug));
     
     final locationFilter = ref.watch(housingLocationFilterProvider);
     final hasActiveFilters = ref.watch(housingTypeFilterProvider) != null || 
@@ -76,7 +78,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
         child: CustomScrollView(
           controller: _scrollController,
           slivers: [
-          _buildSliverAppBar(isPlug),
+          _buildSliverAppBar(isVerifiedPlug),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
@@ -89,7 +91,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
                     _buildRecentSearches(),
                   ],
                   const SizedBox(height: 24),
-                  if (!isPlug) ...[
+                  if (!isVerifiedPlug) ...[
                     applicationAsync.when(
                       data: (application) => _buildBecomePlugCTA(application),
                       loading: () => const SkeletonLoader(width: double.infinity, height: 150, borderRadius: 24),
@@ -121,7 +123,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
         ],
       ),
     ),
-      floatingActionButton: isPlug ? FloatingActionButton.extended(
+      floatingActionButton: isVerifiedPlug ? FloatingActionButton.extended(
         onPressed: () => context.push('/add-housing'),
         backgroundColor: const Color(0xFF1677F2),
         elevation: 4,
@@ -172,9 +174,9 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
     );
   }
 
-  Widget _buildBecomePlugCTA(HousingPlugApplication? application) {
-    final hasPendingApp = application?.status == PlugApplicationStatus.pending;
-    final isRejected = application?.status == PlugApplicationStatus.rejected;
+  Widget _buildBecomePlugCTA(VerificationApplication? application) {
+    final hasPendingApp = application?.status == VerificationStatus.pending;
+    final isRejected = application?.status == VerificationStatus.rejected;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -219,7 +221,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
           ),
           const SizedBox(height: 20),
           ElevatedButton(
-            onPressed: hasPendingApp ? null : () => context.push('/become-plug'),
+            onPressed: hasPendingApp ? null : () => context.push('/trust-center'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white,
               foregroundColor: isRejected ? Colors.red : const Color(0xFF1677F2),
@@ -229,7 +231,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
             ),
             child: Text(
               isRejected 
-                  ? 'Re-apply Now' 
+                  ? 'Check Trust Status'
                   : hasPendingApp 
                       ? 'In Review...' 
                       : 'Become a Housing Plug', 

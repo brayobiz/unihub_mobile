@@ -4,10 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import '../../domain/models/listing.dart';
-import '../controllers/add_listing_controller.dart';
-import '../widgets/marketplace_card.dart';
-import '../../domain/models/marketplace_categories.dart';
+import 'package:unihub_mobile/features/marketplace/domain/models/listing.dart';
+import 'package:unihub_mobile/features/marketplace/presentation/controllers/add_listing_controller.dart';
+import 'package:unihub_mobile/features/marketplace/presentation/widgets/marketplace_card.dart';
+import 'package:unihub_mobile/features/marketplace/domain/models/marketplace_categories.dart';
+import 'package:unihub_mobile/features/auth/shared/providers.dart';
 
 class AddListingScreen extends ConsumerStatefulWidget {
   final Listing? listing;
@@ -192,8 +193,45 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   }
 
   Widget _buildQualityIndicator(AddListingState state) {
-    return Container(
-      padding: const EdgeInsets.all(20),
+    final user = ref.watch(appUserProvider).valueOrNull;
+    final isVerifiedSeller = user?.roles.contains('seller') ?? false;
+
+    return Column(
+      children: [
+        if (user != null && !isVerifiedSeller)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.indigo.shade50,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.indigo.shade100),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.verified_user_outlined, color: Colors.indigo),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Boost your sales!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.indigo)),
+                        Text('Get verified as a seller to build trust with buyers.', 
+                          style: TextStyle(fontSize: 11, color: Colors.indigo.shade700)),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => context.push('/settings'), // Assuming verification is in settings
+                    child: const Text('Get Verified', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        Container(
+          padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
@@ -234,8 +272,10 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  ],
+);
+}
 
   Widget _buildImageUploadSection(AddListingState state, AddListingController controller) {
     final totalPhotos = state.selectedImages.length + state.existingImageUrls.length;

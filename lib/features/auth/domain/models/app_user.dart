@@ -22,7 +22,8 @@ class AppUser {
   final double buyerRating;
   final bool isEmailVerified;
   final bool isPhoneVerified;
-  final bool isVerified; // Official verification badge
+  final bool isStudentVerified;
+  final List<String> verifiedRoles; // List of ProfessionalRole names
   
   final String tier; // 'free' | 'pro'
   final String? whatsappNumber;
@@ -70,7 +71,8 @@ class AppUser {
     this.buyerRating = 0.0,
     this.isEmailVerified = false,
     this.isPhoneVerified = false,
-    this.isVerified = false,
+    this.isStudentVerified = false,
+    this.verifiedRoles = const [],
     this.tier = 'free',
     this.whatsappNumber,
     this.phoneNumber,
@@ -104,6 +106,10 @@ class AppUser {
   });
 
   bool get isHousingPlug => roles.contains('housing_plug');
+  bool get isVerifiedPlug => verifiedRoles.contains('housePlug');
+  bool get isVerifiedSeller => verifiedRoles.contains('seller');
+  bool get isAnyRoleVerified => verifiedRoles.isNotEmpty;
+  bool get isVerified => isAnyRoleVerified;
 
   double get profileCompletion {
     int score = 0;
@@ -141,7 +147,8 @@ class AppUser {
     double? buyerRating,
     bool? isEmailVerified,
     bool? isPhoneVerified,
-    bool? isVerified,
+    bool? isStudentVerified,
+    List<String>? verifiedRoles,
     String? tier,
     String? whatsappNumber,
     String? phoneNumber,
@@ -184,7 +191,8 @@ class AppUser {
       buyerRating: buyerRating ?? this.buyerRating,
       isEmailVerified: isEmailVerified ?? this.isEmailVerified,
       isPhoneVerified: isPhoneVerified ?? this.isPhoneVerified,
-      isVerified: isVerified ?? this.isVerified,
+      isStudentVerified: isStudentVerified ?? this.isStudentVerified,
+      verifiedRoles: verifiedRoles ?? this.verifiedRoles,
       tier: tier ?? this.tier,
       whatsappNumber: whatsappNumber ?? this.whatsappNumber,
       phoneNumber: phoneNumber ?? this.phoneNumber,
@@ -230,7 +238,8 @@ class AppUser {
       'buyerRating': buyerRating,
       'isEmailVerified': isEmailVerified,
       'isPhoneVerified': isPhoneVerified,
-      'isVerified': isVerified,
+      'isStudentVerified': isStudentVerified,
+      'verifiedRoles': verifiedRoles,
       'tier': tier,
       'whatsappNumber': whatsappNumber,
       'phoneNumber': phoneNumber,
@@ -296,7 +305,8 @@ class AppUser {
       buyerRating: safeDouble(json['buyerRating'], 0.0),
       isEmailVerified: json['isEmailVerified'] ?? false,
       isPhoneVerified: json['isPhoneVerified'] ?? false,
-      isVerified: json['isVerified'] ?? false,
+      isStudentVerified: json['isStudentVerified'] ?? false,
+      verifiedRoles: (json['verifiedRoles'] as List?)?.map((e) => e.toString()).toList() ?? <String>[],
       tier: safeString(json['tier'], 'free'),
       whatsappNumber: json['whatsappNumber']?.toString(),
       phoneNumber: json['phoneNumber']?.toString(),
@@ -319,7 +329,7 @@ class AppUser {
       roles: (json['roles'] as List?)?.map((e) => e.toString()).toList() ?? <String>['student'],
       privacySettings: Map<String, String>.from(
         (json['privacySettings'] as Map?)?.map((k, v) => MapEntry(k.toString(), v?.toString() ?? '')) ?? <String, String>{
-          'profile_visibility': 'university',
+          'profile_visibility': 'university', // 'public', 'university', 'private'
           'show_socials': 'university',
           'show_listings': 'public',
         }

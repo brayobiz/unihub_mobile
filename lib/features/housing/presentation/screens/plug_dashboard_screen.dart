@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
-import '../../../auth/shared/providers.dart';
-import '../../shared/providers.dart';
-import '../../domain/models/housing_listing.dart';
-import '../../domain/models/housing_plug_application.dart';
+import 'package:unihub_mobile/features/auth/shared/providers.dart';
+import 'package:unihub_mobile/features/housing/shared/providers.dart';
+import 'package:unihub_mobile/features/housing/domain/models/housing_listing.dart';
+import 'package:unihub_mobile/features/trust/domain/models/professional_role.dart';
+import 'package:unihub_mobile/features/trust/domain/models/verification_application.dart';
+import 'package:unihub_mobile/features/trust/presentation/providers/trust_providers.dart';
 
 class PlugDashboardScreen extends ConsumerWidget {
   const PlugDashboardScreen({super.key});
@@ -16,8 +18,10 @@ class PlugDashboardScreen extends ConsumerWidget {
     final user = ref.watch(appUserProvider).valueOrNull;
     if (user == null) return const Scaffold(body: Center(child: Text('Please log in')));
     
-    if (!user.isHousingPlug) {
-      final applicationAsync = ref.watch(plugApplicationProvider);
+    final isVerifiedPlug = user.verifiedRoles.contains('housePlug');
+
+    if (!isVerifiedPlug) {
+      final applicationAsync = ref.watch(applicationByRoleProvider(ProfessionalRole.housePlug));
 
       return Scaffold(
         backgroundColor: Colors.white,
@@ -36,7 +40,7 @@ class PlugDashboardScreen extends ConsumerWidget {
     }
 
     final listingsAsync = ref.watch(plugListingsProvider(user.uid));
-    final applicationAsync = ref.watch(plugApplicationProvider);
+    final applicationAsync = ref.watch(applicationByRoleProvider(ProfessionalRole.housePlug));
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -82,9 +86,9 @@ class PlugDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildNoAccessBody(BuildContext context, HousingPlugApplication? application) {
-    final hasPendingApp = application?.status == PlugApplicationStatus.pending;
-    final isRejected = application?.status == PlugApplicationStatus.rejected;
+  Widget _buildNoAccessBody(BuildContext context, VerificationApplication? application) {
+    final hasPendingApp = application?.status == VerificationStatus.pending;
+    final isRejected = application?.status == VerificationStatus.rejected;
 
     return Padding(
       padding: const EdgeInsets.all(32),
@@ -133,13 +137,13 @@ class PlugDashboardScreen extends ConsumerWidget {
               width: double.infinity,
               height: 58,
               child: FilledButton(
-                onPressed: () => context.pushReplacement('/become-plug'),
+                onPressed: () => context.pushReplacement('/trust-center'),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF1677F2),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                 ),
                 child: Text(
-                  isRejected ? 'Re-apply Now' : 'Apply to Join Network',
+                  isRejected ? 'Check Status in Trust Center' : 'Go to Trust Center',
                   style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16),
                 ),
               ),
@@ -192,7 +196,7 @@ class PlugDashboardScreen extends ConsumerWidget {
                       const Icon(Icons.verified_rounded, color: Color(0xFF1677F2), size: 16),
                     const SizedBox(width: 4),
                     Text(
-                      user.isVerified ? 'VERIFIED PLUG' : 'STANDARD PLUG', 
+                      user.isHousingPlug ? 'HOUSING PLUG' : 'HOUSING PARTNER', 
                       style: TextStyle(
                         color: user.isVerified ? const Color(0xFF1677F2) : const Color(0xFF64748B), 
                         fontSize: 10, 
@@ -201,6 +205,23 @@ class PlugDashboardScreen extends ConsumerWidget {
                       )
                     ),
                   ],
+                ),
+                const SizedBox(height: 4),
+                // Show platform trust level
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: user.isVerified ? const Color(0xFF10B981).withOpacity(0.1) : const Color(0xFF94A3B8).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    user.isVerified ? 'PLATFORM TRUSTED' : 'STANDARD ACCOUNT',
+                    style: TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                      color: user.isVerified ? const Color(0xFF059669) : const Color(0xFF475569),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Row(
@@ -267,7 +288,7 @@ class PlugDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildVerificationStatusCard(BuildContext context, dynamic user, HousingPlugApplication? application) {
+  Widget _buildVerificationStatusCard(BuildContext context, dynamic user, VerificationApplication? application) {
     // If the user is fully verified in their profile, show the Verified state
     if (user.isVerified) {
       return Container(
@@ -292,8 +313,8 @@ class PlugDashboardScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Verified Housing Plug', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16)),
-                      Text('Your identity and status are confirmed.', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                      Text('Platform Trusted Status', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16)),
+                      Text('Your identity is confirmed by UniHub Trust Engine.', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
                     ],
                   ),
                 ),
@@ -303,9 +324,9 @@ class PlugDashboardScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildVerificationBadge(Icons.check_circle_rounded, 'Identity'),
-                _buildVerificationBadge(Icons.check_circle_rounded, 'Phone'),
-                _buildVerificationBadge(Icons.check_circle_rounded, 'Active'),
+                _buildVerificationBadge(Icons.check_circle_rounded, 'Platform Identity'),
+                _buildVerificationBadge(Icons.check_circle_rounded, 'Phone Verified'),
+                _buildVerificationBadge(Icons.check_circle_rounded, 'Role Active'),
               ],
             ),
           ],
@@ -317,7 +338,7 @@ class PlugDashboardScreen extends ConsumerWidget {
     if (application == null) return const SizedBox.shrink();
 
     return switch (application.status) {
-      PlugApplicationStatus.pending => Container(
+      VerificationStatus.pending => Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: const Color(0xFFF1F5F9),
@@ -332,10 +353,10 @@ class PlugDashboardScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Application Under Review', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16)),
+                    Text('Trust Review Pending', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16)),
                     const SizedBox(height: 4),
                     Text(
-                      'We have received your application. You\'ll be notified once our team completes the review.',
+                      'The platform Trust Engine is reviewing your application. Role activation follows identity confirmation.',
                       style: TextStyle(color: Colors.grey.shade600, fontSize: 12, height: 1.4),
                     ),
                   ],
@@ -344,7 +365,7 @@ class PlugDashboardScreen extends ConsumerWidget {
             ],
           ),
         ),
-      PlugApplicationStatus.rejected => Container(
+      VerificationStatus.rejected => Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: const Color(0xFFFEF2F2),
@@ -382,7 +403,8 @@ class PlugDashboardScreen extends ConsumerWidget {
             ],
           ),
         ),
-      PlugApplicationStatus.approved => const SizedBox.shrink(), // Should be handled by user.isVerified check
+      VerificationStatus.approved => const SizedBox.shrink(), // Should be handled by user.isVerified check
+      VerificationStatus.expired => const SizedBox.shrink(),
     };
   }
 

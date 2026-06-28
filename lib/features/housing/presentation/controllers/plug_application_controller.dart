@@ -2,52 +2,40 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class PlugApplicationState {
   final int currentStep;
-  final String fullName;
-  final String phoneNumber;
-  final String? selectedCampus;
   final String intro;
+  final String? selectedCampus;
   final String areasServed;
   final String hasExperience;
-  final String experienceCount;
-  final String? idDocumentPath;
-  final String? profilePhotoPath;
+  final String experienceLevel; // e.g. "Newcomer", "1-2 years", "3+ years"
+  final String additionalInfo;
 
   PlugApplicationState({
     this.currentStep = 0,
-    this.fullName = '',
-    this.phoneNumber = '',
-    this.selectedCampus,
     this.intro = '',
+    this.selectedCampus,
     this.areasServed = '',
     this.hasExperience = 'No',
-    this.experienceCount = '',
-    this.idDocumentPath,
-    this.profilePhotoPath,
+    this.experienceLevel = 'Newcomer',
+    this.additionalInfo = '',
   });
 
   PlugApplicationState copyWith({
     int? currentStep,
-    String? fullName,
-    String? phoneNumber,
-    String? selectedCampus,
     String? intro,
+    String? selectedCampus,
     String? areasServed,
     String? hasExperience,
-    String? experienceCount,
-    String? idDocumentPath,
-    String? profilePhotoPath,
+    String? experienceLevel,
+    String? additionalInfo,
   }) {
     return PlugApplicationState(
       currentStep: currentStep ?? this.currentStep,
-      fullName: fullName ?? this.fullName,
-      phoneNumber: phoneNumber ?? this.phoneNumber,
-      selectedCampus: selectedCampus ?? this.selectedCampus,
       intro: intro ?? this.intro,
+      selectedCampus: selectedCampus ?? this.selectedCampus,
       areasServed: areasServed ?? this.areasServed,
       hasExperience: hasExperience ?? this.hasExperience,
-      experienceCount: experienceCount ?? this.experienceCount,
-      idDocumentPath: idDocumentPath ?? this.idDocumentPath,
-      profilePhotoPath: profilePhotoPath ?? this.profilePhotoPath,
+      experienceLevel: experienceLevel ?? this.experienceLevel,
+      additionalInfo: additionalInfo ?? this.additionalInfo,
     );
   }
 }
@@ -57,40 +45,29 @@ class PlugApplicationController extends StateNotifier<PlugApplicationState> {
 
   void updateStep(int step) => state = state.copyWith(currentStep: step);
   
-  void updatePersonal({
-    String? fullName,
-    String? phoneNumber,
-    String? campus,
-  }) {
-    state = state.copyWith(
-      fullName: fullName,
-      phoneNumber: phoneNumber,
-      selectedCampus: campus,
-    );
-  }
-
   void updateProfessional({
     String? intro,
+    String? campus,
     String? areas,
   }) {
     state = state.copyWith(
       intro: intro,
+      selectedCampus: campus,
       areasServed: areas,
     );
   }
 
   void updateExperience({
     String? hasExperience,
-    String? count,
+    String? level,
+    String? additionalInfo,
   }) {
     state = state.copyWith(
       hasExperience: hasExperience,
-      experienceCount: count,
+      experienceLevel: level,
+      additionalInfo: additionalInfo,
     );
   }
-
-  void updateIdDocument(String? path) => state = state.copyWith(idDocumentPath: path);
-  void updateProfilePhoto(String? path) => state = state.copyWith(profilePhotoPath: path);
 
   void reset() => state = PlugApplicationState();
 }

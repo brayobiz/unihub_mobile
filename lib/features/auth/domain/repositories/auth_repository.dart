@@ -1,5 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import '../models/app_user.dart';
+import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 
 abstract class AuthRepository {
   Stream<User?> get authStateChanges;

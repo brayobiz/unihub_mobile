@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../auth/domain/models/app_user.dart';
+import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import '../../../auth/shared/providers.dart';
 import '../../domain/models/listing.dart';
 import '../../shared/providers.dart';

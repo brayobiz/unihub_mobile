@@ -3,8 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import '../../domain/models/housing_listing.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../auth/shared/providers.dart';
 
-class HousingCard extends StatelessWidget {
+class HousingCard extends ConsumerWidget {
   final HousingListing listing;
   final VoidCallback onTap;
   final EdgeInsetsGeometry? margin;
@@ -19,9 +21,15 @@ class HousingCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final currencyFormat = NumberFormat.currency(symbol: 'KES ', decimalDigits: 0);
     final isTaken = listing.status == HousingStatus.taken;
+    
+    // Efficiently fetch plug's verification status from the platform cache
+    final plugAsync = ref.watch(userByIdProvider(listing.plugId));
+    final plug = plugAsync.valueOrNull;
+    final plugIsVerified = plug?.isVerified ?? false;
+    final trustScore = plug?.trustScore ?? 70.0;
 
     if (isCompact) {
       return _buildCompact(context, currencyFormat, isTaken);
@@ -69,22 +77,22 @@ class HousingCard extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      if (listing.plugIsVerified)
+                      if (plugIsVerified)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF1677F2),
+                            color: const Color(0xFF10B981),
                             borderRadius: BorderRadius.circular(8),
                             boxShadow: [
                               BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4)
                             ],
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.verified, color: Colors.white, size: 10),
-                              SizedBox(width: 4),
-                              Text('VERIFIED', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                              const Icon(Icons.verified_user_rounded, color: Colors.white, size: 10),
+                              const SizedBox(width: 4),
+                              Text('TRUSTED ${trustScore.toInt()}%', style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
                             ],
                           ),
                         ),

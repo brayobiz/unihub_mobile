@@ -3,7 +3,6 @@ import '../../domain/models/housing_listing.dart';
 import '../../domain/models/housing_review.dart';
 import '../../domain/models/roommate_profile.dart';
 import '../../domain/models/vacancy_request.dart';
-import '../../domain/models/housing_plug_application.dart';
 import '../../domain/repositories/housing_repository.dart';
 import '../../../../services/notification_service.dart';
 
@@ -275,24 +274,6 @@ class HousingRepositoryImpl implements HousingRepository {
   }
 
   @override
-  Future<void> becomeHousingPlug({
-    required String userId,
-    required String phoneNumber,
-    required String bio,
-    required String campus,
-    required List<String> areasServed,
-  }) async {
-    await _firestore.collection('users').doc(userId).update({
-      'phoneNumber': phoneNumber,
-      'bio': bio,
-      'campus': campus,
-      'areasServed': areasServed,
-      'roles': FieldValue.arrayUnion(['housing_plug']),
-      'plugJoinDate': FieldValue.serverTimestamp(),
-    });
-  }
-
-  @override
   Future<void> reportListing({
     required String listingId,
     required String reporterId,
@@ -406,20 +387,5 @@ class HousingRepositoryImpl implements HousingRepository {
       'claimedByPlugId': plugId,
       'claimedByPlugName': plugName,
     });
-  }
-
-  @override
-  Future<void> submitPlugApplication(HousingPlugApplication application) async {
-    await _firestore.collection('housing_plug_applications').doc(application.userId).set(
-      application.toFirestore(),
-    );
-  }
-
-  @override
-  Stream<HousingPlugApplication?> watchPlugApplication(String userId) {
-    return _firestore.collection('housing_plug_applications')
-        .doc(userId)
-        .snapshots()
-        .map((doc) => doc.exists ? HousingPlugApplication.fromFirestore(doc) : null);
   }
 }

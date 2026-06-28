@@ -2,7 +2,6 @@ import '../models/housing_listing.dart';
 import '../models/housing_review.dart';
 import '../models/roommate_profile.dart';
 import '../models/vacancy_request.dart';
-import '../models/housing_plug_application.dart';
 
 abstract class HousingRepository {
   Stream<List<HousingListing>> watchListings({
@@ -39,14 +38,6 @@ abstract class HousingRepository {
 
   Future<void> createRoommateProfile(RoommateProfile profile);
 
-  Future<void> becomeHousingPlug({
-    required String userId,
-    required String phoneNumber,
-    required String bio,
-    required String campus,
-    required List<String> areasServed,
-  });
-
   Future<void> reportListing({
     required String listingId,
     required String reporterId,
@@ -78,8 +69,4 @@ abstract class HousingRepository {
   Stream<List<VacancyRequest>> watchVacancyOpportunities({String? campus});
   
   Future<void> claimVacancyRequest(String requestId, String plugId, String plugName);
-
-  Future<void> submitPlugApplication(HousingPlugApplication application);
-
-  Stream<HousingPlugApplication?> watchPlugApplication(String userId);
 }

@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import '../auth/shared/providers.dart';
-import '../auth/domain/models/app_user.dart';
-import '../shared/storage_repository.dart';
+import 'package:unihub_mobile/features/auth/shared/providers.dart';
+import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
+import 'package:unihub_mobile/features/shared/storage_repository.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});

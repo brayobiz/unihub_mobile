@@ -87,6 +87,9 @@ class PlugProfileScreen extends ConsumerWidget {
   }
 
   Widget _buildPlugHeader(dynamic plug) {
+    final bool isVerified = plug.isVerified;
+    final int trustScore = plug.trustScore.toInt();
+
     return Transform.translate(
       offset: const Offset(0, -60),
       child: Column(
@@ -105,14 +108,41 @@ class PlugProfileScreen extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(plug.fullName, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              if (plug.isVerified)
+              if (isVerified)
                 const Padding(
                   padding: EdgeInsets.only(left: 6),
-                  child: Icon(Icons.verified, color: Color(0xFF1677F2), size: 24),
+                  child: Icon(Icons.verified_user_rounded, color: Color(0xFF10B981), size: 24),
                 ),
             ],
           ),
-          Text(plug.isVerified ? 'Verified Housing Plug' : 'Housing Plug', style: TextStyle(color: plug.isVerified ? const Color(0xFF1677F2) : Colors.grey, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          if (isVerified)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'PLATFORM TRUSTED • $trustScore%',
+                style: const TextStyle(
+                  color: Color(0xFF059669),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
+          Text(
+            'VERIFIED HOUSING PLUG',
+            style: GoogleFonts.plusJakartaSans(
+              color: const Color(0xFF1677F2), 
+              fontWeight: FontWeight.w800,
+              fontSize: 14,
+              letterSpacing: 1.0,
+            )
+          ),
           const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -133,20 +163,28 @@ class PlugProfileScreen extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('About', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const Text('Professional Introduction', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        Text(plug.bio ?? 'No bio shared yet.', style: const TextStyle(color: Colors.blueGrey, height: 1.5)),
+        Text(plug.bio ?? 'No professional introduction shared yet.', style: const TextStyle(color: Colors.blueGrey, height: 1.5)),
       ],
     );
   }
 
   Widget _buildStatsRow(dynamic plug, AsyncValue listingsAsync) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
+    return Column(
       children: [
-        _buildStatItem('Rating', plug.averageRating.toStringAsFixed(1), Icons.star_rounded, Colors.amber),
-        _buildStatItem('Listings', plug.housingListingsCount.toString(), Icons.home_work_rounded, Colors.blue),
-        _buildStatItem('Trust', '${plug.trustScore.toInt()}%', Icons.shield_rounded, Colors.green),
+        const Divider(),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildStatItem('Reputation', plug.averageRating.toStringAsFixed(1), Icons.star_rounded, Colors.amber),
+            _buildStatItem('Active Listings', plug.housingListingsCount.toString(), Icons.home_work_rounded, Colors.blue),
+            _buildStatItem('Platform Trust', '${plug.trustScore.toInt()}%', Icons.shield_rounded, Colors.green),
+          ],
+        ),
+        const SizedBox(height: 16),
+        const Divider(),
       ],
     );
   }

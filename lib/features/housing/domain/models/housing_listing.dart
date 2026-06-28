@@ -58,7 +58,6 @@ class HousingListing {
   final String plugId;
   final String plugName;
   final String? plugPhotoUrl;
-  final bool plugIsVerified;
 
   final bool isFurnished;
   final GenderRestriction genderRestriction;
@@ -88,7 +87,6 @@ class HousingListing {
     required this.plugId,
     required this.plugName,
     this.plugPhotoUrl,
-    this.plugIsVerified = false,
     this.isFurnished = false,
     this.genderRestriction = GenderRestriction.mixed,
     this.views = 0,
@@ -96,23 +94,23 @@ class HousingListing {
   }) : updatedAt = updatedAt ?? createdAt;
 
   factory HousingListing.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+    final data = doc.data() as Map<String, dynamic>? ?? {};
     return HousingListing(
       id: doc.id,
-      title: data['title'] ?? '',
-      description: data['description'] ?? '',
+      title: (data['title'] ?? '').toString(),
+      description: (data['description'] ?? '').toString(),
       rent: (data['rent'] ?? 0).toDouble(),
       deposit: (data['deposit'] ?? 0).toDouble(),
       type: HousingType.values.firstWhere(
         (e) => e.name == data['type'],
         orElse: () => HousingType.hostel,
       ),
-      university: data['university'] ?? '',
-      campus: data['campus'] ?? '',
-      location: data['location'] ?? '',
-      distance: data['distance'] ?? '',
+      university: (data['university'] ?? '').toString(),
+      campus: (data['campus'] ?? '').toString(),
+      location: (data['location'] ?? '').toString(),
+      distance: (data['distance'] ?? '').toString(),
       images: List<String>.from(data['images'] ?? <String>[]),
-      videoUrl: data['videoUrl'],
+      videoUrl: data['videoUrl']?.toString(),
       amenities: List<String>.from(data['amenities'] ?? <String>[]),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
@@ -124,10 +122,9 @@ class HousingListing {
         (e) => e.name == (data['source'] ?? ''),
         orElse: () => PropertySource.plugDiscovery,
       ),
-      plugId: data['plugId'] ?? '',
-      plugName: data['plugName'] ?? '',
-      plugPhotoUrl: data['plugPhotoUrl'],
-      plugIsVerified: data['plugIsVerified'] ?? false,
+      plugId: (data['plugId'] ?? '').toString(),
+      plugName: (data['plugName'] ?? '').toString(),
+      plugPhotoUrl: data['plugPhotoUrl']?.toString(),
       isFurnished: data['isFurnished'] ?? false,
       genderRestriction: GenderRestriction.values.firstWhere(
         (e) => e.name == data['genderRestriction'],
@@ -159,7 +156,6 @@ class HousingListing {
       'plugId': plugId,
       'plugName': plugName,
       'plugPhotoUrl': plugPhotoUrl,
-      'plugIsVerified': plugIsVerified,
       'isFurnished': isFurnished,
       'genderRestriction': genderRestriction.name,
       'views': views,
@@ -209,7 +205,6 @@ class HousingListing {
       plugId: plugId,
       plugName: plugName,
       plugPhotoUrl: plugPhotoUrl,
-      plugIsVerified: plugIsVerified,
       isFurnished: isFurnished ?? this.isFurnished,
       genderRestriction: genderRestriction ?? this.genderRestriction,
       views: views ?? this.views,

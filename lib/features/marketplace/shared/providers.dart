@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../auth/shared/providers.dart';
-import '../../auth/domain/models/app_user.dart';
+import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import '../data/repositories/marketplace_repository_impl.dart';
 import '../domain/models/listing.dart';
 import '../domain/repositories/marketplace_repository.dart';

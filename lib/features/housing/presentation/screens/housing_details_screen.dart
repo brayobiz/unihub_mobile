@@ -10,9 +10,6 @@ import '../../domain/models/housing_listing.dart';
 import '../../domain/models/housing_review.dart';
 import '../../shared/providers.dart';
 import 'package:intl/intl.dart';
-
-import '../../shared/providers.dart';
-import 'package:intl/intl.dart';
 import '../../../../services/history_service.dart';
 
 class HousingDetailsScreen extends ConsumerStatefulWidget {
@@ -239,6 +236,11 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
 
   Widget _buildPlugInfo(BuildContext context) {
     final listing = widget.listing;
+    final plugAsync = ref.watch(userByIdProvider(listing.plugId));
+    final plug = plugAsync.valueOrNull;
+    final isVerified = plug?.isVerified ?? false;
+    final trustScore = plug?.trustScore ?? 70.0;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -270,16 +272,16 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                 Row(
                   children: [
                     Text(listing.plugName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF1A1C1E))),
-                    if (listing.plugIsVerified)
+                    if (isVerified)
                       const Padding(
                         padding: EdgeInsets.only(left: 4),
-                        child: Icon(Icons.verified, color: Color(0xFF1677F2), size: 16),
+                        child: Icon(Icons.verified_user_rounded, color: Color(0xFF10B981), size: 16),
                       ),
                   ],
                 ),
                 Text(
-                  listing.plugIsVerified ? 'Verified Housing Plug' : 'Housing Plug', 
-                  style: TextStyle(color: listing.plugIsVerified ? const Color(0xFF1677F2) : const Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.w700)
+                  isVerified ? 'Verified Platform Plug • ${trustScore.toInt()}% Trust' : 'Housing Plug',
+                  style: TextStyle(color: isVerified ? const Color(0xFF10B981) : const Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.w700)
                 ),
               ],
             ),

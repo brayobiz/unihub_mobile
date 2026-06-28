@@ -54,6 +54,11 @@ import '../../features/gigs/presentation/screens/apply_gig_screen.dart';
 import '../../features/gigs/presentation/screens/employer_dashboard_screen.dart';
 import '../../features/gigs/presentation/screens/freelancer_applications_screen.dart';
 
+import '../../features/trust/presentation/screens/trust_center_screen.dart';
+import '../../features/trust/presentation/screens/student_verification_screen.dart';
+import '../../features/trust/presentation/screens/professional_verification_screen.dart';
+import '../../features/trust/domain/models/professional_role.dart';
+
 class RouterNotifier extends ChangeNotifier {
   final Ref _ref;
 
@@ -364,6 +369,25 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/my-gig-applications',
         builder: (context, state) => const FreelancerApplicationsScreen(),
+      ),
+      GoRoute(
+        path: '/trust-center',
+        builder: (context, state) => const TrustCenterScreen(),
+      ),
+      GoRoute(
+        path: '/verify-student',
+        builder: (context, state) => const StudentVerificationScreen(),
+      ),
+      GoRoute(
+        path: '/verify-professional/:role',
+        builder: (context, state) {
+          final roleName = state.pathParameters['role']!;
+          final role = ProfessionalRole.values.firstWhere(
+            (e) => e.name == roleName,
+            orElse: () => ProfessionalRole.seller,
+          );
+          return ProfessionalVerificationScreen(role: role);
+        },
       ),
     ],
   );

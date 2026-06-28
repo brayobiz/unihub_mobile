@@ -7,7 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import '../../../auth/shared/providers.dart';
-import '../../../auth/domain/models/app_user.dart';
+import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import '../../domain/models/listing.dart';
 import '../../shared/providers.dart';
 import '../../../chat/shared/providers.dart';

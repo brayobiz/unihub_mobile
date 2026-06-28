@@ -2,9 +2,9 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../auth/presentation/controllers/auth_controller.dart';
-import '../auth/shared/providers.dart';
-import '../auth/domain/models/app_user.dart';
+import 'package:unihub_mobile/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:unihub_mobile/features/auth/shared/providers.dart';
+import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -79,6 +79,8 @@ class _ProfileContent extends ConsumerWidget {
                 _buildAcademicSection(),
                 const SizedBox(height: 16),
                 _buildSkillsInterests(),
+                const SizedBox(height: 16),
+                _buildAchievementsSection(),
                 const SizedBox(height: 16),
                 _buildSocialLinks(),
                 const SizedBox(height: 16),
@@ -322,8 +324,8 @@ class _ProfileContent extends ConsumerWidget {
             const SizedBox(width: 12),
             _buildStatCard(
               label: 'Status',
-              value: user.isVerified ? 'Verified' : 'Student',
-              color: user.isVerified ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+              value: user.isStudentVerified ? (user.isVerified ? 'Professional' : 'Verified Student') : 'Student',
+              color: user.isStudentVerified ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
             ),
             const SizedBox(width: 12),
             _buildStatCard(
@@ -467,6 +469,8 @@ class _ProfileContent extends ConsumerWidget {
   Widget _buildActionButtons(BuildContext context, WidgetRef ref) {
     return Column(
       children: [
+        _buildActionButton(Icons.verified_user_outlined, 'Trust & Verification', () => context.push('/trust-center')),
+        const SizedBox(height: 12),
         _buildActionButton(Icons.favorite_outline_rounded, 'Saved Items', () => context.push('/saved')),
         const SizedBox(height: 12),
         _buildActionButton(Icons.history_rounded, 'Activity History', () {}),
@@ -729,8 +733,8 @@ class _ProfileContent extends ConsumerWidget {
       ),
       _CompletionItem(
         label: 'Student Verification',
-        isCompleted: user.isVerified,
-        onTap: () => context.push('/settings'), // Verification usually in settings or special flow
+        isCompleted: user.isStudentVerified,
+        onTap: () => context.push('/trust-center'),
       ),
       _CompletionItem(
         label: 'Phone Number',

@@ -5,7 +5,6 @@ import '../domain/models/housing_listing.dart';
 import '../domain/models/housing_review.dart';
 import '../domain/models/roommate_profile.dart';
 import '../domain/models/vacancy_request.dart';
-import '../domain/models/housing_plug_application.dart';
 import '../domain/repositories/housing_repository.dart';
 
 import '../../../services/notification_service.dart';
@@ -86,10 +85,4 @@ final vacancyOpportunitiesProvider = StreamProvider<List<VacancyRequest>>((ref) 
   return ref.watch(housingRepositoryProvider).watchVacancyOpportunities(
     campus: user?.university,
   );
-});
-
-final plugApplicationProvider = StreamProvider<HousingPlugApplication?>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
-  if (user == null) return Stream.value(null);
-  return ref.watch(housingRepositoryProvider).watchPlugApplication(user.uid);
 });

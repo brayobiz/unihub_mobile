@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../services/notification_service.dart';
-import '../auth/shared/providers.dart';
-import '../auth/domain/models/app_user.dart';
+import 'package:unihub_mobile/features/auth/shared/providers.dart';
+import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 
 final themeModeProvider = StateProvider<ThemeMode>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
@@ -157,6 +157,12 @@ class SettingsScreen extends ConsumerWidget {
 
         _buildSectionHeader('Account & Security'),
         _buildSettingsCard([
+          _buildSettingTile(
+            icon: Icons.verified_user_outlined,
+            title: 'Trust & Verification',
+            onTap: () => context.push('/trust-center'),
+          ),
+          const Divider(height: 1, indent: 50),
           _buildSettingTile(
             icon: Icons.lock_outline_rounded,
             title: 'Change Password',

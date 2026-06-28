@@ -12,6 +12,42 @@ class OpportunityFeedScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(appUserProvider).valueOrNull;
+    final isVerifiedPlug = user?.verifiedRoles.contains('housePlug') ?? false;
+
+    if (!isVerifiedPlug) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(title: const Text('New Opportunities')),
+        body: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.lock_person_rounded, size: 64, color: Color(0xFF64748B)),
+              const SizedBox(height: 24),
+              const Text(
+                'Exclusive Professional Access',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'The Opportunity Feed is reserved for verified Housing Plugs. Verify your role in the Trust Center to view and claim leads.',
+                style: TextStyle(color: Color(0xFF64748B), height: 1.5),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              FilledButton(
+                onPressed: () => context.push('/trust-center'),
+                child: const Text('Go to Trust Center'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final opportunitiesAsync = ref.watch(vacancyOpportunitiesProvider);
 
     return Scaffold(

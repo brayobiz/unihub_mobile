@@ -191,7 +191,6 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
         plugId: user.uid,
         plugName: user.fullName,
         plugPhotoUrl: user.photoUrl,
-        plugIsVerified: user.isVerified,
         isFurnished: _selectedAmenities.contains('Furnished'),
         genderRestriction: _selectedGender,
       );
@@ -218,23 +217,59 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
     final user = ref.watch(appUserProvider).valueOrNull;
     if (user == null) return const Scaffold(body: Center(child: Text('Please log in')));
 
-    if (!user.isHousingPlug) {
+    // Strictly consume the platform's professional role verification
+    final isVerifiedPlug = user.verifiedRoles.contains('housePlug');
+
+    if (!isVerifiedPlug) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Access Denied')),
-        body: Center(
+        appBar: AppBar(
+          title: const Text('Verification Required'),
+          backgroundColor: Colors.white,
+          elevation: 0,
+          foregroundColor: Colors.black,
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(32.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.lock_person_rounded, size: 64, color: Color(0xFF64748B)),
-              const SizedBox(height: 24),
-              const Text('Only Housing Plugs can list properties.', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 8),
-              const Text('Activate the Plug role to get started.', style: TextStyle(color: Color(0xFF64748B))),
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1677F2).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.verified_user_rounded, size: 64, color: Color(0xFF1677F2)),
+              ),
               const SizedBox(height: 32),
-              FilledButton(
-                onPressed: () => context.pushReplacement('/become-plug'),
-                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF1677F2)),
-                child: const Text('Become a Housing Plug'),
+              const Text(
+                'Verified Role Required',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: -0.5),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'To list properties on UniHub, you must verify your identity and activate the Housing Plug role via the platform Trust Engine.',
+                style: TextStyle(color: Color(0xFF64748B), fontSize: 16, height: 1.5),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 40),
+              SizedBox(
+                width: double.infinity,
+                height: 58,
+                child: FilledButton(
+                  onPressed: () => context.push('/trust-center'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF1677F2),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                  ),
+                  child: const Text('Go to Trust Center', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () => context.pop(),
+                child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
               ),
             ],
           ),

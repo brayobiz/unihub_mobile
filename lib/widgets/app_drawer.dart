@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/presentation/controllers/auth_controller.dart';
 import '../features/auth/shared/providers.dart';
 import '../features/housing/shared/providers.dart';
-import '../features/housing/domain/models/housing_plug_application.dart';
+import '../features/trust/domain/models/professional_role.dart';
+import '../features/trust/domain/models/verification_application.dart';
+import '../features/trust/presentation/providers/trust_providers.dart';
 
 class AppDrawer extends ConsumerWidget {
   const AppDrawer({super.key});
@@ -90,10 +92,10 @@ class AppDrawer extends ConsumerWidget {
                   context.push('/plug-dashboard');
                 });
               } else {
-                final applicationAsync = ref.watch(plugApplicationProvider);
+                final applicationAsync = ref.watch(applicationByRoleProvider(ProfessionalRole.housePlug));
                 return applicationAsync.when(
                   data: (app) {
-                    if (app?.status == PlugApplicationStatus.pending) {
+                    if (app?.status == VerificationStatus.pending) {
                       return _drawerItem(Icons.hourglass_empty_rounded, 'Plug App Pending', color: Colors.indigo, onTap: () {
                         context.pop();
                         context.push('/plug-dashboard');
