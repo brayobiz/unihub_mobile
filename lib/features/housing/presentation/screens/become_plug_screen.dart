@@ -367,29 +367,64 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: isVerified ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: isVerified ? const Color(0xFFBBF7D0) : const Color(0xFFFEE2E2)),
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  isVerified ? Icons.check_circle : Icons.lock_person_outlined,
-                  color: isVerified ? Colors.green : Colors.red,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    isVerified
-                        ? 'Universal Platform Trust verified. You\'re eligible for professional onboarding.'
-                        : 'Universal Platform Verification is required before you can join the professional network.',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: isVerified ? const Color(0xFF166534) : const Color(0xFF991B1B),
+                Row(
+                  children: [
+                    Icon(
+                      isVerified ? Icons.verified_user_rounded : Icons.shield_outlined,
+                      color: isVerified ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                      size: 20,
                     ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Platform Trust Status',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF1E293B),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  isVerified
+                      ? 'Your platform identity is verified. You are eligible to complete your professional housing profile.'
+                      : 'To ensure student safety and platform integrity, all professional service providers must complete UniHub Identity Verification before joining the network.',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF64748B),
+                    height: 1.4,
                   ),
                 ),
+                if (!isVerified && !identityPending) ...[
+                  const SizedBox(height: 12),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFF1677F2)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'You will return here automatically once verified.',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF1677F2),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -403,12 +438,23 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
                 ? _nextPage 
                 : (identityPending ? null : () => context.push('/trust-center')),
               style: FilledButton.styleFrom(
-                backgroundColor: isVerified ? const Color(0xFF1677F2) : const Color(0xFF0F172A),
+                backgroundColor: const Color(0xFF1677F2),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
               ),
-              child: Text(
-                isVerified ? 'Start Professional Onboarding' : identityPending ? 'Verification Pending...' : 'Go to Trust Center',
-                style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (identityPending) ...[
+                    const Icon(Icons.hourglass_empty_rounded, size: 20, color: Colors.white70),
+                    const SizedBox(width: 12),
+                  ],
+                  Text(
+                    identityPending 
+                        ? 'Verification in Progress...' 
+                        : (isVerified ? 'Continue to Professional Profile' : 'Start Housing Plug Journey'),
+                    style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16),
+                  ),
+                ],
               ),
             ),
           ),

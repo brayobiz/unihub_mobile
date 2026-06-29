@@ -38,6 +38,8 @@ import '../../features/notes/domain/models/note.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/profile/edit_profile_screen.dart';
 import '../../features/profile/settings_screen.dart';
+import '../../features/profile/activity_history_screen.dart';
+import '../../features/profile/achievements_screen.dart';
 import '../../features/marketplace/presentation/screens/saved_listings_screen.dart';
 import '../../features/shared/help_centre_screen.dart';
 import '../../features/shared/notifications_screen.dart';
@@ -298,11 +300,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/note-reader',
         builder: (context, state) {
-          final extras = state.extra as Map<String, dynamic>;
+          final extra = state.extra;
+          if (extra is! Map) {
+            return const Scaffold(body: Center(child: Text('Invalid data passed to reader')));
+          }
+          final note = extra['note'] as NoteListing?;
+          if (note == null) {
+            return const Scaffold(body: Center(child: Text('Note data missing')));
+          }
           return NoteReaderScreen(
-            note: extras['note'] as NoteListing,
-            filePath: extras['filePath'] as String,
-            initialPage: extras['initialPage'] as int? ?? 0,
+            note: note,
+            filePath: extra['filePath'] as String?,
+            initialPage: extra['initialPage'] as int? ?? 0,
           );
         },
       ),
@@ -317,6 +326,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings',
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/activity-history',
+        builder: (context, state) => const ActivityHistoryScreen(),
+      ),
+      GoRoute(
+        path: '/achievements',
+        builder: (context, state) => const AchievementsScreen(),
       ),
       GoRoute(
         path: '/saved',

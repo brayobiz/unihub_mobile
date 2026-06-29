@@ -221,17 +221,28 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
           ),
           const SizedBox(height: 20),
           ElevatedButton(
-            onPressed: hasPendingApp ? null : () => context.push(isVerified ? '/verify-professional/housePlug' : '/trust-center'),
+            onPressed: hasPendingApp ? null : () => context.push('/become-plug'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white,
+              disabledBackgroundColor: Colors.white.withOpacity(0.8),
               foregroundColor: isRejected ? Colors.red : const Color(0xFF1677F2),
+              disabledForegroundColor: const Color(0xFF1677F2).withOpacity(0.6),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 0,
             ),
-            child: Text(
-              !isVerified ? 'Verify Identity' : (isRejected ? 'Update & Resubmit' : (hasPendingApp ? 'In Review...' : 'Become a Housing Plug')),
-              style: const TextStyle(fontWeight: FontWeight.w900)
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (hasPendingApp) ...[
+                  const Icon(Icons.hourglass_empty_rounded, size: 16),
+                  const SizedBox(width: 10),
+                ],
+                Text(
+                  hasPendingApp ? 'Application Under Review' : (isRejected ? 'Review Application' : 'Become a Housing Plug'),
+                  style: const TextStyle(fontWeight: FontWeight.w900)
+                ),
+              ],
             ),
           ),
         ],

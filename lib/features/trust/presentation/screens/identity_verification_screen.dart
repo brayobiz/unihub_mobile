@@ -210,7 +210,7 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
               width: 60,
               height: 60,
               decoration: BoxDecoration(
-                color: (file != null ? const Color(0xFF10B981) : const Color(0xFF1677F2)).withValues(alpha: 0.1),
+                color: (file != null ? const Color(0xFF10B981) : const Color(0xFF1677F2)).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: file != null

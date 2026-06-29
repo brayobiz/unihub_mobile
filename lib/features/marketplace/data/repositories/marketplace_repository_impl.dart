@@ -89,6 +89,14 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
   }
 
   @override
+  Future<Listing?> getListingById(String id) async {
+    if (id.isEmpty) return null;
+    final doc = await _firestore.collection('listings').doc(id).get();
+    if (!doc.exists) return null;
+    return Listing.fromJson(doc.data() as Map<String, dynamic>);
+  }
+
+  @override
   Stream<List<Listing>> watchSellerListings(String sellerId) {
     if (sellerId.isEmpty) return Stream.value([]);
     

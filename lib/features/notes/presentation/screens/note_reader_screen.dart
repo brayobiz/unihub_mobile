@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdfx/pdfx.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,16 +9,17 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:path/path.dart' as p;
 import '../../domain/models/note.dart';
 import '../../shared/providers.dart';
+import '../../../../services/download_service.dart';
 
 class NoteReaderScreen extends ConsumerStatefulWidget {
   final NoteListing note;
-  final String filePath;
+  final String? filePath;
   final int initialPage;
 
   const NoteReaderScreen({
     super.key,
     required this.note,
-    required this.filePath,
+    this.filePath,
     this.initialPage = 0,
   });
 
@@ -34,45 +37,147 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
   WebViewController? _webViewController;
   bool _isPdf = true;
   bool _isWebLoading = true;
+  bool _isDownloading = false;
+  String? _localPath;
   Timer? _debounce;
+  bool _showUI = true;
+  bool _isError = false;
+  String _errorMessage = '';
 
   @override
   void initState() {
     super.initState();
-    final extension = p.extension(widget.filePath).toLowerCase();
-    _isPdf = extension == '.pdf';
+    _localPath = widget.filePath;
+    _isPdf = _checkIfPdf();
+    
+    // Set system UI to dark theme for reader if PDF
+    if (_isPdf) {
+      SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
+    }
 
     if (_isPdf) {
       _currentPage = widget.initialPage;
+      if (_localPath != null) {
+        _initPdfController();
+      } else {
+        _downloadAndInitPdf();
+      }
+    } else {
+      _initWebView();
+    }
+  }
+
+  bool _checkIfPdf() {
+    final url = widget.note.fileUrl.toLowerCase();
+    final path = (_localPath ?? '').toLowerCase();
+    
+    return url.contains('.pdf') || 
+           path.contains('.pdf') || 
+           widget.note.noteType.toLowerCase() == 'lecture note' || // Fallback assumption
+           url.contains('raw/upload') && url.endsWith('.pdf');
+  }
+
+  void _initPdfController() {
+    try {
+      final file = File(_localPath!);
+      if (!file.existsSync()) {
+        _downloadAndInitPdf();
+        return;
+      }
+      
       _pdfController = PdfControllerPinch(
-        document: PdfDocument.openFile(widget.filePath),
+        document: PdfDocument.openFile(_localPath!),
         initialPage: widget.initialPage + 1,
       );
-    } else {
-      // For Docx/PPT, we use Google Docs Viewer via WebView
-      // Note: This requires an active internet connection even if the file is downloaded,
-      // as the viewer is a remote service.
-      final String viewerUrl = 'https://docs.google.com/gview?embedded=true&url=${Uri.encodeComponent(widget.note.fileUrl)}';
-      
-      _webViewController = WebViewController()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setNavigationDelegate(
-          NavigationDelegate(
-            onPageStarted: (url) => setState(() => _isWebLoading = true),
-            onPageFinished: (url) => setState(() => _isWebLoading = false),
-            onWebResourceError: (error) {
-               debugPrint('🌐 WebView Error: ${error.description}');
-            },
-          ),
-        )
-        ..loadRequest(Uri.parse(viewerUrl));
+      setState(() => _isError = false);
+    } catch (e) {
+      setState(() {
+        _isError = true;
+        _errorMessage = 'Could not open PDF: ${e.toString()}';
+      });
     }
+  }
+
+  Future<void> _downloadAndInitPdf() async {
+    if (!mounted) return;
+    setState(() {
+      _isDownloading = true;
+      _isError = false;
+    });
+
+    try {
+      // Create a safe filename
+      final safeTitle = widget.note.title.replaceAll(RegExp(r'[^\w\s]+'), '_');
+      final ext = widget.note.fileUrl.toLowerCase().contains('.pdf') ? '.pdf' : '.pdf'; // Default to pdf for this flow
+      final fileName = '$safeTitle$ext';
+      
+      final downloadService = ref.read(downloadServiceProvider);
+      
+      final exists = await downloadService.isFileDownloaded(fileName);
+      if (exists) {
+        _localPath = await downloadService.getSavePath(fileName);
+      } else {
+        await downloadService.downloadFile(
+          url: widget.note.fileUrl,
+          fileName: fileName,
+          noteId: widget.note.id,
+        );
+        _localPath = await downloadService.getSavePath(fileName);
+      }
+
+      if (mounted) {
+        setState(() => _isDownloading = false);
+        _initPdfController();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isDownloading = false;
+          _isError = true;
+          // Extract cleaner error from Dio exception if possible
+          _errorMessage = e.toString().contains('401') 
+              ? 'Access Denied: Please sign in again to access this resource.' 
+              : 'Connection Error: Unable to fetch document. Please check your internet.';
+        });
+      }
+    }
+  }
+
+  void _initWebView() {
+    // If not a PDF, we use an office viewer.
+    // Try Microsoft first as it often works better with various auth setups
+    final String encodedUrl = Uri.encodeComponent(widget.note.fileUrl);
+    final String viewerUrl = 'https://view.officeapps.live.com/op/view.aspx?src=$encodedUrl';
+    
+    // Fallback URL if Microsoft fails (though we won't know easily in webview)
+    // final String googleViewerUrl = 'https://docs.google.com/gview?embedded=true&url=$encodedUrl';
+
+    _webViewController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.white)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (url) => setState(() => _isWebLoading = true),
+          onPageFinished: (url) => setState(() => _isWebLoading = false),
+          onWebResourceError: (error) {
+             debugPrint('🌐 WebView Error: ${error.description}');
+             if (mounted && error.errorType != WebResourceErrorType.unknown) {
+               setState(() {
+                 _isError = true;
+                 _errorMessage = 'Document viewer error. Please try again later.';
+               });
+             }
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse(viewerUrl));
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
     _pdfController?.dispose();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
     super.dispose();
   }
 
@@ -95,58 +200,208 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
     });
   }
 
+  void _toggleUI() {
+    setState(() {
+      _showUI = !_showUI;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final progressAsync = ref.watch(noteProgressProvider(widget.note.id));
     final isBookmarked = progressAsync.valueOrNull?.isBookmarked ?? false;
 
     return Scaffold(
-      backgroundColor: _isPdf ? Colors.grey.shade900 : Colors.white,
-      appBar: AppBar(
-        backgroundColor: _isPdf ? Colors.black.withOpacity(0.8) : Colors.indigo,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.note.title,
-              style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.bold),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+      backgroundColor: _isPdf ? const Color(0xFF1A1A1A) : Colors.white,
+      body: Stack(
+        children: [
+          // Main Reader Content
+          GestureDetector(
+            onTap: _toggleUI,
+            child: _isError 
+              ? _buildErrorView()
+              : _isDownloading 
+                ? _buildDownloadView() 
+                : (_isPdf ? _buildPdfView() : _buildWebView()),
+          ),
+
+          // Header (AppBar)
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            top: _showUI ? 0 : -100,
+            left: 0,
+            right: 0,
+            child: _buildHeader(isBookmarked),
+          ),
+
+          // Footer (Progress Controls)
+          if (_isPdf && _totalPages > 0)
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              bottom: _showUI ? 0 : -120,
+              left: 0,
+              right: 0,
+              child: _buildFooter(),
             ),
-            if (_isPdf && _totalPages > 0)
-              Text(
-                'Page ${_currentPage + 1} of $_totalPages',
-                style: const TextStyle(fontSize: 10, color: Colors.white70),
-              )
-            else if (!_isPdf)
-              Text(
-                'Document Viewer',
-                style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.7)),
+
+          // Permanent slim progress indicator at the bottom
+          if (_isPdf && _totalPages > 0 && !_showUI)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: LinearProgressIndicator(
+                value: (_currentPage + 1) / _totalPages,
+                backgroundColor: Colors.transparent,
+                valueColor: AlwaysStoppedAnimation(Colors.indigoAccent.withOpacity(0.5)),
+                minHeight: 3,
               ),
-          ],
-        ),
-        actions: [
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(bool isBookmarked) {
+    return Container(
+      padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top, bottom: 8),
+      decoration: BoxDecoration(
+        color: _isPdf ? Colors.black.withOpacity(0.85) : Colors.indigo,
+        boxShadow: [
+          if (_showUI) BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10)
+        ],
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.note.title,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 15, 
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (_isPdf && _totalPages > 0)
+                  Text(
+                    'Page ${_currentPage + 1} of $_totalPages',
+                    style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.7)),
+                  ),
+              ],
+            ),
+          ),
           IconButton(
             icon: Icon(
               isBookmarked ? Icons.bookmark : Icons.bookmark_border,
               color: isBookmarked ? Colors.amber : Colors.white,
             ),
-            onPressed: () => ref.read(studyControllerProvider).toggleBookmark(widget.note.id),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              ref.read(studyControllerProvider).toggleBookmark(widget.note.id);
+            },
+          ),
+          if (_isPdf)
+            IconButton(
+              icon: const Icon(Icons.grid_view_rounded, color: Colors.white, size: 20),
+              onPressed: () {
+                // Future: Thumbnail view
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Thumbnail view coming soon'), duration: Duration(seconds: 1)),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFooter() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.85),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Progress',
+                style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                '${((_currentPage + 1) / _totalPages * 100).toInt()}%',
+                style: const TextStyle(color: Colors.indigoAccent, fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _buildPageNavButton(Icons.chevron_left, () {
+                if (_currentPage > 0) _pdfController?.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+              }),
+              Expanded(
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 4,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                    activeTrackColor: Colors.indigoAccent,
+                    inactiveTrackColor: Colors.white24,
+                    thumbColor: Colors.white,
+                  ),
+                  child: Slider(
+                    value: _currentPage.toDouble(),
+                    min: 0,
+                    max: (_totalPages - 1).toDouble(),
+                    onChanged: (val) {
+                      _pdfController?.jumpToPage(val.toInt() + 1);
+                    },
+                  ),
+                ),
+              ),
+              _buildPageNavButton(Icons.chevron_right, () {
+                if (_currentPage < _totalPages - 1) _pdfController?.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+              }),
+            ],
           ),
         ],
       ),
-      body: _isPdf ? _buildPdfView() : _buildWebView(),
-      bottomNavigationBar: (_isPdf && _totalPages > 0) ? _buildProgressSlider() : null,
+    );
+  }
+
+  Widget _buildPageNavButton(IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: Colors.white, size: 20),
+      ),
     );
   }
 
   Widget _buildPdfView() {
+    if (_pdfController == null) return const SizedBox.shrink();
     return PdfViewPinch(
       controller: _pdfController!,
       onDocumentLoaded: (document) {
@@ -156,11 +411,70 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
       },
       onPageChanged: _onPageChanged,
       onDocumentError: (error) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error opening PDF: $error')),
-        );
-        Navigator.pop(context);
+        setState(() {
+          _isError = true;
+          _errorMessage = 'Error opening PDF: $error';
+        });
       },
+    );
+  }
+
+  Widget _buildDownloadView() {
+    return Container(
+      width: double.infinity,
+      color: _isPdf ? const Color(0xFF1A1A1A) : Colors.white,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: const Duration(seconds: 2),
+            builder: (context, value, child) => Opacity(
+              opacity: value,
+              child: child,
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: Colors.indigo.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.auto_stories, size: 64, color: Colors.indigo),
+            ),
+          ),
+          const SizedBox(height: 40),
+          Text(
+            'Preparing Your Study Session',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 20, 
+              fontWeight: FontWeight.bold,
+              color: _isPdf ? Colors.white : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 48),
+            child: Text(
+              'Optimizing "${widget.note.title}" for high-quality reading...',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: _isPdf ? Colors.white60 : Colors.grey.shade600,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+          ),
+          const SizedBox(height: 48),
+          const SizedBox(
+            width: 140,
+            child: LinearProgressIndicator(
+              backgroundColor: Colors.white12,
+              valueColor: AlwaysStoppedAnimation(Colors.indigoAccent),
+              minHeight: 4,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -169,49 +483,61 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
       children: [
         WebViewWidget(controller: _webViewController!),
         if (_isWebLoading)
-          const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(color: Colors.indigo),
-                SizedBox(height: 16),
-                Text('Preparing document...', style: TextStyle(color: Colors.grey)),
-              ],
-            ),
-          ),
+          _buildDownloadView(), // Reuse download view for web loading
       ],
     );
   }
 
-  Widget _buildProgressSlider() {
+  Widget _buildErrorView() {
     return Container(
-      color: Colors.black.withOpacity(0.8),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: SafeArea(
-        child: Row(
-          children: [
-            Text(
-              '${_currentPage + 1}',
-              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+      width: double.infinity,
+      padding: const EdgeInsets.all(32),
+      color: _isPdf ? const Color(0xFF1A1A1A) : Colors.white,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline_rounded, size: 80, color: Colors.redAccent),
+          const SizedBox(height: 24),
+          Text(
+            'Unable to Load Document',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 20, 
+              fontWeight: FontWeight.bold,
+              color: _isPdf ? Colors.white : Colors.black87,
             ),
-            Expanded(
-              child: Slider(
-                value: _currentPage.toDouble(),
-                min: 0,
-                max: (_totalPages - 1).toDouble(),
-                activeColor: Colors.indigoAccent,
-                inactiveColor: Colors.white24,
-                onChanged: (val) {
-                  _pdfController?.jumpToPage(val.toInt() + 1);
-                },
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _errorMessage,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+          ),
+          const SizedBox(height: 40),
+          SizedBox(
+            width: 200,
+            height: 50,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                if (_isPdf) {
+                  _downloadAndInitPdf();
+                } else {
+                  _initWebView();
+                }
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try Again', style: TextStyle(fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.indigo,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
             ),
-            Text(
-              '$_totalPages',
-              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Go Back', style: TextStyle(color: Colors.grey)),
+          ),
+        ],
       ),
     );
   }

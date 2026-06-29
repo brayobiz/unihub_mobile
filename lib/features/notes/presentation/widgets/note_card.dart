@@ -172,6 +172,15 @@ class NoteCard extends ConsumerWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                         ),
+                        if (note.description.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            note.description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 11, color: Colors.grey.shade600, height: 1.3),
+                          ),
+                        ],
                       ],
                     ),
                   ),

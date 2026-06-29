@@ -18,20 +18,13 @@ final userApplicationsProvider = StreamProvider<List<VerificationApplication>>((
 });
 
 final applicationByRoleProvider = StreamProvider.family<VerificationApplication?, ProfessionalRole>((ref, role) {
-  final applicationsAsync = ref.watch(userApplicationsProvider);
-  
-  return applicationsAsync.when(
-    data: (applications) {
-      try {
-        final app = applications.firstWhere((app) => app.role == role);
-        return Stream.value(app);
-      } catch (_) {
-        return Stream.value(null);
-      }
-    },
-    loading: () => const Stream.empty(),
-    error: (_, __) => Stream.value(null),
-  );
+  return ref.watch(userApplicationsProvider.stream).map((applications) {
+    try {
+      return applications.firstWhere((app) => app.role == role);
+    } catch (_) {
+      return null;
+    }
+  });
 });
 
 final userApplicationByRoleProvider = FutureProvider.family<VerificationApplication?, ({String userId, ProfessionalRole role})>((ref, arg) {

@@ -156,7 +156,7 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
                             top: 12,
                             right: 12,
                             child: CircleAvatar(
-                              backgroundColor: Colors.black.withValues(alpha: 0.5),
+                              backgroundColor: Colors.black.withOpacity(0.5),
                               child: IconButton(
                                 icon: const Icon(Icons.edit, color: Colors.white),
                                 onPressed: _pickImage,

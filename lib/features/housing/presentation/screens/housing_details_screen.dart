@@ -319,7 +319,17 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
             icon: Icons.phone_rounded,
             label: 'Call',
             onTap: () async {
-              final url = Uri.parse('tel:${widget.listing.plugId}'); // Note: Should be plug's phone, but we use ID as fallback for now if phone is missing in listing
+              final plug = ref.read(userByIdProvider(widget.listing.plugId)).valueOrNull;
+              final phoneNumber = plug?.phoneNumber ?? plug?.whatsappNumber;
+              
+              if (phoneNumber == null || phoneNumber.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Phone number not available'))
+                );
+                return;
+              }
+
+              final url = Uri.parse('tel:$phoneNumber');
               if (await canLaunchUrl(url)) {
                 await launchUrl(url);
               }
@@ -341,13 +351,31 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
   }
 
   void _handleChat(BuildContext context) {
-    // Navigate to chat with Plug
-    // For now, we need to create or get conversation ID.
-    // Simplifying for Phase 1 polish: use a common route.
+    final currentUser = ref.read(authStateProvider).valueOrNull;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please login to contact the plug'))
+      );
+      return;
+    }
+
+    // Don't chat with yourself
+    if (currentUser.uid == widget.listing.plugId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This is your own listing'))
+      );
+      return;
+    }
+
+    // Simple ID generation for the conversation
+    final conversationId = currentUser.uid.compareTo(widget.listing.plugId) < 0 
+        ? '${currentUser.uid}_${widget.listing.plugId}' 
+        : '${widget.listing.plugId}_${currentUser.uid}';
+
     context.push('/chat', extra: {
-      'otherUserId': widget.listing.plugId,
+      'conversationId': conversationId,
       'otherUserName': widget.listing.plugName,
-      'title': widget.listing.title,
+      'listing': null, // The ChatScreen expects a Marketplace Listing, not HousingListing, passing null for now
     });
   }
 
@@ -574,9 +602,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
               child: SizedBox(
                 height: 58,
                 child: FilledButton(
-                  onPressed: listing.status == HousingStatus.taken ? null : () {
-                    // Quick Chat
-                  },
+                  onPressed: listing.status == HousingStatus.taken ? null : () => _handleChat(context),
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFF1677F2),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),

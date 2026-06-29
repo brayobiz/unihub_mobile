@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -44,9 +45,7 @@ class DownloadService {
 
     // 1. Request Permission
     if (Platform.isAndroid) {
-      if (await Permission.storage.request().isDenied) {
-        // On Android 13+, storage permission might be denied but we can still write to Downloads 
-      }
+      await Permission.storage.request();
     }
 
     try {
@@ -56,10 +55,25 @@ class DownloadService {
         await file.parent.create(recursive: true);
       }
 
+      // 2. Prepare Headers (Add Auth if available)
+      final Map<String, dynamic> headers = {};
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        final token = await currentUser.getIdToken();
+        if (token != null) {
+          headers['Authorization'] = 'Bearer $token';
+        }
+      }
+
       // 3. Start Download
       await _dio.download(
         url,
         savePath,
+        options: Options(
+          headers: headers,
+          followRedirects: true,
+          validateStatus: (status) => status != null && status < 400,
+        ),
         onReceiveProgress: (received, total) {
           if (total != -1) {
             final progress = ((received / total) * 100).toInt();
@@ -80,6 +94,11 @@ class DownloadService {
             isDone: true,
             filePath: savePath,
           );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        throw Exception('Access Denied (401). Please try logging in again.');
+      }
+      throw Exception('Download failed: ${e.message}');
     } catch (e) {
       print('Download error: $e');
       rethrow;

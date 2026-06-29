@@ -16,6 +16,8 @@ final notesSearchQueryProvider = StateProvider<String>((ref) => '');
 final notesCategoryFilterProvider = StateProvider<String>((ref) => 'All');
 final notesTypeFilterProvider = StateProvider<String>((ref) => 'All');
 final notesYearFilterProvider = StateProvider<String>((ref) => 'All');
+final notesUniversityFilterProvider = StateProvider<String?>((ref) => null);
+final notesCourseFilterProvider = StateProvider<String>((ref) => 'All');
 
 final notesListingsProvider = StreamProvider.family<List<NoteListing>, int>((ref, limit) {
   final user = ref.watch(appUserProvider).valueOrNull;
@@ -23,9 +25,10 @@ final notesListingsProvider = StreamProvider.family<List<NoteListing>, int>((ref
   final category = ref.watch(notesCategoryFilterProvider);
   final type = ref.watch(notesTypeFilterProvider);
   final year = ref.watch(notesYearFilterProvider);
+  final selectedUni = ref.watch(notesUniversityFilterProvider);
 
   return ref.watch(notesRepositoryProvider).watchNotes(
-    university: user?.university,
+    university: selectedUni ?? user?.university,
     subjectCategory: category,
     noteType: type,
     yearOfStudy: year,
@@ -36,6 +39,26 @@ final notesListingsProvider = StreamProvider.family<List<NoteListing>, int>((ref
 
 final topNotesProvider = StreamProvider<List<NoteListing>>((ref) {
   return ref.watch(notesListingsProvider(40).stream);
+});
+
+final trendingNotesProvider = StreamProvider<List<NoteListing>>((ref) {
+  final user = ref.watch(appUserProvider).valueOrNull;
+  // In a real app, the repository would handle "trending" logic
+  // For now, we'll fetch notes with a higher limit and sort by downloads in UI if needed,
+  // or assume watchNotes supports some sorting (though not in the current interface).
+  // We'll just use the watchNotes with a limit for now.
+  return ref.watch(notesRepositoryProvider).watchNotes(
+    university: user?.university,
+    limit: 10,
+  );
+});
+
+final recentNotesProvider = StreamProvider<List<NoteListing>>((ref) {
+  final user = ref.watch(appUserProvider).valueOrNull;
+  return ref.watch(notesRepositoryProvider).watchNotes(
+    university: user?.university,
+    limit: 10,
+  );
 });
 
 final userNotesProvider = StreamProvider<List<NoteListing>>((ref) {
@@ -55,6 +78,21 @@ final bookmarksProvider = StreamProvider<List<StudyProgress>>((ref) {
   final user = ref.watch(authStateProvider).valueOrNull;
   if (user == null) return Stream.value([]);
   return ref.watch(notesRepositoryProvider).watchBookmarks(user.uid);
+});
+
+// Derived Library Providers
+final continueReadingProvider = Provider<AsyncValue<List<StudyProgress>>>((ref) {
+  final historyAsync = ref.watch(studyHistoryProvider);
+  return historyAsync.whenData((history) => 
+    history.where((p) => p.progress > 0 && p.progress < 0.95).toList()
+  );
+});
+
+final recentlyOpenedProvider = Provider<AsyncValue<List<StudyProgress>>>((ref) {
+  final historyAsync = ref.watch(studyHistoryProvider);
+  return historyAsync.whenData((history) => 
+    history.take(10).toList()
+  );
 });
 
 final noteProgressProvider = StreamProvider.family<StudyProgress?, String>((ref, noteId) {

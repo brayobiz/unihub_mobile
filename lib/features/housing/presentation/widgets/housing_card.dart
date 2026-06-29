@@ -45,7 +45,7 @@ class HousingCard extends ConsumerWidget {
           border: Border.all(color: const Color(0xFFF1F5F9)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: Colors.black.withOpacity(0.04),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -84,7 +84,7 @@ class HousingCard extends ConsumerWidget {
                             color: const Color(0xFF10B981),
                             borderRadius: BorderRadius.circular(8),
                             boxShadow: [
-                              BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4)
+                              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)
                             ],
                           ),
                           child: Row(
@@ -100,7 +100,7 @@ class HousingCard extends ConsumerWidget {
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.9),
+                          color: Colors.white.withOpacity(0.9),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.favorite_border, size: 16, color: Color(0xFF1677F2)),
@@ -115,7 +115,7 @@ class HousingCard extends ConsumerWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: isTaken ? Colors.red.withValues(alpha: 0.9) : Colors.black.withValues(alpha: 0.7),
+                      color: isTaken ? Colors.red.withOpacity(0.9) : Colors.black.withOpacity(0.7),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -254,7 +254,7 @@ class HousingCard extends ConsumerWidget {
           border: Border.all(color: const Color(0xFFF1F5F9)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
+              color: Colors.black.withOpacity(0.03),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),

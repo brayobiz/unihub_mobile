@@ -1,437 +1,514 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:unihub_mobile/core/widgets/optimized_image.dart';
-import 'package:unihub_mobile/features/trust/domain/models/professional_role.dart';
-import 'package:unihub_mobile/features/trust/domain/models/verification_application.dart';
-import 'package:unihub_mobile/features/trust/presentation/providers/trust_providers.dart';
-import 'package:unihub_mobile/features/housing/domain/models/housing_listing.dart';
+import 'package:go_router/go_router.dart';
 import '../../../auth/shared/providers.dart';
+import '../../../auth/domain/models/app_user.dart';
 import '../../shared/providers.dart';
-import '../widgets/housing_card.dart';
+import '../../domain/models/housing_listing.dart';
 
 class PlugProfileScreen extends ConsumerWidget {
   final String plugId;
+
   const PlugProfileScreen({super.key, required this.plugId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final plugAsync = ref.watch(userByIdProvider(plugId));
-    final applicationAsync = ref.watch(userApplicationByRoleProvider((userId: plugId, role: ProfessionalRole.housePlug)));
     final listingsAsync = ref.watch(plugListingsProvider(plugId));
 
     return plugAsync.when(
       data: (plug) {
-        if (plug == null) return const Scaffold(body: Center(child: Text('Plug not found')));
-        
-        return applicationAsync.when(
-          data: (app) {
-            final metadata = app?.metadata ?? {};
-            
-            return Scaffold(
-              backgroundColor: const Color(0xFFF8FAFC),
-              body: CustomScrollView(
-                physics: const BouncingScrollPhysics(),
-                slivers: [
-                  _buildSliverAppBar(plug),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 40),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          _buildProfileHeader(plug, metadata),
-                          const SizedBox(height: 32),
-                          
-                          _buildQuickInfo(metadata),
-                          const SizedBox(height: 32),
+        if (plug == null) {
+          return const Scaffold(
+            body: Center(child: Text('Plug not found')),
+          );
+        }
 
-                          _buildSectionTitle('Professional Introduction'),
-                          const SizedBox(height: 12),
-                          _buildIntroText(metadata['professionalIntro'] ?? plug.bio),
-                          const SizedBox(height: 32),
-                          
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _buildSectionTitle('Active Listings'),
-                              listingsAsync.when(
-                                data: (l) => Text('${l.length} available', 
-                                  style: TextStyle(color: Colors.blueGrey.shade400, fontWeight: FontWeight.bold, fontSize: 12)),
-                                loading: () => const SizedBox.shrink(),
-                                error: (_, __) => const SizedBox.shrink(),
-                              ),
-                            ],
+        return Scaffold(
+          body: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Container(
+                  height: 180,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0xFF1E88E5), Color(0xFF26C6DA)],
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back, color: Colors.white),
+                            onPressed: () => context.pop(),
                           ),
-                          const SizedBox(height: 16),
-                          _buildListings(listingsAsync),
-                          
-                          const SizedBox(height: 16),
                         ],
                       ),
                     ),
                   ),
-                ],
-              ),
-              bottomNavigationBar: _buildBottomContactBar(plug, metadata),
-            );
-          },
-          loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-          error: (e, _) => Scaffold(body: Center(child: Text('Error loading professional profile: $e'))),
+                ),
+
+                // Profile Section
+                Transform.translate(
+                  offset: const Offset(0, -60),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      children: [
+                        Stack(
+                          alignment: Alignment.bottomRight,
+                          children: [
+                            CircleAvatar(
+                              radius: 55,
+                              backgroundColor: Colors.white,
+                              child: CircleAvatar(
+                                radius: 52,
+                                backgroundImage: plug.photoUrl != null
+                                    ? CachedNetworkImageProvider(plug.photoUrl!)
+                                    : const NetworkImage('https://ui-avatars.com/api/?name=Plug&background=random') as ImageProvider,
+                              ),
+                            ),
+                            if (plug.isVerifiedPlug)
+                              const CircleAvatar(
+                                radius: 18,
+                                backgroundColor: Colors.white,
+                                child: Icon(Icons.verified, color: Colors.green, size: 28),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(plug.fullName, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                            if (plug.isVerifiedPlug) ...[
+                              const SizedBox(width: 8),
+                              const Icon(Icons.verified, color: Colors.blue, size: 24),
+                            ],
+                          ],
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (plug.isVerifiedPlug)
+                              const Text('Verified by UniHub', style: TextStyle(color: Colors.grey)),
+                            if (plug.isVerifiedPlug) const SizedBox(width: 16),
+                            const Row(children: [Icon(Icons.home, size: 18), SizedBox(width: 4), Text('Housing Plug')]),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                              decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [Icon(Icons.circle, color: Colors.green, size: 12), SizedBox(width: 6), Text('Accepting New Inquiries', style: TextStyle(color: Colors.green, fontWeight: FontWeight.w500))],
+                              ),
+                            ),
+                            if (plug.university != null) ...[
+                              const SizedBox(width: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(20)),
+                                child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.school, size: 16), const SizedBox(width: 6), Text(plug.university!)]),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Stats
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildStatItem(Icons.home, plug.housingListingsCount.toString(), 'Active Listings'),
+                      _buildStatItem(Icons.people, plug.completedSalesCount.toString(), 'Students Helped'),
+                      _buildStatItem(Icons.calendar_today, plug.createdAt != null ? DateFormat('yyyy').format(plug.createdAt!) : '2024', 'Member Since'),
+                      _buildStatItem(Icons.timer, '', 'Responds\n${plug.responseRate}'),
+                    ],
+                  ),
+                ),
+
+                const Divider(height: 1),
+
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('About ${plug.fullName.split(' ')[0]}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      Text(plug.bio ?? 'This plug has not provided a bio yet.'),
+                      if (plug.bio != null && plug.bio!.length > 100)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: InkWell(
+                            onTap: () => _showBioDialog(context, plug.fullName, plug.bio!),
+                            child: const Text('Read more', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.w500)),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                const Divider(height: 1),
+
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: _buildAreasServed(plug)),
+                      const SizedBox(width: 24),
+                      Expanded(child: _buildSpecialties(plug)),
+                    ],
+                  ),
+                ),
+
+                const Divider(height: 1),
+
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Active Listings', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      listingsAsync.when(
+                        data: (listings) => InkWell(
+                          onTap: () => _showAllListings(context, ref, plug.fullName, listings),
+                          child: Text('View all (${listings.length})', style: const TextStyle(color: Colors.blue)),
+                        ),
+                        loading: () => const SizedBox.shrink(),
+                        error: (_, __) => const SizedBox.shrink(),
+                      ),
+                    ],
+                  ),
+                ),
+
+                SizedBox(
+                  height: 280,
+                  child: listingsAsync.when(
+                    data: (listings) {
+                      if (listings.isEmpty) {
+                        return const Center(child: Text('No active listings'));
+                      }
+                      return ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: listings.length,
+                        itemBuilder: (context, index) {
+                          final listing = listings[index];
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 16),
+                            child: _buildListingCard(context, ref, listing),
+                          );
+                        },
+                      );
+                    },
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (err, _) => Center(child: Text('Error: $err')),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.chat_bubble_outline),
+                          label: const Text('In-App Chat'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            side: const BorderSide(color: Colors.blue),
+                          ),
+                          onPressed: () {
+                            final currentUser = ref.read(authStateProvider).valueOrNull;
+                            if (currentUser == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please login to chat'))
+                              );
+                              return;
+                            }
+                            
+                            // Simple ID generation for the conversation
+                            final conversationId = currentUser.uid.compareTo(plug.uid) < 0 
+                                ? '${currentUser.uid}_${plug.uid}' 
+                                : '${plug.uid}_${currentUser.uid}';
+                            
+                            context.push('/chat', extra: {
+                              'conversationId': conversationId,
+                              'otherUserName': plug.fullName,
+                              'listing': null,
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.message),
+                          label: const Text('WhatsApp'),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), padding: const EdgeInsets.symmetric(vertical: 16)),
+                          onPressed: () => _launchWhatsApp(context, plug.whatsappNumber ?? plug.phoneNumber, plug.fullName),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 40),
+              ],
+            ),
+          ),
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (err, _) => Scaffold(body: Center(child: Text('Error: $err'))),
     );
   }
 
-  Widget _buildSliverAppBar(dynamic plug) {
-    return SliverAppBar(
-      expandedHeight: 140,
-      pinned: true,
-      backgroundColor: const Color(0xFF1677F2),
-      flexibleSpace: FlexibleSpaceBar(
-        background: Stack(
-          fit: StackFit.expand,
+  void _launchWhatsApp(BuildContext context, String? number, String name) async {
+    if (number == null || number.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No WhatsApp number provided for this plug'))
+      );
+      return;
+    }
+    
+    // Clean number: remove all non-digits
+    String cleanNumber = number.replaceAll(RegExp(r'[^0-9]'), '');
+    
+    // Format for Kenyan numbers if local format is used (e.g., 0712345678 -> 254712345678)
+    if (cleanNumber.startsWith('0')) {
+      cleanNumber = '254${cleanNumber.substring(1)}';
+    } else if (cleanNumber.length == 9 && (cleanNumber.startsWith('7') || cleanNumber.startsWith('1'))) {
+      // Handles 712345678 -> 254712345678
+      cleanNumber = '254$cleanNumber';
+    }
+    
+    final whatsappUrl = Uri.parse("https://wa.me/$cleanNumber?text=Hi $name, I'm interested in one of your listings on UniHub.");
+    
+    try {
+      // In many cases on modern Android, canLaunchUrl returns false even if it can launch
+      // So we attempt to launch and catch the error if it fails
+      bool launched = await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        throw 'Could not launch WhatsApp';
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open WhatsApp. Please ensure it is installed. $e'))
+        );
+      }
+    }
+  }
+
+  void _showBioDialog(BuildContext context, String name, String bio) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('About $name'),
+        content: SingleChildScrollView(child: Text(bio)),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      ),
+    );
+  }
+
+  void _showAllListings(BuildContext context, WidgetRef ref, String name, List<HousingListing> listings) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.9,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (context, scrollController) => Column(
           children: [
-            if (plug.coverPhotoUrl != null)
-              OptimizedImage(imageUrl: plug.coverPhotoUrl!, fit: BoxFit.cover)
-            else
-              Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF1677F2), Color(0xFF19D3C5)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text('All Listings by $name', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+            const Divider(),
+            Expanded(
+              child: GridView.builder(
+                controller: scrollController,
+                padding: const EdgeInsets.all(16),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.68,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
                 ),
+                itemCount: listings.length,
+                itemBuilder: (context, index) => _buildListingCard(context, ref, listings[index]),
               ),
-            Container(color: Colors.black.withValues(alpha: 0.05)),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildProfileHeader(dynamic plug, Map<String, dynamic> metadata) {
-    final bool isAvailable = metadata['availabilityStatus'] == 'Available';
-    final String campus = metadata['primaryCampus'] ?? plug.university ?? 'N/A';
-    final bool isVerified = plug.isVerified;
-
-    return Transform.translate(
-      offset: const Offset(0, -50),
-      child: Column(
-        children: [
-          // 1. Profile photo focal point
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-            child: CircleAvatar(
-              radius: 54,
-              backgroundColor: const Color(0xFFF1F5F9),
-              backgroundImage: plug.photoUrl != null ? NetworkImage(plug.photoUrl!) : null,
-              child: plug.photoUrl == null 
-                ? Text(plug.fullName[0], style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold)) 
-                : null,
-            ),
-          ),
-          const SizedBox(height: 16),
-          
-          // 2. Full Name & Verification
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                plug.fullName,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 28, 
-                  fontWeight: FontWeight.w900, 
-                  letterSpacing: -0.5,
-                  color: const Color(0xFF1E293B),
-                ),
-              ),
-              if (isVerified)
-                const Padding(
-                  padding: EdgeInsets.only(left: 8),
-                  child: Icon(Icons.verified_rounded, color: Color(0xFF1677F2), size: 24),
-                ),
-            ],
-          ),
-          const SizedBox(height: 4),
-
-          // 3. Role & Trust Statement
-          Text(
-            isVerified ? 'VERIFIED HOUSING PLUG • TRUSTED BY UNIHUB' : 'HOUSING PLUG',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              color: isVerified ? const Color(0xFF1677F2) : const Color(0xFF64748B),
-              letterSpacing: 1.0,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // 4. Availability & 5. Primary Campus
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildAvailabilityBadge(isAvailable),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(100),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.school_rounded, size: 14, color: Color(0xFF64748B)),
-                    const SizedBox(width: 6),
-                    Text(
-                      campus,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11,
-                        color: const Color(0xFF475569),
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAvailabilityBadge(bool isAvailable) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: isAvailable ? const Color(0xFF10B981).withValues(alpha: 0.1) : Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: isAvailable ? const Color(0xFF10B981).withValues(alpha: 0.2) : Colors.grey.shade200),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: isAvailable ? const Color(0xFF10B981) : Colors.grey.shade400,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            isAvailable ? 'ACCEPTING INQUIRIES' : 'UNAVAILABLE',
-            style: GoogleFonts.plusJakartaSans(
-              color: isAvailable ? const Color(0xFF059669) : Colors.grey.shade600,
-              fontSize: 9,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickInfo(Map<String, dynamic> metadata) {
-    final List<dynamic> areas = metadata['serviceAreas'] ?? [];
-    final List<dynamic> specialties = metadata['accommodationSpecialties'] ?? [];
-
+  Widget _buildStatItem(IconData icon, String value, String label) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (areas.isNotEmpty) ...[
-          _buildSectionTitle('Primary Areas'),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: areas.map((area) => _buildQuickChip(area.toString(), Icons.location_on_rounded)).toList(),
-          ),
-          const SizedBox(height: 20),
-        ],
-        if (specialties.isNotEmpty) ...[
-          _buildSectionTitle('Specialties'),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: specialties.map((s) => _buildQuickChip(s.toString(), Icons.star_rounded, isSpecialty: true)).toList(),
-          ),
-        ],
+        Icon(icon, color: Colors.grey[600]),
+        if (value.isNotEmpty) Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
       ],
     );
   }
 
-  Widget _buildQuickChip(String label, IconData icon, {bool isSpecialty = false}) {
+  Widget _buildAreasServed(AppUser plug) {
+    // We'll use skills or interests as proxy for areas served if not explicitly there, 
+    // but typically we might want to derive this from active listings or campus.
+    final areas = plug.campus != null ? [plug.campus!] : ['N/A'];
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(children: [Icon(Icons.location_on, size: 20), SizedBox(width: 8), Text('Areas Served', style: TextStyle(fontWeight: FontWeight.bold))]),
+        const SizedBox(height: 12),
+        Wrap(spacing: 8, runSpacing: 8, children: areas.map(_buildTag).toList()),
+      ],
+    );
+  }
+
+  Widget _buildSpecialties(AppUser plug) {
+    // Use skills or a default list
+    final specialties = plug.skills.isNotEmpty 
+        ? plug.skills 
+        : ['Hostels', 'Bedsitters', 'One Bedroom', 'Short Stay'];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(children: [Icon(Icons.star, size: 20), SizedBox(width: 8), Text('Accommodation Specialties', style: TextStyle(fontWeight: FontWeight.bold))]),
+        const SizedBox(height: 12),
+        Wrap(spacing: 8, runSpacing: 8, children: specialties.map(_buildTag).toList()),
+      ],
+    );
+  }
+
+  Widget _buildTag(String text) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: isSpecialty ? const Color(0xFF1677F2).withValues(alpha: 0.05) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isSpecialty ? const Color(0xFF1677F2).withValues(alpha: 0.1) : const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: isSpecialty ? const Color(0xFF1677F2) : const Color(0xFF94A3B8)),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 12, 
-              fontWeight: FontWeight.w700, 
-              color: isSpecialty ? const Color(0xFF1677F2) : const Color(0xFF475569),
-            ),
-          ),
-        ],
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(20)),
+      child: Text(text, style: const TextStyle(fontSize: 13)),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title.toUpperCase(),
-      style: GoogleFonts.plusJakartaSans(
-        fontSize: 11, 
-        fontWeight: FontWeight.w900, 
-        color: const Color(0xFF94A3B8),
-        letterSpacing: 1.0,
-      ),
-    );
-  }
+  Widget _buildListingCard(BuildContext context, WidgetRef ref, HousingListing listing) {
+    final currencyFormatter = NumberFormat.currency(symbol: 'KES ', decimalDigits: 0);
+    final savedHousing = ref.watch(savedHousingProvider).valueOrNull ?? [];
+    final isSaved = savedHousing.any((l) => l.id == listing.id);
 
-  Widget _buildListings(AsyncValue<List<HousingListing>> listingsAsync) {
-    return listingsAsync.when(
-      data: (listings) {
-        final activeListings = listings.where((l) => l.status == HousingStatus.available).toList();
-        if (activeListings.isEmpty) {
-          return Container(
-            padding: const EdgeInsets.symmetric(vertical: 32),
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: const Color(0xFFF1F5F9)),
-            ),
-            child: Column(
+    return GestureDetector(
+      onTap: () {
+        context.push('/housing-detail', extra: listing);
+      },
+      child: Container(
+        width: 240,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16), 
+          color: Colors.white, 
+          boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 10)]
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
               children: [
-                Icon(Icons.house_siding_rounded, size: 40, color: Colors.grey.shade300),
-                const SizedBox(height: 12),
-                const Text('No available houses right now.', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  child: CachedNetworkImage(
+                    imageUrl: listing.images.isNotEmpty ? listing.images.first : 'https://picsum.photos/400/250',
+                    height: 160,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(color: Colors.grey[200]),
+                    errorWidget: (context, url, error) => const Icon(Icons.error),
+                  ),
+                ),
+                Positioned(
+                  top: 8, 
+                  right: 8, 
+                  child: GestureDetector(
+                    onTap: () {
+                      final user = ref.read(authStateProvider).valueOrNull;
+                      if (user == null) return;
+                      
+                      if (isSaved) {
+                        ref.read(housingRepositoryProvider).unsaveListing(user.uid, listing.id);
+                      } else {
+                        ref.read(housingRepositoryProvider).saveListing(user.uid, listing.id);
+                      }
+                    },
+                    child: CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Colors.white.withOpacity(0.8),
+                      child: Icon(
+                        isSaved ? Icons.favorite : Icons.favorite_border, 
+                        color: isSaved ? Colors.red : Colors.grey, 
+                        size: 20
+                      ),
+                    ),
+                  )
+                ),
+                Positioned(
+                  bottom: 12, 
+                  left: 12, 
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), 
+                    decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)), 
+                    child: Text(
+                      listing.type.name.toUpperCase(), 
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)
+                    )
+                  )
+                ),
               ],
             ),
-          );
-        }
-        return ListView.builder(
-          shrinkWrap: true,
-          padding: EdgeInsets.zero,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: activeListings.length,
-          itemBuilder: (context, index) => HousingCard(
-            listing: activeListings[index],
-            onTap: () => context.push('/housing-detail', extra: activeListings[index]),
-          ),
-        );
-      },
-      loading: () => const Center(child: Padding(
-        padding: EdgeInsets.all(40),
-        child: CircularProgressIndicator(),
-      )),
-      error: (e, _) => Text('Error: $e'),
-    );
-  }
-
-  Widget _buildIntroText(String? intro) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
-      ),
-      child: Text(
-        intro ?? 'This Housing Plug hasn\'t shared their professional background yet.',
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 14,
-          color: const Color(0xFF475569),
-          height: 1.6,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomContactBar(dynamic plug, Map<String, dynamic> metadata) {
-    final String preferredMethod = metadata['preferredContactMethod'] ?? 'In-App Chat';
-    
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05), 
-            blurRadius: 10, 
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  // TODO: Chat
-                },
-                icon: const Icon(Icons.chat_bubble_rounded),
-                label: const Text('In-App Chat'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  side: BorderSide(
-                    color: preferredMethod == 'In-App Chat' ? const Color(0xFF1677F2) : const Color(0xFFE2E8F0),
-                    width: 2,
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(listing.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text('${listing.university} • ${listing.location}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${currencyFormatter.format(listing.rent)} /month', 
+                    style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  foregroundColor: const Color(0xFF1E293B),
-                  textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: FilledButton.icon(
-                onPressed: () async {
-                  final String phone = plug.whatsappNumber ?? plug.phoneNumber ?? "";
-                  if (phone.isEmpty) return;
-                  
-                  final url = Uri.parse("https://wa.me/$phone?text=Hi ${plug.fullName}, I'm interested in your housing listings on UniHub.");
-                  if (await canLaunchUrl(url)) {
-                    await launchUrl(url, mode: LaunchMode.externalApplication);
-                  }
-                },
-                icon: const Icon(Icons.phone_android_rounded),
-                label: const Text('WhatsApp'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: preferredMethod == 'WhatsApp' ? const Color(0xFF25D366) : const Color(0xFF1677F2),
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 0,
-                  textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-                ),
+                ],
               ),
             ),
           ],

@@ -14,6 +14,7 @@ abstract class MarketplaceRepository {
   Stream<List<Listing>> watchSellerListings(String sellerId);
   Stream<List<Listing>> watchSavedListings(String userId);
   Future<List<Listing>> getListings({int limit = 20, Listing? startAfter});
+  Future<Listing?> getListingById(String id);
 
   Future<void> createListing(Listing listing);
   Future<void> deleteListing(String id);

@@ -79,7 +79,7 @@ class FeedCard extends ConsumerWidget {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: color.withValues(alpha: 0.1),
+                  backgroundColor: color.withOpacity(0.1),
                   radius: 20,
                   child: item.type == FeedType.confession 
                       ? Icon(Icons.favorite, color: color, size: 20)
@@ -184,7 +184,7 @@ class FeedCard extends ConsumerWidget {
                   onTap: () => _showComments(context, ref),
                 ),
                 const Spacer(),
-                Icon(icon, size: 16, color: color.withValues(alpha: 0.5)),
+                Icon(icon, size: 16, color: color.withOpacity(0.5)),
               ],
             ),
           ],

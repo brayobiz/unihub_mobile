@@ -343,46 +343,28 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
     // Mark as opened in history
     await ref.read(studyControllerProvider).markAsOpened(note.id);
 
-    // If it's a new note, set some initial progress
-    final currentProgress = await ref.read(noteProgressProvider(note.id).future);
-    if (currentProgress == null || currentProgress.progress == 0) {
-      await ref.read(studyControllerProvider).updateProgress(note.id, progress: 0.1, page: 0);
-    }
-
     try {
       final fileName = '${note.title.replaceAll(RegExp(r'[^\w\s]+'), '_')}${p.extension(note.fileUrl).isEmpty ? '.pdf' : p.extension(note.fileUrl)}';
       
       final downloadService = ref.read(downloadServiceProvider);
       final isDownloaded = await downloadService.isFileDownloaded(fileName);
-      final savePath = await downloadService.getSavePath(fileName);
-
-      if (isDownloaded) {
-        final progress = await ref.read(noteProgressProvider(note.id).future);
-
-        if (context.mounted) {
-          context.push('/note-reader', extra: {
-            'note': note,
-            'filePath': savePath,
-            'initialPage': progress?.lastPage ?? 0,
-          });
-        }
-        return;
-      }
+      final savePath = isDownloaded ? await downloadService.getSavePath(fileName) : null;
 
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Starting download... check notifications')),
-        );
+        context.push('/note-reader', extra: {
+          'note': note,
+          'filePath': savePath,
+          'initialPage': 0,
+        });
       }
-
-      await downloadService.downloadFile(
-        url: note.fileUrl,
-        fileName: fileName,
-        noteId: note.id,
-      );
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        // Fallback to push reader even if check fails, reader will handle its own errors
+        context.push('/note-reader', extra: {
+          'note': note,
+          'filePath': null,
+          'initialPage': 0,
+        });
       }
     }
   }

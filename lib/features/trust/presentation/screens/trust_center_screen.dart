@@ -146,7 +146,7 @@ class TrustCenterScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF1677F2).withValues(alpha: 0.1),
+              color: const Color(0xFF1677F2).withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.verified_user_rounded, color: Color(0xFF1677F2), size: 40),
@@ -189,7 +189,7 @@ class TrustCenterScreen extends ConsumerWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1677F2).withValues(alpha: 0.3),
+            color: const Color(0xFF1677F2).withOpacity(0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -224,7 +224,7 @@ class TrustCenterScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(100),
                 ),
                 child: Text(
@@ -244,7 +244,7 @@ class TrustCenterScreen extends ConsumerWidget {
             child: LinearProgressIndicator(
               value: user.trustScore / 100,
               minHeight: 8,
-              backgroundColor: Colors.white.withValues(alpha: 0.2),
+              backgroundColor: Colors.white.withOpacity(0.2),
               valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
             ),
           ),
@@ -269,7 +269,7 @@ class TrustCenterScreen extends ConsumerWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withOpacity(0.03),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -283,7 +283,7 @@ class TrustCenterScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: (isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red : const Color(0xFF1677F2))).withValues(alpha: 0.1),
+                  color: (isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red : const Color(0xFF1677F2))).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -363,9 +363,9 @@ class TrustCenterScreen extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        border: Border.all(color: color.withOpacity(0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -389,9 +389,9 @@ class TrustCenterScreen extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1677F2).withValues(alpha: 0.05),
+        color: const Color(0xFF1677F2).withOpacity(0.05),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1677F2).withValues(alpha: 0.1)),
+        border: Border.all(color: const Color(0xFF1677F2).withOpacity(0.1)),
       ),
       child: Row(
         children: [
@@ -429,7 +429,7 @@ class TrustCenterScreen extends ConsumerWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withOpacity(0.03),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -443,7 +443,7 @@ class TrustCenterScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: (isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red : const Color(0xFF1677F2))).withValues(alpha: 0.1),
+                  color: (isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red : const Color(0xFF1677F2))).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -660,7 +660,7 @@ class TrustCenterScreen extends ConsumerWidget {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: (isPositive ? const Color(0xFF10B981) : Colors.blueGrey).withValues(alpha: 0.1),
+            color: (isPositive ? const Color(0xFF10B981) : Colors.blueGrey).withOpacity(0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: isPositive ? const Color(0xFF10B981) : Colors.blueGrey, size: 20),

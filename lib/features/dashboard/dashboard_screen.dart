@@ -163,7 +163,7 @@ class _DashboardAppBar extends ConsumerWidget {
                 Text(
                   'Explore your campus ecosystem',
                   style: GoogleFonts.plusJakartaSans(
-                    color: Colors.white.withValues(alpha: 0.8),
+                    color: Colors.white.withOpacity(0.8),
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
@@ -263,7 +263,7 @@ class _ActionItem extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
+                  color: color.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Icon(icon, color: color, size: 26),
@@ -427,7 +427,7 @@ class _TrendingSection extends ConsumerWidget {
                       border: Border.all(color: const Color(0xFFF1F5F9)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.03),
+                          color: Colors.black.withOpacity(0.03),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -451,7 +451,7 @@ class _TrendingSection extends ConsumerWidget {
                                 child: Container(
                                   padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.9),
+                                    color: Colors.white.withOpacity(0.9),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Icon(
@@ -646,7 +646,7 @@ class _ActivityItem extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: _getCategoryColor(item.model.type).withValues(alpha: 0.1),
+                  color: _getCategoryColor(item.model.type).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
@@ -753,7 +753,7 @@ class _CampusPulseSection extends ConsumerWidget {
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.indigo.shade100.withValues(alpha: 0.5)),
+          border: Border.all(color: Colors.indigo.shade100.withOpacity(0.5)),
         ),
         child: Column(
           children: [
@@ -1016,7 +1016,7 @@ class _ContinueReadingSection extends ConsumerWidget {
                       border: Border.all(color: const Color(0xFFF1F5F9)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
+                          color: Colors.black.withOpacity(0.04),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -1252,7 +1252,7 @@ class _SavedItemCard extends StatelessWidget {
           border: Border.all(color: const Color(0xFFF1F5F9)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
+              color: Colors.black.withOpacity(0.02),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
