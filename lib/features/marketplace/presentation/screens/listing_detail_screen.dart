@@ -34,7 +34,8 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     super.initState();
     // Record a view
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(marketplaceRepositoryProvider).recordView(widget.listing.id);
+      final userId = ref.read(firebaseAuthProvider).currentUser?.uid;
+      ref.read(marketplaceRepositoryProvider).recordView(widget.listing.id, userId: userId);
       
       ref.read(recentHistoryProvider.notifier).addItem(HistoryItem(
         id: widget.listing.id,
@@ -149,6 +150,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
       sellerId: widget.listing.sellerId,
       listingId: widget.listing.id,
       listingTitle: widget.listing.title,
+      module: 'marketplace',
     );
 
     if (mounted) {

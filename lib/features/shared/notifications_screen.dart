@@ -5,14 +5,19 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unihub_mobile/core/utils/date_formatter.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/shared/notification_repository.dart';
+import 'package:unihub_mobile/features/marketplace/shared/providers.dart';
+import 'package:unihub_mobile/features/housing/shared/providers.dart';
+import 'package:unihub_mobile/features/notes/shared/providers.dart';
+import 'package:unihub_mobile/features/chat/shared/providers.dart';
 
 class NotificationsScreen extends ConsumerWidget {
-  const NotificationsScreen({super.key});
+  final String? module;
+  const NotificationsScreen({super.key, this.module});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(appUserProvider).valueOrNull;
-    final notificationsAsync = ref.watch(notificationsProvider);
+    final notificationsAsync = ref.watch(notificationsProvider(module));
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FB),
@@ -20,7 +25,9 @@ class NotificationsScreen extends ConsumerWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         title: Text(
-          'Notifications',
+          module != null 
+              ? '${module![0].toUpperCase()}${module!.substring(1)} Notifications' 
+              : 'Notifications',
           style: GoogleFonts.plusJakartaSans(
             fontWeight: FontWeight.bold,
             color: Colors.black,
@@ -33,7 +40,7 @@ class NotificationsScreen extends ConsumerWidget {
         actions: [
           if (user != null)
             TextButton(
-              onPressed: () => ref.read(notificationRepositoryProvider).markAllAsRead(user.uid),
+              onPressed: () => ref.read(notificationRepositoryProvider).markFeatureNotificationsAsRead(user.uid, module: module),
               child: Text(
                 'Mark all read',
                 style: TextStyle(color: Colors.indigo.shade700, fontWeight: FontWeight.w600),
@@ -51,20 +58,20 @@ class NotificationsScreen extends ConsumerWidget {
           final grouped = _groupNotifications(notifications);
 
           return ListView.builder(
-            padding: const EdgeInsets.only(bottom: 24),
+            padding: const EdgeInsets.only(bottom: 24, top: 8),
             itemCount: grouped.length,
             itemBuilder: (context, index) {
               final item = grouped[index];
               if (item is String) {
                 return Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
                   child: Text(
                     item,
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade500,
-                      letterSpacing: 0.5,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.grey.shade600,
+                      letterSpacing: 0.2,
                     ),
                   ),
                 );
@@ -171,23 +178,23 @@ class _NotificationTile extends ConsumerWidget {
       child: Container(
         color: notification.isRead ? Colors.transparent : Colors.indigo.withOpacity(0.03),
         child: ListTile(
-          onTap: () {
+          onTap: () async {
             if (!notification.isRead) {
               ref.read(notificationRepositoryProvider).markAsRead(userId, notification.id);
             }
-            _handleNavigation(context, notification);
+            await _handleNavigation(context, ref, notification);
           },
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
           leading: Stack(
             children: [
               CircleAvatar(
-                radius: 24,
+                radius: 20,
                 backgroundColor: notification.isRead ? Colors.grey.shade100 : iconColor.withOpacity(0.1),
                 backgroundImage: notification.actorPhotoUrl != null 
                     ? NetworkImage(notification.actorPhotoUrl!) 
                     : null,
                 child: notification.actorPhotoUrl == null 
-                    ? Icon(iconData, color: notification.isRead ? Colors.grey : iconColor, size: 22)
+                    ? Icon(iconData, color: notification.isRead ? Colors.grey : iconColor, size: 18)
                     : null,
               ),
               if (!notification.isRead)
@@ -209,24 +216,28 @@ class _NotificationTile extends ConsumerWidget {
           title: RichText(
             text: TextSpan(
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                color: Colors.black87,
-                height: 1.4,
+                fontSize: 13,
+                color: const Color(0xFF1E293B),
+                height: 1.3,
               ),
               children: [
                 TextSpan(
                   text: '${notification.title} ',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 TextSpan(text: notification.body),
               ],
             ),
           ),
           subtitle: Padding(
-            padding: const EdgeInsets.only(top: 6),
+            padding: const EdgeInsets.only(top: 2),
             child: Text(
               DateFormatter.formatRelative(notification.createdAt),
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+              style: GoogleFonts.plusJakartaSans(
+                color: Colors.grey.shade500, 
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),
@@ -234,7 +245,8 @@ class _NotificationTile extends ConsumerWidget {
     );
   }
 
-  void _handleNavigation(BuildContext context, UniNotification n) {
+  Future<void> _handleNavigation(BuildContext context, WidgetRef ref, UniNotification n) async {
+    // 1. Check for explicit deepLink first
     if (n.deepLink != null && n.deepLink!.isNotEmpty) {
       try {
         context.push(n.deepLink!);
@@ -244,24 +256,106 @@ class _NotificationTile extends ConsumerWidget {
       return;
     }
 
-    if (n.targetId == null) return;
+    if (n.targetId == null || n.targetId!.isEmpty) return;
 
-    switch (n.type) {
-      case NotificationType.chat:
-      case NotificationType.support:
-        context.push('/chat', extra: {
-          'conversationId': n.targetId,
-          'otherUserName': n.type == NotificationType.support ? 'UniHub Support' : 'Message',
-        });
-        break;
-      case NotificationType.marketplace:
-        // We might need to fetch the full listing here, but for now we'll fail gracefully
-        // or just navigate if the router supports it.
-        break;
-      case NotificationType.housing:
-        break;
-      default:
-        break;
+    // Show loading indicator for async fetches
+    final messenger = ScaffoldMessenger.of(context);
+    
+    try {
+      switch (n.type) {
+        case NotificationType.chat:
+        case NotificationType.support:
+          context.push('/chat', extra: {
+            'conversationId': n.targetId,
+            'otherUserName': n.actorName ?? (n.type == NotificationType.support ? 'UniHub Support' : 'Message'),
+          });
+          break;
+
+        case NotificationType.marketplace:
+        case NotificationType.listing:
+          final listing = await ref.read(marketplaceRepositoryProvider).getListingById(n.targetId!);
+          if (context.mounted) {
+            if (listing != null) {
+              context.push('/listing-detail', extra: listing);
+            } else {
+              messenger.showSnackBar(const SnackBar(content: Text('This listing is no longer available.')));
+            }
+          }
+          break;
+
+        case NotificationType.review:
+          if (n.targetType == 'marketplace') {
+            final listing = await ref.read(marketplaceRepositoryProvider).getListingById(n.targetId!);
+            if (context.mounted) {
+              if (listing != null) {
+                context.push('/seller-profile', extra: listing.sellerId);
+              } else if (n.actorId != null) {
+                context.push('/seller-profile', extra: n.actorId);
+              }
+            }
+          } else {
+            // Default to profile for other review types
+            if (n.actorId != null) context.push('/seller-profile', extra: n.actorId);
+          }
+          break;
+
+        case NotificationType.housing:
+          final listing = await ref.read(housingRepositoryProvider).getListingById(n.targetId!);
+          if (context.mounted) {
+            if (listing != null) {
+              context.push('/housing-detail', extra: listing);
+            } else {
+              // Try navigating to dashboard if it was a status update for a plug
+              if (n.deepLink == null && (n.title.contains('Moderation') || n.title.contains('Reported'))) {
+                context.push('/plug-dashboard');
+              } else {
+                messenger.showSnackBar(const SnackBar(content: Text('This property listing is no longer available.')));
+              }
+            }
+          }
+          break;
+
+        case NotificationType.notes:
+          final note = await ref.read(notesRepositoryProvider).getNoteById(n.targetId!);
+          if (context.mounted) {
+            if (note != null) {
+              context.push('/note-detail', extra: note);
+            } else {
+              messenger.showSnackBar(const SnackBar(content: Text('These study notes are no longer available.')));
+            }
+          }
+          break;
+
+        case NotificationType.gig:
+          if (n.title.contains('Application Update')) {
+            context.push('/my-gig-applications');
+          } else if (n.title.contains('New Gig Application')) {
+            context.push('/employer-dashboard');
+          } else {
+            // Default to general gigs if targetId is a gigId
+            context.push('/gigs');
+          }
+          break;
+
+        case NotificationType.follower:
+          if (n.actorId != null) {
+            context.push('/seller-profile', extra: n.actorId);
+          }
+          break;
+
+        case NotificationType.community:
+          context.push('/community');
+          break;
+
+        default:
+          if (n.deepLink != null) context.push(n.deepLink!);
+          break;
+      }
+    } catch (e) {
+      debugPrint('Navigation error: $e');
+      if (context.mounted) {
+        messenger.showSnackBar(SnackBar(content: Text('Could not open: $e')));
+      }
     }
   }
 }

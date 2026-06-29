@@ -10,6 +10,7 @@ class Conversation {
   final DateTime lastMessageTime;
   final Map<String, int> unreadCounts;
   final bool isSupport;
+  final String? module;
 
   Conversation({
     required this.id,
@@ -21,6 +22,7 @@ class Conversation {
     required this.lastMessageTime,
     required this.unreadCounts,
     this.isSupport = false,
+    this.module,
   });
 
   Map<String, dynamic> toJson() {
@@ -34,6 +36,7 @@ class Conversation {
       'lastMessageTime': Timestamp.fromDate(lastMessageTime),
       'unreadCounts': unreadCounts,
       'isSupport': isSupport,
+      'module': module,
     };
   }
 
@@ -48,6 +51,7 @@ class Conversation {
       lastMessageTime: (json['lastMessageTime'] as Timestamp).toDate(),
       unreadCounts: Map<String, int>.from(json['unreadCounts'] ?? {}),
       isSupport: json['isSupport'] ?? false,
+      module: json['module'],
     );
   }
 }

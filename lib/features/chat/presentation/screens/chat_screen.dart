@@ -8,6 +8,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:google_fonts/google_fonts.dart';
+
 import '../../../auth/shared/providers.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/message.dart';
@@ -99,29 +101,56 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        centerTitle: false,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black, size: 20),
+          onPressed: () => context.pop(),
+        ),
+        title: Row(
           children: [
-            Text(widget.otherUserName, style: const TextStyle(fontSize: 16, color: Colors.black, fontWeight: FontWeight.bold)),
-            const Text('Online', style: TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.w500)),
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: Colors.indigo.shade50,
+              child: Text(
+                widget.otherUserName[0].toUpperCase(),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.indigo),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.otherUserName,
+                  style: GoogleFonts.plusJakartaSans(fontSize: 15, color: Colors.black, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  'Online',
+                  style: GoogleFonts.plusJakartaSans(fontSize: 11, color: Colors.green, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
           ],
         ),
       ),
       body: Column(
         children: [
           if (widget.listing != null) _buildListingPreview(),
-          if (widget.listing?.status == ListingStatus.sold) _buildReviewPrompt(),
           
           Expanded(
             child: messagesAsync.when(
               data: (messages) => ListView.builder(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                 reverse: true,
                 itemCount: messages.length,
                 itemBuilder: (context, index) {
                   final message = messages[index];
                   final isMe = message.senderId == ref.read(authStateProvider).valueOrNull?.uid;
-                  return _buildMessageBubble(message, isMe);
+                  
+                  // Grouping logic for tighter spacing
+                  final bool isSameSenderAsNext = index > 0 && messages[index - 1].senderId == message.senderId;
+                  
+                  return _buildMessageBubble(message, isMe, !isSameSenderAsNext);
                 },
               ),
               loading: () => const Center(child: CircularProgressIndicator(color: Colors.indigo)),
@@ -152,33 +181,48 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Widget _buildInputArea() {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(color: Colors.white),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -2))
+        ]
+      ),
       child: SafeArea(
         child: Row(
           children: [
             IconButton(
-              icon: const Icon(Icons.add_circle_outline, color: Colors.indigo),
+              icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF6366F1), size: 28),
               onPressed: () => _showAttachmentMenu(),
             ),
             Expanded(
-              child: TextField(
-                controller: _messageController,
-                decoration: InputDecoration(
-                  hintText: 'Type a message...',
-                  filled: true,
-                  fillColor: const Color(0xFFF8F9FB),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: TextField(
+                  controller: _messageController,
+                  style: GoogleFonts.plusJakartaSans(fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Type a message...',
+                    hintStyle: GoogleFonts.plusJakartaSans(color: Colors.grey.shade500, fontSize: 14),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            CircleAvatar(
-              backgroundColor: Colors.indigo,
-              child: IconButton(
-                icon: const Icon(Icons.send, color: Colors.white, size: 20),
-                onPressed: () => _sendMessage(),
+            const SizedBox(width: 12),
+            GestureDetector(
+              onTap: () => _sendMessage(),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF6366F1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
               ),
             ),
           ],
@@ -217,22 +261,29 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Widget _buildMessageBubble(Message message, bool isMe) {
+  Widget _buildMessageBubble(Message message, bool isMe, bool showTail) {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        margin: EdgeInsets.only(bottom: showTail ? 12 : 4),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: isMe ? Colors.indigo : Colors.white,
+          color: isMe ? const Color(0xFF6366F1) : Colors.white,
           borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(20),
-            topRight: const Radius.circular(20),
-            bottomLeft: Radius.circular(isMe ? 20 : 4),
-            bottomRight: Radius.circular(isMe ? 4 : 20),
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isMe ? 16 : (showTail ? 4 : 16)),
+            bottomRight: Radius.circular(isMe ? (showTail ? 4 : 16) : 16),
           ),
-          boxShadow: [if (!isMe) BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5)],
+          boxShadow: [
+            if (!isMe)
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              )
+          ],
         ),
         child: Column(
           crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -241,7 +292,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             const SizedBox(height: 4),
             Text(
               DateFormat('HH:mm').format(message.timestamp), 
-              style: TextStyle(fontSize: 10, color: isMe ? Colors.white70 : Colors.grey),
+              style: TextStyle(
+                fontSize: 9, 
+                fontWeight: FontWeight.w500,
+                color: isMe ? Colors.white70 : Colors.grey.shade500,
+              ),
             ),
           ],
         ),
@@ -281,7 +336,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
         );
       default:
-        return Text(message.content, style: TextStyle(color: isMe ? Colors.white : Colors.black87, fontSize: 15));
+        return Text(
+          message.content, 
+          style: GoogleFonts.plusJakartaSans(
+            color: isMe ? Colors.white : const Color(0xFF1E293B), 
+            fontSize: 14,
+            height: 1.4,
+          ),
+        );
     }
   }
 

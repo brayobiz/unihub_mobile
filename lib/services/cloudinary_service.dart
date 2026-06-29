@@ -61,11 +61,19 @@ class CloudinaryService {
         debugPrint('☁️ Cloudinary: Compression complete.');
       }
 
+      // Proactive Fix: PDFs should be handled as RAW for guaranteed bit-for-bit retrieval
+      // unless we specifically need image-like transformations. For the study reader,
+      // we need the original bytes. 
+      final isPdf = p.extension(file.path).toLowerCase() == '.pdf';
+      final resourceType = isImg 
+          ? CloudinaryResourceType.Image 
+          : (isPdf ? CloudinaryResourceType.Raw : CloudinaryResourceType.Auto);
+
       final cloudinaryFile = CloudinaryFile.fromFile(
         fileToUpload.path,
         folder: 'unihub/$folder',
         publicId: publicId,
-        resourceType: isImg ? CloudinaryResourceType.Image : CloudinaryResourceType.Auto,
+        resourceType: resourceType,
       );
 
       debugPrint('☁️ Cloudinary: Requesting upload with resourceType: ${cloudinaryFile.resourceType}');

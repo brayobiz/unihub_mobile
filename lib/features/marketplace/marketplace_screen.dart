@@ -6,12 +6,15 @@ import 'package:unihub_mobile/features/trust/domain/models/professional_role.dar
 import 'package:unihub_mobile/features/trust/domain/models/verification_application.dart';
 import 'package:unihub_mobile/features/trust/presentation/providers/trust_providers.dart';
 import '../auth/shared/providers.dart';
+import 'domain/models/listing.dart';
 import 'domain/models/marketplace_categories.dart';
+import 'domain/repositories/marketplace_repository.dart';
 import 'presentation/controllers/marketplace_controller.dart';
 import 'shared/providers.dart';
 import 'domain/models/listing_filter.dart';
 import 'presentation/widgets/marketplace_card.dart';
 import '../../core/utils/debouncer.dart';
+import '../../widgets/app_drawer.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/notification_badge.dart';
 
@@ -25,6 +28,7 @@ class MarketplaceScreen extends ConsumerStatefulWidget {
 class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with SingleTickerProviderStateMixin {
   final _searchDebouncer = Debouncer(milliseconds: 500);
   late TabController _tabController;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -36,6 +40,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
   void dispose() {
     _searchDebouncer.dispose();
     _tabController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -43,9 +48,16 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      drawer: const AppDrawer(),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu_rounded, color: Colors.black),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         title: Text(
           'Marketplace',
           style: GoogleFonts.plusJakartaSans(
@@ -55,7 +67,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
           ),
         ),
         actions: [
-          const NotificationBadge(),
+          const NotificationBadge(module: 'marketplace'),
           const SizedBox(width: 8),
         ],
         bottom: TabBar(
@@ -88,16 +100,25 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
   }
 
   Widget _buildDiscoverTab() {
-    final listingsAsync = ref.watch(scoredListingsProvider);
     final filterState = ref.watch(marketplaceControllerProvider);
     final controller = ref.read(marketplaceControllerProvider.notifier);
-    const List<String> categories = MarketplaceCategories.mainFilters;
+    final user = ref.watch(appUserProvider).valueOrNull;
+
+    // Use specific sections when no search/filter is active
+    final bool isBrowsingHome = filterState.searchQuery.isEmpty && 
+                                filterState.selectedCategory == null &&
+                                filterState.selectedConditions.isEmpty &&
+                                filterState.priceRange == null;
 
     return RefreshIndicator(
       onRefresh: () async {
+        ref.invalidate(trendingListingsProvider);
+        ref.invalidate(recommendedListingsProvider);
+        ref.invalidate(recentlyViewedProvider);
         ref.invalidate(listingsProvider);
       },
       child: CustomScrollView(
+        controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
         slivers: [
           SliverToBoxAdapter(
@@ -106,168 +127,319 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Hero(
-                          tag: 'marketplace_search',
-                          child: Material(
-                            color: Colors.transparent,
-                            child: TextField(
-                              onChanged: (value) {
-                                _searchDebouncer.run(() {
-                                  controller.setSearchQuery(value);
-                                });
-                              },
-                              decoration: InputDecoration(
-                                hintText: 'What are you looking for?',
-                                hintStyle: GoogleFonts.plusJakartaSans(color: Colors.grey.shade400),
-                                prefixIcon: const Icon(Icons.search_rounded, color: Colors.indigo),
-                                filled: true,
-                                fillColor: Colors.grey.shade50,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                  borderSide: BorderSide(color: Colors.grey.shade100),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                  borderSide: BorderSide(color: Colors.grey.shade100),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                  borderSide: const BorderSide(color: Colors.indigo, width: 1.5),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      IconButton(
-                        onPressed: () => _showFilterSheet(context, filterState, controller), 
-                        icon: const Icon(Icons.tune_rounded, color: Colors.black),
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.grey.shade50,
-                          padding: const EdgeInsets.all(12),
-                        ),
-                      ),
-                    ],
-                  ),
+                  _buildSearchBar(controller, filterState),
                   const SizedBox(height: 20),
-                  SizedBox(
-                    height: 44,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      itemCount: categories.length,
-                      itemBuilder: (context, index) {
-                        final cat = categories[index];
-                        final isSelected = filterState.selectedCategory == cat || (cat == 'All' && filterState.selectedCategory == null);
-                        
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 10),
-                          child: ChoiceChip(
-                            label: Text(
-                              cat,
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 13,
-                                color: isSelected ? Colors.white : Colors.black87,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              ),
-                            ),
-                            selected: isSelected,
-                            onSelected: (selected) {
-                              if (selected) {
-                                controller.setCategory(cat);
-                              }
-                            },
-                            backgroundColor: Colors.grey.shade50,
-                            selectedColor: Colors.indigo,
-                            showCheckmark: false,
-                            pressElevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              side: BorderSide(
-                                color: isSelected ? Colors.indigo : Colors.grey.shade200,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
+                  _buildCategoryChips(filterState, controller),
+                  if (isBrowsingHome) ...[
+                    const SizedBox(height: 24),
+                    _buildDiscoverySection(
+                      title: 'Recently Viewed',
+                      provider: recentlyViewedProvider,
+                      emptyWidget: const SizedBox.shrink(),
                     ),
-                  ),
-                  const SizedBox(height: 24),
+                    _buildDiscoverySection(
+                      title: 'Recommended For You',
+                      provider: recommendedListingsProvider,
+                    ),
+                    _buildDiscoverySection(
+                      title: 'Trending in ${user?.university ?? 'Campus'}',
+                      provider: trendingListingsProvider(user?.university),
+                    ),
+                    _buildPopularCategories(),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Recently Added',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Search Results',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () => controller.resetFilters(),
+                          icon: const Icon(Icons.refresh_rounded, size: 16),
+                          label: const Text('Reset'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
+          _buildListingsGrid(isBrowsingHome ? ListingFilter() : filterState),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar(MarketplaceController controller, ListingFilter filterState) {
+    return Row(
+      children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () => showSearch(
+              context: context,
+              delegate: MarketplaceSearchDelegate(ref: ref),
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.grey.shade100),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.search_rounded, color: Colors.indigo),
+                  const SizedBox(width: 12),
                   Text(
-                    '🔥 Trending Items',
+                    filterState.searchQuery.isEmpty 
+                        ? 'What are you looking for?' 
+                        : filterState.searchQuery,
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.5,
+                      color: filterState.searchQuery.isEmpty ? Colors.grey.shade400 : Colors.black87,
                     ),
                   ),
                 ],
               ),
             ),
           ),
+        ),
+        const SizedBox(width: 10),
+        IconButton(
+          onPressed: () => _showFilterSheet(context, filterState, controller), 
+          icon: const Icon(Icons.tune_rounded, color: Colors.black),
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.grey.shade50,
+            padding: const EdgeInsets.all(12),
+          ),
+        ),
+      ],
+    );
+  }
 
-          listingsAsync.when(
-            data: (listings) {
-              if (listings.isEmpty) {
-                return SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.search_off_rounded, size: 64, color: Colors.grey.shade200),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No items found',
-                          style: GoogleFonts.plusJakartaSans(color: Colors.grey, fontSize: 16),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-              return SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    childAspectRatio: 0.75,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) => MarketplaceCard(listing: listings[index], index: index),
-                    childCount: listings.length,
-                    addAutomaticKeepAlives: true,
-                  ),
+  Widget _buildCategoryChips(ListingFilter filterState, MarketplaceController controller) {
+    const List<String> categories = MarketplaceCategories.mainFilters;
+    return SizedBox(
+      height: 44,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: categories.length,
+        itemBuilder: (context, index) {
+          final cat = categories[index];
+          final isSelected = filterState.selectedCategory == cat || (cat == 'All' && filterState.selectedCategory == null);
+          
+          return Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: ChoiceChip(
+              label: Text(
+                cat,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  color: isSelected ? Colors.white : Colors.black87,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
-              );
-            },
-            loading: () => SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
-                  childAspectRatio: 0.75,
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) => const SkeletonLoader(width: double.infinity, height: 250),
-                  childCount: 4,
+              ),
+              selected: isSelected,
+              onSelected: (selected) {
+                if (selected) {
+                  controller.setCategory(cat);
+                }
+              },
+              backgroundColor: Colors.grey.shade50,
+              selectedColor: Colors.indigo,
+              showCheckmark: false,
+              pressElevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(
+                  color: isSelected ? Colors.indigo : Colors.grey.shade200,
                 ),
               ),
             ),
-            error: (err, _) => SliverToBoxAdapter(
-              child: Center(child: Text('Error: $err')),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPopularCategories() {
+    final categories = MarketplaceCategories.mainFilters.where((c) => c != 'All').toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 24),
+        Text(
+          'Popular Categories',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 80,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: categories.length,
+            itemBuilder: (context, index) {
+              final cat = categories[index];
+              return Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: ActionChip(
+                  onPressed: () => context.push('/category-discovery/$cat'),
+                  label: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Text(cat, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                  backgroundColor: Colors.indigo.shade50,
+                  side: BorderSide.none,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDiscoverySection({
+    required String title,
+    required StreamProvider<List<Listing>> provider,
+    Widget? emptyWidget,
+  }) {
+    final asyncListings = ref.watch(provider);
+
+    return asyncListings.when(
+      data: (listings) {
+        if (listings.isEmpty) return emptyWidget ?? const SizedBox.shrink();
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {}, // Show all
+                  child: const Text('See All'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 200,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: listings.length,
+                itemBuilder: (context, index) => Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: SizedBox(
+                    width: 160,
+                    child: MarketplaceCard(listing: listings[index], index: index),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+      loading: () => const Padding(
+        padding: EdgeInsets.only(top: 24),
+        child: SkeletonLoader(width: double.infinity, height: 200),
+      ),
+      error: (e, _) => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildListingsGrid(ListingFilter filter) {
+    final listingsAsync = ref.watch(listingsProvider(filter));
+
+    return listingsAsync.when(
+      data: (listings) {
+        if (listings.isEmpty) {
+          return SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.search_off_rounded, size: 64, color: Colors.grey.shade200),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No items found',
+                    style: GoogleFonts.plusJakartaSans(color: Colors.grey, fontSize: 16),
+                  ),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () => ref.read(marketplaceControllerProvider.notifier).resetFilters(),
+                    child: const Text('Clear all filters'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        return SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: 0.75,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => MarketplaceCard(listing: listings[index], index: index),
+              childCount: listings.length,
             ),
           ),
-        ],
+        );
+      },
+      loading: () => SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        sliver: SliverGrid(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 16,
+            childAspectRatio: 0.75,
+          ),
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => const SkeletonLoader(width: double.infinity, height: 250),
+            childCount: 4,
+          ),
+        ),
+      ),
+      error: (err, _) => SliverToBoxAdapter(
+        child: Center(child: Text('Error: $err')),
       ),
     );
   }
@@ -338,7 +510,6 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
     final isRolePending = app?.status == VerificationStatus.pending;
     final isRoleRejected = app?.status == VerificationStatus.rejected;
 
-    // Determine the most relevant state to show
     final bool showIdentityIssue = !isVerified || isIdentityPending || isIdentityRejected;
 
     return Container(
@@ -435,6 +606,27 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                 ],
               ),
               const SizedBox(height: 24),
+              Text('Sort By', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<ListingSortType>(
+                value: state.sortBy,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+                items: ListingSortType.values.map((s) => DropdownMenuItem(
+                  value: s,
+                  child: Text(s.name.replaceFirst(s.name[0], s.name[0].toUpperCase())),
+                )).toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    controller.setSortBy(val);
+                    setModalState(() {});
+                  }
+                },
+              ),
+              const SizedBox(height: 24),
               Text('Condition', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 12),
               Wrap(
@@ -457,7 +649,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               Text('Price Range (KES)', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 8),
               RangeSlider(
@@ -494,6 +686,133 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
           ),
         ),
       ),
+    );
+  }
+}
+
+class MarketplaceSearchDelegate extends SearchDelegate<String?> {
+  final WidgetRef ref;
+
+  MarketplaceSearchDelegate({required this.ref});
+
+  @override
+  List<Widget>? buildActions(BuildContext context) {
+    return [
+      if (query.isNotEmpty)
+        IconButton(
+          onPressed: () => query = '',
+          icon: const Icon(Icons.clear_rounded),
+        ),
+    ];
+  }
+
+  @override
+  Widget? buildLeading(BuildContext context) {
+    return IconButton(
+      onPressed: () => close(context, null),
+      icon: const Icon(Icons.arrow_back_rounded),
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    final controller = ref.read(marketplaceControllerProvider.notifier);
+    final user = ref.read(appUserProvider).valueOrNull;
+    
+    // Save search query
+    if (user != null && query.isNotEmpty) {
+      ref.read(marketplaceRepositoryProvider).saveSearchQuery(user.uid, query);
+    }
+    
+    // We don't build results here, we just close and set the filter in controller
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.setSearchQuery(query);
+      close(context, query);
+    });
+    
+    return const SizedBox.shrink();
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    final user = ref.watch(appUserProvider).valueOrNull;
+    final recentSearchesAsync = ref.watch(recentSearchesProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (query.isEmpty) ...[
+          recentSearchesAsync.when(
+            data: (searches) {
+              if (searches.isEmpty) return const SizedBox.shrink();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                    child: Text(
+                      'Recent Searches',
+                      style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ),
+                  ...searches.take(5).map((s) => ListTile(
+                    leading: const Icon(Icons.history_rounded, size: 20),
+                    title: Text(s),
+                    onTap: () {
+                      query = s;
+                      showResults(context);
+                    },
+                  )),
+                ],
+              );
+            },
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+            child: Text(
+              'Popular Categories',
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Wrap(
+              spacing: 10,
+              children: MarketplaceCategories.mainFilters.where((c) => c != 'All').take(6).map((cat) => ActionChip(
+                label: Text(cat),
+                onPressed: () {
+                  ref.read(marketplaceControllerProvider.notifier).setCategory(cat);
+                  close(context, cat);
+                },
+              )).toList(),
+            ),
+          ),
+        ] else ...[
+          FutureBuilder<List<String>>(
+            future: ref.read(marketplaceRepositoryProvider).getSearchSuggestions(query),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData || snapshot.data!.isEmpty) return const SizedBox.shrink();
+              return ListView.builder(
+                shrinkWrap: true,
+                itemCount: snapshot.data!.length,
+                itemBuilder: (context, index) {
+                  final suggestion = snapshot.data![index];
+                  return ListTile(
+                    leading: const Icon(Icons.search_rounded, size: 20),
+                    title: Text(suggestion),
+                    onTap: () {
+                      query = suggestion;
+                      showResults(context);
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ],
+      ],
     );
   }
 }

@@ -1,7 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'price_history.dart';
 
 enum ListingCondition { newCondition, likeNew, good, fair }
-enum ListingStatus { active, sold, paused, expired }
+enum ListingStatus { active, sold, paused, expired, reserved, archived }
 
 class Listing {
   final String id;
@@ -30,6 +31,7 @@ class Listing {
   
   final DateTime createdAt;
   final DateTime expiresAt;
+  final List<PriceHistory> priceHistory;
 
   Listing({
     required this.id,
@@ -53,6 +55,7 @@ class Listing {
     this.chatsStartedCount = 0,
     required this.createdAt,
     required this.expiresAt,
+    this.priceHistory = const [],
   });
 
   Map<String, dynamic> toJson() {
@@ -78,13 +81,12 @@ class Listing {
       'chatsStartedCount': chatsStartedCount,
       'createdAt': Timestamp.fromDate(createdAt),
       'expiresAt': Timestamp.fromDate(expiresAt),
-      // Search index for fuzzy matching
+      'priceHistory': priceHistory.map((e) => e.toJson()).toList(),
       'searchKeywords': title.toLowerCase().split(' '),
     };
   }
 
   factory Listing.fromJson(Map<String, dynamic> json) {
-    // Extremely defensive parsing
     String safeString(dynamic value, String defaultValue) {
       if (value == null) return defaultValue;
       return value.toString();
@@ -104,18 +106,9 @@ class Listing {
       return int.tryParse(value.toString()) ?? defaultValue;
     }
 
-    final sId = safeString(json['sellerId'] ?? json['seller_id'], '');
-    
-    final urls = (json['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? 
-                 (json['images'] as List?)?.map((e) => e.toString()).toList() ?? [];
-    
-    if (urls.isNotEmpty) {
-      // print('📖 Listing: Parsed URLs: $urls');
-    }
-
     return Listing(
       id: safeString(json['id'], ''),
-      sellerId: sId,
+      sellerId: safeString(json['sellerId'] ?? json['seller_id'], ''),
       sellerName: safeString(json['sellerName'] ?? json['seller_name'], 'Student'),
       sellerUniversity: safeString(json['sellerUniversity'] ?? json['seller_university'], ''),
       sellerTrustScore: safeDouble(json['sellerTrustScore'] ?? json['trust_score'], 100.0),
@@ -123,7 +116,7 @@ class Listing {
       description: safeString(json['description'], ''),
       price: safeDouble(json['price'], 0.0),
       category: safeString(json['category'], 'Other'),
-      imageUrls: urls,
+      imageUrls: (json['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [],
       campusLocation: safeString(json['campusLocation'] ?? json['location'], ''),
       condition: ListingCondition.values.firstWhere(
         (e) => e.name == safeString(json['condition'], 'good'), 
@@ -134,10 +127,10 @@ class Listing {
         orElse: () => ListingStatus.active
       ),
       contactPreference: safeString(json['contactPreference'], 'chat'),
-      isFeatured: json['isFeatured'] ?? json['is_featured'] ?? false,
+      isFeatured: json['isFeatured'] ?? false,
       isPromoted: json['isPromoted'] ?? false,
-      viewsCount: safeInt(json['viewsCount'] ?? json['views_count'], 0),
-      savesCount: safeInt(json['savesCount'] ?? json['saves_count'], 0),
+      viewsCount: safeInt(json['viewsCount'], 0),
+      savesCount: safeInt(json['savesCount'], 0),
       chatsStartedCount: safeInt(json['chatsStartedCount'], 0),
       createdAt: json['createdAt'] != null 
           ? (json['createdAt'] as Timestamp).toDate() 
@@ -145,6 +138,9 @@ class Listing {
       expiresAt: json['expiresAt'] != null 
           ? (json['expiresAt'] as Timestamp).toDate() 
           : DateTime.now().add(const Duration(days: 30)),
+      priceHistory: (json['priceHistory'] as List?)
+              ?.map((e) => PriceHistory.fromJson(e as Map<String, dynamic>))
+              .toList() ?? [],
     );
   }
 }

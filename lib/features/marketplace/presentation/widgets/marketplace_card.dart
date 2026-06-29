@@ -33,7 +33,12 @@ class MarketplaceCard extends ConsumerWidget {
         );
       },
       child: GestureDetector(
-        onTap: () => context.push('/listing-detail', extra: listing),
+        onTap: () {
+          if (currentUserId != null) {
+            ref.read(marketplaceRepositoryProvider).recordView(listing.id, userId: currentUserId);
+          }
+          context.push('/listing-detail', extra: listing);
+        },
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,

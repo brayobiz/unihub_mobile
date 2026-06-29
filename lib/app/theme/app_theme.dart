@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   AppTheme._(); // prevents instantiation
@@ -17,34 +18,36 @@ class AppTheme {
     // COLORS
     primaryColor: primaryColor,
     scaffoldBackgroundColor: backgroundColor,
-    colorScheme: const ColorScheme.light(
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: primaryColor,
       primary: primaryColor,
       secondary: secondaryColor,
       background: backgroundColor,
     ),
 
     // APP BAR THEME
-    appBarTheme: const AppBarTheme(
+    appBarTheme: AppBarTheme(
       backgroundColor: Colors.white,
       elevation: 0,
       centerTitle: true,
-      iconTheme: IconThemeData(color: Colors.black),
-      titleTextStyle: TextStyle(
+      iconTheme: const IconThemeData(color: Colors.black),
+      titleTextStyle: GoogleFonts.plusJakartaSans(
         color: Colors.black,
         fontSize: 18,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.bold,
       ),
     ),
 
     // TEXT THEME
-    textTheme: const TextTheme(
+    textTheme: GoogleFonts.plusJakartaSansTextTheme(const TextTheme(
       displayLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
       displayMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-      titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-      titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+      titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+      titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
       bodyLarge: TextStyle(fontSize: 16),
       bodyMedium: TextStyle(fontSize: 14),
-    ),
+      labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+    )),
 
     // CARD THEME (FIXED)
     cardTheme: CardThemeData(
@@ -102,6 +105,15 @@ class AppTheme {
       primary: primaryColor,
       secondary: secondaryColor,
     ),
+
+    textTheme: GoogleFonts.plusJakartaSansTextTheme(const TextTheme(
+      displayLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+      displayMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+      titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+      titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+      bodyLarge: TextStyle(fontSize: 16),
+      bodyMedium: TextStyle(fontSize: 14),
+    )),
 
     scaffoldBackgroundColor: const Color(0xFF0F172A),
 

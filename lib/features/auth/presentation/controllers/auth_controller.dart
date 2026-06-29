@@ -118,6 +118,45 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
       resetState();
     }
   }
+
+  Future<void> deleteAccount() async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      await _ref.read(notificationServiceProvider).deleteToken();
+      await _authRepository.deleteAccount();
+    });
+    if (!state.hasError) {
+      resetState();
+    }
+  }
+
+  Future<void> updatePrivacySettings(Map<String, String> settings) async {
+    final user = _ref.read(firebaseAuthProvider).currentUser;
+    if (user == null) return;
+
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() => _authRepository.updateProfile(
+      uid: user.uid,
+      privacySettings: settings,
+    ));
+    if (!state.hasError) {
+      resetState();
+    }
+  }
+
+  Future<void> updateNotificationSettings(Map<String, bool> settings) async {
+    final user = _ref.read(firebaseAuthProvider).currentUser;
+    if (user == null) return;
+
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() => _authRepository.updateProfile(
+      uid: user.uid,
+      notificationSettings: settings,
+    ));
+    if (!state.hasError) {
+      resetState();
+    }
+  }
 }
 
 final authControllerProvider = StateNotifierProvider<AuthController, AsyncValue<void>>((ref) {

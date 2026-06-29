@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../features/auth/presentation/controllers/auth_controller.dart';
 import '../features/auth/shared/providers.dart';
 import '../features/housing/shared/providers.dart';
@@ -22,7 +23,6 @@ class AppDrawer extends ConsumerWidget {
           // Header
           GestureDetector(
             onTap: () {
-              context.pop();
               context.push('/profile');
             },
             child: Container(
@@ -49,17 +49,18 @@ class AppDrawer extends ConsumerWidget {
                       const SizedBox(height: 16),
                       Text(
                         user?.fullName ?? 'User',
-                        style: const TextStyle(
+                        style: GoogleFonts.plusJakartaSans(
                           color: Colors.white,
-                          fontSize: 20,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         user?.email ?? '',
-                        style: const TextStyle(
+                        style: GoogleFonts.plusJakartaSans(
                           color: Colors.white70,
+                          fontSize: 14,
                         ),
                       ),
                     ],
@@ -74,11 +75,9 @@ class AppDrawer extends ConsumerWidget {
           // Discover Section
           _sectionHeader('Marketplace & Gigs'),
           _drawerItem(Icons.inventory_2_outlined, 'My Listings (Seller Hub)', onTap: () {
-            context.pop();
             context.push('/my-listings');
           }),
           _drawerItem(Icons.assignment_ind_outlined, 'Employer Dashboard', onTap: () {
-            context.pop();
             context.push('/employer-dashboard');
           }),
           
@@ -88,7 +87,6 @@ class AppDrawer extends ConsumerWidget {
               final isPlug = user?.isHousingPlug ?? false;
               if (isPlug) {
                 return _drawerItem(Icons.dashboard_customize_outlined, 'Plug Dashboard', onTap: () {
-                  context.pop();
                   context.push('/plug-dashboard');
                 });
               } else {
@@ -97,18 +95,15 @@ class AppDrawer extends ConsumerWidget {
                   data: (app) {
                     if (app?.status == VerificationStatus.pending) {
                       return _drawerItem(Icons.hourglass_empty_rounded, 'Plug App Pending', color: Colors.indigo, onTap: () {
-                        context.pop();
                         context.push('/plug-dashboard');
                       });
                     }
                     return _drawerItem(Icons.add_home_work_outlined, 'Become a Housing Plug', onTap: () {
-                      context.pop();
                       context.push('/become-plug');
                     });
                   },
                   loading: () => const SizedBox.shrink(),
                   error: (_, __) => _drawerItem(Icons.add_home_work_outlined, 'Become a Housing Plug', onTap: () {
-                    context.pop();
                     context.push('/become-plug');
                   }),
                 );
@@ -118,21 +113,17 @@ class AppDrawer extends ConsumerWidget {
             error: (_, __) => const SizedBox.shrink(),
           ),
           _drawerItem(Icons.favorite_border, 'Saved Housing', onTap: () {
-            context.pop();
             context.push('/saved-housing');
           }),
           
           _sectionHeader('Campus Life'),
           _drawerItem(Icons.groups_outlined, 'Community', onTap: () {
-            context.pop();
             context.push('/community');
           }),
           _drawerItem(Icons.work_outline, 'Student Gigs', onTap: () {
-            context.pop();
             context.push('/gigs');
           }),
           _drawerItem(Icons.favorite_border, 'Confessions', onTap: () {
-            context.pop();
             context.push('/confessions');
           }),
 
@@ -141,15 +132,12 @@ class AppDrawer extends ConsumerWidget {
           // More Section
           _sectionHeader('More'),
           _drawerItem(Icons.notifications_outlined, 'Notifications', onTap: () {
-            context.pop();
             context.push('/notifications');
           }),
           _drawerItem(Icons.settings_outlined, 'Settings', onTap: () {
-            context.pop();
             context.push('/settings');
           }),
           _drawerItem(Icons.help_outline, 'Help Centre', onTap: () {
-            context.pop();
             context.push('/help');
           }),
 
@@ -160,9 +148,43 @@ class AppDrawer extends ConsumerWidget {
             Icons.logout,
             'Log Out',
             color: Colors.red,
-            onTap: () {
+            onTap: () => _showLogoutConfirm(context, ref),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLogoutConfirm(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Log Out?',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Are you sure you want to log out of UniHub?',
+          style: GoogleFonts.plusJakartaSans(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.plusJakartaSans(color: Colors.grey, fontWeight: FontWeight.w600),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
               ref.read(authControllerProvider.notifier).signOut();
             },
+            child: Text(
+              'Log Out',
+              style: GoogleFonts.plusJakartaSans(color: Colors.red, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -171,14 +193,14 @@ class AppDrawer extends ConsumerWidget {
 
   Widget _sectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
       child: Text(
         title.toUpperCase(),
-        style: const TextStyle(
+        style: GoogleFonts.plusJakartaSans(
           fontSize: 11,
           fontWeight: FontWeight.bold,
-          color: Colors.grey,
-          letterSpacing: 1.1,
+          color: Colors.grey.shade500,
+          letterSpacing: 1.2,
         ),
       ),
     );
@@ -191,9 +213,17 @@ class AppDrawer extends ConsumerWidget {
         required VoidCallback onTap,
       }) {
     return ListTile(
-      leading: Icon(icon, color: color, size: 22),
-      title: Text(title, style: TextStyle(color: color, fontSize: 15)),
-      trailing: const Icon(Icons.chevron_right, size: 18, color: Colors.grey),
+      leading: Icon(icon, color: color ?? Colors.black87, size: 22),
+      title: Text(
+        title,
+        style: GoogleFonts.plusJakartaSans(
+          color: color ?? Colors.black87,
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
+      trailing: Icon(Icons.chevron_right, size: 18, color: color ?? Colors.grey.shade400),
       onTap: onTap,
     );
   }

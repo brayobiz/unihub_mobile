@@ -133,7 +133,7 @@ class _DashboardAppBar extends ConsumerWidget {
         ),
       ),
       actions: const [
-        NotificationBadge(),
+        NotificationBadge(iconColor: Colors.white),
         SizedBox(width: 12),
       ],
       flexibleSpace: FlexibleSpaceBar(

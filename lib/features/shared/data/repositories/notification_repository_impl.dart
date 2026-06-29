@@ -8,26 +8,57 @@ class NotificationRepositoryImpl implements NotificationRepository {
   NotificationRepositoryImpl(this._firestore);
 
   @override
-  Stream<List<UniNotification>> watchNotifications(String userId) {
-    return _firestore
+  Stream<List<UniNotification>> watchNotifications(String userId, {String? module}) {
+    var query = _firestore
         .collection('users')
         .doc(userId)
         .collection('notifications')
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => UniNotification.fromFirestore(doc)).toList());
+        .orderBy('createdAt', descending: true);
+
+    if (module != null) {
+      List<String> types = [module];
+      
+      // Feature aliases for broader matching (especially for older notifications)
+      if (module == 'marketplace') {
+        types.addAll(['listing', 'review']);
+      }
+      
+      query = query.where(
+        Filter.or(
+          Filter('type', whereIn: types),
+          Filter('targetType', isEqualTo: module),
+        ),
+      );
+    }
+
+    return query.snapshots().map((snapshot) =>
+        snapshot.docs.map((doc) => UniNotification.fromFirestore(doc)).toList());
   }
 
   @override
-  Stream<int> watchUnreadCount(String userId) {
-    return _firestore
+  Stream<int> watchUnreadCount(String userId, {String? module}) {
+    var query = _firestore
         .collection('users')
         .doc(userId)
         .collection('notifications')
-        .where('isRead', isEqualTo: false)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.length);
+        .where('isRead', isEqualTo: false);
+
+    if (module != null) {
+      List<String> types = [module];
+      
+      if (module == 'marketplace') {
+        types.addAll(['listing', 'review']);
+      }
+
+      query = query.where(
+        Filter.or(
+          Filter('type', whereIn: types),
+          Filter('targetType', isEqualTo: module),
+        ),
+      );
+    }
+
+    return query.snapshots().map((snapshot) => snapshot.docs.length);
   }
 
   @override
@@ -57,14 +88,29 @@ class NotificationRepositoryImpl implements NotificationRepository {
   }
 
   @override
-  Future<void> markAllAsRead(String userId) async {
+  Future<void> markFeatureNotificationsAsRead(String userId, {String? module}) async {
     final batch = _firestore.batch();
-    final snapshot = await _firestore
+    var query = _firestore
         .collection('users')
         .doc(userId)
         .collection('notifications')
-        .where('isRead', isEqualTo: false)
-        .get();
+        .where('isRead', isEqualTo: false);
+
+    if (module != null) {
+      List<String> types = [module];
+      if (module == 'marketplace') {
+        types.addAll(['listing', 'review']);
+      }
+
+      query = query.where(
+        Filter.or(
+          Filter('type', whereIn: types),
+          Filter('targetType', isEqualTo: module),
+        ),
+      );
+    }
+
+    final snapshot = await query.get();
 
     for (var doc in snapshot.docs) {
       batch.update(doc.reference, {'isRead': true});
@@ -89,6 +135,7 @@ class NotificationRepositoryImpl implements NotificationRepository {
     required String body,
     String? type,
     String? relatedId,
+    String? targetType,
   }) async {
     final notificationType = NotificationType.values.firstWhere(
       (e) => e.name == type,
@@ -102,6 +149,7 @@ class NotificationRepositoryImpl implements NotificationRepository {
       title: title,
       body: body,
       targetId: relatedId,
+      targetType: targetType,
       createdAt: DateTime.now(),
     ));
   }

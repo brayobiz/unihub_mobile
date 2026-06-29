@@ -5,6 +5,7 @@ import '../../domain/models/roommate_profile.dart';
 import '../../domain/models/vacancy_request.dart';
 import '../../domain/repositories/housing_repository.dart';
 import '../../../../services/notification_service.dart';
+import '../../../shared/domain/models/uni_notification.dart';
 
 class HousingRepositoryImpl implements HousingRepository {
   final FirebaseFirestore _firestore;
@@ -166,10 +167,37 @@ class HousingRepositoryImpl implements HousingRepository {
 
   @override
   Future<void> updateListingStatus(String id, HousingStatus status) async {
-    await _firestore.collection('housing_listings').doc(id).update({
+    final doc = await _firestore.collection('housing_listings').doc(id).get();
+    if (!doc.exists) return;
+
+    final currentStatus = doc.data()?['status'];
+    final plugId = doc.data()?['plugId'];
+    final batch = _firestore.batch();
+
+    batch.update(_firestore.collection('housing_listings').doc(id), {
       'status': status.name,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    // If marked as taken, increment completed deals and trust score
+    if (status == HousingStatus.taken && currentStatus != HousingStatus.taken.name) {
+      if (plugId != null) {
+        batch.update(_firestore.collection('users').doc(plugId), {
+          'completedSalesCount': FieldValue.increment(1),
+          'trustScore': FieldValue.increment(5.0), // Consistent with Marketplace
+        });
+      }
+    } else if (status == HousingStatus.available && currentStatus == HousingStatus.taken.name) {
+      // Reverting from taken back to available
+      if (plugId != null) {
+        batch.update(_firestore.collection('users').doc(plugId), {
+          'completedSalesCount': FieldValue.increment(-1),
+          'trustScore': FieldValue.increment(-5.0),
+        });
+      }
+    }
+
+    await batch.commit();
     await _logHistory(id, 'status_change', {'new_status': status.name});
   }
 
@@ -194,11 +222,14 @@ class HousingRepositoryImpl implements HousingRepository {
     final doc = await _firestore.collection('housing_listings').doc(listingId).get();
     final plugId = doc.data()?['plugId'];
     if (plugId != null && _notificationService != null) {
-      await _notificationService!.triggerPushNotification(
+      await _notificationService!.sendNotification(
         recipientId: plugId,
         title: 'Moderation Update',
         body: 'Your listing status has been updated to ${status.name} by a moderator.',
-        data: {'route': '/plug-dashboard'},
+        type: NotificationType.system,
+        targetId: listingId,
+        targetType: 'housing',
+        deepLink: '/plug-dashboard',
       );
     }
   }
@@ -263,6 +294,7 @@ class HousingRepositoryImpl implements HousingRepository {
         transaction.update(userRef, {
           'averageRating': newRating,
           'ratingsCount': newCount,
+          'trustScore': FieldValue.increment(review.rating >= 4 ? 2.0 : -1.0),
         });
       }
     });
@@ -294,11 +326,14 @@ class HousingRepositoryImpl implements HousingRepository {
     if (listingDoc.exists) {
       final plugId = listingDoc.data()?['plugId'];
       if (plugId != null && _notificationService != null) {
-        await _notificationService!.triggerPushNotification(
+        await _notificationService!.sendNotification(
           recipientId: plugId,
           title: 'Listing Reported',
           body: 'One of your listings has been reported and is under moderation.',
-          data: {'route': '/plug-dashboard'},
+          type: NotificationType.system,
+          targetId: listingId,
+          targetType: 'housing',
+          deepLink: '/plug-dashboard',
         );
       }
     }
@@ -320,11 +355,14 @@ class HousingRepositoryImpl implements HousingRepository {
       });
 
       if (plugId != null && _notificationService != null) {
-        await _notificationService!.triggerPushNotification(
+        await _notificationService!.sendNotification(
           recipientId: plugId,
           title: 'New Save!',
           body: 'Someone saved your listing: $title',
-          data: {'route': '/plug-dashboard', 'listingId': listingId},
+          type: NotificationType.housing,
+          targetId: listingId,
+          targetType: 'housing',
+          deepLink: '/plug-dashboard',
         );
       }
     }

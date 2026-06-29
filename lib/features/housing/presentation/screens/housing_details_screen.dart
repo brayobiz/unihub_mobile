@@ -9,6 +9,7 @@ import '../../../auth/shared/providers.dart';
 import '../../domain/models/housing_listing.dart';
 import '../../domain/models/housing_review.dart';
 import '../../shared/providers.dart';
+import '../../../chat/shared/providers.dart';
 import 'package:intl/intl.dart';
 import '../../../../services/history_service.dart';
 
@@ -350,7 +351,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
     );
   }
 
-  void _handleChat(BuildContext context) {
+  void _handleChat(BuildContext context) async {
     final currentUser = ref.read(authStateProvider).valueOrNull;
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -367,16 +368,21 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
       return;
     }
 
-    // Simple ID generation for the conversation
-    final conversationId = currentUser.uid.compareTo(widget.listing.plugId) < 0 
-        ? '${currentUser.uid}_${widget.listing.plugId}' 
-        : '${widget.listing.plugId}_${currentUser.uid}';
+    final convId = await ref.read(chatRepositoryProvider).getOrCreateConversation(
+      buyerId: currentUser.uid,
+      sellerId: widget.listing.plugId,
+      listingId: widget.listing.id,
+      listingTitle: widget.listing.title,
+      module: 'housing',
+    );
 
-    context.push('/chat', extra: {
-      'conversationId': conversationId,
-      'otherUserName': widget.listing.plugName,
-      'listing': null, // The ChatScreen expects a Marketplace Listing, not HousingListing, passing null for now
-    });
+    if (context.mounted) {
+      context.push('/chat', extra: {
+        'conversationId': convId,
+        'otherUserName': widget.listing.plugName,
+        'listing': null, // The ChatScreen expects a Marketplace Listing
+      });
+    }
   }
 
   void _showReportDialog(BuildContext context) {

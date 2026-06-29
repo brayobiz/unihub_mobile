@@ -247,7 +247,7 @@ class NoteCard extends ConsumerWidget {
                         Text('KES ${note.price.toInt()}', style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.black87))
                       else
                         const Text('FREE', style: TextStyle(fontWeight: FontWeight.w900, color: Colors.green)),
-                      Text('${note.downloadsCount} downloads', style: TextStyle(fontSize: 10, color: Colors.grey.shade400)),
+                      Text('${note.downloadsCount} readers', style: TextStyle(fontSize: 10, color: Colors.grey.shade400)),
                     ],
                   ),
                 ],

@@ -23,7 +23,6 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   @override
   void initState() {
     super.initState();
-    // For existing users who land on the main screen, check for notification permissions
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(notificationServiceProvider).requestPermission();
     });
@@ -39,63 +38,88 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final unreadCount = ref.watch(unreadNotificationsCountProvider(null)).valueOrNull ?? 0;
+    final marketplaceUnreadCount = ref.watch(unreadNotificationsCountProvider('marketplace')).valueOrNull ?? 0;
+    final housingUnreadCount = ref.watch(unreadNotificationsCountProvider('housing')).valueOrNull ?? 0;
+    final notesUnreadCount = ref.watch(unreadNotificationsCountProvider('notes')).valueOrNull ?? 0;
+
     return Scaffold(
       drawer: const AppDrawer(),
       body: pages[currentIndex],
-
-      bottomNavigationBar: Consumer(
-        builder: (context, ref, child) {
-          final unreadCount = ref.watch(unreadNotificationsCountProvider).valueOrNull ?? 0;
-          return NavigationBar(
-            selectedIndex: currentIndex,
-            onDestinationSelected: (index) {
-              setState(() {
-                currentIndex = index;
-              });
-            },
-            destinations: [
-              NavigationDestination(
-                icon: unreadCount > 0 
-                  ? Badge(
-                      label: Text(unreadCount > 9 ? '9+' : '$unreadCount'),
-                      child: const Icon(Icons.home_outlined),
-                    )
-                  : const Icon(Icons.home_outlined),
-                selectedIcon: unreadCount > 0
-                  ? Badge(
-                      label: Text(unreadCount > 9 ? '9+' : '$unreadCount'),
-                      child: const Icon(Icons.home),
-                    )
-                  : const Icon(Icons.home),
-                label: 'Home',
-              ),
-
-              const NavigationDestination(
-                icon: Icon(Icons.storefront_outlined),
-                selectedIcon: Icon(Icons.storefront),
-                label: 'Marketplace',
-              ),
-
-              const NavigationDestination(
-                icon: Icon(Icons.home_work_outlined),
-                selectedIcon: Icon(Icons.home_work),
-                label: 'Housing',
-              ),
-
-              const NavigationDestination(
-                icon: Icon(Icons.menu_book_outlined),
-                selectedIcon: Icon(Icons.menu_book),
-                label: 'Notes',
-              ),
-
-              const NavigationDestination(
-                icon: Icon(Icons.person_outline),
-                selectedIcon: Icon(Icons.person),
-                label: 'Profile',
-              ),
-            ],
-          );
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: currentIndex,
+        onDestinationSelected: (index) {
+          setState(() {
+            currentIndex = index;
+          });
         },
+        destinations: [
+          NavigationDestination(
+            icon: unreadCount > 0 
+              ? Badge(
+                  label: Text(unreadCount > 9 ? '9+' : '$unreadCount'),
+                  child: const Icon(Icons.home_outlined),
+                )
+              : const Icon(Icons.home_outlined),
+            selectedIcon: unreadCount > 0
+              ? Badge(
+                  label: Text(unreadCount > 9 ? '9+' : '$unreadCount'),
+                  child: const Icon(Icons.home),
+                )
+              : const Icon(Icons.home),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: marketplaceUnreadCount > 0
+              ? Badge(
+                  label: Text(marketplaceUnreadCount > 9 ? '9+' : '$marketplaceUnreadCount'),
+                  child: const Icon(Icons.storefront_outlined),
+                )
+              : const Icon(Icons.storefront_outlined),
+            selectedIcon: marketplaceUnreadCount > 0
+              ? Badge(
+                  label: Text(marketplaceUnreadCount > 9 ? '9+' : '$marketplaceUnreadCount'),
+                  child: const Icon(Icons.storefront),
+                )
+              : const Icon(Icons.storefront),
+            label: 'Marketplace',
+          ),
+          NavigationDestination(
+            icon: housingUnreadCount > 0
+              ? Badge(
+                  label: Text(housingUnreadCount > 9 ? '9+' : '$housingUnreadCount'),
+                  child: const Icon(Icons.home_work_outlined),
+                )
+              : const Icon(Icons.home_work_outlined),
+            selectedIcon: housingUnreadCount > 0
+              ? Badge(
+                  label: Text(housingUnreadCount > 9 ? '9+' : '$housingUnreadCount'),
+                  child: const Icon(Icons.home_work),
+                )
+              : const Icon(Icons.home_work),
+            label: 'Housing',
+          ),
+          NavigationDestination(
+            icon: notesUnreadCount > 0
+              ? Badge(
+                  label: Text(notesUnreadCount > 9 ? '9+' : '$notesUnreadCount'),
+                  child: const Icon(Icons.menu_book_outlined),
+                )
+              : const Icon(Icons.menu_book_outlined),
+            selectedIcon: notesUnreadCount > 0
+              ? Badge(
+                  label: Text(notesUnreadCount > 9 ? '9+' : '$notesUnreadCount'),
+                  child: const Icon(Icons.menu_book),
+                )
+              : const Icon(Icons.menu_book),
+            label: 'Notes',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
       ),
     );
   }

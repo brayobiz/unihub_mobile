@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../services/notification_service.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
+import 'package:unihub_mobile/features/auth/presentation/controllers/auth_controller.dart';
 
 final themeModeProvider = StateProvider<ThemeMode>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
@@ -19,31 +21,54 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
     final userAsync = ref.watch(appUserProvider);
+    final authState = ref.watch(authControllerProvider);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FB),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black, size: 20),
-          onPressed: () => context.pop(),
-        ),
-        title: Text(
-          'Settings',
-          style: GoogleFonts.plusJakartaSans(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
+    // Listen to AuthController for global loading/error feedback
+    ref.listen<AsyncValue<void>>(authControllerProvider, (previous, next) {
+      next.whenOrNull(
+        error: (err, _) => ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(err.toString()),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
           ),
         ),
-        centerTitle: true,
-      ),
-      body: userAsync.when(
-        data: (user) => _buildBody(context, ref, user, themeMode),
-        loading: () => const Center(child: CircularProgressIndicator(color: Colors.indigo)),
-        error: (err, _) => Center(child: Text('Error: $err')),
-      ),
+      );
+    });
+
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: const Color(0xFFF8F9FB),
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black, size: 20),
+              onPressed: () => context.pop(),
+            ),
+            title: Text(
+              'Settings',
+              style: GoogleFonts.plusJakartaSans(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+            centerTitle: true,
+          ),
+          body: userAsync.when(
+            data: (user) => _buildBody(context, ref, user, themeMode),
+            loading: () => const Center(child: CircularProgressIndicator(color: Colors.indigo)),
+            error: (err, _) => Center(child: Text('Error: $err')),
+          ),
+        ),
+        if (authState.isLoading)
+          Container(
+            color: Colors.black26,
+            child: const Center(child: CircularProgressIndicator(color: Colors.white)),
+          ),
+      ],
     );
   }
 
@@ -124,16 +149,65 @@ class SettingsScreen extends ConsumerWidget {
         _buildSettingsCard([
           _buildSwitchTile(
             icon: Icons.chat_bubble_outline_rounded,
-            title: 'New Messages',
+            title: 'Messages',
             value: user?.notificationSettings['new_messages'] ?? true,
             onChanged: (val) => user != null ? _updateNotificationSetting(ref, user.uid, 'new_messages', val) : null,
           ),
           const Divider(height: 1, indent: 50),
           _buildSwitchTile(
-            icon: Icons.shopping_bag_outlined,
-            title: 'Listing Updates',
-            value: user?.notificationSettings['listing_updates'] ?? true,
-            onChanged: (val) => user != null ? _updateNotificationSetting(ref, user.uid, 'listing_updates', val) : null,
+            icon: Icons.storefront_outlined,
+            title: 'Marketplace',
+            value: user?.notificationSettings['marketplace'] ?? true,
+            onChanged: (val) => user != null ? _updateNotificationSetting(ref, user.uid, 'marketplace', val) : null,
+          ),
+          const Divider(height: 1, indent: 50),
+          _buildSwitchTile(
+            icon: Icons.home_work_outlined,
+            title: 'Housing',
+            value: user?.notificationSettings['housing'] ?? true,
+            onChanged: (val) => user != null ? _updateNotificationSetting(ref, user.uid, 'housing', val) : null,
+          ),
+          const Divider(height: 1, indent: 50),
+          _buildSwitchTile(
+            icon: Icons.menu_book_outlined,
+            title: 'Study Notes',
+            value: user?.notificationSettings['notes'] ?? true,
+            onChanged: (val) => user != null ? _updateNotificationSetting(ref, user.uid, 'notes', val) : null,
+          ),
+          const Divider(height: 1, indent: 50),
+          _buildSwitchTile(
+            icon: Icons.electrical_services_outlined,
+            title: 'Plug Requests',
+            value: user?.notificationSettings['plug'] ?? true,
+            onChanged: (val) => user != null ? _updateNotificationSetting(ref, user.uid, 'plug', val) : null,
+          ),
+          const Divider(height: 1, indent: 50),
+          _buildSwitchTile(
+            icon: Icons.star_outline_rounded,
+            title: 'Reviews & Feedback',
+            value: user?.notificationSettings['reviews'] ?? true,
+            onChanged: (val) => user != null ? _updateNotificationSetting(ref, user.uid, 'reviews', val) : null,
+          ),
+          const Divider(height: 1, indent: 50),
+          _buildSwitchTile(
+            icon: Icons.person_add_outlined,
+            title: 'New Followers',
+            value: user?.notificationSettings['followers'] ?? true,
+            onChanged: (val) => user != null ? _updateNotificationSetting(ref, user.uid, 'followers', val) : null,
+          ),
+          const Divider(height: 1, indent: 50),
+          _buildSwitchTile(
+            icon: Icons.campaign_outlined,
+            title: 'System Announcements',
+            value: user?.notificationSettings['system'] ?? true,
+            onChanged: (val) => user != null ? _updateNotificationSetting(ref, user.uid, 'system', val) : null,
+          ),
+          const Divider(height: 1, indent: 50),
+          _buildSwitchTile(
+            icon: Icons.groups_outlined,
+            title: 'Community Activity',
+            value: user?.notificationSettings['community_activity'] ?? true,
+            onChanged: (val) => user != null ? _updateNotificationSetting(ref, user.uid, 'community_activity', val) : null,
           ),
           const Divider(height: 1, indent: 50),
           _buildSettingTile(
@@ -173,7 +247,7 @@ class SettingsScreen extends ConsumerWidget {
             icon: Icons.delete_outline_rounded,
             title: 'Delete Account',
             titleColor: Colors.red,
-            onTap: () => _showDeleteAccountDialog(context),
+            onTap: () => _showDeleteAccountDialog(context, ref),
           ),
         ]),
 
@@ -188,7 +262,7 @@ class SettingsScreen extends ConsumerWidget {
           _buildSettingTile(
             icon: Icons.policy_outlined,
             title: 'Privacy Policy',
-            onTap: () {},
+            onTap: () => _launchPrivacyPolicy(),
           ),
         ]),
 
@@ -281,31 +355,20 @@ class SettingsScreen extends ConsumerWidget {
     final user = ref.read(appUserProvider).valueOrNull;
     if (user == null) return;
     
-    final Map<String, bool> newSettings = {};
-    user.notificationSettings.forEach((k, v) => newSettings[k] = v);
+    final Map<String, bool> newSettings = Map.from(user.notificationSettings);
     newSettings[key] = value;
     
-    ref.read(authRepositoryProvider).updateProfile(
-      uid: uid,
-      notificationSettings: newSettings,
-    );
+    ref.read(authControllerProvider.notifier).updateNotificationSettings(newSettings);
   }
 
   void _updatePrivacySetting(WidgetRef ref, String uid, String key, String value) {
     final user = ref.read(appUserProvider).valueOrNull;
     if (user == null) return;
     
-    // Defensive copy and update
-    final Map<String, String> newSettings = {};
-    user.privacySettings.forEach((k, v) => newSettings[k] = v.toString());
+    final Map<String, String> newSettings = Map.from(user.privacySettings);
     newSettings[key] = value;
     
-    ref.read(authRepositoryProvider).updateProfile(
-      uid: uid,
-      privacySettings: newSettings,
-    ).then((_) {
-      debugPrint('Privacy setting updated: $key = $value');
-    });
+    ref.read(authControllerProvider.notifier).updatePrivacySettings(newSettings);
   }
 
   void _showProfileVisibilityDialog(BuildContext context, WidgetRef ref, AppUser user) {
@@ -369,7 +432,7 @@ class SettingsScreen extends ConsumerWidget {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           FilledButton(
             onPressed: () {
-              ref.read(authRepositoryProvider).resetPassword(user.email);
+              ref.read(authControllerProvider.notifier).resetPassword(user.email);
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Reset link sent!'), behavior: SnackBarBehavior.floating),
@@ -394,7 +457,7 @@ class SettingsScreen extends ConsumerWidget {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
             onPressed: () {
-              ref.read(authRepositoryProvider).signOut();
+              ref.read(authControllerProvider.notifier).signOut();
               Navigator.pop(context);
             },
             child: const Text('Sign Out', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
@@ -404,7 +467,7 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _showDeleteAccountDialog(BuildContext context) {
+  void _showDeleteAccountDialog(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -414,12 +477,22 @@ class SettingsScreen extends ConsumerWidget {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
-            onPressed: () {},
+            onPressed: () {
+              ref.read(authControllerProvider.notifier).deleteAccount();
+              Navigator.pop(context);
+            },
             child: const Text('Delete Permanently', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _launchPrivacyPolicy() async {
+    final Uri url = Uri.parse('https://unihub-mobile.web.app/privacy');
+    if (!await launchUrl(url)) {
+      debugPrint('Could not launch $url');
+    }
   }
 }
 

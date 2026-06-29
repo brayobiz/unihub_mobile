@@ -5,6 +5,7 @@ import '../shared/feed_repository.dart';
 import '../../widgets/feed/feed_card.dart';
 import '../auth/shared/providers.dart';
 import '../shared/add_feed_item_screen.dart';
+import '../../widgets/notification_badge.dart';
 
 final confessionsFeedProvider = StreamProvider<List<FeedItem>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
@@ -20,7 +21,13 @@ class ConfessionsScreen extends ConsumerWidget {
     final user = ref.watch(appUserProvider).valueOrNull;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Anonymous Confessions')),
+      appBar: AppBar(
+        title: const Text('Anonymous Confessions'),
+        actions: const [
+          NotificationBadge(module: 'community'),
+          SizedBox(width: 8),
+        ],
+      ),
       body: feedAsync.when(
         data: (items) => items.isEmpty
             ? const Center(child: Text('No confessions yet. Be the first!'))

@@ -238,6 +238,18 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<void> deleteAccount() async {
+    final user = _firebaseAuth.currentUser;
+    if (user != null) {
+      // 1. Delete user data from Firestore
+      await _firestore.collection('users').doc(user.uid).delete();
+      
+      // 2. Delete the user from Firebase Auth
+      await user.delete();
+    }
+  }
+
+  @override
   Future<void> updateTrustScore(String uid, double delta) async {
     await _firestore.collection('users').doc(uid).update({
       'trustScore': FieldValue.increment(delta),

@@ -10,6 +10,7 @@ abstract class ChatRepository {
     required String sellerId,
     required String listingId,
     required String listingTitle,
+    String? module,
   });
   Future<void> markAsRead(String conversationId, String userId);
   Future<String> getSupportConversation(String userId);

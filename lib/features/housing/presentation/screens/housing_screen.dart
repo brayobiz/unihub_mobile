@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:unihub_mobile/widgets/app_drawer.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import 'package:unihub_mobile/widgets/skeleton_loader.dart';
 import 'package:unihub_mobile/widgets/notification_badge.dart';
@@ -70,6 +71,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      drawer: const AppDrawer(),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(topHousingProvider);
@@ -141,9 +143,16 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
       elevation: 0,
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
+      leading: Builder(
+        builder: (context) => IconButton(
+          icon: const Icon(Icons.menu_rounded, color: Colors.black),
+          onPressed: () => Scaffold.of(context).openDrawer(),
+        ),
+      ),
       flexibleSpace: FlexibleSpaceBar(
-        titlePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        centerTitle: false,
+        centerTitle: true,
+        titlePadding: const EdgeInsets.only(bottom: 14),
+        expandedTitleScale: 1.2,
         title: Text(
           'UniHub Housing',
           style: GoogleFonts.plusJakartaSans(
@@ -154,7 +163,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
         ),
       ),
       actions: [
-        const NotificationBadge(),
+        const NotificationBadge(module: 'housing'),
         if (!isPlug)
           IconButton(
             icon: const Icon(Icons.add_business_outlined, color: Color(0xFF1A1C1E)),

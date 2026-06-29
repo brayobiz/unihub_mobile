@@ -7,6 +7,7 @@ import 'package:pdfx/pdfx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:path/path.dart' as p;
+import 'package:open_filex/open_filex.dart';
 import '../../domain/models/note.dart';
 import '../../shared/providers.dart';
 import '../../../../services/download_service.dart';
@@ -71,73 +72,122 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
     final url = widget.note.fileUrl.toLowerCase();
     final path = (_localPath ?? '').toLowerCase();
     
-    return url.contains('.pdf') || 
-           path.contains('.pdf') || 
-           widget.note.noteType.toLowerCase() == 'lecture note' || // Fallback assumption
-           url.contains('raw/upload') && url.endsWith('.pdf');
+    // Most resources on UniHub are PDFs. If it's not explicitly something else, try PDF.
+    if (url.contains('.docx') || url.contains('.doc') || 
+        url.contains('.pptx') || url.contains('.ppt')) return false;
+        
+    if (url.contains('.pdf') || path.contains('.pdf')) return true;
+    
+    // Cloudinary raw content check
+    if (url.contains('/raw/upload')) return true;
+    
+    // Default to PDF for study notes
+    return true;
   }
 
   void _initPdfController() {
+    debugPrint('🚩 Reader: Initializing PDF Controller');
+    debugPrint('🚩 Reader: Local Path: $_localPath');
+    
     try {
+      if (_localPath == null) {
+        debugPrint('🚩 Reader: localPath is NULL, triggering download');
+        _downloadAndInitPdf();
+        return;
+      }
+
       final file = File(_localPath!);
-      if (!file.existsSync()) {
+      final exists = file.existsSync();
+      final size = exists ? file.lengthSync() : 0;
+      
+      debugPrint('🚩 Reader: File Exists: $exists');
+      debugPrint('🚩 Reader: File Size: $size bytes');
+
+      if (!exists || size == 0) {
+        debugPrint('🚩 Reader: File missing or empty, downloading...');
         _downloadAndInitPdf();
         return;
       }
       
+      debugPrint('🚩 Reader: Attempting to open PDF with pdfx...');
       _pdfController = PdfControllerPinch(
         document: PdfDocument.openFile(_localPath!),
         initialPage: widget.initialPage + 1,
       );
       setState(() => _isError = false);
-    } catch (e) {
+      debugPrint('🚩 Reader: PDF Controller initialized successfully');
+    } catch (e, stack) {
+      debugPrint('❌ Reader: PDF Init Error: $e');
+      debugPrint('❌ Reader: StackTrace: $stack');
       setState(() {
         _isError = true;
-        _errorMessage = 'Could not open PDF: ${e.toString()}';
+        _errorMessage = 'UniHub cannot render this specific document internally. It might be too large or uses a complex format.';
       });
     }
   }
 
   Future<void> _downloadAndInitPdf() async {
     if (!mounted) return;
+    debugPrint('🚩 Reader: Starting Download Pipeline');
+    debugPrint('🚩 Reader: Remote URL: ${widget.note.fileUrl}');
+
     setState(() {
       _isDownloading = true;
       _isError = false;
     });
 
     try {
-      // Create a safe filename
       final safeTitle = widget.note.title.replaceAll(RegExp(r'[^\w\s]+'), '_');
-      final ext = widget.note.fileUrl.toLowerCase().contains('.pdf') ? '.pdf' : '.pdf'; // Default to pdf for this flow
-      final fileName = '$safeTitle$ext';
       
+      // Better extension detection
+      String ext = '.pdf';
+      if (widget.note.fileUrl.contains('.docx')) ext = '.docx';
+      else if (widget.note.fileUrl.contains('.doc')) ext = '.doc';
+      else if (widget.note.fileUrl.contains('.pptx')) ext = '.pptx';
+      else if (widget.note.fileUrl.contains('.ppt')) ext = '.ppt';
+
+      final fileName = '$safeTitle$ext';
       final downloadService = ref.read(downloadServiceProvider);
       
-      final exists = await downloadService.isFileDownloaded(fileName);
-      if (exists) {
-        _localPath = await downloadService.getSavePath(fileName);
-      } else {
-        await downloadService.downloadFile(
-          url: widget.note.fileUrl,
-          fileName: fileName,
-          noteId: widget.note.id,
-        );
-        _localPath = await downloadService.getSavePath(fileName);
+      debugPrint('🚩 Reader: Generated Filename: $fileName');
+
+      if (_isError) {
+        final path = await downloadService.getSavePath(fileName);
+        final file = File(path);
+        if (file.existsSync()) {
+          debugPrint('🚩 Reader: Deleting existing failed file');
+          await file.delete();
+        }
       }
+
+      debugPrint('🚩 Reader: Calling downloadService.downloadFile');
+      await downloadService.downloadFile(
+        url: widget.note.fileUrl,
+        fileName: fileName,
+        noteId: widget.note.id,
+      );
+      
+      _localPath = await downloadService.getSavePath(fileName);
+      debugPrint('🚩 Reader: Download complete. New Local Path: $_localPath');
 
       if (mounted) {
         setState(() => _isDownloading = false);
-        _initPdfController();
+        if (_isPdf) {
+          _initPdfController();
+        } else {
+          _initWebView();
+        }
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('❌ Reader: Download Pipeline Failed: $e');
+      debugPrint('❌ Reader: StackTrace: $stack');
       if (mounted) {
         setState(() {
           _isDownloading = false;
           _isError = true;
-          // Extract cleaner error from Dio exception if possible
           _errorMessage = e.toString().contains('401') 
-              ? 'Access Denied: Please sign in again to access this resource.' 
-              : 'Connection Error: Unable to fetch document. Please check your internet.';
+              ? 'Access Denied: Please sign in again.' 
+              : 'Download failed. Please check your connection.';
         });
       }
     }
@@ -533,6 +583,7 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 12),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Go Back', style: TextStyle(color: Colors.grey)),

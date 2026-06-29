@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
+import 'package:path/path.dart' as p;
 import '../../../auth/shared/providers.dart';
 import '../../domain/models/note.dart';
 import '../../shared/providers.dart';
@@ -35,6 +36,7 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
   
   File? _selectedFile;
   String? _fileName;
+  String? _fileSize;
   bool _isLoading = false;
   double _uploadProgress = 0;
 
@@ -55,6 +57,7 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     
     if (widget.note != null) {
       _tags.addAll(widget.note!.tags);
+      _fileName = 'Existing Document (.docx)';
     }
   }
 
@@ -92,13 +95,35 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'],
+      allowedExtensions: ['docx'],
     );
 
     if (result != null && result.files.single.path != null) {
+      final file = File(result.files.single.path!);
+      final extension = p.extension(file.path).toLowerCase();
+      
+      if (extension != '.docx') {
+        if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+             const SnackBar(
+               content: Text('Only Microsoft Word (.docx) documents are supported at the moment. PDF support will be available in a future update.'),
+               backgroundColor: Colors.orange,
+             )
+           );
+        }
+        return;
+      }
+
+      final sizeInBytes = await file.length();
+      final sizeInKb = sizeInBytes / 1024;
+      final sizeStr = sizeInKb > 1024 
+          ? '${(sizeInKb / 1024).toStringAsFixed(1)} MB' 
+          : '${sizeInKb.toStringAsFixed(1)} KB';
+
       setState(() {
-        _selectedFile = File(result.files.single.path!);
+        _selectedFile = file;
         _fileName = result.files.single.name;
+        _fileSize = sizeStr;
         if (_titleController.text.isEmpty) {
           _titleController.text = _fileName!.split('.').first;
         }
@@ -109,11 +134,11 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedFile == null && widget.note == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a file')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a .docx file')));
       return;
     }
     if (_tags.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please add at least one tag')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please add at least one topic tag')));
       return;
     }
 
@@ -163,7 +188,10 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(widget.note == null ? 'Note uploaded successfully!' : 'Note updated successfully!'))
+          SnackBar(
+            content: Text(widget.note == null ? 'Note published successfully!' : 'Note updated successfully!'),
+            backgroundColor: Colors.green,
+          )
         );
         context.pop();
       }
@@ -177,143 +205,230 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F9FB),
       appBar: AppBar(
-        title: Text('Upload Study Note', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
+        title: Text(widget.note == null ? 'Share Study Notes' : 'Edit Study Note', 
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 18)),
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black,
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildFileSelector(),
-              const SizedBox(height: 32),
-              _buildSectionLabel('Academic Info'),
-              _buildTextField(
-                controller: _courseController,
-                label: 'Course / Program',
-                hint: 'e.g. BSc. Computer Science',
-                validator: (v) => v!.isEmpty ? 'Required' : null,
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _unitCodeController,
-                      label: 'Unit Code',
-                      hint: 'e.g. BIT 2204',
-                      validator: (v) => v!.isEmpty ? 'Required' : null,
+        child: Column(
+          children: [
+            _buildHeaderHint(),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildFileSelector(),
+                    const SizedBox(height: 32),
+                    
+                    _buildSectionHeader('Note Details', Icons.description_outlined),
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      controller: _titleController,
+                      label: 'Title',
+                      hint: 'e.g. Introduction to Database Systems',
+                      validator: (v) => v!.isEmpty ? 'Please enter a title' : null,
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildDropdown(
-                      label: 'Year of Study',
-                      value: _selectedYear,
-                      items: ['1', '2', '3', '4', '5', '6'],
-                      onChanged: (v) => setState(() => _selectedYear = v!),
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      controller: _descriptionController,
+                      label: 'Brief Description',
+                      hint: 'Help others understand what is covered...',
+                      maxLines: 3,
                     ),
-                  ),
-                ],
+                    
+                    const SizedBox(height: 32),
+                    _buildSectionHeader('Academic Context', Icons.school_outlined),
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      controller: _courseController,
+                      label: 'Course / Program',
+                      hint: 'e.g. BSc. Computer Science',
+                      validator: (v) => v!.isEmpty ? 'Please enter your course' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildTextField(
+                            controller: _unitCodeController,
+                            label: 'Unit Code',
+                            hint: 'e.g. COM 2101',
+                            validator: (v) => v!.isEmpty ? 'Required' : null,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildDropdown(
+                            label: 'Year of Study',
+                            value: _selectedYear,
+                            items: ['1', '2', '3', '4', '5', '6'],
+                            onChanged: (v) => setState(() => _selectedYear = v!),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      controller: _unitNameController,
+                      label: 'Unit Name',
+                      hint: 'e.g. Operating Systems',
+                      validator: (v) => v!.isEmpty ? 'Please enter the unit name' : null,
+                    ),
+                    
+                    const SizedBox(height: 32),
+                    _buildSectionHeader('Classification', Icons.category_outlined),
+                    const SizedBox(height: 16),
+                    _buildDropdown(
+                      label: 'Subject Category',
+                      value: _selectedCategory,
+                      items: _categories,
+                      onChanged: (v) => setState(() => _selectedCategory = v!),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildDropdown(
+                      label: 'Note Type',
+                      value: _selectedNoteType,
+                      items: _noteTypes,
+                      onChanged: (v) => setState(() => _selectedNoteType = v!),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildTagsInput(),
+                    
+                    const SizedBox(height: 32),
+                    _buildSectionHeader('Access & Pricing', Icons.payments_outlined),
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      controller: _priceController,
+                      label: 'Price (KES)',
+                      hint: 'Leave empty or 0 for FREE',
+                      keyboardType: TextInputType.number,
+                      prefixIcon: Icons.payments_outlined,
+                    ),
+                    
+                    const SizedBox(height: 48),
+                    _buildSubmitButton(),
+                    const SizedBox(height: 40),
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                controller: _unitNameController,
-                label: 'Unit Name',
-                hint: 'e.g. Data Structures and Algorithms',
-                validator: (v) => v!.isEmpty ? 'Required' : null,
-              ),
-              const SizedBox(height: 32),
-              _buildSectionLabel('Categorization'),
-              _buildDropdown(
-                label: 'Subject Category',
-                value: _selectedCategory,
-                items: _categories,
-                onChanged: (v) => setState(() => _selectedCategory = v!),
-              ),
-              const SizedBox(height: 16),
-              _buildDropdown(
-                label: 'Note Type',
-                value: _selectedNoteType,
-                items: _noteTypes,
-                onChanged: (v) => setState(() => _selectedNoteType = v!),
-              ),
-              const SizedBox(height: 16),
-              _buildTagsInput(),
-              const SizedBox(height: 32),
-              _buildSectionLabel('Note Details'),
-              _buildTextField(
-                controller: _titleController,
-                label: 'Title',
-                hint: 'e.g. Detailed Linked Lists Notes',
-                validator: (v) => v!.isEmpty ? 'Required' : null,
-              ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                controller: _descriptionController,
-                label: 'Description',
-                hint: 'What is covered in this note?',
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                controller: _priceController,
-                label: 'Price (KES) - Optional',
-                hint: '0 for free',
-                keyboardType: TextInputType.number,
-                prefixIcon: Icons.payments_outlined,
-              ),
-              const SizedBox(height: 40),
-              _buildSubmitButton(),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
+  Widget _buildHeaderHint() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      color: Colors.indigo.shade50,
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, size: 18, color: Colors.indigo.shade700),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Help your fellow students by sharing high-quality .docx notes.',
+              style: TextStyle(fontSize: 12, color: Colors.indigo.shade900, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: Colors.indigo),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.black87),
+        ),
+      ],
+    );
+  }
+
   Widget _buildFileSelector() {
+    final bool hasFile = _selectedFile != null || widget.note != null;
+    
     return InkWell(
       onTap: _isLoading ? null : _pickFile,
+      borderRadius: BorderRadius.circular(24),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         width: double.infinity,
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
         decoration: BoxDecoration(
-          color: _selectedFile != null ? Colors.green.shade50 : Colors.indigo.shade50.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(20),
+          color: hasFile ? Colors.white : Colors.white,
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: _selectedFile != null ? Colors.green.shade200 : Colors.indigo.shade100, 
+            color: hasFile ? Colors.green.shade300 : Colors.grey.shade200, 
             width: 2, 
-            style: BorderStyle.solid
           ),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))
+          ],
         ),
         child: Column(
           children: [
-            AnimatedRotation(
-              duration: const Duration(milliseconds: 500),
-              turns: _selectedFile != null ? 1 : 0,
-              child: Icon(
-                _selectedFile != null ? Icons.check_circle_rounded : Icons.cloud_upload_outlined, 
-                size: 48, 
-                color: _selectedFile != null ? Colors.green : Colors.indigo
+            if (!hasFile) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: Colors.indigo.shade50, shape: BoxShape.circle),
+                child: const Icon(Icons.upload_file_rounded, size: 32, color: Colors.indigo),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _fileName ?? 'Tap to select PDF, DOC, or PPT', 
-              textAlign: TextAlign.center, 
-              style: TextStyle(
-                fontWeight: FontWeight.bold, 
-                color: _selectedFile != null ? Colors.green.shade700 : Colors.indigo.shade700
-              )
-            ),
+              const SizedBox(height: 16),
+              Text('Select Microsoft Word Document', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 15)),
+              const SizedBox(height: 4),
+              Text('Only .docx files are supported', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+            ] else ...[
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(12)),
+                    child: const Icon(Icons.check_circle_outline_rounded, color: Colors.green, size: 24),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_fileName ?? 'Selected Document', 
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        Row(
+                          children: [
+                            Text('.DOCX', style: TextStyle(color: Colors.grey.shade600, fontSize: 11, fontWeight: FontWeight.bold)),
+                            if (_fileSize != null) ...[
+                              const SizedBox(width: 8),
+                              const CircleAvatar(radius: 2, backgroundColor: Colors.grey),
+                              const SizedBox(width: 8),
+                              Text(_fileSize!, style: TextStyle(color: Colors.grey.shade600, fontSize: 11)),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _isLoading ? null : _pickFile,
+                    child: const Text('Change', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo)),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -332,18 +447,20 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
               child: TextFormField(
                 controller: _tagController,
                 decoration: InputDecoration(
-                  hintText: 'Add a topic...',
+                  hintText: 'Add a topic (e.g. Java, DBMS)...',
                   filled: true,
-                  fillColor: const Color(0xFFF8F9FB),
+                  fillColor: Colors.white,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)),
                 ),
                 onFieldSubmitted: (_) => _addTag(),
               ),
             ),
-            const SizedBox(width: 8),
-            IconButton(
+            const SizedBox(width: 12),
+            IconButton.filled(
               onPressed: _addTag,
-              icon: const Icon(Icons.add_circle, color: Colors.indigo),
+              style: IconButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white),
+              icon: const Icon(Icons.add, size: 20),
             ),
           ],
         ),
@@ -353,10 +470,12 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
             spacing: 8,
             runSpacing: 8,
             children: _tags.map((tag) => Chip(
-              label: Text(tag, style: const TextStyle(fontSize: 12)),
+              label: Text(tag, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
               onDeleted: () => setState(() => _tags.remove(tag)),
-              backgroundColor: Colors.indigo.shade50,
-              deleteIconColor: Colors.indigo,
+              backgroundColor: Colors.white,
+              side: BorderSide(color: Colors.indigo.shade100),
+              deleteIconColor: Colors.red.shade400,
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
             )).toList(),
           ),
         ],
@@ -372,23 +491,17 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           value: value,
-          items: items.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+          items: items.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)))).toList(),
           onChanged: onChanged,
           decoration: InputDecoration(
             filled: true,
-            fillColor: const Color(0xFFF8F9FB),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)),
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildSectionLabel(String label) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12, left: 4),
-      child: Text(label, style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.indigo, letterSpacing: 0.5)),
     );
   }
 
@@ -403,15 +516,18 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
           maxLines: maxLines,
           keyboardType: keyboardType,
           validator: validator,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           decoration: InputDecoration(
             hintText: hint,
+            hintStyle: TextStyle(color: Colors.grey.shade400, fontWeight: FontWeight.normal, fontSize: 13),
             prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20, color: Colors.indigo.shade300) : null,
             filled: true,
-            fillColor: const Color(0xFFF8F9FB),
+            fillColor: Colors.white,
             contentPadding: const EdgeInsets.all(18),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)),
             focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.indigo, width: 1.5)),
+            errorStyle: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
       ],
@@ -421,13 +537,25 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
   Widget _buildSubmitButton() {
     return SizedBox(
       width: double.infinity,
-      height: 56,
+      height: 60,
       child: FilledButton(
         onPressed: _isLoading ? null : _submit,
-        style: FilledButton.styleFrom(backgroundColor: Colors.indigo, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+        style: FilledButton.styleFrom(
+          backgroundColor: Colors.indigo, 
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          elevation: 0,
+        ),
         child: _isLoading
-            ? Row(mainAxisAlignment: MainAxisAlignment.center, children: [const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)), const SizedBox(width: 12), Text('Uploading ${(_uploadProgress * 100).toInt()}%')])
-            : const Text('Publish Study Material', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ? Row(
+                mainAxisAlignment: MainAxisAlignment.center, 
+                children: [
+                  const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)), 
+                  const SizedBox(width: 16), 
+                  Text('Uploading ${(_uploadProgress * 100).toInt()}%', style: const TextStyle(fontWeight: FontWeight.bold)),
+                ]
+              )
+            : Text(widget.note == null ? 'Publish Study Material' : 'Save Changes', 
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       ),
     );
   }

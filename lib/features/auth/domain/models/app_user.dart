@@ -100,8 +100,13 @@ class AppUser {
     },
     this.notificationSettings = const {
       'new_messages': true,
-      'listing_updates': true,
-      'price_drops': true,
+      'marketplace': true,
+      'housing': true,
+      'notes': true,
+      'plug': true,
+      'reviews': true,
+      'followers': true,
+      'system': true,
       'community_activity': true,
     },
     this.fcmToken,
@@ -114,6 +119,46 @@ class AppUser {
   bool get isVerifiedSeller => verifiedRoles.contains('seller');
   bool get isAnyRoleVerified => verifiedRoles.isNotEmpty;
   bool get isVerified => isIdentityVerified || isAnyRoleVerified;
+
+  /// Calculates a reality-based trust score based on verified milestones and activity.
+  /// This ensures the score is a deterministic reflection of the user's standing.
+  double get calculatedTrustScore {
+    double score = 0.0;
+
+    // 1. Foundational Verifications (50% of total)
+    if (isIdentityVerified) score += 30.0; // Government ID is the strongest signal
+    if (isStudentVerified) score += 20.0;  // Campus enrollment confirmation
+
+    // 2. Professional Standing (15% of total)
+    // +5 for each unique professional role (max 3 roles counted)
+    score += (verifiedRoles.length.clamp(0, 3) * 5.0);
+
+    // 3. Platform Activity & Reputation (25% of total)
+    // Scale profile completion (0.0 to 1.0) to 10 points
+    score += (profileCompletion * 10.0);
+    
+    // Reward successful deals (+2 per deal, max 10 points)
+    score += (completedSalesCount.clamp(0, 5) * 2.0);
+    
+    // Reward community contribution (+1 per resource, max 5 points)
+    score += (resourcesSharedCount.clamp(0, 5) * 1.0);
+
+    // 4. Community Feedback (10% of total)
+    // Requires at least 3 ratings to be statistically significant
+    if (ratingsCount >= 3) {
+      if (averageRating >= 4.5) {
+        score += 10.0;
+      } else if (averageRating >= 4.0) {
+        score += 7.0;
+      } else if (averageRating >= 3.0) {
+        score += 3.0;
+      }
+    }
+
+    return score.clamp(0.0, 100.0);
+  }
+
+  double get displayTrustScore => calculatedTrustScore;
 
   double get profileCompletion {
     int score = 0;
@@ -349,8 +394,13 @@ class AppUser {
       notificationSettings: Map<String, bool>.from(
         (json['notificationSettings'] as Map?)?.map((k, v) => MapEntry(k.toString(), v is bool ? v : true)) ?? <String, bool>{
           'new_messages': true,
-          'listing_updates': true,
-          'price_drops': true,
+          'marketplace': true,
+          'housing': true,
+          'notes': true,
+          'plug': true,
+          'reviews': true,
+          'followers': true,
+          'system': true,
           'community_activity': true,
         }
       ),

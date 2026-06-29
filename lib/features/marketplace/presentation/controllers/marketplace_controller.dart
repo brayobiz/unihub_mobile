@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../auth/shared/providers.dart';
 import '../../domain/models/listing.dart';
+import '../../domain/repositories/marketplace_repository.dart';
 import '../../shared/providers.dart';
 
 import '../../domain/models/listing_filter.dart';
@@ -31,6 +32,18 @@ class MarketplaceController extends StateNotifier<ListingFilter> {
 
   void setPriceRange(RangeValues range) {
     state = state.copyWith(priceRange: range);
+  }
+
+  void setSortBy(ListingSortType sortBy) {
+    state = state.copyWith(sortBy: sortBy);
+  }
+
+  void setStatus(ListingStatus status) {
+    state = state.copyWith(status: status);
+  }
+
+  void resetFilters() {
+    state = ListingFilter();
   }
 }
 

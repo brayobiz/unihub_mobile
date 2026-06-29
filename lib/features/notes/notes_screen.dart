@@ -6,6 +6,7 @@ import '../auth/shared/providers.dart';
 import 'shared/providers.dart';
 import 'presentation/widgets/discover_tab.dart';
 import 'presentation/widgets/library_tab.dart';
+import '../../widgets/app_drawer.dart';
 import '../../widgets/notification_badge.dart';
 
 class NotesScreen extends ConsumerStatefulWidget {
@@ -34,9 +35,16 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FB),
+      drawer: const AppDrawer(),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu_rounded, color: Colors.black),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         title: Text(
           'UniHub Study',
           style: GoogleFonts.plusJakartaSans(
@@ -56,7 +64,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
           ],
         ),
         actions: [
-          const NotificationBadge(),
+          const NotificationBadge(module: 'notes'),
           IconButton(
             icon: const Icon(Icons.tune, color: Colors.black87),
             onPressed: () => _showFilterSheet(),

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../auth/shared/providers.dart';
 import '../../domain/models/gig_application.dart';
 import '../../shared/providers.dart';
+import '../../../../widgets/notification_badge.dart';
 
 final employerApplicationsProvider = StreamProvider<List<GigApplication>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
@@ -32,6 +33,10 @@ class _EmployerDashboardScreenState extends ConsumerState<EmployerDashboardScree
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
+        actions: const [
+          NotificationBadge(module: 'gig'),
+          SizedBox(width: 8),
+        ],
       ),
       body: Column(
         children: [

@@ -36,6 +36,7 @@ abstract class AuthRepository {
     Map<String, bool>? notificationSettings,
   });
   Future<void> updateOnboardingStatus(String uid, bool completed);
+  Future<void> deleteAccount();
   
   // Reputation & Trust
   Future<void> updateTrustScore(String uid, double delta);

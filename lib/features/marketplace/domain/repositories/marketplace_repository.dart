@@ -1,4 +1,7 @@
 import '../models/listing.dart';
+import '../models/offer.dart';
+
+enum ListingSortType { newest, oldest, lowestPrice, highestPrice, mostViewed, mostSaved }
 
 abstract class MarketplaceRepository {
   Stream<List<Listing>> watchListings({
@@ -10,25 +13,62 @@ abstract class MarketplaceRepository {
     bool? isFeatured,
     String? university,
     String? searchQuery,
+    ListingSortType? sortBy,
+    ListingStatus? status,
   });
+  
   Stream<List<Listing>> watchSellerListings(String sellerId);
   Stream<List<Listing>> watchSavedListings(String userId);
+  
+  // Discovery & Sections
+  Stream<List<Listing>> watchRecentlyViewed(String userId);
+  Stream<List<Listing>> watchTrendingListings({String? university, int limit = 10});
+  Stream<List<Listing>> watchRecommendedListings(String userId, {int limit = 10});
+  Stream<List<Listing>> watchSimilarListings(Listing listing, {int limit = 6});
+  
+  // Collections
+  Stream<List<String>> watchCollectionNames(String userId);
+  Future<void> createCollection(String userId, String name);
+  Future<void> deleteCollection(String userId, String name);
+  Future<void> addToCollection(String userId, String collectionName, String listingId);
+  Future<void> removeFromCollection(String userId, String collectionName, String listingId);
+  Stream<List<Listing>> watchCollectionListings(String userId, String collectionName);
+
+  // Offers & Negotiation
+  Future<void> makeOffer(Offer offer);
+  Future<void> respondToOffer(String offerId, OfferStatus status, {double? counterAmount});
+  Stream<List<Offer>> watchListingOffers(String listingId);
+  Stream<List<Offer>> watchUserOffers(String userId);
+
+  // Search enhancements
+  Future<List<String>> getSearchSuggestions(String query);
+  Future<void> saveSearchQuery(String userId, String query);
+  Stream<List<String>> watchRecentSearches(String userId);
+
+  // Seller Dashboard & Performance
+  Future<Map<String, dynamic>> getSellerStats(String userId);
+  Stream<List<Listing>> watchSellerListingsByStatus(String sellerId, ListingStatus status);
+
   Future<List<Listing>> getListings({int limit = 20, Listing? startAfter});
   Future<Listing?> getListingById(String id);
 
   Future<void> createListing(Listing listing);
+  Future<void> updateListing(Listing listing);
   Future<void> deleteListing(String id);
   Future<void> toggleSaveListing(String userId, String listingId);
   Future<void> boostListing(String listingId);
-  Future<void> recordView(String listingId);
+  Future<void> recordView(String listingId, {String? userId});
   Future<void> recordSave(String listingId, bool isSaved);
   Future<void> recordChatStarted(String listingId);
   Future<void> updateListingStatus(String listingId, ListingStatus status);
+  Future<void> updateListingPrice(String listingId, double newPrice);
+  
   Future<void> reportListing({
     required String listingId,
     required String reporterId,
     required String reason,
   });
+
   Future<void> submitReview({
     required String sellerId,
     required String buyerId,

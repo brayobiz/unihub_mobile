@@ -5,20 +5,22 @@ import 'package:unihub_mobile/features/shared/notification_repository.dart';
 
 class NotificationBadge extends ConsumerWidget {
   final Color iconColor;
+  final String? module;
   
   const NotificationBadge({
     super.key, 
     this.iconColor = Colors.black,
+    this.module,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final unreadCount = ref.watch(unreadNotificationsCountProvider).valueOrNull ?? 0;
+    final unreadCount = ref.watch(unreadNotificationsCountProvider(module)).valueOrNull ?? 0;
     
     return Stack(
       children: [
         IconButton(
-          onPressed: () => context.push('/notifications'),
+          onPressed: () => context.push('/notifications', extra: module),
           icon: Icon(Icons.notifications_none_rounded, color: iconColor),
         ),
         if (unreadCount > 0)

@@ -7,6 +7,10 @@ import 'package:flutter/foundation.dart';
 import '../features/auth/shared/providers.dart';
 import '../app/router/app_router.dart';
 import 'package:unihub_mobile/features/shared/notification_repository.dart';
+import 'package:unihub_mobile/features/marketplace/shared/providers.dart';
+import 'package:unihub_mobile/features/housing/shared/providers.dart';
+import 'package:unihub_mobile/features/notes/shared/providers.dart';
+import 'package:unihub_mobile/features/chat/shared/providers.dart';
 
 final notificationServiceProvider = Provider((ref) => NotificationService(ref));
 
@@ -135,17 +139,109 @@ class NotificationService {
     }
   }
 
-  void _handleRemoteMessageTap(RemoteMessage message) {
+  Future<void> _handleRemoteMessageTap(RemoteMessage message) async {
     final notificationId = message.data['notificationId'];
-    final route = message.data['route'];
     final userId = _ref.read(authStateProvider).valueOrNull?.uid;
 
-    if (userId != null && notificationId != null) {
-      markAsRead(userId, notificationId);
+    if (userId == null || notificationId == null) {
+      final route = message.data['route'];
+      if (route != null) _handleNotificationTap(route);
+      return;
     }
 
-    if (route != null) {
-      _handleNotificationTap(route);
+    // 1. Mark as read
+    await markAsRead(userId, notificationId);
+
+    // 2. Fetch full notification to get metadata and targetId
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('notifications')
+          .doc(notificationId)
+          .get();
+      
+      if (doc.exists) {
+        final notification = UniNotification.fromFirestore(doc);
+        await _navigateToNotificationTarget(notification);
+      } else {
+        // Fallback to simple route if doc doesn't exist
+        final route = message.data['route'];
+        if (route != null) _handleNotificationTap(route);
+      }
+    } catch (e) {
+      debugPrint('Error handling remote message tap: $e');
+    }
+  }
+
+  Future<void> _navigateToNotificationTarget(UniNotification n) async {
+    final router = _ref.read(routerProvider);
+
+    // 1. Explicit deepLink
+    if (n.deepLink != null && n.deepLink!.isNotEmpty) {
+      router.push(n.deepLink!);
+      return;
+    }
+
+    if (n.targetId == null || n.targetId!.isEmpty) return;
+
+    try {
+      switch (n.type) {
+        case NotificationType.chat:
+        case NotificationType.support:
+          router.push('/chat', extra: {
+            'conversationId': n.targetId,
+            'otherUserName': n.actorName ?? (n.type == NotificationType.support ? 'UniHub Support' : 'Message'),
+          });
+          break;
+
+        case NotificationType.marketplace:
+        case NotificationType.listing:
+          final listing = await _ref.read(marketplaceRepositoryProvider).getListingById(n.targetId!);
+          if (listing != null) {
+            router.push('/listing-detail', extra: listing);
+          }
+          break;
+
+        case NotificationType.housing:
+          final listing = await _ref.read(housingRepositoryProvider).getListingById(n.targetId!);
+          if (listing != null) {
+            router.push('/housing-detail', extra: listing);
+          }
+          break;
+
+        case NotificationType.notes:
+          final note = await _ref.read(notesRepositoryProvider).getNoteById(n.targetId!);
+          if (note != null) {
+            router.push('/note-detail', extra: note);
+          }
+          break;
+
+        case NotificationType.gig:
+          if (n.title.contains('Application Update')) {
+            router.push('/my-gig-applications');
+          } else if (n.title.contains('New Gig Application')) {
+            router.push('/employer-dashboard');
+          } else {
+            router.push('/gigs');
+          }
+          break;
+
+        case NotificationType.follower:
+          if (n.actorId != null) {
+            router.push('/seller-profile', extra: n.actorId);
+          }
+          break;
+
+        case NotificationType.community:
+          router.push('/community');
+          break;
+
+        default:
+          break;
+      }
+    } catch (e) {
+      debugPrint('Navigation error in service: $e');
     }
   }
 
@@ -200,7 +296,7 @@ class NotificationService {
 
     await _localNotifications.show(
       id,
-      isDone ? 'Download Complete' : 'Downloading...',
+      isDone ? 'Ready to Study' : 'Preparing Material...',
       isDone ? title : '$title ($progress%)',
       details,
       payload: isDone ? 'open_file:$filePath' : null,
@@ -255,6 +351,97 @@ class NotificationService {
     NotificationPriority priority = NotificationPriority.normal,
     Map<String, dynamic>? metadata,
   }) async {
+    // 0. Check recipient notification preferences
+    if (priority != NotificationPriority.high) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(recipientId).get();
+        if (doc.exists) {
+          final settings = doc.data()?['notificationSettings'] as Map<String, dynamic>?;
+          if (settings != null) {
+            bool isEnabled = true;
+            
+            // Map NotificationType/targetType to setting keys
+            switch (type) {
+              case NotificationType.chat:
+              case NotificationType.support:
+                isEnabled = settings['new_messages'] ?? true;
+                break;
+              case NotificationType.marketplace:
+              case NotificationType.listing:
+                isEnabled = settings['marketplace'] ?? true;
+                break;
+              case NotificationType.housing:
+                // If it's for the plug dashboard, check 'plug' setting, otherwise 'housing'
+                if (deepLink?.contains('plug') == true || targetType == 'plug') {
+                  isEnabled = settings['plug'] ?? true;
+                } else {
+                  isEnabled = settings['housing'] ?? true;
+                }
+                break;
+              case NotificationType.notes:
+                isEnabled = settings['notes'] ?? true;
+                break;
+              case NotificationType.review:
+                isEnabled = settings['reviews'] ?? true;
+                break;
+              case NotificationType.follower:
+                isEnabled = settings['followers'] ?? true;
+                break;
+              case NotificationType.system:
+                isEnabled = settings['system'] ?? true;
+                break;
+              case NotificationType.gig:
+                // Gigs usually fall under marketplace/community preference or own
+                isEnabled = settings['marketplace'] ?? true;
+                break;
+              case NotificationType.community:
+                isEnabled = settings['community_activity'] ?? true;
+                break;
+            }
+
+            if (!isEnabled) {
+              debugPrint('🚫 Notification suppressed by user preference: $type to $recipientId');
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ Error checking preferences: $e');
+      }
+    }
+
+    // Logic to ensure notifications appear in the correct feature-specific tabs.
+    // The targetType is used by NotificationRepository to filter by module/feature.
+    String? effectiveTargetType = targetType;
+    if (effectiveTargetType == null) {
+      switch (type) {
+        case NotificationType.marketplace:
+        case NotificationType.listing:
+        case NotificationType.review:
+          effectiveTargetType = 'marketplace';
+          break;
+        case NotificationType.housing:
+          effectiveTargetType = 'housing';
+          break;
+        case NotificationType.notes:
+          effectiveTargetType = 'notes';
+          break;
+        case NotificationType.gig:
+          effectiveTargetType = 'gig';
+          break;
+        case NotificationType.community:
+          effectiveTargetType = 'community';
+          break;
+        case NotificationType.support:
+        case NotificationType.chat:
+          // For chat, we usually expect the caller to pass the specific targetType (e.g., 'marketplace' or 'housing')
+          // because chat can belong to any module. If not passed, it only shows in Home.
+          break;
+        default:
+          break;
+      }
+    }
+
     final notification = UniNotification(
       id: '', // Will be generated by repository
       recipientId: recipientId,
@@ -266,7 +453,7 @@ class NotificationService {
       body: body,
       imageUrl: imageUrl,
       targetId: targetId,
-      targetType: targetType,
+      targetType: effectiveTargetType,
       deepLink: deepLink,
       priority: priority,
       createdAt: DateTime.now(),
@@ -305,7 +492,7 @@ class NotificationService {
         'notificationId': savedNotification.id,
         'type': type.name,
         'targetId': targetId,
-        'targetType': targetType,
+        'targetType': effectiveTargetType,
         'deepLink': deepLink,
         'route': route,
       },
@@ -316,8 +503,8 @@ class NotificationService {
     await _ref.read(notificationRepositoryProvider).markAsRead(userId, notificationId);
   }
 
-  Future<void> markAllAsRead(String userId) async {
-    await _ref.read(notificationRepositoryProvider).markAllAsRead(userId);
+  Future<void> markAllAsRead(String userId, {String? module}) async {
+    await _ref.read(notificationRepositoryProvider).markFeatureNotificationsAsRead(userId, module: module);
   }
 
   Future<void> deleteNotification(String userId, String notificationId) async {

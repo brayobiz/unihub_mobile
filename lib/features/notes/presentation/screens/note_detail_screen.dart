@@ -344,7 +344,18 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
     await ref.read(studyControllerProvider).markAsOpened(note.id);
 
     try {
-      final fileName = '${note.title.replaceAll(RegExp(r'[^\w\s]+'), '_')}${p.extension(note.fileUrl).isEmpty ? '.pdf' : p.extension(note.fileUrl)}';
+      String ext = p.extension(note.fileUrl).toLowerCase();
+      if (ext.isEmpty || ext.length > 5) {
+        if (note.fileUrl.contains('.pdf')) ext = '.pdf';
+        else if (note.fileUrl.contains('.docx')) ext = '.docx';
+        else if (note.fileUrl.contains('.doc')) ext = '.doc';
+        else if (note.fileUrl.contains('.pptx')) ext = '.pptx';
+        else if (note.fileUrl.contains('.ppt')) ext = '.ppt';
+        else ext = '.pdf'; // Default
+      }
+      
+      final safeTitle = note.title.replaceAll(RegExp(r'[^\w\s]+'), '_');
+      final fileName = '$safeTitle$ext';
       
       final downloadService = ref.read(downloadServiceProvider);
       final isDownloaded = await downloadService.isFileDownloaded(fileName);

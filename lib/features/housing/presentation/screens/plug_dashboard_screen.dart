@@ -9,6 +9,7 @@ import 'package:unihub_mobile/features/housing/domain/models/housing_listing.dar
 import 'package:unihub_mobile/features/trust/domain/models/professional_role.dart';
 import 'package:unihub_mobile/features/trust/domain/models/verification_application.dart';
 import 'package:unihub_mobile/features/trust/presentation/providers/trust_providers.dart';
+import 'package:unihub_mobile/widgets/notification_badge.dart';
 
 class PlugDashboardScreen extends ConsumerWidget {
   const PlugDashboardScreen({super.key});
@@ -49,6 +50,10 @@ class PlugDashboardScreen extends ConsumerWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black,
+        actions: const [
+          NotificationBadge(module: 'housing'),
+          SizedBox(width: 8),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),

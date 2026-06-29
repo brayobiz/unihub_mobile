@@ -9,6 +9,7 @@ import '../shared/feed_repository.dart';
 import '../../widgets/feed/feed_card.dart';
 import '../auth/shared/providers.dart';
 import '../shared/add_feed_item_screen.dart';
+import '../../widgets/notification_badge.dart';
 
 final gigsFeedProvider = StreamProvider<List<FeedItem>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
@@ -41,6 +42,10 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Student Gigs', style: TextStyle(fontWeight: FontWeight.bold)),
+        actions: const [
+          NotificationBadge(module: 'gig'),
+          SizedBox(width: 8),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(70),
           child: Padding(

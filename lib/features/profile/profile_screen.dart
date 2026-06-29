@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:unihub_mobile/widgets/app_drawer.dart';
 import 'package:unihub_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
+import 'package:unihub_mobile/features/trust/domain/models/professional_role.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -17,6 +19,7 @@ class ProfileScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      drawer: const AppDrawer(),
       body: appUserAsync.when(
         data: (user) {
           if (user == null) {
@@ -81,13 +84,21 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      if (context.canPop())
-                        IconButton(
-                          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                          onPressed: () => context.pop(),
-                        )
-                      else
-                        const SizedBox(width: 48),
+                      Builder(
+                        builder: (context) {
+                          if (context.canPop()) {
+                            return IconButton(
+                              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                              onPressed: () => context.pop(),
+                            );
+                          } else {
+                            return IconButton(
+                              icon: const Icon(Icons.menu_rounded, color: Colors.white),
+                              onPressed: () => Scaffold.of(context).openDrawer(),
+                            );
+                          }
+                        },
+                      ),
                       _buildEditButton(context),
                     ],
                   ),
@@ -123,6 +134,8 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
           sliver: SliverList(
             delegate: SliverChildListDelegate([
               _buildStatsSection(),
+              const SizedBox(height: 24),
+              _buildTrustSummary(),
               const SizedBox(height: 24),
               _buildProfileCompletion(context),
               const SizedBox(height: 24),
@@ -258,8 +271,6 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
               _buildSmallInfoPill(Icons.school_rounded, user.university ?? 'Uni'),
               const SizedBox(width: 8),
               _buildSmallInfoPill(Icons.calendar_today_rounded, user.yearOfStudy ?? 'Year'),
-              const SizedBox(width: 8),
-              _buildSmallInfoPill(Icons.location_on_rounded, user.campus ?? 'Campus'),
             ],
           ),
         ),
@@ -267,7 +278,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
         // Trust & Rating Row
         Row(
           children: [
-            _buildTrustBadge(user.trustScore.toInt()),
+            _buildTrustBadge(user.displayTrustScore.toInt()),
             const SizedBox(width: 10),
             _buildRatingBadge(user.averageRating, user.ratingsCount),
           ],
@@ -372,7 +383,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _buildStatItem(Icons.shield_outlined, '${user.trustScore.toInt()}%', 'Trust Score'),
+            _buildStatItem(Icons.shield_outlined, '${user.displayTrustScore.toInt()}%', 'Trust Score'),
             _buildVerticalDivider(),
             _buildStatItem(Icons.star_outline_rounded, user.averageRating.toStringAsFixed(1), 'Reputation'),
             _buildVerticalDivider(),
@@ -631,31 +642,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
             const SnackBar(content: Text('Achievements are coming soon! Stay tuned.')),
           );
         }),
-        const SizedBox(height: 8),
-        _buildActionButton(Icons.logout_rounded, 'Log Out', () {
-          _showLogoutConfirm(context, ref);
-        }, isDestructive: true),
       ],
-    );
-  }
-
-  void _showLogoutConfirm(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Log Out?'),
-        content: const Text('Are you sure you want to log out of UniHub?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ref.read(authControllerProvider.notifier).signOut();
-            },
-            child: const Text('Log Out', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
     );
   }
 
@@ -685,6 +672,104 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
+    );
+  }
+
+  Widget _buildTrustSummary() {
+    final user = widget.user;
+    return _buildSectionCard(
+      'Trust & Verification',
+      Column(
+        children: [
+          _buildVerificationRow(
+            Icons.school_rounded,
+            'Student Status',
+            user.isStudentVerified ? 'Verified Student' : 'Not Verified',
+            user.isStudentVerified,
+          ),
+          const SizedBox(height: 16),
+          _buildVerificationRow(
+            Icons.badge_rounded,
+            'Identity Status',
+            user.isIdentityVerified ? 'Identity Confirmed' : 'Not Verified',
+            user.isIdentityVerified,
+          ),
+          if (user.verifiedRoles.isNotEmpty) ...[
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Divider(height: 1),
+            ),
+            const Row(
+              children: [
+                Icon(Icons.workspace_premium_rounded, size: 16, color: Color(0xFF6366F1)),
+                SizedBox(width: 8),
+                Text(
+                  'Verified Professional Roles',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: user.verifiedRoles.map((roleName) {
+                final role = ProfessionalRole.values.firstWhere(
+                  (e) => e.name == roleName,
+                  orElse: () => ProfessionalRole.seller,
+                );
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1677F2).withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF1677F2).withOpacity(0.1)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF1677F2)),
+                      const SizedBox(width: 6),
+                      Text(
+                        role.label,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF1677F2)),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+      icon: Icons.verified_user_outlined,
+    );
+  }
+
+  Widget _buildVerificationRow(IconData icon, String title, String status, bool isVerified) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: (isVerified ? const Color(0xFF10B981) : Colors.grey).withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: isVerified ? const Color(0xFF10B981) : Colors.grey, size: 18),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+              Text(status, style: TextStyle(color: isVerified ? const Color(0xFF059669) : Colors.grey.shade600, fontSize: 12, fontWeight: FontWeight.w500)),
+            ],
+          ),
+        ),
+        if (isVerified)
+          const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 18),
+      ],
     );
   }
 

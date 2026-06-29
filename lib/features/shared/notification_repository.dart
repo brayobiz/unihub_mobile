@@ -14,16 +14,16 @@ final notificationRepositoryProvider = Provider<domain.NotificationRepository>((
   return NotificationRepositoryImpl(ref.watch(firestoreProvider));
 });
 
-final notificationsProvider = StreamProvider<List<UniNotification>>((ref) {
+final notificationsProvider = StreamProvider.family<List<UniNotification>, String?>((ref, module) {
   final user = ref.watch(authStateProvider).valueOrNull;
   if (user == null) return Stream.value([]);
   
-  return ref.watch(notificationRepositoryProvider).watchNotifications(user.uid);
+  return ref.watch(notificationRepositoryProvider).watchNotifications(user.uid, module: module);
 });
 
-final unreadNotificationsCountProvider = StreamProvider<int>((ref) {
+final unreadNotificationsCountProvider = StreamProvider.family<int, String?>((ref, module) {
   final user = ref.watch(authStateProvider).valueOrNull;
   if (user == null) return Stream.value(0);
   
-  return ref.watch(notificationRepositoryProvider).watchUnreadCount(user.uid);
+  return ref.watch(notificationRepositoryProvider).watchUnreadCount(user.uid, module: module);
 });

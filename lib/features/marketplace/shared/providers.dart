@@ -5,12 +5,14 @@ import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import '../data/repositories/marketplace_repository_impl.dart';
 import '../domain/models/listing.dart';
 import '../domain/repositories/marketplace_repository.dart';
+import '../../../../services/notification_service.dart';
 
 import '../domain/models/listing_filter.dart';
 
 final marketplaceRepositoryProvider = Provider<MarketplaceRepository>((ref) {
   return MarketplaceRepositoryImpl(
     ref.watch(firestoreProvider),
+    ref.watch(notificationServiceProvider),
   );
 });
 
@@ -25,7 +27,46 @@ final listingsProvider = StreamProvider.family<List<Listing>, ListingFilter>((re
     maxPrice: filter.priceRange?.end,
     isFeatured: filter.isFeaturedOnly,
     searchQuery: filter.searchQuery,
+    sortBy: filter.sortBy,
+    status: filter.status,
   );
+});
+
+final recentlyViewedProvider = StreamProvider<List<Listing>>((ref) {
+  final user = ref.watch(appUserProvider).valueOrNull;
+  if (user == null) return Stream.value([]);
+  return ref.watch(marketplaceRepositoryProvider).watchRecentlyViewed(user.uid);
+});
+
+final trendingListingsProvider = StreamProvider.family<List<Listing>, String?>((ref, university) {
+  return ref.watch(marketplaceRepositoryProvider).watchTrendingListings(university: university);
+});
+
+final recommendedListingsProvider = StreamProvider<List<Listing>>((ref) {
+  final user = ref.watch(appUserProvider).valueOrNull;
+  // If no user, show general trending
+  if (user == null) {
+    return ref.watch(marketplaceRepositoryProvider).watchTrendingListings();
+  }
+  return ref.watch(marketplaceRepositoryProvider).watchRecommendedListings(user.uid);
+});
+
+final collectionNamesProvider = StreamProvider<List<String>>((ref) {
+  final user = ref.watch(appUserProvider).valueOrNull;
+  if (user == null) return Stream.value([]);
+  return ref.watch(marketplaceRepositoryProvider).watchCollectionNames(user.uid);
+});
+
+final collectionListingsProvider = StreamProvider.family<List<Listing>, String>((ref, collectionName) {
+  final user = ref.watch(appUserProvider).valueOrNull;
+  if (user == null) return Stream.value([]);
+  return ref.watch(marketplaceRepositoryProvider).watchCollectionListings(user.uid, collectionName);
+});
+
+final recentSearchesProvider = StreamProvider<List<String>>((ref) {
+  final user = ref.watch(appUserProvider).valueOrNull;
+  if (user == null) return Stream.value([]);
+  return ref.watch(marketplaceRepositoryProvider).watchRecentSearches(user.uid);
 });
 
 final sellerListingsProvider = StreamProvider.family<List<Listing>, String>((ref, sellerId) {
@@ -54,15 +95,8 @@ final sellerReviewsProvider = StreamProvider.family<List<Map<String, dynamic>>, 
       .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
 });
 
-final similarListingsProvider = Provider.family<AsyncValue<List<Listing>>, Listing>((ref, currentListing) {
-  final allListingsAsync = ref.watch(listingsProvider(ListingFilter(
-    selectedCategory: currentListing.category,
-  )));
-  
-  return allListingsAsync.whenData((listings) => listings
-      .where((l) => l.id != currentListing.id)
-      .take(6)
-      .toList());
+final similarListingsProvider = StreamProvider.family<List<Listing>, Listing>((ref, currentListing) {
+  return ref.watch(marketplaceRepositoryProvider).watchSimilarListings(currentListing);
 });
 
 final otherUserProvider = StreamProvider.family<AppUser, String>((ref, userId) {

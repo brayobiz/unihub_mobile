@@ -58,6 +58,7 @@ class GigsRepositoryImpl implements GigsRepository {
         lastMessageTime: DateTime.now(),
         unreadCounts: unreadCounts,
         lastMessage: 'New gig application from ${application.fullName}',
+        module: 'gig',
       );
       
       batch.set(newConvRef, conversation.toJson());
@@ -88,6 +89,7 @@ class GigsRepositoryImpl implements GigsRepository {
       body: '${application.fullName} applied for "${application.gigTitle}"',
       type: NotificationType.gig,
       targetId: application.gigId,
+      targetType: 'gig',
     );
 
     // 4. Send email (mock)
@@ -168,6 +170,7 @@ class GigsRepositoryImpl implements GigsRepository {
           body: 'Your application for "$gigTitle" was ${status.name}.',
           type: NotificationType.gig,
           targetId: applicationId,
+          targetType: 'gig',
         );
       }
     }

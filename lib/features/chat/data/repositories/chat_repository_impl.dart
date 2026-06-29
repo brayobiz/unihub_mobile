@@ -64,16 +64,23 @@ class ChatRepositoryImpl implements ChatRepository {
     // 3. Send Notification to Recipient
     final convDoc = await _firestore.collection('conversations').doc(conversationId).get();
     if (convDoc.exists) {
-      final participants = List<String>.from(convDoc.data()?['participants'] ?? []);
+      final data = convDoc.data()!;
+      final participants = List<String>.from(data['participants'] ?? []);
       final recipientId = participants.firstWhere((id) => id != message.senderId, orElse: () => '');
       
       if (recipientId.isNotEmpty) {
+        // Correctly set targetType based on conversation module
+        // This ensures the notification appears in the correct feature tab (Marketplace/Housing/etc)
+        final module = data['module'] as String?;
+        final isSupport = data['isSupport'] ?? false;
+        
         await _notificationService.sendNotification(
           recipientId: recipientId,
           title: 'New Message',
           body: message.content,
-          type: NotificationType.chat,
+          type: isSupport ? NotificationType.support : NotificationType.chat,
           targetId: conversationId,
+          targetType: module,
         );
       }
     }
@@ -85,6 +92,7 @@ class ChatRepositoryImpl implements ChatRepository {
     required String sellerId,
     required String listingId,
     required String listingTitle,
+    String? module,
   }) async {
     // Check if conversation already exists for this listing between these two
     final existing = await _firestore
@@ -109,6 +117,7 @@ class ChatRepositoryImpl implements ChatRepository {
       listingTitle: listingTitle,
       lastMessageTime: DateTime.now(),
       unreadCounts: {buyerId: 0, sellerId: 0},
+      module: module,
     );
 
     await newConvRef.set(conversation.toJson());

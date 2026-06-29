@@ -41,6 +41,7 @@ import '../../features/profile/settings_screen.dart';
 import '../../features/profile/activity_history_screen.dart';
 import '../../features/profile/achievements_screen.dart';
 import '../../features/marketplace/presentation/screens/saved_listings_screen.dart';
+import '../../features/marketplace/presentation/screens/category_discovery_screen.dart';
 import '../../features/shared/help_centre_screen.dart';
 import '../../features/shared/notifications_screen.dart';
 import '../../features/shared/feed_item_detail_screen.dart';
@@ -340,8 +341,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SavedListingsScreen(),
       ),
       GoRoute(
+        path: '/category-discovery/:category',
+        builder: (context, state) {
+          final category = state.pathParameters['category']!;
+          return CategoryDiscoveryScreen(category: category);
+        },
+      ),
+      GoRoute(
         path: '/notifications',
-        builder: (context, state) => const NotificationsScreen(),
+        builder: (context, state) {
+          final module = state.extra as String?;
+          return NotificationsScreen(module: module);
+        },
       ),
       GoRoute(
         path: '/help',
