@@ -82,7 +82,75 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                     ),
                     const SizedBox(height: 20),
                     _buildSectionCard(
-                      title: 'Pricing',
+                      title: 'Specifications',
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                label: 'Brand',
+                                hint: 'e.g. Apple, Samsung',
+                                initialValue: state.brand,
+                                onChanged: controller.updateBrand,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _buildTextField(
+                                label: 'Color',
+                                hint: 'e.g. Graphite, Silver',
+                                initialValue: state.color,
+                                onChanged: controller.updateColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        _buildTextField(
+                          label: 'Storage / Capacity (Optional)',
+                          hint: 'e.g. 128 GB, 1TB',
+                          initialValue: state.storage,
+                          onChanged: controller.updateStorage,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    _buildSectionCard(
+                      title: 'Specifications',
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                label: 'Brand',
+                                hint: 'e.g. Apple, Samsung',
+                                initialValue: state.brand,
+                                onChanged: controller.updateBrand,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _buildTextField(
+                                label: 'Color',
+                                hint: 'e.g. Graphite, Silver',
+                                initialValue: state.color,
+                                onChanged: controller.updateColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        _buildTextField(
+                          label: 'Storage / Capacity (Optional)',
+                          hint: 'e.g. 128 GB, 1TB',
+                          initialValue: state.storage,
+                          onChanged: controller.updateStorage,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    _buildSectionCard(
+                      title: 'Pricing & Negotiation',
                       children: [
                         _buildTextField(
                           label: 'Price (KES)',
@@ -96,7 +164,8 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                         SwitchListTile(
                           value: state.isNegotiable,
                           onChanged: controller.toggleNegotiable,
-                          title: const Text('Price is Negotiable', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                          title: const Text('Allow price offers (Negotiable)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                          subtitle: const Text('Buyers will see a "Make an Offer" button.', style: TextStyle(fontSize: 11)),
                           contentPadding: EdgeInsets.zero,
                           activeColor: Colors.indigo,
                         ),
@@ -641,6 +710,10 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                       : state.existingImageUrls,
                   campusLocation: state.campusLocation.isEmpty ? 'Location' : state.campusLocation,
                   condition: state.condition,
+                  brand: state.brand,
+                  storage: state.storage,
+                  color: state.color,
+                  isNegotiable: state.isNegotiable,
                   createdAt: DateTime.now(),
                   expiresAt: DateTime.now(),
                 ),

@@ -117,7 +117,7 @@ class _SavedListingsScreenState extends ConsumerState<SavedListingsScreen> with 
   Widget _buildAllSavedTab() {
     final savedAsync = ref.watch(savedListingsProvider);
     return savedAsync.when(
-      data: (listings) => _buildListingsGrid(listings),
+      data: (listings) => _buildListingsGrid(listings, prefix: 'all_saved'),
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, _) => Center(child: Text('Error: $err')),
     );
@@ -146,7 +146,7 @@ class _SavedListingsScreenState extends ConsumerState<SavedListingsScreen> with 
               ],
             ),
           ),
-          Expanded(child: _buildListingsGrid(listings)),
+          Expanded(child: _buildListingsGrid(listings, prefix: 'coll_${name.replaceAll(' ', '_').toLowerCase()}')),
         ],
       ),
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -154,7 +154,7 @@ class _SavedListingsScreenState extends ConsumerState<SavedListingsScreen> with 
     );
   }
 
-  Widget _buildListingsGrid(List<dynamic> listings) {
+  Widget _buildListingsGrid(List<dynamic> listings, {String prefix = 'saved'}) {
     if (listings.isEmpty) {
       return Center(
         child: Column(
@@ -177,7 +177,11 @@ class _SavedListingsScreenState extends ConsumerState<SavedListingsScreen> with 
       ),
       itemCount: listings.length,
       itemBuilder: (context, index) {
-        return MarketplaceCard(listing: listings[index], index: index);
+        return MarketplaceCard(
+          listing: listings[index], 
+          index: index,
+          heroTag: 'hero_${prefix}_${listings[index].id}',
+        );
       },
     );
   }

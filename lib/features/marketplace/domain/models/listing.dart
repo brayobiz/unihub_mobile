@@ -22,6 +22,12 @@ class Listing {
   final ListingStatus status;
   final String contactPreference; 
   
+  // Specs captured from detail view requirements
+  final String? brand;
+  final String? storage;
+  final String? color;
+  final bool isNegotiable;
+  
   // Algorithmic & Engagement Data
   final bool isFeatured;
   final bool isPromoted;
@@ -48,6 +54,10 @@ class Listing {
     required this.condition,
     this.status = ListingStatus.active,
     this.contactPreference = 'chat',
+    this.brand,
+    this.storage,
+    this.color,
+    this.isNegotiable = true,
     this.isFeatured = false,
     this.isPromoted = false,
     this.viewsCount = 0,
@@ -74,6 +84,10 @@ class Listing {
       'condition': condition.name,
       'status': status.name,
       'contactPreference': contactPreference,
+      'brand': brand,
+      'storage': storage,
+      'color': color,
+      'isNegotiable': isNegotiable,
       'isFeatured': isFeatured,
       'isPromoted': isPromoted,
       'viewsCount': viewsCount,
@@ -106,6 +120,14 @@ class Listing {
       return int.tryParse(value.toString()) ?? defaultValue;
     }
 
+    bool safeBool(dynamic value, bool defaultValue) {
+      if (value == null) return defaultValue;
+      if (value is bool) return value;
+      if (value is String) return value.toLowerCase() == 'true';
+      if (value is num) return value != 0;
+      return defaultValue;
+    }
+
     return Listing(
       id: safeString(json['id'], ''),
       sellerId: safeString(json['sellerId'] ?? json['seller_id'], ''),
@@ -116,7 +138,7 @@ class Listing {
       description: safeString(json['description'], ''),
       price: safeDouble(json['price'], 0.0),
       category: safeString(json['category'], 'Other'),
-      imageUrls: (json['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      imageUrls: (json['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? <String>[],
       campusLocation: safeString(json['campusLocation'] ?? json['location'], ''),
       condition: ListingCondition.values.firstWhere(
         (e) => e.name == safeString(json['condition'], 'good'), 
@@ -127,20 +149,24 @@ class Listing {
         orElse: () => ListingStatus.active
       ),
       contactPreference: safeString(json['contactPreference'], 'chat'),
-      isFeatured: json['isFeatured'] ?? false,
-      isPromoted: json['isPromoted'] ?? false,
+      brand: json['brand']?.toString(),
+      storage: json['storage']?.toString(),
+      color: json['color']?.toString(),
+      isNegotiable: safeBool(json['isNegotiable'], true),
+      isFeatured: safeBool(json['isFeatured'], false),
+      isPromoted: safeBool(json['isPromoted'], false),
       viewsCount: safeInt(json['viewsCount'], 0),
       savesCount: safeInt(json['savesCount'], 0),
       chatsStartedCount: safeInt(json['chatsStartedCount'], 0),
-      createdAt: json['createdAt'] != null 
+      createdAt: (json['createdAt'] is Timestamp) 
           ? (json['createdAt'] as Timestamp).toDate() 
           : DateTime.now(),
-      expiresAt: json['expiresAt'] != null 
+      expiresAt: (json['expiresAt'] is Timestamp) 
           ? (json['expiresAt'] as Timestamp).toDate() 
           : DateTime.now().add(const Duration(days: 30)),
       priceHistory: (json['priceHistory'] as List?)
               ?.map((e) => PriceHistory.fromJson(e as Map<String, dynamic>))
-              .toList() ?? [],
+              .toList() ?? <PriceHistory>[],
     );
   }
 }

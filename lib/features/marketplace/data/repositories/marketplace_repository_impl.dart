@@ -103,6 +103,18 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       // 7. Search Query Filter (Keyword matching)
       if (searchQuery != null && searchQuery.isNotEmpty) {
         final queryTerms = searchQuery.toLowerCase().split(' ').where((s) => s.isNotEmpty).toList();
+        
+        // STRICT MODULE SEPARATION: Filter out non-marketplace intent
+        final excludedTerms = {
+          'house', 'hostel', 'rent', 'roommate', 'bedsit', 'apartment',
+          'note', 'exam', 'paper', 'tutorial', 'document', 'study',
+          'job', 'gig', 'freelance', 'work', 'internship', 'hire'
+        };
+
+        if (queryTerms.any((term) => excludedTerms.contains(term))) {
+          return <Listing>[];
+        }
+
         items = items.where((l) {
           final title = l.title.toLowerCase();
           final desc = l.description.toLowerCase();

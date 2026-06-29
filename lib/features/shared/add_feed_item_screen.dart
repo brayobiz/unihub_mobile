@@ -9,6 +9,7 @@ import '../auth/shared/providers.dart';
 import 'feed_repository.dart';
 import 'storage_repository.dart';
 import '../marketplace/domain/models/marketplace_categories.dart';
+import '../gigs/domain/models/gig_categories.dart';
 
 class AddFeedItemScreen extends ConsumerStatefulWidget {
   final FeedType type;

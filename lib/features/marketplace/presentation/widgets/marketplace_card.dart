@@ -12,13 +12,23 @@ import '../../shared/providers.dart';
 class MarketplaceCard extends ConsumerWidget {
   final Listing listing;
   final int index;
-  const MarketplaceCard({super.key, required this.listing, required this.index});
+  final String? heroTag;
+  
+  const MarketplaceCard({
+    super.key, 
+    required this.listing, 
+    required this.index,
+    this.heroTag,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUserId = ref.watch(firebaseAuthProvider).currentUser?.uid;
     final isOwner = currentUserId == listing.sellerId;
     final user = ref.watch(appUserProvider).valueOrNull;
+    
+    // Ensure the tag is unique to this instance
+    final effectiveHeroTag = heroTag ?? 'listing_img_${listing.id}_$index';
 
     return TweenAnimationBuilder<double>(
       duration: Duration(milliseconds: 150 + (index * 30)),
@@ -37,7 +47,10 @@ class MarketplaceCard extends ConsumerWidget {
           if (currentUserId != null) {
             ref.read(marketplaceRepositoryProvider).recordView(listing.id, userId: currentUserId);
           }
-          context.push('/listing-detail', extra: listing);
+          context.push('/listing-detail', extra: {
+            'listing': listing,
+            'heroTag': effectiveHeroTag,
+          });
         },
         child: Container(
           decoration: BoxDecoration(
@@ -58,7 +71,7 @@ class MarketplaceCard extends ConsumerWidget {
                 child: Stack(
                   children: [
                     Hero(
-                      tag: 'listing_img_${listing.id}',
+                      tag: effectiveHeroTag,
                       child: Container(
                         width: double.infinity,
                         decoration: BoxDecoration(
@@ -79,7 +92,7 @@ class MarketplaceCard extends ConsumerWidget {
                               ),
                       ),
                     ),
-                    if (listing.isFeatured)
+                    if (listing.isFeatured == true)
                       Positioned(
                         top: 12,
                         left: 12,

@@ -20,6 +20,9 @@ class AddListingState {
   final List<String> existingImageUrls;
   final String campusLocation;
   final ListingCondition condition;
+  final String? brand;
+  final String? storage;
+  final String? color;
   final bool isNegotiable;
   final bool isLoading;
   final double uploadProgress;
@@ -36,6 +39,9 @@ class AddListingState {
     this.existingImageUrls = const [],
     this.campusLocation = '',
     this.condition = ListingCondition.good,
+    this.brand,
+    this.storage,
+    this.color,
     this.isNegotiable = false,
     this.isLoading = false,
     this.uploadProgress = 0,
@@ -76,6 +82,9 @@ class AddListingState {
     List<String>? existingImageUrls,
     String? campusLocation,
     ListingCondition? condition,
+    String? brand,
+    String? storage,
+    String? color,
     bool? isNegotiable,
     bool? isLoading,
     double? uploadProgress,
@@ -92,6 +101,9 @@ class AddListingState {
       existingImageUrls: existingImageUrls ?? this.existingImageUrls,
       campusLocation: campusLocation ?? this.campusLocation,
       condition: condition ?? this.condition,
+      brand: brand ?? this.brand,
+      storage: storage ?? this.storage,
+      color: color ?? this.color,
       isNegotiable: isNegotiable ?? this.isNegotiable,
       isLoading: isLoading ?? this.isLoading,
       uploadProgress: uploadProgress ?? this.uploadProgress,
@@ -109,6 +121,9 @@ class AddListingState {
       'category': category,
       'campusLocation': campusLocation,
       'condition': condition.name,
+      'brand': brand,
+      'storage': storage,
+      'color': color,
       'isNegotiable': isNegotiable,
     };
   }
@@ -129,6 +144,10 @@ class AddListingController extends StateNotifier<AddListingState> {
         existingImageUrls: initialListing.imageUrls,
         campusLocation: initialListing.campusLocation,
         condition: initialListing.condition,
+        brand: initialListing.brand,
+        storage: initialListing.storage,
+        color: initialListing.color,
+        isNegotiable: initialListing.isNegotiable,
       );
     } else {
       _loadDraft();
@@ -162,6 +181,21 @@ class AddListingController extends StateNotifier<AddListingState> {
 
   void updateLocation(String val) {
     state = state.copyWith(campusLocation: val);
+    _saveDraft();
+  }
+
+  void updateBrand(String? val) {
+    state = state.copyWith(brand: val);
+    _saveDraft();
+  }
+
+  void updateStorage(String? val) {
+    state = state.copyWith(storage: val);
+    _saveDraft();
+  }
+
+  void updateColor(String? val) {
+    state = state.copyWith(color: val);
     _saveDraft();
   }
 
@@ -208,6 +242,9 @@ class AddListingController extends StateNotifier<AddListingState> {
         price: (data['price'] ?? 0.0).toDouble(),
         category: data['category'] ?? 'Electronics',
         campusLocation: data['campusLocation'] ?? '',
+        brand: data['brand'],
+        storage: data['storage'],
+        color: data['color'],
         isNegotiable: data['isNegotiable'] ?? false,
       );
     }
@@ -262,6 +299,10 @@ class AddListingController extends StateNotifier<AddListingState> {
         imageUrls: imageUrls,
         campusLocation: state.campusLocation,
         condition: state.condition,
+        brand: state.brand,
+        storage: state.storage,
+        color: state.color,
+        isNegotiable: state.isNegotiable,
         createdAt: DateTime.now(),
         expiresAt: DateTime.now().add(const Duration(days: 30)),
       );

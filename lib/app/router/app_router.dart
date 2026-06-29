@@ -209,8 +209,27 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/listing-detail',
         builder: (context, state) {
-          final listing = state.extra as Listing;
-          return ListingDetailScreen(listing: listing);
+          final extra = state.extra;
+          if (extra is Listing) {
+            return ListingDetailScreen(listing: extra);
+          }
+          if (extra is Map<String, dynamic>) {
+            if (extra.containsKey('listing') && extra['listing'] is Listing) {
+              return ListingDetailScreen(
+                listing: extra['listing'] as Listing,
+                heroTag: extra['heroTag'] as String?,
+              );
+            }
+            // If it's a raw map from Firestore or elsewhere
+            try {
+              return ListingDetailScreen(listing: Listing.fromJson(extra));
+            } catch (_) {
+              // fall through to error
+            }
+          }
+          return const Scaffold(
+            body: Center(child: Text('Invalid listing data')),
+          );
         },
       ),
       GoRoute(

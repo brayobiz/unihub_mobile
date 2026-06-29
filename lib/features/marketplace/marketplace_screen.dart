@@ -128,10 +128,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildSearchBar(controller, filterState),
-                  const SizedBox(height: 20),
-                  _buildCategoryChips(filterState, controller),
+                  const SizedBox(height: 12),
                   if (isBrowsingHome) ...[
-                    const SizedBox(height: 24),
+                    _buildPopularCategories(),
                     _buildDiscoverySection(
                       title: 'Recently Viewed',
                       provider: recentlyViewedProvider,
@@ -145,7 +144,6 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                       title: 'Trending in ${user?.university ?? 'Campus'}',
                       provider: trendingListingsProvider(user?.university),
                     ),
-                    _buildPopularCategories(),
                     const SizedBox(height: 24),
                     Text(
                       'Recently Added',
@@ -156,15 +154,20 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                       ),
                     ),
                   ] else ...[
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 8),
+                    _buildCategoryChips(filterState, controller),
+                    const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Search Results',
+                          filterState.searchQuery.isNotEmpty 
+                            ? 'Results for "${filterState.searchQuery}"'
+                            : 'Browsing ${filterState.selectedCategory ?? 'Items'}',
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
+                            color: Colors.black87,
                           ),
                         ),
                         TextButton.icon(
@@ -280,37 +283,60 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
   }
 
   Widget _buildPopularCategories() {
-    final categories = MarketplaceCategories.mainFilters.where((c) => c != 'All').toList();
+    final categories = MarketplaceCategories.mainFilters;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 24),
         Text(
-          'Popular Categories',
+          'Shop by Category',
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 18,
+            fontSize: 16,
             fontWeight: FontWeight.bold,
+            color: Colors.black87,
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         SizedBox(
           height: 80,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
             itemCount: categories.length,
             itemBuilder: (context, index) {
               final cat = categories[index];
               return Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: ActionChip(
-                  onPressed: () => context.push('/category-discovery/$cat'),
-                  label: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: Text(cat, style: const TextStyle(fontWeight: FontWeight.bold)),
+                padding: const EdgeInsets.only(right: 14),
+                child: GestureDetector(
+                  onTap: () => context.push('/category-discovery/$cat'),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.grey.shade100),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          MarketplaceCategories.getIcon(cat),
+                          style: const TextStyle(fontSize: 18),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        cat,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey.shade700,
+                        ),
+                        maxLines: 1,
+                      ),
+                    ],
                   ),
-                  backgroundColor: Colors.indigo.shade50,
-                  side: BorderSide.none,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               );
             },
@@ -326,6 +352,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
     Widget? emptyWidget,
   }) {
     final asyncListings = ref.watch(provider);
+    final sectionPrefix = title.replaceAll(' ', '_').toLowerCase();
 
     return asyncListings.when(
       data: (listings) {
@@ -363,7 +390,11 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                   padding: const EdgeInsets.only(right: 16),
                   child: SizedBox(
                     width: 160,
-                    child: MarketplaceCard(listing: listings[index], index: index),
+                    child: MarketplaceCard(
+                      listing: listings[index], 
+                      index: index,
+                      heroTag: 'hero_${sectionPrefix}_${listings[index].id}',
+                    ),
                   ),
                 ),
               ),
@@ -417,7 +448,11 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
               childAspectRatio: 0.75,
             ),
             delegate: SliverChildBuilderDelegate(
-              (context, index) => MarketplaceCard(listing: listings[index], index: index),
+              (context, index) => MarketplaceCard(
+                listing: listings[index], 
+                index: index,
+                heroTag: 'hero_grid_${listings[index].id}',
+              ),
               childCount: listings.length,
             ),
           ),
@@ -490,7 +525,11 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                   childAspectRatio: 0.75,
                 ),
                 itemCount: listings.length,
-                itemBuilder: (context, index) => MarketplaceCard(listing: listings[index], index: index),
+                itemBuilder: (context, index) => MarketplaceCard(
+                  listing: listings[index], 
+                  index: index,
+                  heroTag: 'hero_my_${listings[index].id}',
+                ),
               );
             },
             loading: () => const Center(child: CircularProgressIndicator()),
