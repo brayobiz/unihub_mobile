@@ -182,45 +182,80 @@ class MarketplaceCard extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 8,
-                          backgroundColor: Colors.indigo.shade50,
-                          child: Text(
-                            listing.sellerName.isNotEmpty ? listing.sellerName[0].toUpperCase() : 'S',
-                            style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.indigo),
+                    // REAL-TIME SELLER TRUST DATA
+                    Consumer(
+                      builder: (context, ref, child) {
+                        final sellerAsync = ref.watch(otherUserProvider(listing.sellerId));
+                        return sellerAsync.when(
+                          data: (seller) => Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 8,
+                                    backgroundColor: Colors.indigo.shade50,
+                                    backgroundImage: seller.photoUrl != null ? NetworkImage(seller.photoUrl!) : null,
+                                    child: seller.photoUrl == null 
+                                      ? Text(
+                                          seller.fullName[0].toUpperCase(),
+                                          style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.indigo),
+                                        )
+                                      : null,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            seller.fullName,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 10,
+                                              color: Colors.grey.shade700,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                        if (seller.isVerifiedSeller) ...[
+                                          const SizedBox(width: 4),
+                                          const Icon(Icons.verified, color: Colors.indigo, size: 10),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.shield_rounded, 
+                                    size: 10, 
+                                    color: seller.displayTrustScore > 80 ? Colors.green.shade400 : Colors.orange.shade400
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Trust ${seller.displayTrustScore.toInt()}%',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 9,
+                                      color: Colors.grey.shade500,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            listing.sellerName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 10,
-                              color: Colors.grey.shade700,
-                              fontWeight: FontWeight.w600,
-                            ),
+                          loading: () => const SizedBox(height: 24), // Avoid layout jump
+                          error: (_, __) => Text(
+                            'By Student',
+                            style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(Icons.shield_rounded, size: 10, color: Colors.green.shade400),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Trust ${listing.sellerTrustScore.toInt()}%',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 9,
-                            color: Colors.grey.shade500,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -264,7 +299,20 @@ class MarketplaceCard extends ConsumerWidget {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              await ref.read(marketplaceRepositoryProvider).deleteListing(listing.id);
+              try {
+                await ref.read(marketplaceRepositoryProvider).deleteListing(listing.id);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Listing deleted successfully')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to delete listing: $e'), backgroundColor: Colors.red),
+                  );
+                }
+              }
             },
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),

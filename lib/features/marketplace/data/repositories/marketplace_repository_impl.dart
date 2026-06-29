@@ -340,19 +340,26 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     await _firestore.collection('offers').doc(offer.id).set(offer.toJson());
     
     if (_notificationService != null) {
+      final listing = await getListingById(offer.listingId);
       await _notificationService!.sendNotification(
         recipientId: offer.sellerId,
+        actorId: offer.buyerId,
         title: 'New Offer!',
-        body: 'Someone offered KES ${offer.amount} for your item.',
+        body: 'Someone offered KES ${offer.amount} for "${listing?.title ?? 'your item'}".',
         type: NotificationType.marketplace,
         targetId: offer.listingId,
         targetType: 'marketplace_offer',
+        metadata: {
+          'offerId': offer.id,
+          'amount': offer.amount,
+          'buyerId': offer.buyerId,
+        },
       );
     }
   }
 
   @override
-  Future<void> respondToOffer(String offerId, OfferStatus status, {double? counterAmount}) async {
+  Future<void> respondToOffer(String offerId, OfferStatus status, {double? counterAmount, String? sellerMessage}) async {
     final offerDoc = await _firestore.collection('offers').doc(offerId).get();
     if (!offerDoc.exists) return;
     
@@ -362,26 +369,48 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     batch.update(_firestore.collection('offers').doc(offerId), {
       'status': status.name,
       if (counterAmount != null) 'counterAmount': counterAmount,
+      if (sellerMessage != null) 'sellerMessage': sellerMessage,
     });
+    
+    if (status == OfferStatus.accepted) {
+      // Mark listing as sold
+      batch.update(_firestore.collection('listings').doc(offer.listingId), {
+        'status': ListingStatus.sold.name,
+      });
+      
+      // Update seller stats
+      final userRef = _firestore.collection('users').doc(offer.sellerId);
+      batch.update(userRef, {
+        'completedSalesCount': FieldValue.increment(1),
+        'activeListingsCount': FieldValue.increment(-1),
+        'trustScore': FieldValue.increment(10.0), // Big boost for successful sale
+      });
+    }
     
     await batch.commit();
 
     if (_notificationService != null) {
       String title = '';
       String body = '';
+      final listing = await getListingById(offer.listingId);
+      final listingTitle = listing?.title ?? 'your item';
       
       switch (status) {
         case OfferStatus.accepted:
-          title = 'Offer Accepted!';
-          body = 'Your offer for "${offer.listingId}" was accepted.';
+          title = 'Offer Accepted! 🎉';
+          body = sellerMessage != null && sellerMessage.isNotEmpty 
+              ? '$sellerMessage. Tap to message the seller!'
+              : 'Your offer for "$listingTitle" was accepted. Tap to message the seller!';
           break;
         case OfferStatus.rejected:
           title = 'Offer Rejected';
-          body = 'Your offer for "${offer.listingId}" was declined.';
+          body = sellerMessage != null && sellerMessage.isNotEmpty
+              ? sellerMessage
+              : 'Your offer for "$listingTitle" was declined.';
           break;
         case OfferStatus.countered:
           title = 'Counter-Offer Received';
-          body = 'The seller countered your offer with KES $counterAmount.';
+          body = 'The seller countered your offer for "$listingTitle" with KES $counterAmount.';
           break;
         default: break;
       }
@@ -389,11 +418,17 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       if (title.isNotEmpty) {
         await _notificationService!.sendNotification(
           recipientId: offer.buyerId,
+          actorId: offer.sellerId,
           title: title,
           body: body,
           type: NotificationType.marketplace,
           targetId: offer.listingId,
-          targetType: 'marketplace_offer',
+          targetType: 'marketplace', // Regular marketplace type for buyer to see it
+          metadata: {
+            'offerId': offer.id,
+            'status': status.name,
+            if (sellerMessage != null) 'sellerMessage': sellerMessage,
+          },
         );
       }
     }

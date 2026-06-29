@@ -6,8 +6,10 @@ import 'package:unihub_mobile/core/utils/date_formatter.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/shared/notification_repository.dart';
 import 'package:unihub_mobile/features/marketplace/shared/providers.dart';
+import 'package:unihub_mobile/features/marketplace/domain/models/offer.dart';
 import 'package:unihub_mobile/features/housing/shared/providers.dart';
 import 'package:unihub_mobile/features/notes/shared/providers.dart';
+import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
 import 'package:unihub_mobile/features/chat/shared/providers.dart';
 
 class NotificationsScreen extends ConsumerWidget {
@@ -25,7 +27,7 @@ class NotificationsScreen extends ConsumerWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         title: Text(
-          module != null 
+          (module != null && module!.isNotEmpty)
               ? '${module![0].toUpperCase()}${module!.substring(1)} Notifications' 
               : 'Notifications',
           style: GoogleFonts.plusJakartaSans(
@@ -229,20 +231,171 @@ class _NotificationTile extends ConsumerWidget {
               ],
             ),
           ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              DateFormatter.formatRelative(notification.createdAt),
-              style: GoogleFonts.plusJakartaSans(
-                color: Colors.grey.shade500, 
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  DateFormatter.formatRelative(notification.createdAt),
+                  style: GoogleFonts.plusJakartaSans(
+                    color: Colors.grey.shade500, 
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
-            ),
+              if (notification.targetType == 'marketplace_offer' && !notification.isRead)
+                _buildOfferActions(context, ref),
+            ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildOfferActions(BuildContext context, WidgetRef ref) {
+    final offerId = notification.metadata['offerId'] as String?;
+    if (offerId == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: SizedBox(
+              height: 36,
+              child: OutlinedButton(
+                onPressed: () => _handleOfferResponse(context, ref, offerId, OfferStatus.rejected),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red,
+                  side: const BorderSide(color: Colors.red),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: EdgeInsets.zero,
+                ),
+                child: const Text('Reject', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: SizedBox(
+              height: 36,
+              child: FilledButton(
+                onPressed: () => _handleOfferResponse(context, ref, offerId, OfferStatus.accepted),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: EdgeInsets.zero,
+                ),
+                child: const Text('Accept', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleOfferResponse(BuildContext context, WidgetRef ref, String offerId, OfferStatus status) async {
+    final controller = TextEditingController();
+    final isAccept = status == OfferStatus.accepted;
+    
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text(isAccept ? 'Accept Offer?' : 'Reject Offer?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(isAccept 
+              ? 'Accepting this offer will mark the item as sold. You can add a message for the buyer below.' 
+              : 'Add an optional reason for rejecting this offer.'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                hintText: isAccept ? 'e.g. Great! Let\'s meet at...' : 'e.g. Price too low, sorry!',
+                filled: true,
+                fillColor: Colors.grey.shade50,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: isAccept ? Colors.green : Colors.red,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text(isAccept ? 'Accept & Close Deal' : 'Reject Offer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final messenger = ScaffoldMessenger.of(context);
+      final sellerMessage = controller.text.trim();
+      
+      await ref.read(marketplaceRepositoryProvider).respondToOffer(
+        offerId, 
+        status, 
+        sellerMessage: sellerMessage.isNotEmpty ? sellerMessage : null,
+      );
+      
+      // Mark notification as read after responding
+      await ref.read(notificationRepositoryProvider).markAsRead(userId, notification.id);
+
+      if (context.mounted) {
+        messenger.showSnackBar(SnackBar(
+          content: Text(status == OfferStatus.accepted ? 'Offer accepted! Redirecting to chat...' : 'Offer rejected.'),
+          backgroundColor: status == OfferStatus.accepted ? Colors.green : Colors.red,
+        ));
+
+        if (status == OfferStatus.accepted) {
+          // If accepted, redirect to chat
+          final buyerId = notification.metadata['buyerId'] as String?;
+          final listingId = notification.targetId;
+          
+          if (buyerId != null && listingId != null) {
+            final listing = await ref.read(marketplaceRepositoryProvider).getListingById(listingId);
+            if (listing != null && context.mounted) {
+              final chatContext = ChatContext(
+                type: 'marketplace',
+                id: listingId,
+                title: listing.title,
+                thumbnail: listing.imageUrls.isNotEmpty ? listing.imageUrls.first : null,
+              );
+              
+              final convId = await ref.read(chatRepositoryProvider).getOrCreateConversation(
+                participantIds: [userId, buyerId],
+                context: chatContext,
+              );
+              
+              if (context.mounted) {
+                context.push('/chat', extra: {
+                  'conversationId': convId,
+                  'otherUserName': notification.actorName ?? 'Buyer',
+                  'context': chatContext,
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
   }
 
   Future<void> _handleNavigation(BuildContext context, WidgetRef ref, UniNotification n) async {
@@ -273,6 +426,35 @@ class _NotificationTile extends ConsumerWidget {
 
         case NotificationType.marketplace:
         case NotificationType.listing:
+          // Special case: If it's an offer response, take them to chat
+          if (n.title.contains('Offer Accepted') || n.targetType == 'marketplace_offer') {
+            final listing = await ref.read(marketplaceRepositoryProvider).getListingById(n.targetId!);
+            if (listing != null && context.mounted) {
+              final otherId = n.actorId;
+              if (otherId != null) {
+                final chatContext = ChatContext(
+                  type: 'marketplace',
+                  id: listing.id,
+                  title: listing.title,
+                  thumbnail: listing.imageUrls.isNotEmpty ? listing.imageUrls.first : null,
+                );
+                
+                final convId = await ref.read(chatRepositoryProvider).getOrCreateConversation(
+                  participantIds: [n.recipientId, otherId],
+                  context: chatContext,
+                );
+                if (context.mounted) {
+                  context.push('/chat', extra: {
+                    'conversationId': convId,
+                    'otherUserName': n.actorName ?? 'Seller',
+                    'context': chatContext,
+                  });
+                  return;
+                }
+              }
+            }
+          }
+
           final listing = await ref.read(marketplaceRepositoryProvider).getListingById(n.targetId!);
           if (context.mounted) {
             if (listing != null) {

@@ -84,20 +84,9 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Builder(
-                        builder: (context) {
-                          if (context.canPop()) {
-                            return IconButton(
-                              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                              onPressed: () => context.pop(),
-                            );
-                          } else {
-                            return IconButton(
-                              icon: const Icon(Icons.menu_rounded, color: Colors.white),
-                              onPressed: () => Scaffold.of(context).openDrawer(),
-                            );
-                          }
-                        },
+                      IconButton(
+                        icon: const Icon(Icons.menu_rounded, color: Colors.white),
+                        onPressed: () => Scaffold.of(context).openDrawer(),
                       ),
                       _buildEditButton(context),
                     ],

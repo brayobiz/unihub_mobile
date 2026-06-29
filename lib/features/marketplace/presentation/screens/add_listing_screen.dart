@@ -19,335 +19,268 @@ class AddListingScreen extends ConsumerStatefulWidget {
 }
 
 class _AddListingScreenState extends ConsumerState<AddListingScreen> {
-  final _scrollController = ScrollController();
+  late final PageController _pageController;
   bool _showPreview = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Use the state's current step if possible, but default to 0
+    _pageController = PageController(initialPage: 0);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(addListingControllerProvider(widget.listing));
     final controller = ref.read(addListingControllerProvider(widget.listing).notifier);
 
+    // Explicitly cast to int to be safe, though state.currentStep is int
+    final int currentStep = (state.currentStep as dynamic) ?? 0;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FB),
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close_rounded, color: Colors.black),
-          onPressed: () => _handleExit(context, controller),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black, size: 20),
+          onPressed: () {
+            if (currentStep > 0) {
+              _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+              controller.previousStep();
+            } else {
+              _handleExit(context, controller);
+            }
+          },
         ),
-        title: Text(
-          widget.listing == null ? 'Create Listing' : 'Edit Listing',
-          style: GoogleFonts.plusJakartaSans(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
+        title: Column(
+          children: [
+            Text(
+              widget.listing == null ? 'Post Listing' : 'Edit Listing',
+              style: GoogleFonts.plusJakartaSans(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 4),
+            _buildStepIndicator(currentStep),
+          ],
         ),
         actions: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: TextButton(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              icon: Icon(_showPreview ? Icons.edit_note_rounded : Icons.remove_red_eye_outlined, color: const Color(0xFF007BFF)),
               onPressed: () => setState(() => _showPreview = !_showPreview),
-              child: Text(_showPreview ? 'Edit' : 'Preview', 
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo)),
             ),
           ),
         ],
       ),
       body: state.isLoading 
-        ? const Center(child: CircularProgressIndicator(color: Colors.indigo))
+        ? const Center(child: CircularProgressIndicator(color: Color(0xFF007BFF)))
         : Stack(
             children: [
-              SingleChildScrollView(
-                controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 120),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildQualityIndicator(state),
-                    const SizedBox(height: 24),
-                    _buildImageUploadSection(state, controller),
-                    const SizedBox(height: 24),
-                    _buildSectionCard(
-                      title: 'Basic Information',
-                      children: [
-                        _buildTextField(
-                          label: 'Item Name',
-                          hint: 'e.g. MacBook Pro 2021',
-                          initialValue: state.title,
-                          onChanged: controller.updateTitle,
-                        ),
-                        const SizedBox(height: 20),
-                        _buildCategoryPicker(context, state, controller),
-                        const SizedBox(height: 20),
-                        _buildConditionPicker(state, controller),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    _buildSectionCard(
-                      title: 'Specifications',
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildTextField(
-                                label: 'Brand',
-                                hint: 'e.g. Apple, Samsung',
-                                initialValue: state.brand,
-                                onChanged: controller.updateBrand,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: _buildTextField(
-                                label: 'Color',
-                                hint: 'e.g. Graphite, Silver',
-                                initialValue: state.color,
-                                onChanged: controller.updateColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                        _buildTextField(
-                          label: 'Storage / Capacity (Optional)',
-                          hint: 'e.g. 128 GB, 1TB',
-                          initialValue: state.storage,
-                          onChanged: controller.updateStorage,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    _buildSectionCard(
-                      title: 'Specifications',
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildTextField(
-                                label: 'Brand',
-                                hint: 'e.g. Apple, Samsung',
-                                initialValue: state.brand,
-                                onChanged: controller.updateBrand,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: _buildTextField(
-                                label: 'Color',
-                                hint: 'e.g. Graphite, Silver',
-                                initialValue: state.color,
-                                onChanged: controller.updateColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                        _buildTextField(
-                          label: 'Storage / Capacity (Optional)',
-                          hint: 'e.g. 128 GB, 1TB',
-                          initialValue: state.storage,
-                          onChanged: controller.updateStorage,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    _buildSectionCard(
-                      title: 'Pricing & Negotiation',
-                      children: [
-                        _buildTextField(
-                          label: 'Price (KES)',
-                          hint: '0.00',
-                          initialValue: state.price > 0 ? state.price.toInt().toString() : '',
-                          keyboardType: TextInputType.number,
-                          prefixIcon: Icons.payments_outlined,
-                          onChanged: (val) => controller.updatePrice(double.tryParse(val) ?? 0),
-                        ),
-                        const SizedBox(height: 12),
-                        SwitchListTile(
-                          value: state.isNegotiable,
-                          onChanged: controller.toggleNegotiable,
-                          title: const Text('Allow price offers (Negotiable)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                          subtitle: const Text('Buyers will see a "Make an Offer" button.', style: TextStyle(fontSize: 11)),
-                          contentPadding: EdgeInsets.zero,
-                          activeColor: Colors.indigo,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    _buildSectionCard(
-                      title: 'Location',
-                      children: [
-                        _buildTextField(
-                          label: 'Campus / Area',
-                          hint: 'e.g. Main Campus, Juja',
-                          initialValue: state.campusLocation,
-                          prefixIcon: Icons.location_on_outlined,
-                          onChanged: controller.updateLocation,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    _buildSectionCard(
-                      title: 'Description',
-                      children: [
-                        _buildTextField(
-                          label: 'Tell buyers more',
-                          hint: 'Describe the item condition, features, and why you are selling...',
-                          initialValue: state.description,
-                          maxLines: 5,
-                          onChanged: controller.updateDescription,
-                        ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              '${state.description.length}/500',
-                              style: TextStyle(fontSize: 10, color: Colors.grey.shade400, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (state.error != null)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 20),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(12)),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.error_outline, color: Colors.red, size: 20),
-                              const SizedBox(width: 8),
-                              Expanded(child: Text(state.error!, style: const TextStyle(color: Colors.red, fontSize: 12))),
-                            ],
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+              PageView(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _buildStep1(state, controller),
+                  _buildStep2(state, controller),
+                  _buildStep3(state, controller),
+                ],
               ),
-              
               if (_showPreview)
                 _buildPreviewOverlay(state),
             ],
           ),
-      bottomNavigationBar: _buildActionArea(context, state, controller),
+      bottomNavigationBar: _buildBottomAction(state, controller),
     );
   }
 
-  void _handleExit(BuildContext context, AddListingController controller) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Save draft?'),
-        content: const Text('You can continue editing this listing later.'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              controller.clearDraft();
-              Navigator.pop(context);
-              context.pop();
-            },
-            child: const Text('Discard', style: TextStyle(color: Colors.red)),
+  Widget _buildStepIndicator(int currentStep) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(3, (index) {
+        final bool isActive = index <= currentStep;
+        return Container(
+          width: 24,
+          height: 4,
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          decoration: BoxDecoration(
+            color: isActive ? const Color(0xFF007BFF) : Colors.grey.shade200,
+            borderRadius: BorderRadius.circular(2),
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.pop();
-            },
-            child: const Text('Save & Exit'),
-          ),
-        ],
-      ),
+        );
+      }),
     );
   }
 
-  Widget _buildQualityIndicator(AddListingState state) {
-    final user = ref.watch(appUserProvider).valueOrNull;
-    final isVerifiedSeller = user?.roles.contains('seller') ?? false;
-
-    return Column(
-      children: [
-        if (user != null && !isVerifiedSeller)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.indigo.shade50,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.indigo.shade100),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.verified_user_outlined, color: Colors.indigo),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Boost your sales!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.indigo)),
-                        Text('Get verified as a seller to build trust with buyers.', 
-                          style: TextStyle(fontSize: 11, color: Colors.indigo.shade700)),
-                      ],
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => context.push('/settings'), // Assuming verification is in settings
-                    child: const Text('Get Verified', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        Container(
-          padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
-      ),
+  Widget _buildStep1(AddListingState state, AddListingController controller) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Listing Quality', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 15)),
-                  const SizedBox(height: 2),
-                  Text('Good listings sell 3x faster', style: TextStyle(color: Colors.grey.shade500, fontSize: 11)),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: state.qualityColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(state.qualityLabel, style: TextStyle(color: state.qualityColor, fontWeight: FontWeight.w800, fontSize: 12)),
-              ),
-            ],
+          _buildQualityIndicator(state),
+          const SizedBox(height: 32),
+          Text('What are you selling?', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          Text('Select a category and add photos of your item.', style: TextStyle(color: Colors.grey.shade600)),
+          const SizedBox(height: 32),
+          _buildCategoryGrid(state, controller),
+          const SizedBox(height: 32),
+          _buildImageUploadSection(state, controller),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStep2(AddListingState state, AddListingController controller) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Item Details', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          Text('Provide more information about your ${state.category.toLowerCase()}.', style: TextStyle(color: Colors.grey.shade600)),
+          const SizedBox(height: 32),
+          _buildTextField(
+            label: 'Listing Title',
+            hint: 'e.g. iPhone 13 Pro Max - 256GB',
+            initialValue: state.title,
+            onChanged: (val) => controller.updateTitle(val),
           ),
+          const SizedBox(height: 24),
+          _buildConditionPicker(state, controller),
+          const SizedBox(height: 32),
+          Text('Specifications', style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
-              value: state.qualityScore,
-              minHeight: 8,
-              backgroundColor: Colors.grey.shade50,
-              valueColor: AlwaysStoppedAnimation<Color>(state.qualityColor),
-            ),
+          _buildCategorySpecificFields(state, controller),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStep3(AddListingState state, AddListingController controller) {
+    final int quantity = (state.quantity as dynamic) ?? 1;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Final Details', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 32),
+          _buildTextField(
+            label: 'Price (KES)',
+            hint: '0.00',
+            initialValue: state.price > 0 ? state.price.toInt().toString() : '',
+            keyboardType: TextInputType.number,
+            prefixIcon: Icons.payments_outlined,
+            onChanged: (val) {
+              final d = double.tryParse(val);
+              if (d != null) controller.updatePrice(d);
+            },
+          ),
+          const SizedBox(height: 12),
+          SwitchListTile(
+            value: state.isNegotiable,
+            onChanged: (val) => controller.toggleNegotiable(val),
+            title: const Text('Negotiable', style: TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: const Text('Allow buyers to make offers'),
+            contentPadding: EdgeInsets.zero,
+            activeColor: const Color(0xFF007BFF),
+          ),
+          const SizedBox(height: 24),
+          _buildTextField(
+            label: 'Quantity (Optional)',
+            hint: '1',
+            initialValue: quantity.toString(),
+            keyboardType: TextInputType.number,
+            onChanged: (val) {
+              final q = int.tryParse(val);
+              if (q != null) controller.updateQuantity(q);
+            },
+          ),
+          const SizedBox(height: 32),
+          _buildTextField(
+            label: 'Description',
+            hint: 'Describe your item in detail...',
+            initialValue: state.description,
+            maxLines: 5,
+            onChanged: (val) => controller.updateDescription(val),
+          ),
+          const SizedBox(height: 32),
+          _buildTextField(
+            label: 'Meetup Location',
+            hint: 'e.g. Student Center, Main Campus',
+            initialValue: state.campusLocation,
+            prefixIcon: Icons.location_on_outlined,
+            onChanged: (val) => controller.updateLocation(val),
           ),
         ],
       ),
-    ),
-  ],
-);
-}
+    );
+  }
+
+  Widget _buildCategoryGrid(AddListingState state, AddListingController controller) {
+    final categories = MarketplaceCategories.all;
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.9,
+      ),
+      itemCount: categories.length,
+      itemBuilder: (context, index) {
+        final cat = categories[index];
+        final bool isSelected = state.category == cat;
+        return GestureDetector(
+          onTap: () => controller.updateCategory(cat),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isSelected ? const Color(0xFF007BFF).withOpacity(0.05) : Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isSelected ? const Color(0xFF007BFF) : Colors.transparent,
+                width: 2,
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(MarketplaceCategories.getIcon(cat), style: const TextStyle(fontSize: 24)),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    cat,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      color: isSelected ? const Color(0xFF007BFF) : Colors.black87,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   Widget _buildImageUploadSection(AddListingState state, AddListingController controller) {
-    final totalPhotos = state.selectedImages.length + state.existingImageUrls.length;
+    final int totalPhotos = state.selectedImages.length + state.existingImageUrls.length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -356,76 +289,89 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text('Photos', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16)),
-            Text('$totalPhotos/5', style: TextStyle(color: Colors.grey.shade400, fontSize: 13, fontWeight: FontWeight.bold)),
+            Text('$totalPhotos/10', style: TextStyle(color: Colors.grey.shade400, fontSize: 13, fontWeight: FontWeight.bold)),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         SizedBox(
-          height: 110,
-          child: ListView(
+          height: 120,
+          child: ReorderableListView(
             scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
+            onReorder: (int oldIdx, int newIdx) {
+              controller.reorderSelectedImages(oldIdx, newIdx);
+            },
+            proxyDecorator: (child, index, animation) => child,
             children: [
               GestureDetector(
-                onTap: controller.pickImages,
+                key: const ValueKey('add_button'),
+                onTap: () => controller.pickImages(),
                 child: Container(
-                  width: 110,
+                  width: 120,
+                  margin: const EdgeInsets.only(right: 12),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.indigo.shade50, width: 2),
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.grey.shade200, width: 2, style: BorderStyle.solid),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(color: Colors.indigo.shade50, shape: BoxShape.circle),
-                        child: const Icon(Icons.add_a_photo_rounded, color: Colors.indigo, size: 24),
-                      ),
+                      Icon(Icons.add_a_photo_outlined, color: Colors.grey.shade400, size: 32),
                       const SizedBox(height: 8),
-                      const Text('Add Photo', style: TextStyle(fontSize: 10, color: Colors.indigo, fontWeight: FontWeight.w800)),
+                      Text('Add Photo', style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
               ),
               ...state.existingImageUrls.map((url) => _buildPhotoItem(
+                key: ValueKey(url),
                 image: NetworkImage(url),
                 onRemove: () => controller.removeExistingImage(url),
+                isHero: state.existingImageUrls.indexOf(url) == 0 && state.selectedImages.isEmpty,
               )),
               ...state.selectedImages.map((file) => _buildPhotoItem(
+                key: ValueKey(file.path),
                 image: FileImage(file),
                 onRemove: () => controller.removeSelectedImage(file),
+                isHero: state.selectedImages.indexOf(file) == 0 && state.existingImageUrls.isEmpty,
               )),
             ],
           ),
         ),
-        const SizedBox(height: 8),
-        Text('Pro Tip: Listings with 3+ clear photos sell much faster.', 
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 11, fontStyle: FontStyle.italic)),
       ],
     );
   }
 
-  Widget _buildPhotoItem({required ImageProvider image, required VoidCallback onRemove}) {
+  Widget _buildPhotoItem({required Key key, required ImageProvider image, required VoidCallback onRemove, bool isHero = false}) {
     return Container(
-      width: 110,
-      margin: const EdgeInsets.only(left: 12),
+      key: key,
+      width: 120,
+      margin: const EdgeInsets.only(right: 12),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         image: DecorationImage(image: image, fit: BoxFit.cover),
       ),
       child: Stack(
         children: [
+          if (isHero)
+            Positioned(
+              top: 8,
+              left: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: const Color(0xFF007BFF), borderRadius: BorderRadius.circular(8)),
+                child: const Text('Cover', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+              ),
+            ),
           Positioned(
             top: 4,
             right: 4,
             child: GestureDetector(
               onTap: onRemove,
-              child: CircleAvatar(
-                radius: 12,
-                backgroundColor: Colors.black.withOpacity(0.5),
-                child: const Icon(Icons.close, size: 14, color: Colors.white),
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                child: const Icon(Icons.close, size: 16, color: Colors.black),
               ),
             ),
           ),
@@ -434,23 +380,115 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
     );
   }
 
-  Widget _buildSectionCard({required String title, required List<Widget> children}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 20, offset: const Offset(0, 10))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 14, color: Colors.indigo, letterSpacing: 0.5)),
-          const SizedBox(height: 24),
-          ...children,
-        ],
-      ),
+  Widget _buildCategorySpecificFields(AddListingState state, AddListingController controller) {
+    switch (state.category) {
+      case MarketplaceCategories.electronics:
+      case MarketplaceCategories.phones:
+      case MarketplaceCategories.computers:
+        return Column(
+          children: [
+            _buildAttributeField('Brand', 'e.g. Apple, Samsung', 'brand', state, controller),
+            const SizedBox(height: 16),
+            _buildAttributeField('Model', 'e.g. iPhone 13 Pro', 'model', state, controller),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(child: _buildAttributeField('Storage', 'e.g. 256GB', 'storage', state, controller)),
+                const SizedBox(width: 16),
+                Expanded(child: _buildAttributeField('Color', 'e.g. Sierra Blue', 'color', state, controller)),
+              ],
+            ),
+          ],
+        );
+      case MarketplaceCategories.vehicles:
+        return Column(
+          children: [
+            Row(
+              children: [
+                Expanded(child: _buildAttributeField('Make', 'e.g. Toyota', 'make', state, controller)),
+                const SizedBox(width: 16),
+                Expanded(child: _buildAttributeField('Model', 'e.g. Corolla', 'model', state, controller)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(child: _buildAttributeField('Year', 'e.g. 2018', 'year', state, controller, keyboardType: TextInputType.number)),
+                const SizedBox(width: 16),
+                Expanded(child: _buildAttributeField('Mileage', 'e.g. 45,000 km', 'mileage', state, controller)),
+              ],
+            ),
+          ],
+        );
+      case MarketplaceCategories.fashion:
+      case MarketplaceCategories.shoes:
+        return Column(
+          children: [
+            _buildAttributeField('Brand', 'e.g. Nike, Zara', 'brand', state, controller),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(child: _buildAttributeField('Size', 'e.g. XL, 42', 'size', state, controller)),
+                const SizedBox(width: 16),
+                Expanded(child: _buildAttributeField('Gender', 'e.g. Unisex', 'gender', state, controller)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildAttributeField('Material', 'e.g. Cotton, Leather', 'material', state, controller),
+          ],
+        );
+      case MarketplaceCategories.books:
+        return Column(
+          children: [
+            _buildAttributeField('Author', 'e.g. J.K. Rowling', 'author', state, controller),
+            const SizedBox(height: 16),
+            _buildAttributeField('Edition', 'e.g. 3rd Edition', 'edition', state, controller),
+          ],
+        );
+      case MarketplaceCategories.furniture:
+      case MarketplaceCategories.homeEssentials:
+      case MarketplaceCategories.kitchen:
+        return Column(
+          children: [
+            _buildAttributeField('Type', 'e.g. Dining Table, Blender', 'type', state, controller),
+            const SizedBox(height: 16),
+            _buildAttributeField('Material', 'e.g. Wood, Metal', 'material', state, controller),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(child: _buildAttributeField('Dimensions', 'e.g. 120x80cm', 'dimensions', state, controller)),
+                const SizedBox(width: 16),
+                Expanded(child: _buildAttributeField('Color', 'e.g. Oak', 'color', state, controller)),
+              ],
+            ),
+          ],
+        );
+      case MarketplaceCategories.sports:
+        return Column(
+          children: [
+            _buildAttributeField('Type', 'e.g. Treadmill, Racket', 'type', state, controller),
+            const SizedBox(height: 16),
+            _buildAttributeField('Brand', 'e.g. Adidas, York', 'brand', state, controller),
+          ],
+        );
+      default:
+        return Column(
+          children: [
+            _buildAttributeField('Brand', 'Optional', 'brand', state, controller),
+            const SizedBox(height: 16),
+            _buildAttributeField('Color', 'Optional', 'color', state, controller),
+          ],
+        );
+    }
+  }
+
+  Widget _buildAttributeField(String label, String hint, String key, AddListingState state, AddListingController controller, {TextInputType? keyboardType}) {
+    return _buildTextField(
+      label: label,
+      hint: hint,
+      initialValue: state.attributes[key]?.toString() ?? '',
+      keyboardType: keyboardType,
+      onChanged: (val) => controller.updateAttribute(key, val),
     );
   }
 
@@ -466,185 +504,26 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87)),
+        Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
         const SizedBox(height: 8),
         TextFormField(
           initialValue: initialValue,
           onChanged: onChanged,
           keyboardType: keyboardType,
           maxLines: maxLines,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+          style: const TextStyle(fontSize: 16),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-            prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20, color: Colors.indigo.shade300) : null,
+            hintStyle: TextStyle(color: Colors.grey.shade400),
+            prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20) : null,
             filled: true,
-            fillColor: const Color(0xFFF8F9FB),
-            contentPadding: const EdgeInsets.all(18),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.indigo, width: 1.5)),
+            fillColor: Colors.grey.shade50,
+            contentPadding: const EdgeInsets.all(20),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: const BorderSide(color: Color(0xFF007BFF), width: 1.5)),
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildCategoryPicker(BuildContext context, AddListingState state, AddListingController controller) {
-    final categories = MarketplaceCategories.all;
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Category', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87)),
-            GestureDetector(
-              onTap: () => _showGigDifferentiator(context),
-              child: Text('Offering a service?', 
-                style: TextStyle(fontSize: 11, color: Colors.indigo.shade400, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        InkWell(
-          onTap: () => _showCategorySheet(context, categories, state.category, controller),
-          child: Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8F9FB),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.grid_view_rounded, size: 20, color: Colors.indigo.shade300),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(state.category, 
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const Icon(Icons.expand_more_rounded, color: Colors.grey),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _showGigDifferentiator(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Row(
-          children: [
-            Icon(Icons.lightbulb_outline, color: Colors.amber.shade700),
-            const SizedBox(width: 10),
-            const Text('Marketplace vs Gigs'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildDiffItem(
-              icon: Icons.shopping_bag_rounded,
-              title: 'Marketplace',
-              desc: 'For selling physical or digital items (Books, Laptops, Clothes).',
-              color: Colors.green,
-            ),
-            const SizedBox(height: 16),
-            _buildDiffItem(
-              icon: Icons.work_rounded,
-              title: 'Student Gigs',
-              desc: 'For offering services, tasks, or jobs (Tutoring, Design, Errands).',
-              color: Colors.indigo,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Got it')),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.pop(); // Close current add listing
-              // Navigate to add gig - assuming path /add-gig or similar
-              // For now we navigate to the feed adder with type gig
-              // Check go_router config or just use Navigator
-              // Since I don't have the router config handy for all paths, I'll just close it.
-            },
-            style: FilledButton.styleFrom(backgroundColor: Colors.indigo),
-            child: const Text('Go to Gigs'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDiffItem({required IconData icon, required String title, required String desc, required Color color}) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
-          child: Icon(icon, color: color, size: 20),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              const SizedBox(height: 2),
-              Text(desc, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _showCategorySheet(BuildContext context, List<String> categories, String selected, AddListingController controller) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
-      builder: (context) => Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
-        padding: const EdgeInsets.symmetric(vertical: 30),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Select Category', style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Text('Physical items only. Services go to Gigs.', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
-            const SizedBox(height: 20),
-            Expanded(
-              child: ListView.builder(
-                itemCount: categories.length,
-                itemBuilder: (context, index) {
-                  final cat = categories[index];
-                  return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 30, vertical: 4),
-                    title: Text(cat, style: const TextStyle(fontWeight: FontWeight.w600)),
-                    trailing: selected == cat ? const Icon(Icons.check_circle, color: Colors.indigo) : null,
-                    onTap: () {
-                      controller.updateCategory(cat);
-                      Navigator.pop(context);
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -652,30 +531,33 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Condition', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87)),
+        const Text('Condition', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        Row(
           children: ListingCondition.values.map((cond) {
-            final isSelected = state.condition == cond;
-            return ChoiceChip(
-              label: Text(cond.name.replaceFirst('newCondition', 'New')),
-              selected: isSelected,
-              onSelected: (_) => controller.updateCondition(cond),
-              selectedColor: Colors.indigo.shade50,
-              labelStyle: TextStyle(
-                color: isSelected ? Colors.indigo : Colors.black87,
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            final bool isSelected = state.condition == cond;
+            return Expanded(
+              child: GestureDetector(
+                onTap: () => controller.updateCondition(cond),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFF007BFF) : Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Center(
+                    child: Text(
+                      cond.name.replaceFirst('newCondition', 'New'),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? Colors.white : Colors.black54,
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              backgroundColor: const Color(0xFFF8F9FB),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: isSelected ? Colors.indigo : Colors.transparent),
-              ),
-              showCheckmark: false,
             );
           }).toList(),
         ),
@@ -683,47 +565,150 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
     );
   }
 
+  Widget _buildQualityIndicator(AddListingState state) {
+    final double qualityScore = (state.qualityScore as dynamic) ?? 0.0;
+    final Color qualityColor = (state.qualityColor as dynamic) ?? Colors.grey;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: qualityColor.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Listing Quality: ${state.qualityLabel}', 
+                    style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 14, color: qualityColor)),
+                ],
+              ),
+              Text('${(qualityScore * 100).toInt()}%', 
+                style: TextStyle(color: qualityColor, fontWeight: FontWeight.w900, fontSize: 16)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(
+              value: qualityScore,
+              minHeight: 6,
+              backgroundColor: Colors.grey.shade200,
+              valueColor: AlwaysStoppedAnimation<Color>(qualityColor),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomAction(AddListingState state, AddListingController controller) {
+    final int currentStep = (state.currentStep as dynamic) ?? 0;
+    final bool isLastStep = currentStep >= 2;
+    
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Colors.grey.shade100)),
+      ),
+      child: Row(
+        children: [
+          if (currentStep > 0) ...[
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () {
+                  if (_pageController.hasClients) {
+                    _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+                  }
+                  controller.previousStep();
+                },
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  side: BorderSide(color: Colors.grey.shade200),
+                ),
+                child: const Text('Back', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const SizedBox(width: 16),
+          ],
+          Expanded(
+            flex: 2,
+            child: FilledButton(
+              onPressed: state.isLoading ? null : () async {
+                if (isLastStep) {
+                  final success = await controller.publish();
+                  if (success && mounted) {
+                    _showSuccessDialog(context);
+                  }
+                } else {
+                  if (_pageController.hasClients) {
+                    _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+                  }
+                  controller.nextStep();
+                }
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF007BFF),
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              ),
+              child: Text(
+                isLastStep ? (widget.listing == null ? 'Publish Now' : 'Save Changes') : 'Continue',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPreviewOverlay(AddListingState state) {
+    final int quantity = (state.quantity as dynamic) ?? 1;
     return Positioned.fill(
       child: Container(
-        color: Colors.black.withOpacity(0.8),
+        color: Colors.black.withOpacity(0.9),
         child: Column(
           children: [
             const Spacer(),
-            Text('Listing Preview', style: GoogleFonts.plusJakartaSans(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 24),
+            Text('Listing Preview', style: GoogleFonts.plusJakartaSans(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
+            const SizedBox(height: 32),
             SizedBox(
-              width: 240,
+              width: 280,
               child: MarketplaceCard(
                 index: 0,
                 listing: Listing(
                   id: state.id,
                   sellerId: 'preview',
                   sellerName: 'You',
-                  sellerUniversity: state.campusLocation,
+                  sellerUniversity: state.campusLocation.isEmpty ? 'University' : state.campusLocation,
                   title: state.title.isEmpty ? 'Item Title' : state.title,
                   description: state.description,
                   price: state.price,
                   category: state.category,
                   imageUrls: state.selectedImages.isNotEmpty 
-                      ? [state.selectedImages.first.path] // This is a path, local, won't show but card handles it
+                      ? state.selectedImages.map((e) => e.path).toList()
                       : state.existingImageUrls,
-                  campusLocation: state.campusLocation.isEmpty ? 'Location' : state.campusLocation,
+                  campusLocation: state.campusLocation,
                   condition: state.condition,
-                  brand: state.brand,
-                  storage: state.storage,
-                  color: state.color,
                   isNegotiable: state.isNegotiable,
+                  quantity: quantity,
+                  attributes: state.attributes,
                   createdAt: DateTime.now(),
                   expiresAt: DateTime.now(),
                 ),
               ),
             ),
-            const SizedBox(height: 40),
-            TextButton.icon(
+            const SizedBox(height: 48),
+            IconButton(
               onPressed: () => setState(() => _showPreview = false),
-              icon: const Icon(Icons.close_rounded, color: Colors.white),
-              label: const Text('Close Preview', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              icon: const Icon(Icons.close_rounded, color: Colors.white, size: 40),
             ),
             const Spacer(),
           ],
@@ -732,59 +717,30 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
     );
   }
 
-  Widget _buildActionArea(BuildContext context, AddListingState state, AddListingController controller) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -4))],
-      ),
-      child: SafeArea(
-        child: Row(
-          children: [
-            Expanded(
-              flex: 1,
-              child: OutlinedButton(
-                onPressed: () => _handleExit(context, controller),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  side: BorderSide(color: Colors.grey.shade200),
-                ),
-                child: const Text('Save Draft', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 2,
-              child: FilledButton(
-                onPressed: state.isLoading ? null : () async {
-                  final success = await controller.publish();
-                  if (success && context.mounted) {
-                    _showSuccessDialog(context);
-                  }
-                },
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.indigo,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 4,
-                  shadowColor: Colors.indigo.withOpacity(0.3),
-                ),
-                child: state.isLoading 
-                  ? Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
-                        const SizedBox(width: 12),
-                        Text('Publishing ${(state.uploadProgress * 100).toInt()}%', style: const TextStyle(fontSize: 14)),
-                      ],
-                    )
-                  : const Text('Publish Listing', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
-        ),
+  void _handleExit(BuildContext context, AddListingController controller) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Save draft?'),
+        content: const Text('You can finish your listing later.'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              controller.clearDraft();
+              Navigator.pop(context);
+              context.pop();
+            },
+            child: const Text('Discard', style: TextStyle(color: Colors.red)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.pop();
+            },
+            child: const Text('Save Draft'),
+          ),
+        ],
       ),
     );
   }
@@ -793,37 +749,40 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-        content: Padding(
-          padding: const EdgeInsets.all(10),
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+        child: Padding(
+          padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const SizedBox(height: 10),
               Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(color: Colors.green.shade50, shape: BoxShape.circle),
-                child: const Icon(Icons.check_circle_rounded, color: Colors.green, size: 60),
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(color: Color(0xFFE8F5E9), shape: BoxShape.circle),
+                child: const Icon(Icons.check_rounded, color: Color(0xFF4CAF50), size: 48),
               ),
               const SizedBox(height: 24),
-              Text('Successfully Published!', style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              const Text('Your item is now live and visible to students across campus.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, height: 1.5)),
+              Text('Live on UniHub!', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              const Text(
+                'Your listing is now visible to everyone. Good luck with the sale!',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.black54, height: 1.5),
+              ),
               const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
-                height: 54,
                 child: FilledButton(
                   onPressed: () {
-                    Navigator.pop(context); // Close dialog
-                    context.pop(); // Go back to marketplace
+                    Navigator.pop(context);
+                    context.pop();
                   },
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.indigo, 
+                    backgroundColor: const Color(0xFF007BFF),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                  child: const Text('View Marketplace', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text('Done', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
             ],

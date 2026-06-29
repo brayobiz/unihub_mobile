@@ -24,10 +24,14 @@ class AddListingState {
   final String? storage;
   final String? color;
   final bool isNegotiable;
+  final int quantity;
+  final List<String> tags;
   final bool isLoading;
   final double uploadProgress;
   final String? error;
-  final Map<String, dynamic> extraFields;
+  final Map<String, dynamic> attributes;
+  final int currentStep;
+  final bool isEditing;
 
   AddListingState({
     required this.id,
@@ -43,34 +47,43 @@ class AddListingState {
     this.storage,
     this.color,
     this.isNegotiable = false,
+    this.quantity = 1,
+    this.tags = const [],
     this.isLoading = false,
     this.uploadProgress = 0,
     this.error,
-    this.extraFields = const {},
+    this.attributes = const {},
+    this.currentStep = 0,
+    this.isEditing = false,
   });
 
   double get qualityScore {
-    double score = 0;
-    if (title.length > 10) score += 0.2;
-    if (description.length > 50) score += 0.3;
-    if (price > 0) score += 0.1;
-    if (selectedImages.isNotEmpty || existingImageUrls.isNotEmpty) score += 0.2;
-    if (campusLocation.isNotEmpty) score += 0.2;
-    return score;
+    int totalPoints = 0;
+    const int maxPoints = 8;
+    
+    if (title.length > 10) totalPoints++;
+    if (description.length > 50) totalPoints++;
+    if (price > 0) totalPoints++;
+    if (selectedImages.isNotEmpty || existingImageUrls.isNotEmpty) totalPoints += 2;
+    if (campusLocation.isNotEmpty) totalPoints++;
+    if (attributes.isNotEmpty) totalPoints++;
+    if (condition != ListingCondition.good) totalPoints++;
+
+    return totalPoints / maxPoints;
   }
 
   String get qualityLabel {
     final s = qualityScore;
-    if (s < 0.4) return 'Needs Work';
-    if (s < 0.7) return 'Good';
-    return 'Excellent';
+    if (s < 0.4) return 'Basic';
+    if (s < 0.7) return 'Great';
+    return 'Professional';
   }
 
   Color get qualityColor {
     final s = qualityScore;
-    if (s < 0.4) return Colors.red;
-    if (s < 0.7) return Colors.orange;
-    return Colors.green;
+    if (s < 0.4) return const Color(0xFFFF4B4B);
+    if (s < 0.7) return const Color(0xFFFFB800);
+    return const Color(0xFF00C566);
   }
 
   AddListingState copyWith({
@@ -86,10 +99,14 @@ class AddListingState {
     String? storage,
     String? color,
     bool? isNegotiable,
+    int? quantity,
+    List<String>? tags,
     bool? isLoading,
     double? uploadProgress,
     String? error,
-    Map<String, dynamic>? extraFields,
+    Map<String, dynamic>? attributes,
+    int? currentStep,
+    bool? isEditing,
   }) {
     return AddListingState(
       id: id,
@@ -105,10 +122,14 @@ class AddListingState {
       storage: storage ?? this.storage,
       color: color ?? this.color,
       isNegotiable: isNegotiable ?? this.isNegotiable,
+      quantity: quantity ?? this.quantity,
+      tags: tags ?? this.tags,
       isLoading: isLoading ?? this.isLoading,
       uploadProgress: uploadProgress ?? this.uploadProgress,
       error: error,
-      extraFields: extraFields ?? this.extraFields,
+      attributes: attributes ?? this.attributes,
+      currentStep: currentStep ?? this.currentStep,
+      isEditing: isEditing ?? this.isEditing,
     );
   }
 
@@ -125,98 +146,158 @@ class AddListingState {
       'storage': storage,
       'color': color,
       'isNegotiable': isNegotiable,
+      'quantity': quantity,
+      'tags': tags,
+      'attributes': attributes,
+      'currentStep': currentStep,
+      'isEditing': isEditing,
     };
   }
 }
 
 class AddListingController extends StateNotifier<AddListingState> {
   final Ref _ref;
-  static const String _draftKey = 'listing_draft';
+  static const String _draftKey = 'listing_draft_v5';
 
   AddListingController(this._ref, Listing? initialListing) 
-    : super(AddListingState(id: initialListing?.id ?? const Uuid().v4())) {
-    if (initialListing != null) {
-      state = state.copyWith(
-        title: initialListing.title,
-        description: initialListing.description,
-        price: initialListing.price,
-        category: initialListing.category,
-        existingImageUrls: initialListing.imageUrls,
-        campusLocation: initialListing.campusLocation,
-        condition: initialListing.condition,
-        brand: initialListing.brand,
-        storage: initialListing.storage,
-        color: initialListing.color,
-        isNegotiable: initialListing.isNegotiable,
-      );
-    } else {
+    : super(_createInitialState(initialListing)) {
+    if (initialListing == null) {
       _loadDraft();
     }
   }
 
+  static AddListingState _createInitialState(Listing? listing) {
+    if (listing == null) {
+      return AddListingState(id: const Uuid().v4(), isEditing: false);
+    }
+    return AddListingState(
+      id: listing.id,
+      title: listing.title,
+      description: listing.description,
+      price: listing.price,
+      category: listing.category,
+      existingImageUrls: listing.imageUrls,
+      campusLocation: listing.campusLocation,
+      condition: listing.condition,
+      brand: listing.brand,
+      storage: listing.storage,
+      color: listing.color,
+      isNegotiable: listing.isNegotiable,
+      quantity: listing.quantity,
+      tags: listing.tags,
+      attributes: listing.attributes,
+      currentStep: 0,
+      isEditing: true,
+    );
+  }
+
   void updateTitle(String val) {
     state = state.copyWith(title: val);
-    _saveDraft();
+    if (!state.isEditing) _saveDraft();
   }
 
   void updateDescription(String val) {
     state = state.copyWith(description: val);
-    _saveDraft();
+    if (!state.isEditing) _saveDraft();
   }
 
   void updatePrice(double val) {
     state = state.copyWith(price: val);
-    _saveDraft();
+    if (!state.isEditing) _saveDraft();
   }
 
   void updateCategory(String val) {
-    state = state.copyWith(category: val, extraFields: {});
-    _saveDraft();
+    state = state.copyWith(category: val, attributes: {});
+    if (!state.isEditing) _saveDraft();
   }
 
   void updateCondition(ListingCondition val) {
     state = state.copyWith(condition: val);
-    _saveDraft();
+    if (!state.isEditing) _saveDraft();
   }
 
   void updateLocation(String val) {
     state = state.copyWith(campusLocation: val);
-    _saveDraft();
+    if (!state.isEditing) _saveDraft();
   }
 
   void updateBrand(String? val) {
     state = state.copyWith(brand: val);
-    _saveDraft();
+    if (!state.isEditing) _saveDraft();
   }
 
   void updateStorage(String? val) {
     state = state.copyWith(storage: val);
-    _saveDraft();
+    if (!state.isEditing) _saveDraft();
   }
 
   void updateColor(String? val) {
     state = state.copyWith(color: val);
-    _saveDraft();
+    if (!state.isEditing) _saveDraft();
   }
 
   void toggleNegotiable(bool val) {
     state = state.copyWith(isNegotiable: val);
-    _saveDraft();
+    if (!state.isEditing) _saveDraft();
+  }
+
+  void updateQuantity(int val) {
+    state = state.copyWith(quantity: val);
+    if (!state.isEditing) _saveDraft();
+  }
+
+  void updateTags(List<String> val) {
+    state = state.copyWith(tags: val);
+    if (!state.isEditing) _saveDraft();
+  }
+
+  void updateAttribute(String key, dynamic value) {
+    final newAttr = Map<String, dynamic>.from(state.attributes);
+    newAttr[key] = value;
+    state = state.copyWith(attributes: newAttr);
+    if (!state.isEditing) _saveDraft();
+  }
+
+  void nextStep() {
+    if (state.currentStep < 2) {
+      state = state.copyWith(currentStep: state.currentStep + 1);
+    }
+  }
+
+  void previousStep() {
+    if (state.currentStep > 0) {
+      state = state.copyWith(currentStep: state.currentStep - 1);
+    }
   }
 
   Future<void> pickImages() async {
-    final picker = ImagePicker();
-    final images = await picker.pickMultiImage();
-    if (images.isNotEmpty) {
-      final current = List<File>.from(state.selectedImages);
-      current.addAll(images.map((i) => File(i.path)));
-      state = state.copyWith(selectedImages: current);
-    }
+    try {
+      final picker = ImagePicker();
+      final images = await picker.pickMultiImage();
+      if (images.isNotEmpty) {
+        final current = List<File>.from(state.selectedImages);
+        current.addAll(images.map((i) => File(i.path)));
+        state = state.copyWith(selectedImages: current);
+      }
+    } catch (_) {}
   }
 
   void removeSelectedImage(File file) {
     final current = List<File>.from(state.selectedImages);
     current.remove(file);
+    state = state.copyWith(selectedImages: current);
+  }
+
+  void reorderSelectedImages(int oldIndex, int newIndex) {
+    final current = List<File>.from(state.selectedImages);
+    if (newIndex > oldIndex) newIndex -= 1;
+    if (oldIndex < 0 || oldIndex >= current.length) return;
+    final item = current.removeAt(oldIndex);
+    if (newIndex < 0 || newIndex > current.length) {
+      current.add(item);
+    } else {
+      current.insert(newIndex, item);
+    }
     state = state.copyWith(selectedImages: current);
   }
 
@@ -227,32 +308,46 @@ class AddListingController extends StateNotifier<AddListingState> {
   }
 
   Future<void> _saveDraft() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_draftKey, jsonEncode(state.toMap()));
+    if (state.isEditing) return; // Don't save drafts while editing existing items
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_draftKey, jsonEncode(state.toMap()));
+    } catch (_) {}
   }
 
   Future<void> _loadDraft() async {
-    final prefs = await SharedPreferences.getInstance();
-    final draftJson = prefs.getString(_draftKey);
-    if (draftJson != null) {
-      final data = jsonDecode(draftJson);
-      state = state.copyWith(
-        title: data['title'] ?? '',
-        description: data['description'] ?? '',
-        price: (data['price'] ?? 0.0).toDouble(),
-        category: data['category'] ?? 'Electronics',
-        campusLocation: data['campusLocation'] ?? '',
-        brand: data['brand'],
-        storage: data['storage'],
-        color: data['color'],
-        isNegotiable: data['isNegotiable'] ?? false,
-      );
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final draftJson = prefs.getString(_draftKey);
+      if (draftJson != null) {
+        final data = jsonDecode(draftJson);
+        state = state.copyWith(
+          title: data['title']?.toString() ?? '',
+          description: data['description']?.toString() ?? '',
+          price: (data['price'] ?? 0.0).toDouble(),
+          category: data['category']?.toString() ?? 'Electronics',
+          campusLocation: data['campusLocation']?.toString() ?? '',
+          brand: data['brand']?.toString(),
+          storage: data['storage']?.toString(),
+          color: data['color']?.toString(),
+          isNegotiable: data['isNegotiable'] == true,
+          quantity: int.tryParse(data['quantity']?.toString() ?? '1') ?? 1,
+          tags: (data['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
+          attributes: Map<String, dynamic>.from(data['attributes'] ?? {}),
+          currentStep: 0, // Always start at step 0
+          isEditing: false,
+        );
+      }
+    } catch (_) {
+      await clearDraft();
     }
   }
 
   Future<void> clearDraft() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_draftKey);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_draftKey);
+    } catch (_) {}
   }
 
   Future<bool> publish() async {
@@ -268,7 +363,6 @@ class AddListingController extends StateNotifier<AddListingState> {
 
       final imageUrls = [...state.existingImageUrls];
       
-      // Upload New Images
       for (var i = 0; i < state.selectedImages.length; i++) {
         final url = await _ref.read(storageRepositoryProvider).uploadFile(
           path: 'listings/${state.id}',
@@ -303,12 +397,20 @@ class AddListingController extends StateNotifier<AddListingState> {
         storage: state.storage,
         color: state.color,
         isNegotiable: state.isNegotiable,
+        quantity: state.quantity,
+        tags: state.tags,
+        attributes: state.attributes,
         createdAt: DateTime.now(),
         expiresAt: DateTime.now().add(const Duration(days: 30)),
       );
 
-      await _ref.read(marketplaceRepositoryProvider).createListing(listing);
-      await clearDraft();
+      if (state.isEditing) {
+        await _ref.read(marketplaceRepositoryProvider).updateListing(listing);
+      } else {
+        await _ref.read(marketplaceRepositoryProvider).createListing(listing);
+        await clearDraft();
+      }
+
       state = state.copyWith(isLoading: false);
       return true;
     } catch (e) {

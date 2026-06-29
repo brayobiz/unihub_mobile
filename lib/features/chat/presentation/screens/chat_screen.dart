@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,28 +8,26 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
-
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../auth/shared/providers.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/message.dart';
+import '../../domain/models/chat_context.dart';
 import '../../shared/providers.dart';
-import '../../../marketplace/domain/models/listing.dart';
-import '../../../marketplace/shared/providers.dart';
 import '../../../shared/storage_repository.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String conversationId;
   final String otherUserName;
-  final Listing? listing;
+  final ChatContext? chatContext;
 
   const ChatScreen({
     super.key,
     required this.conversationId,
     required this.otherUserName,
-    this.listing,
+    this.chatContext,
   });
 
   @override
@@ -37,7 +36,51 @@ class ChatScreen extends ConsumerStatefulWidget {
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _messageController = TextEditingController();
+  final _scrollController = ScrollController();
   bool _isUploading = false;
+  Timer? _typingTimer;
+  bool _isTyping = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Mark as read when opening
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = ref.read(authStateProvider).valueOrNull;
+      if (user != null) {
+        ref.read(chatRepositoryProvider).markAsRead(widget.conversationId, user.uid);
+      }
+    });
+    
+    _messageController.addListener(_onTextChanged);
+  }
+
+  @override
+  void dispose() {
+    _messageController.removeListener(_onTextChanged);
+    _messageController.dispose();
+    _scrollController.dispose();
+    _typingTimer?.cancel();
+    super.dispose();
+  }
+
+  void _onTextChanged() {
+    final user = ref.read(authStateProvider).valueOrNull;
+    if (user == null) return;
+
+    if (!_isTyping && _messageController.text.isNotEmpty) {
+      _isTyping = true;
+      ref.read(chatRepositoryProvider).updateTypingStatus(widget.conversationId, user.uid, true);
+    }
+
+    _typingTimer?.cancel();
+    _typingTimer = Timer(const Duration(seconds: 3), () {
+      if (_isTyping) {
+        _isTyping = false;
+        ref.read(chatRepositoryProvider).updateTypingStatus(widget.conversationId, user.uid, false);
+      }
+    });
+  }
 
   void _sendMessage([String? quickContent, MessageType type = MessageType.text]) {
     final content = quickContent ?? _messageController.text.trim();
@@ -51,6 +94,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       senderId: user.uid,
       content: content,
       type: type,
+      status: MessageStatus.sending, // Start with sending status for optimistic UI
       timestamp: DateTime.now(),
     );
 
@@ -92,15 +136,75 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  void _onLongPressMessage(Message message, bool isMe) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.copy_rounded),
+              title: const Text('Copy Text'),
+              onTap: () {
+                // Clipboard logic
+                Navigator.pop(context);
+              },
+            ),
+            if (isMe)
+              ListTile(
+                leading: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                title: const Text('Delete Message', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  ref.read(chatRepositoryProvider).deleteMessage(widget.conversationId, message.id);
+                  Navigator.pop(context);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final messagesAsync = ref.watch(messagesStreamProvider(widget.conversationId));
+    final conversationAsync = ref.watch(conversationProvider(widget.conversationId));
+    final currentUser = ref.watch(authStateProvider).valueOrNull;
+    
+    final conversation = conversationAsync.valueOrNull;
+    
+    // Auto-mark as read when new messages arrive while on screen
+    ref.listen(messagesStreamProvider(widget.conversationId), (previous, next) {
+      if (next.hasValue && next.value!.isNotEmpty) {
+        final lastMessage = next.value!.first;
+        if (lastMessage.senderId != currentUser?.uid && currentUser != null) {
+          ref.read(chatRepositoryProvider).markAsRead(widget.conversationId, currentUser.uid);
+        }
+      }
+    });
+    
+    String? otherUserId;
+    if (conversation != null && currentUser != null) {
+      otherUserId = conversation.participants.firstWhere((id) => id != currentUser.uid, orElse: () => '');
+    }
+    
+    final otherUser = (otherUserId != null && otherUserId.isNotEmpty) 
+        ? ref.watch(userByIdProvider(otherUserId)).valueOrNull 
+        : null;
+
+    final isOnline = otherUser?.isOnline == true;
+    final lastSeen = otherUser?.lastSeen;
+    
+    final bool isOtherTyping = conversation?.typing[otherUserId] != null;
+
+    final effectiveContext = widget.chatContext ?? conversation?.context;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FB),
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 0,
+        elevation: 0.5,
         centerTitle: false,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black, size: 20),
@@ -111,48 +215,84 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             CircleAvatar(
               radius: 18,
               backgroundColor: Colors.indigo.shade50,
-              child: Text(
-                widget.otherUserName[0].toUpperCase(),
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.indigo),
-              ),
+              backgroundImage: otherUser?.photoUrl != null ? NetworkImage(otherUser!.photoUrl!) : null,
+              child: otherUser?.photoUrl == null 
+                ? Text(
+                    widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : '?',
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.indigo),
+                  )
+                : null,
             ),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.otherUserName,
-                  style: GoogleFonts.plusJakartaSans(fontSize: 15, color: Colors.black, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  'Online',
-                  style: GoogleFonts.plusJakartaSans(fontSize: 11, color: Colors.green, fontWeight: FontWeight.w600),
-                ),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          widget.otherUserName,
+                          style: GoogleFonts.plusJakartaSans(fontSize: 15, color: Colors.black, fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (otherUser?.isVerified == true) ...[
+                        const SizedBox(width: 4),
+                        const Icon(Icons.verified, color: Color(0xFF6366F1), size: 14),
+                      ],
+                    ],
+                  ),
+                  Text(
+                    isOtherTyping 
+                        ? 'typing...' 
+                        : (isOnline ? 'Online' : (lastSeen != null ? 'Last seen ${_formatLastSeen(lastSeen)}' : 'Offline')),
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11, 
+                      color: isOtherTyping || isOnline ? Colors.green : Colors.grey,
+                      fontWeight: FontWeight.w600
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.more_vert_rounded, color: Colors.black),
+            onPressed: () => _showConversationMenu(),
+          ),
+        ],
       ),
       body: Column(
         children: [
-          if (widget.listing != null) _buildListingPreview(),
+          if (effectiveContext != null && effectiveContext.type != 'support') 
+            _buildContextBanner(effectiveContext),
           
           Expanded(
             child: messagesAsync.when(
-              data: (messages) => ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                reverse: true,
-                itemCount: messages.length,
-                itemBuilder: (context, index) {
-                  final message = messages[index];
-                  final isMe = message.senderId == ref.read(authStateProvider).valueOrNull?.uid;
-                  
-                  // Grouping logic for tighter spacing
-                  final bool isSameSenderAsNext = index > 0 && messages[index - 1].senderId == message.senderId;
-                  
-                  return _buildMessageBubble(message, isMe, !isSameSenderAsNext);
-                },
-              ),
+              data: (messages) {
+                if (messages.isEmpty) {
+                  return _buildEmptyState();
+                }
+                return ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                  reverse: true,
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    final message = messages[index];
+                    final isMe = message.senderId == currentUser?.uid;
+                    final bool isSameSenderAsNext = index > 0 && messages[index - 1].senderId == message.senderId;
+                    
+                    return GestureDetector(
+                      onLongPress: () => _onLongPressMessage(message, isMe),
+                      child: _buildMessageBubble(message, isMe, !isSameSenderAsNext),
+                    );
+                  },
+                );
+              },
               loading: () => const Center(child: CircularProgressIndicator(color: Colors.indigo)),
               error: (err, stack) => Center(child: Text('Error: $err')),
             ),
@@ -171,12 +311,83 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             ),
 
-          _buildQuickReplies(),
+          _buildQuickReplies(effectiveContext?.type),
           
           _buildInputArea(),
         ],
       ),
     );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.chat_bubble_outline_rounded, size: 48, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
+          Text(
+            'Say hello to ${widget.otherUserName}!',
+            style: GoogleFonts.plusJakartaSans(color: Colors.grey.shade600, fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContextBanner(ChatContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white, 
+        border: Border(bottom: BorderSide(color: Colors.grey.shade200))
+      ),
+      child: Row(
+        children: [
+          if (context.thumbnail != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: OptimizedImage(imageUrl: context.thumbnail!, width: 40, height: 40, fit: BoxFit.cover),
+            )
+          else
+            Container(
+              width: 40, height: 40, 
+              decoration: BoxDecoration(color: Colors.indigo.shade50, borderRadius: BorderRadius.circular(8)), 
+              child: Icon(_getContextIcon(context.type), color: Colors.indigo, size: 20)
+            ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start, 
+              children: [
+                Text(context.type.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                Text(context.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+              ]
+            )
+          ),
+          TextButton(
+            onPressed: () => _navigateToContext(context), 
+            child: const Text('View', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getContextIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'marketplace': return Icons.storefront;
+      case 'housing': return Icons.home_work;
+      default: return Icons.info_outline;
+    }
+  }
+
+  void _navigateToContext(ChatContext chatContext) {
+    if (chatContext.type == 'marketplace') {
+      context.push('/listing-detail', extra: {'id': chatContext.id}); // Assumes router handles ID or we need full listing
+    } else if (chatContext.type == 'housing') {
+      context.push('/housing-detail', extra: {'id': chatContext.id});
+    }
   }
 
   Widget _buildInputArea() {
@@ -261,6 +472,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
+  void _showConversationMenu() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+              title: const Text('Delete Conversation', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                ref.read(chatRepositoryProvider).deleteConversation(widget.conversationId);
+                context.pop(); // pop sheet
+                context.pop(); // pop screen
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildMessageBubble(Message message, bool isMe, bool showTail) {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -290,18 +523,48 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           children: [
             _buildMessageContent(message, isMe),
             const SizedBox(height: 4),
-            Text(
-              DateFormat('HH:mm').format(message.timestamp), 
-              style: TextStyle(
-                fontSize: 9, 
-                fontWeight: FontWeight.w500,
-                color: isMe ? Colors.white70 : Colors.grey.shade500,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  DateFormat('HH:mm').format(message.timestamp), 
+                  style: TextStyle(
+                    fontSize: 9, 
+                    fontWeight: FontWeight.w500,
+                    color: isMe ? Colors.white70 : Colors.grey.shade500,
+                  ),
+                ),
+                if (isMe) ...[
+                  const SizedBox(width: 4),
+                  _buildStatusIcon(message.status),
+                ],
+              ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildStatusIcon(MessageStatus status) {
+    IconData icon;
+    Color color = Colors.white70;
+    switch (status) {
+      case MessageStatus.sending:
+        icon = Icons.access_time;
+        break;
+      case MessageStatus.sent:
+        icon = Icons.check;
+        break;
+      case MessageStatus.delivered:
+        icon = Icons.done_all;
+        break;
+      case MessageStatus.read:
+        icon = Icons.done_all;
+        color = Colors.lightBlueAccent;
+        break;
+    }
+    return Icon(icon, size: 12, color: color);
   }
 
   Widget _buildMessageContent(Message message, bool isMe) {
@@ -354,92 +617,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
-  // ... rest of methods (review prompt, listing preview, quick replies)
-  Widget _buildReviewPrompt() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      color: Colors.amber.shade50,
-      child: Row(
-        children: [
-          const Icon(Icons.star_outline, color: Colors.amber),
-          const SizedBox(width: 8),
-          const Expanded(
-            child: Text('This item was marked as sold. Rate your experience?', 
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-          ),
-          TextButton(onPressed: () => _showReviewDialog(), child: const Text('Rate Now')),
-        ],
-      ),
-    );
+  String _formatLastSeen(DateTime lastSeen) {
+    final now = DateTime.now();
+    final difference = now.difference(lastSeen);
+
+    if (difference.inMinutes < 1) return 'just now';
+    if (difference.inMinutes < 60) return '${difference.inMinutes}m ago';
+    if (difference.inHours < 24) return '${difference.inHours}h ago';
+    if (difference.inDays < 7) return '${difference.inDays}d ago';
+    return DateFormat('MMM d').format(lastSeen);
   }
 
-  void _showReviewDialog() {
-    double rating = 5.0;
-    final commentController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => AlertDialog(
-          title: const Text('Rate Experience'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (index) => IconButton(
-                  icon: Icon(index < rating ? Icons.star : Icons.star_border, color: Colors.amber),
-                  onPressed: () => setModalState(() => rating = index + 1.0),
-                )),
-              ),
-              TextField(controller: commentController, decoration: const InputDecoration(hintText: 'Comment (optional)'), maxLines: 2),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            TextButton(
-              onPressed: () {
-                final buyer = ref.read(authStateProvider).valueOrNull;
-                if (buyer != null && widget.listing != null) {
-                  ref.read(marketplaceRepositoryProvider).submitReview(
-                    sellerId: widget.listing!.sellerId,
-                    buyerId: buyer.uid,
-                    listingId: widget.listing!.id,
-                    rating: rating,
-                    comment: commentController.text,
-                  );
-                }
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Thank you!')));
-              },
-              child: const Text('Submit'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _buildQuickReplies(String? contextType) {
+    List<String> replies;
+    if (contextType == 'marketplace') {
+      replies = ["Is this available?", "Last price?", "Can we meet today?"];
+    } else if (contextType == 'housing') {
+      replies = ["Is this still vacant?", "When can I view?", "Are utilities included?"];
+    } else {
+      replies = ["Hello!", "I have a question", "Thank you"];
+    }
 
-  Widget _buildListingPreview() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: Colors.grey.shade200))),
-      child: Row(
-        children: [
-          Container(width: 40, height: 40, decoration: BoxDecoration(color: Colors.indigo.shade50, borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.shopping_bag_outlined, color: Colors.indigo, size: 20)),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(widget.listing!.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
-            Text('KES ${widget.listing!.price.toInt()}', style: const TextStyle(color: Colors.indigo, fontSize: 12, fontWeight: FontWeight.bold)),
-          ])),
-          TextButton(onPressed: () => context.push('/listing-detail', extra: widget.listing), child: const Text('View', style: TextStyle(fontSize: 12))),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickReplies() {
-    final replies = ["Is this available?", "Last price?", "Can we meet today?"];
     return SizedBox(
       height: 40,
       child: ListView.builder(

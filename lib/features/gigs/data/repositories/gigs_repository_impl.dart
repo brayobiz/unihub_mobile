@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unihub_mobile/features/chat/domain/models/conversation.dart';
 import 'package:unihub_mobile/features/chat/domain/models/message.dart';
+import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
 import 'package:unihub_mobile/services/notification_service.dart';
 import 'package:unihub_mobile/features/gigs/domain/models/gig_application.dart';
 import 'package:unihub_mobile/features/gigs/domain/repositories/gigs_repository.dart';
@@ -25,10 +26,10 @@ class GigsRepositoryImpl implements GigsRepository {
     String conversationId = '';
     
     // Check if conversation already exists for this gig between these two
-    // Filter by gigId first, then filter by participant in memory to avoid index requirements
     final existing = await _firestore
         .collection('conversations')
-        .where('gigId', isEqualTo: application.gigId)
+        .where('context.id', isEqualTo: application.gigId)
+        .where('context.type', isEqualTo: 'gig')
         .get();
 
     for (var doc in existing.docs) {
@@ -44,7 +45,6 @@ class GigsRepositoryImpl implements GigsRepository {
       final newConvRef = _firestore.collection('conversations').doc();
       conversationId = newConvRef.id;
       
-      // Fix for unreadCounts keys: Firestore keys cannot be empty strings
       final Map<String, int> unreadCounts = {
         application.freelancerId: 0,
         application.employerId: 1,
@@ -53,12 +53,14 @@ class GigsRepositoryImpl implements GigsRepository {
       final conversation = Conversation(
         id: conversationId,
         participants: [application.freelancerId, application.employerId],
-        gigId: application.gigId,
-        listingTitle: application.gigTitle,
+        context: ChatContext(
+          type: 'gig',
+          id: application.gigId,
+          title: application.gigTitle,
+        ),
         lastMessageTime: DateTime.now(),
         unreadCounts: unreadCounts,
         lastMessage: 'New gig application from ${application.fullName}',
-        module: 'gig',
       );
       
       batch.set(newConvRef, conversation.toJson());

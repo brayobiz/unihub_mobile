@@ -28,8 +28,8 @@ class HousingCard extends ConsumerWidget {
     // Efficiently fetch plug's verification status from the platform cache
     final plugAsync = ref.watch(userByIdProvider(listing.plugId));
     final plug = plugAsync.valueOrNull;
-    final plugIsVerified = plug?.isVerified ?? false;
-    final trustScore = plug?.trustScore ?? 70.0;
+    final plugIsVerified = plug?.isVerifiedPlug ?? false;
+    final trustScore = plug?.displayTrustScore ?? 70.0;
 
     if (isCompact) {
       return _buildCompact(context, currencyFormat, isTaken);

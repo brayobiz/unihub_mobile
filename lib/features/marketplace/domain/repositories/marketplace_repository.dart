@@ -36,7 +36,7 @@ abstract class MarketplaceRepository {
 
   // Offers & Negotiation
   Future<void> makeOffer(Offer offer);
-  Future<void> respondToOffer(String offerId, OfferStatus status, {double? counterAmount});
+  Future<void> respondToOffer(String offerId, OfferStatus status, {double? counterAmount, String? sellerMessage});
   Stream<List<Offer>> watchListingOffers(String listingId);
   Stream<List<Offer>> watchUserOffers(String userId);
 

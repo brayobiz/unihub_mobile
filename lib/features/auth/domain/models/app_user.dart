@@ -51,6 +51,8 @@ class AppUser {
   final String? fcmToken;
 
   final bool isOnboardingCompleted;
+  final bool isOnline;
+  final DateTime? lastSeen;
   final DateTime? createdAt;
 
   AppUser({
@@ -111,6 +113,8 @@ class AppUser {
     },
     this.fcmToken,
     this.isOnboardingCompleted = false,
+    this.isOnline = false,
+    this.lastSeen,
     this.createdAt,
   });
 
@@ -118,7 +122,7 @@ class AppUser {
   bool get isVerifiedPlug => verifiedRoles.contains('housePlug');
   bool get isVerifiedSeller => verifiedRoles.contains('seller');
   bool get isAnyRoleVerified => verifiedRoles.isNotEmpty;
-  bool get isVerified => isIdentityVerified || isAnyRoleVerified;
+  bool get isVerified => isIdentityVerified == true || isAnyRoleVerified == true;
 
   /// Calculates a reality-based trust score based on verified milestones and activity.
   /// This ensures the score is a deterministic reflection of the user's standing.
@@ -220,6 +224,8 @@ class AppUser {
     Map<String, bool>? notificationSettings,
     String? fcmToken,
     bool? isOnboardingCompleted,
+    bool? isOnline,
+    DateTime? lastSeen,
     DateTime? createdAt,
   }) {
     return AppUser(
@@ -266,6 +272,8 @@ class AppUser {
       notificationSettings: notificationSettings ?? this.notificationSettings,
       fcmToken: fcmToken ?? this.fcmToken,
       isOnboardingCompleted: isOnboardingCompleted ?? this.isOnboardingCompleted,
+      isOnline: isOnline ?? this.isOnline,
+      lastSeen: lastSeen ?? this.lastSeen,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -315,6 +323,8 @@ class AppUser {
       'notificationSettings': notificationSettings,
       'fcmToken': fcmToken,
       'isOnboardingCompleted': isOnboardingCompleted,
+      'isOnline': isOnline,
+      'lastSeen': lastSeen != null ? Timestamp.fromDate(lastSeen!) : null,
       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : null,
     };
   }
@@ -340,6 +350,14 @@ class AppUser {
       return double.tryParse(value.toString()) ?? defaultValue;
     }
 
+    bool safeBool(dynamic value, bool defaultValue) {
+      if (value == null) return defaultValue;
+      if (value is bool) return value;
+      if (value is String) return value.toLowerCase() == 'true';
+      if (value is int) return value != 0;
+      return defaultValue;
+    }
+
     return AppUser(
       uid: safeString(json['uid'], ''),
       email: safeString(json['email'], ''),
@@ -358,10 +376,10 @@ class AppUser {
       averageRating: safeDouble(json['averageRating'], 0.0),
       sellerRating: safeDouble(json['sellerRating'], 0.0),
       buyerRating: safeDouble(json['buyerRating'], 0.0),
-      isEmailVerified: json['isEmailVerified'] ?? false,
-      isPhoneVerified: json['isPhoneVerified'] ?? false,
-      isStudentVerified: json['isStudentVerified'] ?? false,
-      isIdentityVerified: json['isIdentityVerified'] ?? false,
+      isEmailVerified: safeBool(json['isEmailVerified'], false),
+      isPhoneVerified: safeBool(json['isPhoneVerified'], false),
+      isStudentVerified: safeBool(json['isStudentVerified'], false),
+      isIdentityVerified: safeBool(json['isIdentityVerified'], false),
       identityStatus: json['identityStatus']?.toString() ?? 'none',
       verifiedRoles: (json['verifiedRoles'] as List?)?.map((e) => e.toString()).toList() ?? <String>[],
       tier: safeString(json['tier'], 'free'),
@@ -405,7 +423,11 @@ class AppUser {
         }
       ),
       fcmToken: json['fcmToken']?.toString(),
-      isOnboardingCompleted: json['isOnboardingCompleted'] ?? false,
+      isOnboardingCompleted: safeBool(json['isOnboardingCompleted'], false),
+      isOnline: safeBool(json['isOnline'], false),
+      lastSeen: json['lastSeen'] != null 
+          ? (json['lastSeen'] as Timestamp).toDate() 
+          : null,
       createdAt: json['createdAt'] != null 
           ? (json['createdAt'] as Timestamp).toDate() 
           : null,

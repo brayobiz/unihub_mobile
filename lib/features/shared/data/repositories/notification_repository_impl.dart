@@ -9,56 +9,57 @@ class NotificationRepositoryImpl implements NotificationRepository {
 
   @override
   Stream<List<UniNotification>> watchNotifications(String userId, {String? module}) {
-    var query = _firestore
+    // We use server-side ordering but client-side filtering for module
+    // This avoids complex composite index requirements for every possible module/type combination
+    final query = _firestore
         .collection('users')
         .doc(userId)
         .collection('notifications')
-        .orderBy('createdAt', descending: true);
+        .orderBy('createdAt', descending: true)
+        .limit(100); // Limit to last 100 notifications for performance
 
-    if (module != null) {
-      List<String> types = [module];
+    return query.snapshots().map((snapshot) {
+      final all = snapshot.docs.map((doc) => UniNotification.fromFirestore(doc)).toList();
       
-      // Feature aliases for broader matching (especially for older notifications)
+      if (module == null) return all;
+
+      final List<String> types = [module];
       if (module == 'marketplace') {
         types.addAll(['listing', 'review']);
       }
-      
-      query = query.where(
-        Filter.or(
-          Filter('type', whereIn: types),
-          Filter('targetType', isEqualTo: module),
-        ),
-      );
-    }
 
-    return query.snapshots().map((snapshot) =>
-        snapshot.docs.map((doc) => UniNotification.fromFirestore(doc)).toList());
+      return all.where((n) {
+        // Match by type enum name or targetType string
+        return types.contains(n.type.name) || n.targetType == module;
+      }).toList();
+    });
   }
 
   @override
   Stream<int> watchUnreadCount(String userId, {String? module}) {
-    var query = _firestore
+    // We remove orderBy here because it's not needed for count and 
+    // requires a composite index when combined with where('isRead').
+    final query = _firestore
         .collection('users')
         .doc(userId)
         .collection('notifications')
         .where('isRead', isEqualTo: false);
 
-    if (module != null) {
-      List<String> types = [module];
-      
+    return query.snapshots().map((snapshot) {
+      if (module == null) return snapshot.docs.length;
+
+      final List<String> types = [module];
       if (module == 'marketplace') {
         types.addAll(['listing', 'review']);
       }
 
-      query = query.where(
-        Filter.or(
-          Filter('type', whereIn: types),
-          Filter('targetType', isEqualTo: module),
-        ),
-      );
-    }
-
-    return query.snapshots().map((snapshot) => snapshot.docs.length);
+      return snapshot.docs.where((doc) {
+        final data = doc.data();
+        final type = data['type'] as String?;
+        final targetType = data['targetType'] as String?;
+        return types.contains(type) || targetType == module;
+      }).length;
+    });
   }
 
   @override
@@ -89,33 +90,40 @@ class NotificationRepositoryImpl implements NotificationRepository {
 
   @override
   Future<void> markFeatureNotificationsAsRead(String userId, {String? module}) async {
-    final batch = _firestore.batch();
-    var query = _firestore
+    final query = _firestore
         .collection('users')
         .doc(userId)
         .collection('notifications')
         .where('isRead', isEqualTo: false);
 
-    if (module != null) {
-      List<String> types = [module];
-      if (module == 'marketplace') {
-        types.addAll(['listing', 'review']);
-      }
-
-      query = query.where(
-        Filter.or(
-          Filter('type', whereIn: types),
-          Filter('targetType', isEqualTo: module),
-        ),
-      );
-    }
-
     final snapshot = await query.get();
-
-    for (var doc in snapshot.docs) {
-      batch.update(doc.reference, {'isRead': true});
+    final batch = _firestore.batch();
+    
+    final List<String> types = module != null ? [module] : [];
+    if (module == 'marketplace') {
+      types.addAll(['listing', 'review']);
     }
-    await batch.commit();
+
+    int count = 0;
+    for (var doc in snapshot.docs) {
+      if (module == null) {
+        batch.update(doc.reference, {'isRead': true});
+        count++;
+      } else {
+        final data = doc.data();
+        final type = data['type'] as String?;
+        final targetType = data['targetType'] as String?;
+        
+        if (types.contains(type) || targetType == module) {
+          batch.update(doc.reference, {'isRead': true});
+          count++;
+        }
+      }
+    }
+    
+    if (count > 0) {
+      await batch.commit();
+    }
   }
 
   @override

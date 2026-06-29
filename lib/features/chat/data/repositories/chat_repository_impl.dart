@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:unihub_mobile/features/chat/domain/models/conversation.dart';
 import 'package:unihub_mobile/features/chat/domain/models/message.dart';
+import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
 import 'package:unihub_mobile/features/chat/domain/repositories/chat_repository.dart';
 import 'package:unihub_mobile/services/notification_service.dart';
 import 'package:unihub_mobile/features/shared/notification_repository.dart';
@@ -21,10 +22,18 @@ class ChatRepositoryImpl implements ChatRepository {
       final items = snapshot.docs
           .map((doc) => Conversation.fromJson(doc.data()))
           .toList();
-      // Sort in memory to avoid Firestore Composite Index requirements
       items.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
       return items;
     });
+  }
+
+  @override
+  Stream<Conversation?> watchConversation(String conversationId) {
+    return _firestore
+        .collection('conversations')
+        .doc(conversationId)
+        .snapshots()
+        .map((doc) => doc.exists ? Conversation.fromJson(doc.data()!) : null);
   }
 
   @override
@@ -44,7 +53,6 @@ class ChatRepositoryImpl implements ChatRepository {
   Future<void> sendMessage(String conversationId, Message message) async {
     final batch = _firestore.batch();
     
-    // 1. Add message to sub-collection
     final messageRef = _firestore
         .collection('conversations')
         .doc(conversationId)
@@ -52,26 +60,38 @@ class ChatRepositoryImpl implements ChatRepository {
         .doc(message.id);
     batch.set(messageRef, message.toJson());
     
-    // 2. Update conversation summary
     final convRef = _firestore.collection('conversations').doc(conversationId);
     batch.update(convRef, {
       'lastMessage': message.content,
+      'lastMessageSenderId': message.senderId,
+      'lastMessageStatus': message.status.name,
       'lastMessageTime': Timestamp.fromDate(message.timestamp),
     });
 
+    // Update unread counts for other participants
+    final convDoc = await convRef.get();
+    if (convDoc.exists) {
+      final participants = List<String>.from(convDoc.data()?['participants'] ?? []);
+      for (final participantId in participants) {
+        if (participantId != message.senderId) {
+          batch.update(convRef, {
+            'unreadCounts.$participantId': FieldValue.increment(1),
+          });
+        }
+      }
+    }
+
     await batch.commit();
 
-    // 3. Send Notification to Recipient
-    final convDoc = await _firestore.collection('conversations').doc(conversationId).get();
+    // Send Notification
     if (convDoc.exists) {
       final data = convDoc.data()!;
       final participants = List<String>.from(data['participants'] ?? []);
       final recipientId = participants.firstWhere((id) => id != message.senderId, orElse: () => '');
       
       if (recipientId.isNotEmpty) {
-        // Correctly set targetType based on conversation module
-        // This ensures the notification appears in the correct feature tab (Marketplace/Housing/etc)
-        final module = data['module'] as String?;
+        final contextData = data['context'] as Map<String, dynamic>?;
+        final module = contextData?['type'] as String?;
         final isSupport = data['isSupport'] ?? false;
         
         await _notificationService.sendNotification(
@@ -88,22 +108,20 @@ class ChatRepositoryImpl implements ChatRepository {
 
   @override
   Future<String> getOrCreateConversation({
-    required String buyerId,
-    required String sellerId,
-    required String listingId,
-    required String listingTitle,
-    String? module,
+    required List<String> participantIds,
+    required ChatContext context,
   }) async {
-    // Check if conversation already exists for this listing between these two
+    // Check if conversation already exists for this context between these participants
     final existing = await _firestore
         .collection('conversations')
-        .where('participants', arrayContains: buyerId)
-        .where('listingId', isEqualTo: listingId)
+        .where('context.id', isEqualTo: context.id)
+        .where('context.type', isEqualTo: context.type)
         .get();
 
     for (var doc in existing.docs) {
       final participants = List<String>.from(doc.data()['participants']);
-      if (participants.contains(sellerId)) {
+      if (participants.length == participantIds.length && 
+          participants.every((p) => participantIds.contains(p))) {
         return doc.id;
       }
     }
@@ -112,12 +130,10 @@ class ChatRepositoryImpl implements ChatRepository {
     final newConvRef = _firestore.collection('conversations').doc();
     final conversation = Conversation(
       id: newConvRef.id,
-      participants: [buyerId, sellerId],
-      listingId: listingId,
-      listingTitle: listingTitle,
+      participants: participantIds,
+      context: context,
       lastMessageTime: DateTime.now(),
-      unreadCounts: {buyerId: 0, sellerId: 0},
-      module: module,
+      unreadCounts: {for (var id in participantIds) id: 0},
     );
 
     await newConvRef.set(conversation.toJson());
@@ -126,14 +142,41 @@ class ChatRepositoryImpl implements ChatRepository {
 
   @override
   Future<void> markAsRead(String conversationId, String userId) async {
-    await _firestore.collection('conversations').doc(conversationId).update({
+    final convRef = _firestore.collection('conversations').doc(conversationId);
+    
+    // Mark conversation unread count to 0 for this user
+    await convRef.update({
       'unreadCounts.$userId': 0,
     });
+
+    final convDoc = await convRef.get();
+    if (convDoc.exists) {
+      final data = convDoc.data()!;
+      if (data['lastMessageSenderId'] != userId) {
+        await convRef.update({'lastMessageStatus': MessageStatus.read.name});
+      }
+    }
+
+    // Optionally mark all messages as read (status = read)
+    // This can be expensive if there are many messages, usually done in batches or for visible messages
+    final unreadMessages = await convRef
+        .collection('messages')
+        .where('senderId', isNotEqualTo: userId)
+        .where('status', isNotEqualTo: MessageStatus.read.name)
+        .get();
+
+    if (unreadMessages.docs.isNotEmpty) {
+      final batch = _firestore.batch();
+      for (var doc in unreadMessages.docs) {
+        batch.update(doc.reference, {'status': MessageStatus.read.name});
+      }
+      await batch.commit();
+    }
   }
 
   @override
   Future<String> getSupportConversation(String userId) async {
-    const adminId = 'unihub_admin'; // Global admin account ID
+    const adminId = 'unihub_admin';
     
     final existing = await _firestore
         .collection('conversations')
@@ -149,16 +192,54 @@ class ChatRepositoryImpl implements ChatRepository {
     final conversation = Conversation(
       id: newConvRef.id,
       participants: [userId, adminId],
-      listingTitle: 'UniHub Support',
+      context: ChatContext(
+        type: 'support',
+        id: 'support_$userId',
+        title: 'UniHub Support',
+      ),
       lastMessageTime: DateTime.now(),
       unreadCounts: {userId: 0, adminId: 0},
-      lastMessage: 'Hi! How can we help you today?',
+      isSupport: true,
     );
 
-    final data = conversation.toJson();
-    data['isSupport'] = true;
-    
-    await newConvRef.set(data);
+    await newConvRef.set(conversation.toJson());
     return newConvRef.id;
+  }
+
+  @override
+  Future<void> deleteMessage(String conversationId, String messageId) async {
+    await _firestore
+        .collection('conversations')
+        .doc(conversationId)
+        .collection('messages')
+        .doc(messageId)
+        .delete();
+  }
+
+  @override
+  Future<void> deleteConversation(String conversationId) async {
+    // In a real app, we might want to just "hide" it for the user, 
+    // but the requirement says "Delete conversation".
+    // Deleting subcollections requires deleting all documents inside.
+    final messages = await _firestore
+        .collection('conversations')
+        .doc(conversationId)
+        .collection('messages')
+        .get();
+        
+    final batch = _firestore.batch();
+    for (var doc in messages.docs) {
+      batch.delete(doc.reference);
+    }
+    batch.delete(_firestore.collection('conversations').doc(conversationId));
+    
+    await batch.commit();
+  }
+
+  @override
+  Future<void> updateTypingStatus(String conversationId, String userId, bool isTyping) async {
+    await _firestore.collection('conversations').doc(conversationId).update({
+      'typing.$userId': isTyping ? FieldValue.serverTimestamp() : FieldValue.delete(),
+    });
   }
 }

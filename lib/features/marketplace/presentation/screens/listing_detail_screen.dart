@@ -6,11 +6,13 @@ import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
+import '../../../../core/utils/date_formatter.dart';
 import '../../../auth/shared/providers.dart';
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import '../../domain/models/listing.dart';
 import '../../domain/models/offer.dart';
 import '../../shared/providers.dart';
+import '../../../chat/domain/models/chat_context.dart';
 import '../../../chat/shared/providers.dart';
 import '../widgets/marketplace_card.dart';
 import '../../../../services/history_service.dart';
@@ -78,19 +80,26 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
       return;
     }
 
+    final chatContext = ChatContext(
+      type: 'marketplace',
+      id: listing.id,
+      title: listing.title,
+      thumbnail: (listing.imageUrls != null && listing.imageUrls.isNotEmpty) ? listing.imageUrls.first : null,
+      metadata: {
+        'price': listing.price,
+      },
+    );
+
     final convId = await ref.read(chatRepositoryProvider).getOrCreateConversation(
-      buyerId: buyer.uid,
-      sellerId: listing.sellerId,
-      listingId: listing.id,
-      listingTitle: listing.title,
-      module: 'marketplace',
+      participantIds: [buyer.uid, listing.sellerId],
+      context: chatContext,
     );
 
     if (mounted) {
       context.push('/chat', extra: {
         'conversationId': convId,
         'otherUserName': listing.sellerName,
-        'listing': listing,
+        'context': chatContext,
       });
       ref.read(marketplaceRepositoryProvider).recordChatStarted(listing.id);
     }
@@ -197,7 +206,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 20),
-                      _buildVerifiedBadgeRow(),
+                      _buildVerifiedBadgeRow(sellerAsync),
                       const SizedBox(height: 12),
                       Text(
                         listing.title ?? 'No Title',
@@ -428,49 +437,126 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     );
   }
 
-  Widget _buildVerifiedBadgeRow() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE8F5E9),
-            borderRadius: BorderRadius.circular(8),
+  Widget _buildVerifiedBadgeRow(AsyncValue<AppUser> sellerAsync) {
+    return sellerAsync.when(
+      data: (seller) => Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          if (seller.isVerifiedSeller)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.verified, color: Color(0xFF4CAF50), size: 14),
+                  SizedBox(width: 4),
+                  Text('Verified Seller', style: TextStyle(color: Color(0xFF4CAF50), fontSize: 11, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.shield_outlined, color: Colors.grey.shade600, size: 14),
+                  const SizedBox(width: 4),
+                  Text('Student Listing', style: TextStyle(color: Colors.grey.shade600, fontSize: 11, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          Text(
+            'Posted ${DateFormatter.formatRelative(widget.listing.createdAt)}  •  ${widget.listing.viewsCount} views',
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
           ),
-          child: const Row(
-            children: [
-              Icon(Icons.verified, color: Color(0xFF4CAF50), size: 14),
-              SizedBox(width: 4),
-              Text('Verified Seller', style: TextStyle(color: Color(0xFF4CAF50), fontSize: 11, fontWeight: FontWeight.bold)),
-            ],
-          ),
-        ),
-        Text(
-          'Posted ${DateFormat('h').format(widget.listing.createdAt)} hours ago  •  ${widget.listing.viewsCount} views',
-          style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-        ),
-      ],
+        ],
+      ),
+      loading: () => const SizedBox(height: 28),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 
   Widget _buildSpecsGrid() {
-    return Row(
+    final attributes = widget.listing.attributes;
+    final List<Map<String, dynamic>> specItems = [];
+
+    // Add Condition first
+    specItems.add({
+      'icon': Icons.sentiment_satisfied_alt_rounded,
+      'label': 'Condition',
+      'value': widget.listing.condition.name.replaceFirst('newCondition', 'New'),
+    });
+
+    if (widget.listing.quantity > 1) {
+      specItems.add({
+        'icon': Icons.inventory_2_outlined,
+        'label': 'Quantity',
+        'value': widget.listing.quantity.toString(),
+      });
+    }
+
+    // Add legacy fields if present and not in attributes
+    if (widget.listing.brand != null && !attributes.containsKey('brand')) {
+      specItems.add({'icon': Icons.branding_watermark_outlined, 'label': 'Brand', 'value': widget.listing.brand});
+    }
+    if (widget.listing.storage != null && !attributes.containsKey('storage')) {
+      specItems.add({'icon': Icons.storage_rounded, 'label': 'Storage', 'value': widget.listing.storage});
+    }
+    if (widget.listing.color != null && !attributes.containsKey('color')) {
+      specItems.add({'icon': Icons.palette_outlined, 'label': 'Color', 'value': widget.listing.color});
+    }
+
+    // Add dynamic attributes
+    attributes.forEach((key, value) {
+      if (value == null || value.toString().isEmpty) return;
+      
+      IconData icon;
+      switch (key.toLowerCase()) {
+        case 'brand': icon = Icons.branding_watermark_outlined; break;
+        case 'storage': icon = Icons.storage_rounded; break;
+        case 'color': icon = Icons.palette_outlined; break;
+        case 'model': icon = Icons.model_training_outlined; break;
+        case 'size': icon = Icons.straighten_rounded; break;
+        case 'material': icon = Icons.layers_outlined; break;
+        case 'year': icon = Icons.calendar_today_rounded; break;
+        case 'mileage': icon = Icons.speed_rounded; break;
+        case 'author': icon = Icons.person_outline_rounded; break;
+        case 'edition': icon = Icons.menu_book_rounded; break;
+        default: icon = Icons.info_outline_rounded;
+      }
+      
+      specItems.add({
+        'icon': icon,
+        'label': key.isNotEmpty ? (key[0].toUpperCase() + key.substring(1)) : key,
+        'value': value.toString(),
+      });
+    });
+
+    if (specItems.isEmpty) return const SizedBox.shrink();
+
+    return Column(
       children: [
-        _specItem(Icons.sentiment_satisfied_alt_rounded, 'Condition', 
-          widget.listing.condition.name.replaceFirst('newCondition', 'New')),
-        if (widget.listing.brand != null) ...[
-          const SizedBox(width: 8),
-          _specItem(Icons.branding_watermark_outlined, 'Brand', widget.listing.brand!),
-        ],
-        if (widget.listing.storage != null) ...[
-          const SizedBox(width: 8),
-          _specItem(Icons.storage_rounded, 'Storage', widget.listing.storage!),
-        ],
-        if (widget.listing.color != null) ...[
-          const SizedBox(width: 8),
-          _specItem(Icons.palette_outlined, 'Color', widget.listing.color!),
-        ],
+        for (var i = 0; i < specItems.length; i += 2)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                _specItem(specItems[i]['icon'], specItems[i]['label'], specItems[i]['value']),
+                const SizedBox(width: 8),
+                if (i + 1 < specItems.length)
+                  _specItem(specItems[i + 1]['icon'], specItems[i + 1]['label'], specItems[i + 1]['value'])
+                else
+                  const Expanded(child: SizedBox.shrink()),
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -515,19 +601,20 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                       backgroundImage: seller.photoUrl != null ? NetworkImage(seller.photoUrl!) : null,
                       backgroundColor: Colors.grey.shade100,
                     ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        width: 14,
-                        height: 14,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF4CAF50),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
+                    if (seller.isOnline)
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4CAF50),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
                 const SizedBox(width: 16),
@@ -545,8 +632,10 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.verified, color: Color(0xFF007BFF), size: 16),
+                          if (seller.isVerifiedSeller) ...[
+                            const SizedBox(width: 4),
+                            const Icon(Icons.verified, color: Color(0xFF007BFF), size: 16),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 4),
@@ -554,6 +643,12 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: [
+                            if (seller.isOnline) ...[
+                              const Text('Online Now', style: TextStyle(color: Color(0xFF4CAF50), fontSize: 12, fontWeight: FontWeight.bold)),
+                              const SizedBox(width: 8),
+                              Text('•', style: TextStyle(color: Colors.grey.shade400)),
+                              const SizedBox(width: 8),
+                            ],
                             const Icon(Icons.star, color: Colors.amber, size: 14),
                             const SizedBox(width: 4),
                             Text('${seller.averageRating} (${seller.ratingsCount} reviews)', 

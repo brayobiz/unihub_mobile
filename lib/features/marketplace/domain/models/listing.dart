@@ -27,6 +27,11 @@ class Listing {
   final String? storage;
   final String? color;
   final bool isNegotiable;
+  final int quantity;
+  final List<String> tags;
+  
+  // Category-specific flexible attributes
+  final Map<String, dynamic> attributes;
   
   // Algorithmic & Engagement Data
   final bool isFeatured;
@@ -58,6 +63,9 @@ class Listing {
     this.storage,
     this.color,
     this.isNegotiable = true,
+    this.quantity = 1,
+    this.tags = const [],
+    this.attributes = const {},
     this.isFeatured = false,
     this.isPromoted = false,
     this.viewsCount = 0,
@@ -88,6 +96,9 @@ class Listing {
       'storage': storage,
       'color': color,
       'isNegotiable': isNegotiable,
+      'quantity': quantity,
+      'tags': tags,
+      'attributes': attributes,
       'isFeatured': isFeatured,
       'isPromoted': isPromoted,
       'viewsCount': viewsCount,
@@ -153,6 +164,9 @@ class Listing {
       storage: json['storage']?.toString(),
       color: json['color']?.toString(),
       isNegotiable: safeBool(json['isNegotiable'], true),
+      quantity: safeInt(json['quantity'], 1),
+      tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? <String>[],
+      attributes: Map<String, dynamic>.from(json['attributes'] ?? {}),
       isFeatured: safeBool(json['isFeatured'], false),
       isPromoted: safeBool(json['isPromoted'], false),
       viewsCount: safeInt(json['viewsCount'], 0),

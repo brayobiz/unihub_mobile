@@ -117,17 +117,39 @@ class _MyListingCard extends ConsumerWidget {
                   ),
                 ),
                 PopupMenuButton<String>(
-                  onSelected: (val) {
-                    if (val == 'delete') {
-                      ref.read(marketplaceRepositoryProvider).deleteListing(listing.id);
-                    } else if (val == 'sold') {
-                      ref.read(marketplaceRepositoryProvider).updateListingStatus(listing.id, ListingStatus.sold);
-                    } else if (val == 'pause') {
-                      ref.read(marketplaceRepositoryProvider).updateListingStatus(listing.id, ListingStatus.paused);
-                    } else if (val == 'activate') {
-                      ref.read(marketplaceRepositoryProvider).updateListingStatus(listing.id, ListingStatus.active);
-                    } else if (val == 'edit') {
-                      context.push('/add-listing', extra: listing);
+                  onSelected: (val) async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    try {
+                      if (val == 'delete') {
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Delete Listing?'),
+                            content: const Text('This action cannot be undone.'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                              TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+                            ],
+                          ),
+                        );
+                        if (confirmed == true) {
+                          await ref.read(marketplaceRepositoryProvider).deleteListing(listing.id);
+                          messenger.showSnackBar(const SnackBar(content: Text('Listing deleted')));
+                        }
+                      } else if (val == 'sold') {
+                        await ref.read(marketplaceRepositoryProvider).updateListingStatus(listing.id, ListingStatus.sold);
+                        messenger.showSnackBar(const SnackBar(content: Text('Item marked as sold! 🎉')));
+                      } else if (val == 'pause') {
+                        await ref.read(marketplaceRepositoryProvider).updateListingStatus(listing.id, ListingStatus.paused);
+                        messenger.showSnackBar(const SnackBar(content: Text('Listing paused')));
+                      } else if (val == 'activate') {
+                        await ref.read(marketplaceRepositoryProvider).updateListingStatus(listing.id, ListingStatus.active);
+                        messenger.showSnackBar(const SnackBar(content: Text('Listing is now active')));
+                      } else if (val == 'edit') {
+                        context.push('/add-listing', extra: listing);
+                      }
+                    } catch (e) {
+                      messenger.showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
                     }
                   },
                   itemBuilder: (context) => [

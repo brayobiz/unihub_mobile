@@ -5,23 +5,34 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
+import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
+import '../../../../core/utils/date_formatter.dart';
 import '../../../auth/shared/providers.dart';
+import '../../../auth/domain/models/app_user.dart';
 import '../../domain/models/housing_listing.dart';
 import '../../domain/models/housing_review.dart';
 import '../../shared/providers.dart';
 import '../../../chat/shared/providers.dart';
-import 'package:intl/intl.dart';
+import '../../../chat/domain/models/chat_context.dart';
 import '../../../../services/history_service.dart';
+import '../widgets/housing_card.dart';
 
 class HousingDetailsScreen extends ConsumerStatefulWidget {
   final HousingListing listing;
-  const HousingDetailsScreen({super.key, required this.listing});
+  final String? heroTag;
+
+  const HousingDetailsScreen({super.key, required this.listing, this.heroTag});
 
   @override
   ConsumerState<HousingDetailsScreen> createState() => _HousingDetailsScreenState();
 }
 
 class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
+  bool _isDescriptionExpanded = false;
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
+
   @override
   void initState() {
     super.initState();
@@ -33,590 +44,760 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
         imageUrl: widget.listing.images.isNotEmpty ? widget.listing.images.first : null,
         timestamp: DateTime.now(),
       ));
+      
+      // Record view logic could be added here if the repository supports it
     });
+  }
+
+  void _toggleSave() {
+    final user = ref.read(appUserProvider).valueOrNull;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please log in to save listings')));
+      return;
+    }
+    
+    final savedListings = ref.read(savedHousingProvider).valueOrNull ?? [];
+    final isSaved = savedListings.any((l) => l.id == widget.listing.id);
+
+    if (isSaved) {
+      ref.read(housingRepositoryProvider).unsaveListing(user.uid, widget.listing.id);
+    } else {
+      ref.read(housingRepositoryProvider).saveListing(user.uid, widget.listing.id);
+    }
+    ref.invalidate(savedHousingProvider);
+  }
+
+  void _handleChat() async {
+    final currentUser = ref.read(appUserProvider).valueOrNull;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please login to contact the plug')));
+      return;
+    }
+
+    if (currentUser.uid == widget.listing.plugId) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This is your own listing.')));
+      return;
+    }
+
+    final chatContext = ChatContext(
+      type: 'housing',
+      id: widget.listing.id,
+      title: widget.listing.title,
+      thumbnail: widget.listing.images.isNotEmpty ? widget.listing.images.first : null,
+      metadata: {
+        'rent': widget.listing.rent,
+        'location': widget.listing.location,
+      },
+    );
+
+    final convId = await ref.read(chatRepositoryProvider).getOrCreateConversation(
+      participantIds: [currentUser.uid, widget.listing.plugId],
+      context: chatContext,
+    );
+
+    if (mounted) {
+      context.push('/chat', extra: {
+        'conversationId': convId,
+        'otherUserName': widget.listing.plugName,
+        'context': chatContext,
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final listing = widget.listing;
     final currencyFormat = NumberFormat.currency(symbol: 'KES ', decimalDigits: 0);
-    final reviewsAsync = ref.watch(plugReviewsProvider(listing.plugId));
+    final plugAsync = ref.watch(userByIdProvider(listing.plugId));
     final savedListingsAsync = ref.watch(savedHousingProvider);
     final isSaved = savedListingsAsync.valueOrNull?.any((l) => l.id == listing.id) ?? false;
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: CustomScrollView(
-        slivers: [
-          _buildSliverAppBar(context, ref, isSaved),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeaderSection(currencyFormat),
-                  const SizedBox(height: 24),
-                  _buildPlugInfo(context),
-                  const SizedBox(height: 32),
-                  _buildActionButtons(context),
-                  const SizedBox(height: 40),
-                  _buildDescriptionSection(),
-                  const SizedBox(height: 32),
-                  _buildAmenitiesSection(),
-                  const SizedBox(height: 32),
-                  _buildReviewsSection(context, reviewsAsync),
-                  const SizedBox(height: 100),
-                ],
+      body: Stack(
+        children: [
+          CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              _buildImageGallery(isSaved),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 20),
+                      _buildVerifiedBadgeRow(plugAsync),
+                      const SizedBox(height: 12),
+                      Text(
+                        listing.title,
+                        style: GoogleFonts.plusJakartaSans(fontSize: 24, fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on_rounded, size: 16, color: Color(0xFF6366F1)),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              '${listing.campus} • ${listing.location}', 
+                              style: TextStyle(color: Colors.grey.shade600, fontSize: 14, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            currencyFormat.format(listing.rent),
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 26, 
+                              fontWeight: FontWeight.w900, 
+                              color: const Color(0xFF6366F1)
+                            ),
+                          ),
+                          Text(
+                            ' / month',
+                            style: TextStyle(color: Colors.grey.shade500, fontSize: 14, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                      if (listing.deposit > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Deposit: ${currencyFormat.format(listing.deposit)}',
+                            style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      const SizedBox(height: 24),
+                      _buildSpecsGrid(),
+                      const SizedBox(height: 32),
+                      Text('Description', style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 12),
+                      Text(
+                        listing.description,
+                        maxLines: _isDescriptionExpanded ? null : 4,
+                        style: TextStyle(color: Colors.grey.shade700, height: 1.6, fontSize: 15),
+                      ),
+                      if (listing.description.length > 150)
+                        GestureDetector(
+                          onTap: () => setState(() => _isDescriptionExpanded = !_isDescriptionExpanded),
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              _isDescriptionExpanded ? 'Read less' : 'Read more',
+                              style: const TextStyle(color: Color(0xFF6366F1), fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 32),
+                      _buildAmenitiesSection(),
+                      const SizedBox(height: 32),
+                      _buildPlugCard(plugAsync),
+                      const SizedBox(height: 24),
+                      _buildSafetyBanner(),
+                      const SizedBox(height: 32),
+                      _buildSimilarProperties(),
+                      const SizedBox(height: 120),
+                    ],
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
+          _buildStickyActionBar(),
         ],
       ),
-      bottomNavigationBar: _buildBottomBar(context, currencyFormat),
     );
   }
 
-  Widget _buildSliverAppBar(BuildContext context, WidgetRef ref, bool isSaved) {
-    final listing = widget.listing;
+  Widget _buildImageGallery(bool isSaved) {
+    final images = widget.listing.images;
+    final topPadding = MediaQuery.of(context).padding.top;
+    
     return SliverAppBar(
-      expandedHeight: 400,
+      expandedHeight: 420,
       pinned: true,
       elevation: 0,
       backgroundColor: Colors.white,
-      foregroundColor: Colors.white,
-      leading: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: CircleAvatar(
-          backgroundColor: Colors.black.withOpacity(0.3),
-          child: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
-            onPressed: () => context.pop(),
-          ),
-        ),
-      ),
+      automaticallyImplyLeading: false,
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
-          fit: StackFit.expand,
-          children: [
-            Hero(
-              tag: 'housing_${listing.id}',
-              child: PageView.builder(
-                itemCount: listing.images.isNotEmpty ? listing.images.length : 1,
-                itemBuilder: (context, index) => OptimizedImage(
-                  imageUrl: listing.images.isNotEmpty ? listing.images[index] : 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=2070&auto=format&fit=crop',
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-            if (listing.videoUrl != null)
-              Positioned(
-                bottom: 24,
-                right: 24,
-                child: FloatingActionButton.extended(
-                  onPressed: () {}, // Open video walkthrough
-                  backgroundColor: Colors.white,
-                  icon: const Icon(Icons.play_circle_filled, color: Color(0xFF1677F2)),
-                  label: const Text('Video Tour', style: TextStyle(color: Color(0xFF1677F2), fontWeight: FontWeight.bold)),
-                ),
-              ),
-          ],
-        ),
-      ),
-      actions: [
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: CircleAvatar(
-            backgroundColor: Colors.black.withOpacity(0.3),
-            child: IconButton(
-              icon: const Icon(Icons.share_outlined, color: Colors.white, size: 20),
-              onPressed: () {
-                Share.share('Check out this ${listing.type.name} at ${listing.location} for KES ${listing.rent.toInt()}/mo on UniHub!');
-              },
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(right: 12.0, top: 8.0, bottom: 8.0),
-          child: CircleAvatar(
-            backgroundColor: Colors.black.withOpacity(0.3),
-            child: IconButton(
-              icon: Icon(
-                isSaved ? Icons.favorite_rounded : Icons.favorite_border_rounded, 
-                color: isSaved ? Colors.red : Colors.white, 
-                size: 20
-              ),
-              onPressed: () {
-                final userId = ref.read(appUserProvider).valueOrNull?.uid;
-                if (userId != null) {
-                  if (isSaved) {
-                    ref.read(housingRepositoryProvider).unsaveListing(userId, listing.id);
-                  } else {
-                    ref.read(housingRepositoryProvider).saveListing(userId, listing.id);
-                  }
-                  ref.invalidate(savedHousingProvider);
-                }
-              },
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHeaderSection(NumberFormat format) {
-    final listing = widget.listing;
-    final isTaken = listing.status == HousingStatus.taken;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1677F2).withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    listing.type.name.replaceAll(RegExp(r'(?=[A-Z])'), ' ').toUpperCase(),
-                    style: const TextStyle(color: Color(0xFF1677F2), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                Expanded(
+                  flex: 3,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(20, topPadding + 64, 4, 12),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: PageView.builder(
+                        controller: _pageController,
+                        onPageChanged: (i) => setState(() => _currentPage = i),
+                        itemCount: images.isEmpty ? 1 : images.length,
+                        itemBuilder: (context, index) {
+                          return Hero(
+                            tag: index == 0 ? (widget.heroTag ?? 'housing_img_${widget.listing.id}') : 'housing_img_${widget.listing.id}_$index',
+                            child: OptimizedImage(
+                              imageUrl: images.isEmpty ? '' : images[index],
+                              fit: BoxFit.cover,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ),
                 ),
-                if (isTaken) ...[
-                  const SizedBox(width: 8),
+                if (images.length > 1)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Text(
-                      'TAKEN',
-                      style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                    width: MediaQuery.of(context).size.width * 0.28,
+                    padding: EdgeInsets.fromLTRB(4, topPadding + 64, 20, 12),
+                    child: Column(
+                      children: [
+                        ...images.skip(1).take(3).indexed.map((entry) {
+                          final idx = entry.$1 + 1;
+                          final url = entry.$2;
+                          final isLast = idx == 3 && images.length > 4;
+                          
+                          return Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: GestureDetector(
+                                onTap: () => _pageController.animateToPage(idx, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      OptimizedImage(imageUrl: url, fit: BoxFit.cover),
+                                      if (isLast)
+                                        Container(
+                                          color: Colors.black.withOpacity(0.6),
+                                          alignment: Alignment.center,
+                                          child: Text('+${images.length - 4}', 
+                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
                     ),
                   ),
-                ],
               ],
             ),
-            Text(
-              'Updated ${DateFormat.yMMMd().format(listing.updatedAt)}',
-              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600),
+            Positioned(
+              top: topPadding + 8,
+              left: 16,
+              child: _buildCircleButton(Icons.arrow_back, () => context.pop()),
             ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Text(
-          listing.title,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            color: const Color(0xFF1A1C1E),
-            height: 1.2,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            const Icon(Icons.location_on_rounded, size: 20, color: Color(0xFF1677F2)),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                '${listing.university} • ${listing.location}', 
-                style: const TextStyle(color: Color(0xFF475569), fontWeight: FontWeight.w600, fontSize: 15),
+            Positioned(
+              top: topPadding + 8,
+              right: 16,
+              child: Row(
+                children: [
+                  _buildCircleButton(Icons.ios_share, () => Share.share('Check out this ${widget.listing.type.name} at ${widget.listing.location} on UniHub!')),
+                  const SizedBox(width: 12),
+                  _buildCircleButton(
+                    isSaved ? Icons.favorite : Icons.favorite_border, 
+                    _toggleSave,
+                    iconColor: isSaved ? Colors.red : Colors.black,
+                  ),
+                ],
               ),
             ),
+            if (images.isNotEmpty)
+              Positioned(
+                bottom: 24,
+                left: 0,
+                right: images.length > 1 ? MediaQuery.of(context).size.width * 0.26 : 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${_currentPage + 1} / ${images.length}',
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ),
+            if (widget.listing.videoUrl != null)
+               Positioned(
+                bottom: 24,
+                right: images.length > 1 ? MediaQuery.of(context).size.width * 0.32 : 24,
+                child: GestureDetector(
+                  onTap: () async {
+                    final url = Uri.parse(widget.listing.videoUrl!);
+                    if (await canLaunchUrl(url)) {
+                      await launchUrl(url, mode: LaunchMode.externalApplication);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.play_circle_fill, color: Color(0xFF6366F1), size: 20),
+                        SizedBox(width: 6),
+                        Text('Video Tour', style: TextStyle(color: Color(0xFF6366F1), fontWeight: FontWeight.bold, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildPlugInfo(BuildContext context) {
-    final listing = widget.listing;
-    final plugAsync = ref.watch(userByIdProvider(listing.plugId));
-    final plug = plugAsync.valueOrNull;
-    final isVerified = plug?.isVerified ?? false;
-    final trustScore = plug?.trustScore ?? 70.0;
-
+  Widget _buildCircleButton(IconData icon, VoidCallback onTap, {Color? iconColor}) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      height: 40,
+      width: 40,
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(2),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFF1677F2).withOpacity(0.2), width: 2),
-            ),
-            child: CircleAvatar(
-              radius: 26,
-              backgroundImage: listing.plugPhotoUrl != null ? NetworkImage(listing.plugPhotoUrl!) : null,
-              child: listing.plugPhotoUrl == null ? Text(listing.plugName[0], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)) : null,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Listed by', style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(listing.plugName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF1A1C1E))),
-                    if (isVerified)
-                      const Padding(
-                        padding: EdgeInsets.only(left: 4),
-                        child: Icon(Icons.verified_user_rounded, color: Color(0xFF10B981), size: 16),
-                      ),
-                  ],
-                ),
-                Text(
-                  isVerified ? 'Verified Platform Plug • ${trustScore.toInt()}% Trust' : 'Housing Plug',
-                  style: TextStyle(color: isVerified ? const Color(0xFF10B981) : const Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.w700)
-                ),
-              ],
-            ),
-          ),
-          GestureDetector(
-            onTap: () => context.push('/plug-profile/${listing.plugId}'),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: const Text('View', style: TextStyle(color: Color(0xFF1677F2), fontWeight: FontWeight.w800, fontSize: 13)),
-            ),
+        color: Colors.white,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildActionButtons(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildActionButton(
-            icon: Icons.chat_bubble_rounded,
-            label: 'Message',
-            onTap: () => _handleChat(context),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _buildActionButton(
-            icon: Icons.phone_rounded,
-            label: 'Call',
-            onTap: () async {
-              final plug = ref.read(userByIdProvider(widget.listing.plugId)).valueOrNull;
-              final phoneNumber = plug?.phoneNumber ?? plug?.whatsappNumber;
-              
-              if (phoneNumber == null || phoneNumber.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Phone number not available'))
-                );
-                return;
-              }
-
-              final url = Uri.parse('tel:$phoneNumber');
-              if (await canLaunchUrl(url)) {
-                await launchUrl(url);
-              }
-            },
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _buildActionButton(
-            icon: Icons.report_problem_rounded,
-            label: 'Report',
-            color: const Color(0xFFFEF2F2),
-            iconColor: const Color(0xFFEF4444),
-            onTap: () => _showReportDialog(context),
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _handleChat(BuildContext context) async {
-    final currentUser = ref.read(authStateProvider).valueOrNull;
-    if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please login to contact the plug'))
-      );
-      return;
-    }
-
-    // Don't chat with yourself
-    if (currentUser.uid == widget.listing.plugId) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This is your own listing'))
-      );
-      return;
-    }
-
-    final convId = await ref.read(chatRepositoryProvider).getOrCreateConversation(
-      buyerId: currentUser.uid,
-      sellerId: widget.listing.plugId,
-      listingId: widget.listing.id,
-      listingTitle: widget.listing.title,
-      module: 'housing',
-    );
-
-    if (context.mounted) {
-      context.push('/chat', extra: {
-        'conversationId': convId,
-        'otherUserName': widget.listing.plugName,
-        'listing': null, // The ChatScreen expects a Marketplace Listing
-      });
-    }
-  }
-
-  void _showReportDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => _HousingReportDialog(listing: widget.listing),
-    );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon, 
-    required String label, 
-    required VoidCallback onTap,
-    Color? color,
-    Color? iconColor,
-  }) {
-    return Material(
-      color: color ?? const Color(0xFFF1F5F9),
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            children: [
-              Icon(icon, color: iconColor ?? const Color(0xFF1A1C1E), size: 22),
-              const SizedBox(height: 6),
-              Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: iconColor ?? const Color(0xFF1A1C1E))),
-            ],
-          ),
-        ),
+      child: IconButton(
+        icon: Icon(icon, color: iconColor ?? Colors.black, size: 20),
+        onPressed: onTap,
+        padding: EdgeInsets.zero,
       ),
     );
   }
 
-  Widget _buildDescriptionSection() {
+  Widget _buildVerifiedBadgeRow(AsyncValue<AppUser?> plugAsync) {
+    return plugAsync.when(
+      data: (plug) => Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          if (plug != null && plug.isVerifiedPlug)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.verified, color: Color(0xFF4CAF50), size: 14),
+                  SizedBox(width: 4),
+                  Text('Verified Plug', style: TextStyle(color: Color(0xFF4CAF50), fontSize: 11, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.shield_outlined, color: Colors.grey.shade600, size: 14),
+                  const SizedBox(width: 4),
+                  Text('Direct Listing', style: TextStyle(color: Colors.grey.shade600, fontSize: 11, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          Text(
+            'Posted ${DateFormatter.formatRelative(widget.listing.createdAt)}',
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+          ),
+        ],
+      ),
+      loading: () => const SizedBox(height: 28),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildSpecsGrid() {
+    final listing = widget.listing;
+    final List<Map<String, dynamic>> specItems = [];
+
+    specItems.add({
+      'icon': Icons.home_work_outlined,
+      'label': 'Property Type',
+      'value': _formatHousingType(listing.type),
+    });
+
+    specItems.add({
+      'icon': Icons.people_outline_rounded,
+      'label': 'Occupancy',
+      'value': _formatGenderRestriction(listing.genderRestriction),
+    });
+
+    if (listing.isFurnished) {
+      specItems.add({
+        'icon': Icons.chair_outlined,
+        'label': 'Furnishing',
+        'value': 'Furnished',
+      });
+    } else {
+      specItems.add({
+        'icon': Icons.chair_outlined,
+        'label': 'Furnishing',
+        'value': 'Unfurnished',
+      });
+    }
+
+    if (listing.distance.isNotEmpty) {
+      specItems.add({
+        'icon': Icons.directions_walk_rounded,
+        'label': 'Distance',
+        'value': listing.distance,
+      });
+    }
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('About this property', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1A1C1E))),
-        const SizedBox(height: 16),
-        Text(
-          widget.listing.description,
-          style: const TextStyle(height: 1.6, color: Color(0xFF475569), fontSize: 15, fontWeight: FontWeight.w500),
-        ),
+        for (var i = 0; i < specItems.length; i += 2)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                _specItem(specItems[i]['icon'], specItems[i]['label'], specItems[i]['value']),
+                const SizedBox(width: 8),
+                if (i + 1 < specItems.length)
+                  _specItem(specItems[i + 1]['icon'], specItems[i + 1]['label'], specItems[i + 1]['value'])
+                else
+                  const Expanded(child: SizedBox.shrink()),
+              ],
+            ),
+          ),
       ],
+    );
+  }
+
+  Widget _specItem(IconData icon, String label, String value) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade100),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 18, color: Colors.grey.shade700),
+            const SizedBox(height: 8),
+            Text(label, style: TextStyle(color: Colors.grey.shade500, fontSize: 10)),
+            Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildAmenitiesSection() {
+    if (widget.listing.amenities.isEmpty) return const SizedBox.shrink();
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Amenities', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1A1C1E))),
-        const SizedBox(height: 20),
+        Text('Amenities', style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 16),
         Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: widget.listing.amenities.map((a) => _buildAmenityChip(a)).toList(),
+          spacing: 10,
+          runSpacing: 10,
+          children: widget.listing.amenities.map((amenity) => _buildAmenityCard(amenity)).toList(),
         ),
       ],
     );
   }
 
-  Widget _buildAmenityChip(String label) {
+  Widget _buildAmenityCard(String amenity) {
+    IconData icon = _getAmenityIcon(amenity);
+    
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.check_circle_rounded, size: 18, color: Color(0xFF10B981)),
-          const SizedBox(width: 8),
-          Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1C1E))),
+          Icon(icon, size: 18, color: const Color(0xFF6366F1)),
+          const SizedBox(width: 10),
+          Text(
+            amenity, 
+            style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B)),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildReviewsSection(BuildContext context, AsyncValue reviewsAsync) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Plug Reviews', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1A1C1E))),
-            TextButton(
-              onPressed: () {}, 
-              child: const Text('See all', style: TextStyle(color: Color(0xFF1677F2), fontWeight: FontWeight.w800))
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        reviewsAsync.when(
-          data: (reviews) => reviews.isEmpty 
-            ? Container(
-                padding: const EdgeInsets.all(20),
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  children: [
-                    const Text('No reviews for this plug yet.', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
-                    const SizedBox(height: 12),
-                    TextButton.icon(
-                      onPressed: () => _showReviewDialog(context),
-                      icon: const Icon(Icons.rate_review_outlined, size: 18),
-                      label: const Text('Be the first to review'),
-                    ),
-                  ],
-                ),
-              )
-            : Column(
+  IconData _getAmenityIcon(String amenity) {
+    final a = amenity.toLowerCase();
+    if (a.contains('water')) return Icons.water_drop_outlined;
+    if (a.contains('wifi') || a.contains('internet')) return Icons.wifi_rounded;
+    if (a.contains('security') || a.contains('cctv')) return Icons.security_rounded;
+    if (a.contains('token') || a.contains('electricity')) return Icons.electric_bolt_rounded;
+    if (a.contains('parking')) return Icons.local_parking_rounded;
+    if (a.contains('furnished')) return Icons.chair_outlined;
+    if (a.contains('laundry')) return Icons.local_laundry_service_outlined;
+    if (a.contains('borehole')) return Icons.waves_rounded;
+    if (a.contains('balcony')) return Icons.balcony_rounded;
+    if (a.contains('kitchen')) return Icons.kitchen_outlined;
+    if (a.contains('wardrobe')) return Icons.door_sliding_outlined;
+    if (a.contains('shower')) return Icons.shower_outlined;
+    return Icons.check_circle_outline_rounded;
+  }
+
+  Widget _buildPlugCard(AsyncValue<AppUser?> plugAsync) {
+    return plugAsync.when(
+      data: (plug) {
+        if (plug == null) return const SizedBox.shrink();
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.grey.shade100),
+          ),
+          child: Column(
+            children: [
+              Row(
                 children: [
-                  ListView.builder(
-                    shrinkWrap: true,
-                    padding: EdgeInsets.zero,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: reviews.length > 2 ? 2 : reviews.length,
-                    itemBuilder: (context, index) => _buildReviewItem(reviews[index]),
+                  Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 30,
+                        backgroundImage: plug.photoUrl != null ? NetworkImage(plug.photoUrl!) : null,
+                        backgroundColor: Colors.grey.shade100,
+                        child: plug.photoUrl == null ? Text(plug.fullName[0], style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)) : null,
+                      ),
+                      if (plug.isOnline)
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            width: 14,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4CAF50),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: () => _showReviewDialog(context),
-                    icon: const Icon(Icons.rate_review_outlined, size: 18),
-                    label: const Text('Write a Review'),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                plug.fullName, 
+                                style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (plug.isVerifiedPlug) ...[
+                              const SizedBox(width: 4),
+                              const Icon(Icons.verified, color: Color(0xFF6366F1), size: 16),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                           child: Row(
+                          children: [
+                            const Icon(Icons.star, color: Colors.amber, size: 14),
+                            const SizedBox(width: 4),
+                            Text('${plug.averageRating} (${plug.ratingsCount} reviews)', 
+                              style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                            const SizedBox(width: 8),
+                            Text('•', style: TextStyle(color: Colors.grey.shade400)),
+                            const SizedBox(width: 8),
+                            Text('${plug.displayTrustScore.toInt()}% Trust', 
+                              style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                          ],
+                        ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => context.push('/plug-profile/${plug.uid}'),
                     style: OutlinedButton.styleFrom(
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      side: BorderSide(color: Colors.grey.shade200),
                     ),
+                    child: const Text('View', style: TextStyle(fontSize: 12)),
                   ),
                 ],
               ),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => const Text('Error loading reviews'),
-        ),
-      ],
-    );
-  }
-
-  void _showReviewDialog(BuildContext context) {
-    // We'll need a stateful widget for the dialog to handle star selection
-    showDialog(
-      context: context,
-      builder: (context) => _HousingReviewDialog(listing: widget.listing),
-    );
-  }
-
-  Widget _buildReviewItem(dynamic review) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 16, 
-                backgroundImage: review.userPhotoUrl != null ? NetworkImage(review.userPhotoUrl!) : null,
-                child: review.userPhotoUrl == null ? const Icon(Icons.person, size: 16) : null,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(review.userName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF1A1C1E))),
-              ),
-              Row(
-                children: List.generate(5, (i) => Icon(
-                  Icons.star_rounded, 
-                  size: 16, 
-                  color: i < review.rating ? const Color(0xFFFFB800) : const Color(0xFFE2E8F0)
-                )),
-              ),
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 16),
+              _buildPlugDetailRow(Icons.bolt_rounded, 'Response rate', plug.responseRate),
+              const SizedBox(height: 12),
+              _buildPlugDetailRow(Icons.access_time_rounded, 'Response time', 'Usually within 1 hr'),
+              const SizedBox(height: 12),
+              _buildPlugDetailRow(Icons.calendar_today_rounded, 'Member since', 
+                plug.createdAt != null ? DateFormat('MMMM yyyy').format(plug.createdAt!) : 'Recent'),
+              const SizedBox(height: 12),
+              _buildPlugDetailRow(Icons.school_outlined, 'University', plug.university ?? 'UniHub Student'),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(review.comment, style: const TextStyle(fontSize: 14, color: Color(0xFF475569), fontWeight: FontWeight.w500, height: 1.5)),
-        ],
-      ),
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 
-  Widget _buildBottomBar(BuildContext context, NumberFormat format) {
-    final listing = widget.listing;
+  Widget _buildPlugDetailRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.grey.shade500),
+        const SizedBox(width: 8),
+        Text(label, style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+        const Spacer(),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B))),
+      ],
+    );
+  }
+
+
+  Widget _buildSafetyBanner() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 20, offset: const Offset(0, -4))
-        ],
+        color: const Color(0xFFF1F7FF),
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: SafeArea(
-        child: Row(
-          children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
+      child: Row(
+        children: [
+          const Icon(Icons.shield_outlined, color: Color(0xFF4CAF50)),
+          const SizedBox(width: 16),
+          const Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  format.format(listing.rent),
-                  style: GoogleFonts.plusJakartaSans(fontSize: 24, fontWeight: FontWeight.w900, color: const Color(0xFF1677F2)),
-                ),
-                Text(
-                  'Deposit: ${format.format(listing.deposit)}', 
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w700)
-                ),
+                Text('Secure Viewing Guarantee', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                Text('Only pay deposit after viewing and signing a lease.', style: TextStyle(color: Colors.black54, fontSize: 12)),
               ],
             ),
-            const SizedBox(width: 24),
+          ),
+          Icon(Icons.chevron_right, color: Colors.grey.shade400),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSimilarProperties() {
+    final similarAsync = ref.watch(housingListingsProvider(10)); // Simplified: just show top listings for now
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Similar Properties', style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 240,
+          child: similarAsync.when(
+            data: (listings) {
+              final filtered = listings.where((l) => l.id != widget.listing.id).toList();
+              if (filtered.isEmpty) return const Center(child: Text('No similar properties found'));
+              
+              return ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: filtered.length,
+                itemBuilder: (context, index) => SizedBox(
+                  width: 180,
+                  child: HousingCard(
+                    listing: filtered[index],
+                    isCompact: true,
+                    margin: const EdgeInsets.only(right: 16),
+                    onTap: () => context.push('/housing-details', extra: filtered[index]),
+                  ),
+                ),
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStickyActionBar() {
+    final isTaken = widget.listing.status == HousingStatus.taken;
+    
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -5))],
+        ),
+        child: Row(
+          children: [
+            Container(
+              height: 56,
+              width: 56,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF6366F1)),
+                onPressed: _handleChat,
+              ),
+            ),
+            const SizedBox(width: 12),
             Expanded(
               child: SizedBox(
-                height: 58,
+                height: 56,
                 child: FilledButton(
-                  onPressed: listing.status == HousingStatus.taken ? null : () => _handleChat(context),
+                  onPressed: isTaken ? null : _handleChat,
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF1677F2),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                    elevation: 0,
+                    backgroundColor: const Color(0xFF6366F1),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   child: Text(
-                    listing.status == HousingStatus.taken ? 'Property Taken' : 'Book Viewing', 
-                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)
+                    isTaken ? 'Already Taken' : 'Contact House Plug', 
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
                   ),
                 ),
               ),
@@ -626,189 +807,24 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
       ),
     );
   }
-}
 
-class _HousingReportDialog extends ConsumerStatefulWidget {
-  final HousingListing listing;
-  const _HousingReportDialog({required this.listing});
-
-  @override
-  ConsumerState<_HousingReportDialog> createState() => _HousingReportDialogState();
-}
-
-class _HousingReportDialogState extends ConsumerState<_HousingReportDialog> {
-  String _selectedCategory = 'Scam';
-  final _reasonController = TextEditingController();
-  bool _isSubmitting = false;
-
-  final _categories = ['Scam', 'Fake listing', 'Already occupied', 'Duplicate', 'Offensive content', 'Wrong information'];
-
-  @override
-  void dispose() {
-    _reasonController.dispose();
-    super.dispose();
+  String _formatHousingType(HousingType type) {
+    return switch(type) {
+      HousingType.hostel => 'Hostel',
+      HousingType.bedsitter => 'Bedsitter',
+      HousingType.singleRoom => 'Single Room',
+      HousingType.oneBedroom => '1 Bedroom',
+      HousingType.twoBedroom => '2 Bedroom',
+      HousingType.airbnb => 'Airbnb',
+      HousingType.shortStay => 'Short Stay',
+    };
   }
 
-  Future<void> _submit() async {
-    final user = ref.read(appUserProvider).valueOrNull;
-    if (user == null) return;
-
-    setState(() => _isSubmitting = true);
-    
-    try {
-      await ref.read(housingRepositoryProvider).reportListing(
-        listingId: widget.listing.id,
-        reporterId: user.uid,
-        category: _selectedCategory,
-        reason: _reasonController.text.trim(),
-      );
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report submitted. Thank you for keeping UniHub safe.')));
-      }
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      title: const Text('Report Listing', style: TextStyle(fontWeight: FontWeight.bold)),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Why are you reporting this?', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _categories.map((c) => ChoiceChip(
-                label: Text(c, style: TextStyle(fontSize: 12, color: _selectedCategory == c ? Colors.white : Colors.black87)),
-                selected: _selectedCategory == c,
-                onSelected: (val) => setState(() => _selectedCategory = c),
-                selectedColor: const Color(0xFF1677F2),
-              )).toList(),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _reasonController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Additional details (optional)',
-                filled: true,
-                fillColor: const Color(0xFFF1F5F9),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        FilledButton(
-          onPressed: _isSubmitting ? null : _submit,
-          style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
-          child: _isSubmitting ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Submit Report'),
-        ),
-      ],
-    );
-  }
-}
-
-class _HousingReviewDialog extends ConsumerStatefulWidget {
-  final HousingListing listing;
-  const _HousingReviewDialog({required this.listing});
-
-  @override
-  ConsumerState<_HousingReviewDialog> createState() => _HousingReviewDialogState();
-}
-
-class _HousingReviewDialogState extends ConsumerState<_HousingReviewDialog> {
-  double _rating = 5;
-  final _commentController = TextEditingController();
-  bool _isSubmitting = false;
-
-  @override
-  void dispose() {
-    _commentController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final user = ref.read(appUserProvider).valueOrNull;
-    if (user == null) return;
-
-    setState(() => _isSubmitting = true);
-    
-    try {
-      final review = HousingReview(
-        id: '',
-        plugId: widget.listing.plugId,
-        userId: user.uid,
-        userName: user.fullName,
-        userPhotoUrl: user.photoUrl,
-        comment: _commentController.text.trim(),
-        rating: _rating,
-        createdAt: DateTime.now(),
-      );
-
-      await ref.read(housingRepositoryProvider).submitReview(review);
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      title: const Text('Rate your experience', style: TextStyle(fontWeight: FontWeight.bold)),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('How was your interaction with this plug?', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(5, (index) => IconButton(
-              icon: Icon(
-                index < _rating ? Icons.star_rounded : Icons.star_outline_rounded,
-                color: const Color(0xFFFFB800),
-                size: 32,
-              ),
-              onPressed: () => setState(() => _rating = index + 1.0),
-            )),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _commentController,
-            maxLines: 3,
-            decoration: InputDecoration(
-              hintText: 'Share your feedback...',
-              filled: true,
-              fillColor: const Color(0xFFF1F5F9),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        FilledButton(
-          onPressed: _isSubmitting ? null : _submit,
-          style: FilledButton.styleFrom(backgroundColor: const Color(0xFF1677F2)),
-          child: _isSubmitting ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Submit'),
-        ),
-      ],
-    );
+  String _formatGenderRestriction(GenderRestriction restriction) {
+    return switch(restriction) {
+      GenderRestriction.mixed => 'Mixed / Any',
+      GenderRestriction.maleOnly => 'Male Students Only',
+      GenderRestriction.femaleOnly => 'Female Students Only',
+    };
   }
 }

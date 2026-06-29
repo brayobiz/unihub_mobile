@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../auth/shared/providers.dart';
+import '../marketplace/domain/models/listing.dart';
 import '../marketplace/shared/providers.dart';
 import '../housing/shared/providers.dart';
 import '../housing/presentation/widgets/housing_card.dart';
@@ -21,7 +22,6 @@ import '../shared/add_feed_item_screen.dart';
 import '../shared/global_search_screen.dart';
 import '../shared/campus_pulse_screen.dart';
 import '../../models/feed_type.dart' as models;
-import 'package:intl/intl.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -968,7 +968,7 @@ void _handleItemTap(BuildContext context, SmartFeedItem item) {
   } else if (item.model.type == FeedType.notes) {
     context.push('/note-detail', extra: item.originalData);
   } else if (item.model.type == FeedType.marketplace) {
-    context.push('/marketplace-detail', extra: item.originalData);
+    context.push('/listing-detail', extra: item.originalData);
   } else if (item.model.type == FeedType.gig) {
     context.push('/gig-detail', extra: item.originalData);
   } else if (item.model.type == FeedType.community) {
@@ -1179,7 +1179,9 @@ class _SavedItemsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final savedListings = ref.watch(savedListingsProvider).valueOrNull ?? [];
+    final allSavedListings = ref.watch(savedListingsProvider).valueOrNull ?? [];
+    // Only show active listings in the homepage favorites preview
+    final savedListings = allSavedListings.where((l) => l.status == ListingStatus.active).toList();
     final savedHousing = ref.watch(savedHousingProvider).valueOrNull ?? [];
 
     if (savedListings.isEmpty && savedHousing.isEmpty) return const SizedBox.shrink();

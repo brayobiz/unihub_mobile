@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
@@ -61,6 +62,18 @@ class OptimizedImage extends StatelessWidget {
   Widget build(BuildContext context) {
     if (imageUrl.isEmpty) {
       return _buildErrorWidget();
+    }
+
+    if (!imageUrl.startsWith('http')) {
+      // Handle local files (useful for previews)
+      final file = File(imageUrl);
+      if (file.existsSync()) {
+        Widget result = Image.file(file, width: width, height: height, fit: fit);
+        if (borderRadius != null) {
+          result = ClipRRect(borderRadius: borderRadius!, child: result);
+        }
+        return result;
+      }
     }
     
     final optimizedUrl = _getOptimizedUrl();

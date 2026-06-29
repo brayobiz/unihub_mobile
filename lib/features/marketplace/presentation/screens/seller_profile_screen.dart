@@ -69,17 +69,12 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                             left: 16,
                             right: 16,
                             child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              mainAxisAlignment: MainAxisAlignment.end,
                               children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                                  onPressed: () => context.pop(),
-                                ),
                                 IconButton(
                                   icon: const Icon(Icons.share_outlined, color: Colors.white),
                                   onPressed: () {},
                                 ),
-                                // 3 dots (more_horiz) removed as requested
                               ],
                             ),
                           ),
@@ -179,12 +174,29 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                 child: const Icon(Icons.verified, color: Color(0xFF10B981), size: 24),
               ),
             ),
+          if (seller.isOnline == true)
+            Positioned(
+              right: 6,
+              top: 6,
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 3),
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 
   Widget _buildIdentityInfo(BuildContext context, AppUser seller) {
+    final isOnline = seller.isOnline == true;
+    final lastSeen = seller.lastSeen;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -211,13 +223,29 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
               ),
           ],
         ),
-        Text(
-          '@${seller.username ?? 'unihub_seller'}',
-          style: TextStyle(
-            fontSize: 15,
-            color: Colors.white.withOpacity(0.8),
-            fontWeight: FontWeight.w600,
-          ),
+        Row(
+          children: [
+            Text(
+              '@${seller.username ?? 'unihub_seller'}',
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.white.withOpacity(0.8),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isOnline ? Colors.green.shade400 : Colors.white24,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                isOnline ? 'ONLINE' : (lastSeen != null ? _formatLastSeen(lastSeen).toUpperCase() : 'OFFLINE'),
+                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.white),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
         SingleChildScrollView(
@@ -705,6 +733,17 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open WhatsApp.')));
       }
     }
+  }
+
+  String _formatLastSeen(DateTime lastSeen) {
+    final now = DateTime.now();
+    final difference = now.difference(lastSeen);
+
+    if (difference.inMinutes < 1) return 'just now';
+    if (difference.inMinutes < 60) return '${difference.inMinutes}m ago';
+    if (difference.inHours < 24) return '${difference.inHours}h ago';
+    if (difference.inDays < 7) return '${difference.inDays}d ago';
+    return DateFormat('MMM d').format(lastSeen);
   }
 
   void _showAllListings(BuildContext context, String name, List<Listing> listings) {
