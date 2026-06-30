@@ -466,6 +466,10 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
   Widget _buildActionButtons(BuildContext context, WidgetRef ref) {
     return Column(
       children: [
+        if (widget.user.isAdmin) ...[
+          _buildActionButton(Icons.admin_panel_settings, 'Admin Panel', () => context.push('/admin/dashboard')),
+          const SizedBox(height: 8),
+        ],
         _buildActionButton(Icons.verified_user_outlined, 'Trust & Verification', () => context.push('/trust-center')),
         const SizedBox(height: 8),
         _buildActionButton(Icons.favorite_outline_rounded, 'Saved Items', () => context.push('/saved')),

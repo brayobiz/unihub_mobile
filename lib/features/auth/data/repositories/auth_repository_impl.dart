@@ -44,7 +44,7 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
-        throw Exception('Google Sign-In canceled by user.');
+        return; // User canceled the sign-in flow
       }
 
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
@@ -109,7 +109,14 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<void> signOut() async {
-    await _firebaseAuth.signOut();
+    try {
+      await _googleSignIn.signOut();
+      await _firebaseAuth.signOut();
+    } catch (e) {
+      debugPrint('Error during sign out: $e');
+      // Still attempt to sign out from Firebase if Google sign out fails
+      await _firebaseAuth.signOut();
+    }
   }
 
   @override
@@ -300,11 +307,24 @@ class AuthRepositoryImpl implements AuthRepository {
   Exception _handleAuthException(FirebaseAuthException e) {
     debugPrint('🛑 Auth Error Code: ${e.code}');
     switch (e.code) {
-      case 'user-not-found': return Exception('No user found with this email.');
-      case 'wrong-password': return Exception('Incorrect password.');
-      case 'network-request-failed': return Exception('Network error: Please check your internet connection or DNS settings.');
-      case 'too-many-requests': return Exception('Too many attempts. Please try again later.');
-      default: return Exception(e.message ?? 'An unknown authentication error occurred.');
+      case 'user-not-found':
+      case 'user-disabled':
+      case 'invalid-email':
+      case 'wrong-password':
+      case 'invalid-credential':
+        return Exception('Invalid email or password. Please try again.');
+      case 'email-already-in-use':
+        return Exception('This email is already registered. Please sign in instead.');
+      case 'operation-not-allowed':
+        return Exception('This authentication method is currently disabled.');
+      case 'weak-password':
+        return Exception('The password provided is too weak.');
+      case 'network-request-failed':
+        return Exception('No internet connection. Please check your network and try again.');
+      case 'too-many-requests':
+        return Exception('Too many attempts. Please try again in a few minutes.');
+      default:
+        return Exception(e.message ?? 'An unexpected authentication error occurred. Please try again.');
     }
   }
 }

@@ -88,8 +88,6 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
       return;
     }
 
-    setState(() => _localLoading = true);
-    
     await ref.read(authControllerProvider.notifier).updateProfile(
       university: university,
       course: course,
@@ -100,9 +98,11 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
     if (mounted) {
       final state = ref.read(authControllerProvider);
       if (state.hasError) {
-        setState(() => _localLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(state.error.toString().replaceAll('Exception: ', ''))),
+          SnackBar(
+            content: Text(state.error.toString().replaceAll('Exception: ', '')),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -111,6 +111,9 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final authState = ref.watch(authControllerProvider);
+    final isProcessing = authState.isLoading || _localLoading;
+
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
@@ -120,7 +123,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.logout, color: theme.colorScheme.primary),
-            onPressed: () => ref.read(authControllerProvider.notifier).signOut(),
+            onPressed: isProcessing ? null : () => ref.read(authControllerProvider.notifier).signOut(),
           )
         ],
       ),
@@ -155,7 +158,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
               child: Stack(
                 children: [
                   GestureDetector(
-                    onTap: _localLoading ? null : _pickImage,
+                    onTap: isProcessing ? null : _pickImage,
                     child: CircleAvatar(
                       radius: 58,
                       backgroundColor: theme.colorScheme.surfaceVariant,
@@ -178,7 +181,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                     bottom: 4,
                     right: 4,
                     child: GestureDetector(
-                      onTap: _localLoading ? null : _pickImage,
+                      onTap: isProcessing ? null : _pickImage,
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
@@ -208,14 +211,14 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
               controller: universityController,
               hintText: 'University / Campus',
               icon: Icons.school_outlined,
-              enabled: !_localLoading,
+              enabled: !isProcessing,
             ),
             const SizedBox(height: 18),
             AuthTextField(
               controller: courseController,
               hintText: 'Course / Major',
               icon: Icons.menu_book_outlined,
-              enabled: !_localLoading,
+              enabled: !isProcessing,
             ),
             const SizedBox(height: 18),
             AuthTextField(
@@ -223,14 +226,14 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
               hintText: 'Year of Study',
               icon: Icons.calendar_today_outlined,
               keyboardType: TextInputType.number,
-              enabled: !_localLoading,
+              enabled: !isProcessing,
             ),
             const SizedBox(height: 50),
             
             SizedBox(
               width: double.infinity,
               height: 56,
-              child: _localLoading
+              child: isProcessing
                   ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
                   : FilledButton(
                       onPressed: _onContinue,

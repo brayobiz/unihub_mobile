@@ -49,10 +49,21 @@ import '../../features/shared/notifications_screen.dart';
 import '../../features/shared/feed_item_detail_screen.dart';
 import '../../features/shared/global_search_screen.dart';
 import '../../features/shared/campus_pulse_screen.dart';
+import '../../features/shared/banned_screen.dart';
 import '../../features/community/community_screen.dart';
 import '../../features/gigs/gigs_screen.dart';
 import '../../features/confessions/confessions_screen.dart';
 import '../../features/shared/feed_repository.dart';
+
+import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
+import '../../features/admin/presentation/screens/verification_queue_screen.dart';
+import '../../features/admin/presentation/screens/verification_detail_screen.dart';
+import '../../features/admin/presentation/screens/report_queue_screen.dart';
+import '../../features/admin/presentation/screens/report_detail_screen.dart';
+import '../../features/admin/presentation/screens/feature_moderation_screen.dart';
+import '../../features/admin/domain/models/verification_request.dart';
+import '../../features/admin/domain/models/report.dart';
+import '../../features/admin/domain/models/moderation_content.dart';
 
 import '../../features/gigs/presentation/screens/gig_details_screen.dart';
 import '../../features/gigs/presentation/screens/apply_gig_screen.dart';
@@ -113,6 +124,12 @@ class RouterNotifier extends ChangeNotifier {
       return null;
     }
 
+    // Restriction check
+    if (appUser.isRestricted) {
+      if (state.matchedLocation != '/banned') return '/banned';
+      return null;
+    }
+
     final isProfileIncomplete = appUser.university == null || appUser.course == null;
     if (isProfileIncomplete) {
       if (state.matchedLocation != '/complete-profile') return '/complete-profile';
@@ -133,6 +150,13 @@ class RouterNotifier extends ChangeNotifier {
 
     if (isAuthRoute) {
       return '/main';
+    }
+
+    // Admin route protection
+    if (state.matchedLocation.startsWith('/admin')) {
+      if (appUser == null || !appUser.isAdmin) {
+        return '/main';
+      }
     }
 
     return null;
@@ -183,6 +207,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/complete-profile',
         builder: (context, state) => const CompleteProfileScreen(),
+      ),
+      GoRoute(
+        path: '/banned',
+        builder: (context, state) => const BannedScreen(),
       ),
       GoRoute(
         path: '/global-search',
@@ -446,6 +474,45 @@ final routerProvider = Provider<GoRouter>((ref) {
           );
           return ProfessionalVerificationScreen(role: role);
         },
+      ),
+      // Admin Routes
+      GoRoute(
+        path: '/admin/dashboard',
+        builder: (context, state) => const AdminDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/admin/verifications',
+        builder: (context, state) => const VerificationQueueScreen(),
+      ),
+      GoRoute(
+        path: '/admin/verifications/:id',
+        builder: (context, state) {
+          final request = state.extra as AdminVerificationRequest;
+          return VerificationDetailScreen(request: request);
+        },
+      ),
+      GoRoute(
+        path: '/admin/reports',
+        builder: (context, state) => const ReportQueueScreen(),
+      ),
+      GoRoute(
+        path: '/admin/reports/:id',
+        builder: (context, state) {
+          final report = state.extra as AdminReport;
+          return ReportDetailScreen(report: report);
+        },
+      ),
+      GoRoute(
+        path: '/admin/marketplace',
+        builder: (context, state) => const FeatureModerationScreen(contentType: ContentType.marketplace),
+      ),
+      GoRoute(
+        path: '/admin/housing',
+        builder: (context, state) => const FeatureModerationScreen(contentType: ContentType.housing),
+      ),
+      GoRoute(
+        path: '/admin/notes',
+        builder: (context, state) => const FeatureModerationScreen(contentType: ContentType.notes),
       ),
     ],
   );

@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum IdentityVerificationStatus { none, pending, approved, rejected }
+enum IdentityVerificationStatus { none, pending, underReview, approved, rejected, resubmissionRequested }
 
 class IdentityVerification {
   final String userId;

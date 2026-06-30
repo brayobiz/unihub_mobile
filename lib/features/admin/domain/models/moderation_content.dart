@@ -1,0 +1,76 @@
+import '../../../marketplace/domain/models/listing.dart';
+import '../../../housing/domain/models/housing_listing.dart';
+import '../../../notes/domain/models/note.dart';
+
+enum ContentType { marketplace, housing, notes }
+
+class ModeratedContent {
+  final String id;
+  final ContentType type;
+  final String title;
+  final String authorId;
+  final String authorName;
+  final String? university;
+  final DateTime createdAt;
+  final String status;
+  final List<String> imageUrls;
+  final dynamic originalData; // Holds the original Listing, HousingListing, or NoteListing
+
+  ModeratedContent({
+    required this.id,
+    required this.type,
+    required this.title,
+    required this.authorId,
+    required this.authorName,
+    this.university,
+    required this.createdAt,
+    required this.status,
+    this.imageUrls = const [],
+    this.originalData,
+  });
+
+  factory ModeratedContent.fromMarketplace(Listing listing) {
+    return ModeratedContent(
+      id: listing.id,
+      type: ContentType.marketplace,
+      title: listing.title,
+      authorId: listing.sellerId,
+      authorName: listing.sellerName,
+      university: listing.sellerUniversity,
+      createdAt: listing.createdAt,
+      status: listing.status.name,
+      imageUrls: listing.imageUrls,
+      originalData: listing,
+    );
+  }
+
+  factory ModeratedContent.fromHousing(HousingListing listing) {
+    return ModeratedContent(
+      id: listing.id,
+      type: ContentType.housing,
+      title: listing.title,
+      authorId: listing.plugId,
+      authorName: listing.plugName,
+      university: listing.university,
+      createdAt: listing.createdAt,
+      status: listing.status.name,
+      imageUrls: listing.images,
+      originalData: listing,
+    );
+  }
+
+  factory ModeratedContent.fromNote(NoteListing note) {
+    return ModeratedContent(
+      id: note.id,
+      type: ContentType.notes,
+      title: note.title,
+      authorId: note.authorId,
+      authorName: note.authorName,
+      university: note.university,
+      createdAt: note.createdAt,
+      status: 'active', // NoteListing doesn't have status enum yet
+      imageUrls: [],
+      originalData: note,
+    );
+  }
+}

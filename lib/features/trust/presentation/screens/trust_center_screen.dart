@@ -257,6 +257,8 @@ class TrustCenterScreen extends ConsumerWidget {
     final bool isVerified = user.isIdentityVerified;
     final bool isPending = v?.status == IdentityVerificationStatus.pending;
     final bool isRejected = v?.status == IdentityVerificationStatus.rejected;
+    final bool isUnderReview = v?.status == IdentityVerificationStatus.underReview;
+    final bool isResubmit = v?.status == IdentityVerificationStatus.resubmissionRequested;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -264,7 +266,7 @@ class TrustCenterScreen extends ConsumerWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red.shade200 : Colors.transparent),
+          color: isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red.shade200 : (isResubmit ? Colors.orange.shade200 : Colors.transparent)),
           width: 1,
         ),
         boxShadow: [
@@ -283,12 +285,12 @@ class TrustCenterScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: (isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red : const Color(0xFF1677F2))).withOpacity(0.1),
+                  color: (isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red : (isResubmit ? Colors.orange : const Color(0xFF1677F2)))).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  isVerified ? Icons.badge_rounded : (isRejected ? Icons.error_outline_rounded : Icons.badge_outlined),
-                  color: isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red : const Color(0xFF1677F2)),
+                  isVerified ? Icons.badge_rounded : (isRejected ? Icons.error_outline_rounded : (isResubmit ? Icons.refresh_rounded : Icons.badge_outlined)),
+                  color: isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red : (isResubmit ? Colors.orange : const Color(0xFF1677F2))),
                   size: 24,
                 ),
               ),
@@ -310,12 +312,16 @@ class TrustCenterScreen extends ConsumerWidget {
                         ? 'Your identity is confirmed' 
                         : isPending 
                           ? 'Review in progress' 
-                          : isRejected 
-                            ? 'Verification rejected'
-                            : 'Verify your ID and face to build trust',
+                          : isUnderReview
+                            ? 'Actively being reviewed'
+                            : isResubmit
+                              ? 'Action required: Resubmit docs'
+                              : isRejected 
+                                ? 'Verification rejected'
+                                : 'Verify your ID and face to build trust',
                       style: TextStyle(
                         fontSize: 13,
-                        color: isRejected ? Colors.red.shade700 : Colors.blueGrey.shade500,
+                        color: isRejected ? Colors.red.shade700 : (isResubmit ? Colors.orange.shade700 : Colors.blueGrey.shade500),
                       ),
                     ),
                   ],
@@ -323,37 +329,73 @@ class TrustCenterScreen extends ConsumerWidget {
               ),
               if (isVerified)
                 const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981))
-              else if (isPending)
-                _buildStatusBadge('Pending', Colors.orange)
+              else if (isPending || isUnderReview)
+                _buildStatusBadge(isUnderReview ? 'Reviewing' : 'Pending', Colors.orange)
+              else if (isResubmit)
+                _buildStatusBadge('Resubmit', Colors.orange)
               else if (isRejected)
                 _buildStatusBadge('Rejected', Colors.red)
             ],
           ),
-          if (isPending) ...[
+          if (isPending || isUnderReview) ...[
             const SizedBox(height: 16),
-            _buildInfoBox('Our team is verifying your government ID. This usually takes 12-24 hours.'),
+            _buildInfoBox(isUnderReview 
+              ? 'An administrator is currently reviewing your documents.'
+              : 'Our team is verifying your government ID. This usually takes 12-24 hours.'),
+          ],
+          if (isResubmit && v?.rejectionReason != null) ...[
+            const SizedBox(height: 12),
+            _buildWarningBox('Resubmission Needed: ${v!.rejectionReason}'),
           ],
           if (isRejected && v?.rejectionReason != null) ...[
             const SizedBox(height: 12),
             _buildErrorBox('Reason: ${v!.rejectionReason}'),
           ],
-          if (!isVerified && !isPending) ...[
+          if (!isVerified && !isPending && !isUnderReview) ...[
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => context.push('/verify-identity'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isRejected ? Colors.red : const Color(0xFF1677F2),
+                  backgroundColor: isRejected ? Colors.red : (isResubmit ? Colors.orange : const Color(0xFF1677F2)),
                   foregroundColor: Colors.white,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('Verify Identity', style: TextStyle(fontWeight: FontWeight.w700)),
+                child: Text(isResubmit ? 'Resubmit Identity' : 'Verify Identity', style: const TextStyle(fontWeight: FontWeight.w700)),
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWarningBox(String message) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.orange.shade100),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, size: 18, color: Colors.orange.shade700),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: 12, 
+                color: Colors.orange.shade800, 
+                fontWeight: FontWeight.w600,
+                height: 1.4,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -417,6 +459,8 @@ class TrustCenterScreen extends ConsumerWidget {
     final bool isVerified = user.isStudentVerified;
     final bool isPending = v?.status == StudentVerificationStatus.pending;
     final bool isRejected = v?.status == StudentVerificationStatus.rejected;
+    final bool isUnderReview = v?.status == StudentVerificationStatus.underReview;
+    final bool isResubmit = v?.status == StudentVerificationStatus.resubmissionRequested;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -424,7 +468,7 @@ class TrustCenterScreen extends ConsumerWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red.shade200 : Colors.transparent),
+          color: isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red.shade200 : (isResubmit ? Colors.orange.shade200 : Colors.transparent)),
           width: 1,
         ),
         boxShadow: [
@@ -443,12 +487,12 @@ class TrustCenterScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: (isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red : const Color(0xFF1677F2))).withOpacity(0.1),
+                  color: (isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red : (isResubmit ? Colors.orange : const Color(0xFF1677F2)))).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  isVerified ? Icons.school_rounded : (isRejected ? Icons.error_outline_rounded : Icons.school_outlined),
-                  color: isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red : const Color(0xFF1677F2)),
+                  isVerified ? Icons.school_rounded : (isRejected ? Icons.error_outline_rounded : (isResubmit ? Icons.refresh_rounded : Icons.school_outlined)),
+                  color: isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red : (isResubmit ? Colors.orange : const Color(0xFF1677F2))),
                   size: 24,
                 ),
               ),
@@ -470,12 +514,16 @@ class TrustCenterScreen extends ConsumerWidget {
                         ? 'Confirmed Student' 
                         : isPending 
                           ? 'Review in progress' 
-                          : isRejected 
-                            ? 'Verification rejected'
-                            : 'Verify your campus enrollment',
+                          : isUnderReview
+                            ? 'Actively being reviewed'
+                            : isResubmit
+                              ? 'Action required: Resubmit ID'
+                              : isRejected 
+                                ? 'Verification rejected'
+                                : 'Verify your campus enrollment',
                       style: TextStyle(
                         fontSize: 13,
-                        color: isRejected ? Colors.red.shade700 : Colors.blueGrey.shade500,
+                        color: isRejected ? Colors.red.shade700 : (isResubmit ? Colors.orange.shade700 : Colors.blueGrey.shade500),
                       ),
                     ),
                   ],
@@ -483,34 +531,42 @@ class TrustCenterScreen extends ConsumerWidget {
               ),
               if (isVerified)
                 const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981))
-              else if (isPending)
-                _buildStatusBadge('Pending', Colors.orange)
+              else if (isPending || isUnderReview)
+                _buildStatusBadge(isUnderReview ? 'Reviewing' : 'Pending', Colors.orange)
+              else if (isResubmit)
+                _buildStatusBadge('Resubmit', Colors.orange)
               else if (isRejected)
                 _buildStatusBadge('Rejected', Colors.red)
             ],
           ),
-          if (isPending) ...[
+          if (isPending || isUnderReview) ...[
             const SizedBox(height: 16),
-            _buildInfoBox('Our team is verifying your student ID. This usually takes 12-24 hours.'),
+            _buildInfoBox(isUnderReview
+              ? 'An administrator is currently reviewing your student ID.'
+              : 'Our team is verifying your student ID. This usually takes 12-24 hours.'),
+          ],
+          if (isResubmit && v?.rejectionReason != null) ...[
+            const SizedBox(height: 12),
+            _buildWarningBox('Resubmission Needed: ${v!.rejectionReason}'),
           ],
           if (isRejected && v?.rejectionReason != null) ...[
             const SizedBox(height: 12),
             _buildErrorBox('Reason: ${v!.rejectionReason}'),
           ],
-          if (!isVerified && !isPending) ...[
+          if (!isVerified && !isPending && !isUnderReview) ...[
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => context.push('/verify-student'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isRejected ? Colors.red : const Color(0xFF1677F2),
+                  backgroundColor: isRejected ? Colors.red : (isResubmit ? Colors.orange : const Color(0xFF1677F2)),
                   foregroundColor: Colors.white,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('Verify Student Status', style: TextStyle(fontWeight: FontWeight.w700)),
+                child: Text(isResubmit ? 'Resubmit Student ID' : 'Verify Student Status', style: const TextStyle(fontWeight: FontWeight.w700)),
               ),
             ),
           ],

@@ -19,7 +19,6 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
-  bool _localLoading = false;
 
   @override
   void dispose() {
@@ -39,16 +38,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
 
-    setState(() => _localLoading = true);
-
     await ref.read(authControllerProvider.notifier).signIn(email, password);
 
     if (mounted) {
       final state = ref.read(authControllerProvider);
       if (state.hasError) {
-        setState(() => _localLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(state.error.toString().replaceAll('Exception: ', ''))),
+          SnackBar(
+            content: Text(state.error.toString().replaceAll('Exception: ', '')),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -57,6 +56,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final authState = ref.watch(authControllerProvider);
+    final isLoading = authState.isLoading;
+
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
@@ -97,7 +99,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               hintText: 'Email',
               icon: Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
-              enabled: !_localLoading,
+              enabled: !isLoading,
             ),
 
             const SizedBox(height: 18),
@@ -105,7 +107,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             PasswordField(
               controller: passwordController,
               hintText: 'Password',
-              enabled: !_localLoading,
+              enabled: !isLoading,
             ),
 
             const SizedBox(height: 12),
@@ -113,7 +115,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-                onPressed: _localLoading ? null : () {
+                onPressed: isLoading ? null : () {
                   context.push('/forgot-password');
                 },
                 child: Text(
@@ -125,7 +127,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
             const SizedBox(height: 28),
 
-            if (_localLoading)
+            if (isLoading)
               Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
             else
               AuthButton(
@@ -140,15 +142,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             const SizedBox(height: 32),
 
             GoogleSignInButton(
-              onPressed: _localLoading ? null : () async {
-                setState(() => _localLoading = true);
+              onPressed: isLoading ? null : () async {
                 await ref.read(authControllerProvider.notifier).signInWithGoogle();
                 if (mounted) {
                   final state = ref.read(authControllerProvider);
                   if (state.hasError) {
-                    setState(() => _localLoading = false);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(state.error.toString().replaceAll('Exception: ', ''))),
+                      SnackBar(
+                        content: Text(state.error.toString().replaceAll('Exception: ', '')),
+                        behavior: SnackBarBehavior.floating,
+                      ),
                     );
                   }
                 }

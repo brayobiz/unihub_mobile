@@ -426,6 +426,44 @@ class PlugDashboardScreen extends ConsumerWidget {
         ),
       VerificationStatus.approved => const SizedBox.shrink(), // Should be handled by user.isVerified check
       VerificationStatus.expired => const SizedBox.shrink(),
+      VerificationStatus.resubmissionRequested => Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 28),
+                  const SizedBox(width: 16),
+                  Text('Action Required', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.primary)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Further documentation is needed to verify your application. Please check your notifications for details.',
+                style: TextStyle(color: AppColors.primary.withOpacity(0.8), fontSize: 12, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => context.push('/become-plug'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Resubmit Documents', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
     };
   }
 

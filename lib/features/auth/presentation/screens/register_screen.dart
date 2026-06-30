@@ -21,7 +21,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
-  bool _localLoading = false;
 
   @override
   void dispose() {
@@ -52,8 +51,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       return;
     }
 
-    setState(() => _localLoading = true);
-
     await ref.read(authControllerProvider.notifier).signUp(
       email: email, 
       password: password,
@@ -63,9 +60,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (mounted) {
       final state = ref.read(authControllerProvider);
       if (state.hasError) {
-        setState(() => _localLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(state.error.toString().replaceAll('Exception: ', ''))),
+          SnackBar(
+            content: Text(state.error.toString().replaceAll('Exception: ', '')),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -74,6 +73,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final authState = ref.watch(authControllerProvider);
+    final isLoading = authState.isLoading;
+
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
@@ -114,7 +116,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               controller: fullNameController,
               hintText: 'Full Name',
               icon: Icons.person_outline,
-              enabled: !_localLoading,
+              enabled: !isLoading,
             ),
 
             const SizedBox(height: 18),
@@ -125,7 +127,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               hintText: 'Email',
               icon: Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
-              enabled: !_localLoading,
+              enabled: !isLoading,
             ),
 
             const SizedBox(height: 18),
@@ -134,7 +136,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             PasswordField(
               controller: passwordController,
               hintText: 'Password',
-              enabled: !_localLoading,
+              enabled: !isLoading,
             ),
 
             const SizedBox(height: 18),
@@ -143,13 +145,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             PasswordField(
               controller: confirmPasswordController,
               hintText: 'Confirm Password',
-              enabled: !_localLoading,
+              enabled: !isLoading,
             ),
 
             const SizedBox(height: 32),
 
             // Create Account Button
-            if (_localLoading)
+            if (isLoading)
               Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
             else
               AuthButton(
@@ -165,15 +167,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
             // Google Sign In
             GoogleSignInButton(
-              onPressed: _localLoading ? null : () async {
-                setState(() => _localLoading = true);
+              onPressed: isLoading ? null : () async {
                 await ref.read(authControllerProvider.notifier).signInWithGoogle();
                 if (mounted) {
                   final state = ref.read(authControllerProvider);
                   if (state.hasError) {
-                    setState(() => _localLoading = false);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(state.error.toString().replaceAll('Exception: ', ''))),
+                      SnackBar(
+                        content: Text(state.error.toString().replaceAll('Exception: ', '')),
+                        behavior: SnackBarBehavior.floating,
+                      ),
                     );
                   }
                 }

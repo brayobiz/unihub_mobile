@@ -34,11 +34,17 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       final state = ref.read(authControllerProvider);
       if (state.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(state.error.toString().replaceAll('Exception: ', ''))),
+          SnackBar(
+            content: Text(state.error.toString().replaceAll('Exception: ', '')),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reset link sent to your email')),
+          const SnackBar(
+            content: Text('Reset link sent to your email'),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
         Navigator.pop(context);
       }
@@ -47,47 +53,56 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final authState = ref.watch(authControllerProvider);
+    final isLoading = authState.isLoading;
 
     return Scaffold(
-      appBar: AppBar(),
-      body: Padding(
+      backgroundColor: theme.colorScheme.surface,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
+      ),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            const SizedBox(height: 20),
+            Text(
               'Forgot Password',
-              style: TextStyle(
-                fontSize: 30,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 32,
                 fontWeight: FontWeight.bold,
+                letterSpacing: -1,
+                color: theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 10),
             Text(
               'Enter your email and we will send you a reset link.',
               style: TextStyle(
-                color: Colors.grey.shade600,
+                fontSize: 16,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 48),
             AuthTextField(
               controller: emailController,
               hintText: 'Email',
               icon: Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
-              enabled: !authState.isLoading,
+              enabled: !isLoading,
             ),
-            const SizedBox(height: 25),
-            SizedBox(
-              width: double.infinity,
-              child: authState.isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : FilledButton(
-                      onPressed: _onResetPassword,
-                      child: const Text('Send Reset Link'),
-                    ),
-            ),
+            const SizedBox(height: 32),
+            if (isLoading)
+              Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
+            else
+              AuthButton(
+                text: 'Send Reset Link',
+                onPressed: _onResetPassword,
+              ),
           ],
         ),
       ),

@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum StudentVerificationStatus { pending, approved, rejected, expired }
+enum StudentVerificationStatus { pending, underReview, approved, rejected, expired, resubmissionRequested }
 
 class StudentVerification {
   final String id;

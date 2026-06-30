@@ -55,6 +55,11 @@ class AppUser {
   final DateTime? lastSeen;
   final DateTime? createdAt;
 
+  // Moderation
+  final bool isBanned;
+  final String? banReason;
+  final DateTime? suspendedUntil;
+
   AppUser({
     required this.uid,
     required this.email,
@@ -116,13 +121,24 @@ class AppUser {
     this.isOnline = false,
     this.lastSeen,
     this.createdAt,
+    this.isBanned = false,
+    this.banReason,
+    this.suspendedUntil,
   });
 
   bool get isHousingPlug => roles.contains('housing_plug');
   bool get isVerifiedPlug => verifiedRoles.contains('housePlug');
   bool get isVerifiedSeller => verifiedRoles.contains('seller');
+  bool get isAdmin => roles.contains('admin');
   bool get isAnyRoleVerified => verifiedRoles.isNotEmpty;
   bool get isVerified => isIdentityVerified == true || isAnyRoleVerified == true;
+  
+  bool get isCurrentlySuspended {
+    if (suspendedUntil == null) return false;
+    return suspendedUntil!.isAfter(DateTime.now());
+  }
+
+  bool get isRestricted => isBanned || isCurrentlySuspended;
 
   /// Calculates a reality-based trust score based on verified milestones and activity.
   /// This ensures the score is a deterministic reflection of the user's standing.
@@ -227,6 +243,9 @@ class AppUser {
     bool? isOnline,
     DateTime? lastSeen,
     DateTime? createdAt,
+    bool? isBanned,
+    String? banReason,
+    DateTime? suspendedUntil,
   }) {
     return AppUser(
       uid: uid ?? this.uid,
@@ -275,6 +294,9 @@ class AppUser {
       isOnline: isOnline ?? this.isOnline,
       lastSeen: lastSeen ?? this.lastSeen,
       createdAt: createdAt ?? this.createdAt,
+      isBanned: isBanned ?? this.isBanned,
+      banReason: banReason ?? this.banReason,
+      suspendedUntil: suspendedUntil ?? this.suspendedUntil,
     );
   }
 
@@ -326,6 +348,9 @@ class AppUser {
       'isOnline': isOnline,
       'lastSeen': lastSeen != null ? Timestamp.fromDate(lastSeen!) : null,
       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : null,
+      'isBanned': isBanned,
+      'banReason': banReason,
+      'suspendedUntil': suspendedUntil != null ? Timestamp.fromDate(suspendedUntil!) : null,
     };
   }
 
@@ -430,6 +455,11 @@ class AppUser {
           : null,
       createdAt: json['createdAt'] != null 
           ? (json['createdAt'] as Timestamp).toDate() 
+          : null,
+      isBanned: safeBool(json['isBanned'], false),
+      banReason: json['banReason']?.toString(),
+      suspendedUntil: json['suspendedUntil'] != null 
+          ? (json['suspendedUntil'] as Timestamp).toDate()
           : null,
     );
   }
