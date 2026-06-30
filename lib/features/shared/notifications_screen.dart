@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/core/utils/date_formatter.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/shared/notification_repository.dart';
@@ -18,25 +18,26 @@ class NotificationsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final user = ref.watch(appUserProvider).valueOrNull;
     final notificationsAsync = ref.watch(notificationsProvider(module));
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FB),
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         title: Text(
           (module != null && module!.isNotEmpty)
               ? '${module![0].toUpperCase()}${module!.substring(1)} Notifications' 
               : 'Notifications',
-          style: GoogleFonts.plusJakartaSans(
+          style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.bold,
-            color: Colors.black,
+            color: theme.colorScheme.onSurface,
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.colorScheme.onSurface, size: 20),
           onPressed: () => context.pop(),
         ),
         actions: [
@@ -45,7 +46,7 @@ class NotificationsScreen extends ConsumerWidget {
               onPressed: () => ref.read(notificationRepositoryProvider).markFeatureNotificationsAsRead(user.uid, module: module),
               child: Text(
                 'Mark all read',
-                style: TextStyle(color: Colors.indigo.shade700, fontWeight: FontWeight.w600),
+                style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w600),
               ),
             ),
           const SizedBox(width: 8),
@@ -69,10 +70,10 @@ class NotificationsScreen extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
                   child: Text(
                     item,
-                    style: GoogleFonts.plusJakartaSans(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
-                      color: Colors.grey.shade600,
+                      color: theme.colorScheme.onSurfaceVariant,
                       letterSpacing: 0.2,
                     ),
                   ),
@@ -87,7 +88,7 @@ class NotificationsScreen extends ConsumerWidget {
             },
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
         error: (err, _) => Center(child: Text('Error: $err')),
       ),
     );
@@ -120,29 +121,30 @@ class _NotificationTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     IconData iconData;
     Color iconColor;
     
     switch (notification.type) {
       case NotificationType.chat:
         iconData = Icons.chat_bubble_outline_rounded;
-        iconColor = Colors.blue;
+        iconColor = theme.colorScheme.primary;
         break;
       case NotificationType.marketplace:
         iconData = Icons.shopping_bag_outlined;
-        iconColor = Colors.orange;
+        iconColor = AppColors.marketplace;
         break;
       case NotificationType.housing:
         iconData = Icons.home_work_outlined;
-        iconColor = Colors.green;
+        iconColor = AppColors.housing;
         break;
       case NotificationType.gig:
         iconData = Icons.work_outline_rounded;
-        iconColor = Colors.indigo;
+        iconColor = AppColors.gigs;
         break;
       case NotificationType.support:
         iconData = Icons.help_outline_rounded;
-        iconColor = Colors.orange;
+        iconColor = AppColors.marketplace;
         break;
       case NotificationType.follower:
         iconData = Icons.person_add_outlined;
@@ -150,7 +152,7 @@ class _NotificationTile extends ConsumerWidget {
         break;
       case NotificationType.review:
         iconData = Icons.star_outline_rounded;
-        iconColor = Colors.amber;
+        iconColor = AppColors.warning;
         break;
       case NotificationType.community:
         iconData = Icons.groups_outlined;
@@ -158,27 +160,27 @@ class _NotificationTile extends ConsumerWidget {
         break;
       case NotificationType.notes:
         iconData = Icons.description_outlined;
-        iconColor = Colors.red;
+        iconColor = AppColors.notes;
         break;
       default:
         iconData = Icons.notifications_none_rounded;
-        iconColor = Colors.grey;
+        iconColor = theme.colorScheme.onSurfaceVariant;
     }
 
     return Dismissible(
       key: Key(notification.id),
       direction: DismissDirection.endToStart,
       background: Container(
-        color: Colors.red.shade50,
+        color: AppColors.error.withValues(alpha: 0.1),
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 24),
-        child: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+        child: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
       ),
       onDismissed: (_) {
         ref.read(notificationRepositoryProvider).deleteNotification(userId, notification.id);
       },
       child: Material(
-        color: notification.isRead ? Colors.transparent : Colors.indigo.withOpacity(0.03),
+        color: notification.isRead ? Colors.transparent : theme.colorScheme.primary.withValues(alpha: 0.05),
         child: ListTile(
           onTap: () async {
             if (!notification.isRead) {
@@ -191,12 +193,12 @@ class _NotificationTile extends ConsumerWidget {
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundColor: notification.isRead ? Colors.grey.shade100 : iconColor.withOpacity(0.1),
+                backgroundColor: notification.isRead ? theme.colorScheme.surfaceVariant : iconColor.withValues(alpha: 0.1),
                 backgroundImage: notification.actorPhotoUrl != null 
                     ? NetworkImage(notification.actorPhotoUrl!) 
                     : null,
                 child: notification.actorPhotoUrl == null 
-                    ? Icon(iconData, color: notification.isRead ? Colors.grey : iconColor, size: 18)
+                    ? Icon(iconData, color: notification.isRead ? theme.colorScheme.onSurfaceVariant : iconColor, size: 18)
                     : null,
               ),
               if (!notification.isRead)
@@ -207,9 +209,9 @@ class _NotificationTile extends ConsumerWidget {
                     width: 12,
                     height: 12,
                     decoration: BoxDecoration(
-                      color: Colors.red,
+                      color: AppColors.error,
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+                      border: Border.all(color: theme.colorScheme.surface, width: 2),
                     ),
                   ),
                 ),
@@ -217,17 +219,18 @@ class _NotificationTile extends ConsumerWidget {
           ),
           title: RichText(
             text: TextSpan(
-              style: GoogleFonts.plusJakartaSans(
+              style: TextStyle(
                 fontSize: 13,
-                color: const Color(0xFF1E293B),
+                color: theme.colorScheme.onSurface,
                 height: 1.3,
+                fontFamily: theme.textTheme.bodyMedium?.fontFamily,
               ),
               children: [
                 TextSpan(
                   text: '${notification.title} ',
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
-                TextSpan(text: notification.body),
+                TextSpan(text: notification.body, style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
               ],
             ),
           ),
@@ -238,8 +241,8 @@ class _NotificationTile extends ConsumerWidget {
                 padding: const EdgeInsets.only(top: 2),
                 child: Text(
                   DateFormatter.formatRelative(notification.createdAt),
-                  style: GoogleFonts.plusJakartaSans(
-                    color: Colors.grey.shade500, 
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7), 
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
@@ -255,6 +258,7 @@ class _NotificationTile extends ConsumerWidget {
   }
 
   Widget _buildOfferActions(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final offerId = notification.metadata['offerId'] as String?;
     if (offerId == null) return const SizedBox.shrink();
 
@@ -268,8 +272,8 @@ class _NotificationTile extends ConsumerWidget {
               child: OutlinedButton(
                 onPressed: () => _handleOfferResponse(context, ref, offerId, OfferStatus.rejected),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red,
-                  side: const BorderSide(color: Colors.red),
+                  foregroundColor: AppColors.error,
+                  side: const BorderSide(color: AppColors.error),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   padding: EdgeInsets.zero,
                 ),
@@ -284,11 +288,11 @@ class _NotificationTile extends ConsumerWidget {
               child: FilledButton(
                 onPressed: () => _handleOfferResponse(context, ref, offerId, OfferStatus.accepted),
                 style: FilledButton.styleFrom(
-                  backgroundColor: Colors.green,
+                  backgroundColor: AppColors.success,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   padding: EdgeInsets.zero,
                 ),
-                child: const Text('Accept', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                child: const Text('Accept', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
               ),
             ),
           ),
@@ -298,27 +302,33 @@ class _NotificationTile extends ConsumerWidget {
   }
 
   Future<void> _handleOfferResponse(BuildContext context, WidgetRef ref, String offerId, OfferStatus status) async {
+    final theme = Theme.of(context);
     final controller = TextEditingController();
     final isAccept = status == OfferStatus.accepted;
     
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: theme.colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text(isAccept ? 'Accept Offer?' : 'Reject Offer?'),
+        title: Text(isAccept ? 'Accept Offer?' : 'Reject Offer?', style: TextStyle(color: theme.colorScheme.onSurface)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(isAccept 
               ? 'Accepting this offer will mark the item as sold. You can add a message for the buyer below.' 
-              : 'Add an optional reason for rejecting this offer.'),
+              : 'Add an optional reason for rejecting this offer.',
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: controller,
+              style: TextStyle(color: theme.colorScheme.onSurface),
               decoration: InputDecoration(
                 hintText: isAccept ? 'e.g. Great! Let\'s meet at...' : 'e.g. Price too low, sorry!',
+                hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
                 filled: true,
-                fillColor: Colors.grey.shade50,
+                fillColor: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               ),
               maxLines: 3,
@@ -330,10 +340,10 @@ class _NotificationTile extends ConsumerWidget {
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
-              backgroundColor: isAccept ? Colors.green : Colors.red,
+              backgroundColor: isAccept ? AppColors.success : AppColors.error,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: Text(isAccept ? 'Accept & Close Deal' : 'Reject Offer'),
+            child: Text(isAccept ? 'Accept & Close Deal' : 'Reject Offer', style: const TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -357,7 +367,7 @@ class _NotificationTile extends ConsumerWidget {
       if (context.mounted) {
         messenger.showSnackBar(SnackBar(
           content: Text(status == OfferStatus.accepted ? 'Offer accepted! Redirecting to chat...' : 'Offer rejected.'),
-          backgroundColor: status == OfferStatus.accepted ? Colors.green : Colors.red,
+          backgroundColor: status == OfferStatus.accepted ? AppColors.success : AppColors.error,
         ));
 
         if (status == OfferStatus.accepted) {
@@ -545,6 +555,7 @@ class _NotificationTile extends ConsumerWidget {
 class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -552,25 +563,25 @@ class _EmptyState extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: theme.colorScheme.surface,
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
               ],
             ),
-            child: Icon(Icons.notifications_off_outlined, size: 64, color: Colors.indigo.shade200),
+            child: Icon(Icons.notifications_off_outlined, size: 64, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
           ),
           const SizedBox(height: 24),
           Text(
             'All caught up!',
-            style: GoogleFonts.plusJakartaSans(
+            style: theme.textTheme.titleLarge?.copyWith(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              color: theme.colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
@@ -578,7 +589,7 @@ class _EmptyState extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 48),
             child: Text(
               'No new notifications for now. We\'ll let you know when things happen.',
-              style: TextStyle(color: Colors.grey.shade600, height: 1.5),
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, height: 1.5),
               textAlign: TextAlign.center,
             ),
           ),

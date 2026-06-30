@@ -32,6 +32,7 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final notesAsync = ref.watch(notesListingsProvider(50));
     
     final user = ref.watch(appUserProvider).valueOrNull;
@@ -49,8 +50,8 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
           SliverToBoxAdapter(
             child: Column(
               children: [
-                _buildSearchBar(),
-                _buildCategoryList(selectedCategory),
+                _buildSearchBar(context),
+                _buildCategoryList(context, selectedCategory),
               ],
             ),
           ),
@@ -63,17 +64,18 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
                   children: [
                     Text(
                       'All Resources',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: theme.textTheme.titleLarge?.copyWith(
                         fontSize: 18, 
                         fontWeight: FontWeight.bold,
                         letterSpacing: -0.5,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                     const Spacer(),
                     if (user?.university != null)
                       Text(
                         'at ${user?.university}',
-                        style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontWeight: FontWeight.w600),
+                        style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w600),
                       ),
                   ],
                 ),
@@ -87,10 +89,11 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
               sliver: SliverToBoxAdapter(
                 child: Text(
                   'Search Results',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: theme.textTheme.titleLarge?.copyWith(
                     fontSize: 18, 
                     fontWeight: FontWeight.bold,
                     letterSpacing: -0.5,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -99,7 +102,7 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
           // Main List
           notesAsync.when(
             data: (notes) => notes.isEmpty 
-              ? SliverToBoxAdapter(child: _buildEmptyState())
+              ? SliverToBoxAdapter(child: _buildEmptyState(context))
               : SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   sliver: SliverList(
@@ -114,8 +117,8 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
                     ),
                   ),
                 ),
-            loading: () => const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator(color: Colors.indigo)),
+            loading: () => SliverFillRemaining(
+              child: Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
             ),
             error: (err, stack) => SliverFillRemaining(
               child: Center(child: Text('Error: $err')),
@@ -143,12 +146,14 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
     }
   }
 
-  Widget _buildSearchBar() {
+  Widget _buildSearchBar(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
-      color: Colors.white,
+      color: theme.colorScheme.surface,
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
       child: TextField(
         controller: _searchController,
+        style: TextStyle(color: theme.colorScheme.onSurface),
         onChanged: (val) {
           _searchDebouncer.run(() {
             ref.read(notesSearchQueryProvider.notifier).state = val;
@@ -157,10 +162,11 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
         },
         decoration: InputDecoration(
           hintText: 'Search courses, units, topics...',
-          prefixIcon: const Icon(Icons.search, color: Colors.indigo),
+          hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+          prefixIcon: Icon(Icons.search, color: theme.colorScheme.primary),
           suffixIcon: _searchController.text.isNotEmpty 
             ? IconButton(
-                icon: const Icon(Icons.clear), 
+                icon: Icon(Icons.clear, color: theme.colorScheme.onSurfaceVariant), 
                 onPressed: () {
                   _searchController.clear();
                   ref.read(notesSearchQueryProvider.notifier).state = '';
@@ -168,7 +174,7 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
               )
             : null,
           filled: true,
-          fillColor: const Color(0xFFF8F9FB),
+          fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
@@ -179,10 +185,11 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
     );
   }
 
-  Widget _buildCategoryList(String selected) {
+  Widget _buildCategoryList(BuildContext context, String selected) {
+    final theme = Theme.of(context);
     return Container(
       height: 50,
-      color: Colors.white,
+      color: theme.colorScheme.surface,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -198,13 +205,14 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
               onSelected: (val) {
                 if (val) ref.read(notesCategoryFilterProvider.notifier).state = cat;
               },
-              selectedColor: Colors.indigo,
+              selectedColor: theme.colorScheme.primary,
+              checkmarkColor: Colors.white,
               labelStyle: TextStyle(
-                color: isSelected ? Colors.white : Colors.black87,
+                color: isSelected ? Colors.white : theme.colorScheme.onSurface,
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
-              backgroundColor: const Color(0xFFF8F9FB),
+              backgroundColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               side: BorderSide.none,
             ),
@@ -214,7 +222,8 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
+    final theme = Theme.of(context);
     final query = ref.read(notesSearchQueryProvider);
     final category = ref.read(notesCategoryFilterProvider);
     
@@ -223,16 +232,16 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.search_off_rounded, size: 80, color: Colors.indigo.shade100),
+          Icon(Icons.search_off_rounded, size: 80, color: theme.colorScheme.primary.withOpacity(0.2)),
           const SizedBox(height: 24),
           Text(
             category == 'All' 
               ? 'No resources found' 
               : 'No $category notes yet',
-            style: GoogleFonts.plusJakartaSans(
+            style: theme.textTheme.titleLarge?.copyWith(
               fontSize: 18, 
               fontWeight: FontWeight.bold, 
-              color: Colors.black87
+              color: theme.colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 12),
@@ -241,14 +250,14 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
               ? 'We couldn\'t find anything matching "$query". Try a different keyword.'
               : 'Be the first to share resources for this category and help your fellow students!',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey.shade600, height: 1.5),
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, height: 1.6),
           ),
           const SizedBox(height: 32),
           if (query.isNotEmpty || category != 'All')
             TextButton.icon(
               onPressed: _resetFilters,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Clear all filters'),
+              icon: Icon(Icons.refresh, color: theme.colorScheme.primary),
+              label: Text('Clear all filters', style: TextStyle(color: theme.colorScheme.primary)),
             ),
         ],
       ),

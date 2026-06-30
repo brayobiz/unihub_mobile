@@ -1,134 +1,160 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'app_colors.dart';
+import 'app_typography.dart';
 
+/// The entry point for the UniHub Theming System.
+/// 
+/// This class provides the light and dark [ThemeData] and acts as the
+/// single source of truth for the application's appearance.
 class AppTheme {
-  AppTheme._(); // prevents instantiation
+  AppTheme._();
 
-  // 🎨 PRIMARY COLORS (UniHubLife brand style)
-  static const Color primaryColor = Color(0xFF3B82F6); // blue
-  static const Color secondaryColor = Color(0xFF6366F1); // indigo
-  static const Color backgroundColor = Color(0xFFF7F8FC);
-  static const Color cardColor = Colors.white;
+  // Legacy constants kept for internal backward compatibility within this file
+  static const Color primaryColor = AppColors.primary;
+  static const Color secondaryColor = AppColors.secondary;
+  static const Color backgroundColor = AppColors.scaffoldLight;
+  static const Color cardColor = AppColors.white;
 
-  // 🌓 LIGHT THEME
-  static ThemeData lightTheme = ThemeData(
-    useMaterial3: true,
-    brightness: Brightness.light,
+  /// Returns the Light Theme for UniHub.
+  static ThemeData get lightTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
 
-    // COLORS
-    primaryColor: primaryColor,
-    scaffoldBackgroundColor: backgroundColor,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: primaryColor,
-      primary: primaryColor,
-      secondary: secondaryColor,
-      background: backgroundColor,
-    ),
-
-    // APP BAR THEME
-    appBarTheme: AppBarTheme(
-      backgroundColor: Colors.white,
-      elevation: 0,
-      centerTitle: true,
-      iconTheme: const IconThemeData(color: Colors.black),
-      titleTextStyle: GoogleFonts.plusJakartaSans(
-        color: Colors.black,
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
+      // Colors
+      primaryColor: primaryColor,
+      scaffoldBackgroundColor: backgroundColor,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: primaryColor,
+        primary: primaryColor,
+        secondary: secondaryColor,
+        surface: backgroundColor,
+        surfaceContainerHighest: AppColors.grey100,
+        outlineVariant: AppColors.grey200,
+        onSurface: AppColors.black,
+        onSurfaceVariant: AppColors.grey600,
+        error: AppColors.error,
       ),
-    ),
 
-    // TEXT THEME
-    textTheme: GoogleFonts.plusJakartaSansTextTheme(const TextTheme(
-      displayLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-      displayMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-      titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-      titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-      bodyLarge: TextStyle(fontSize: 16),
-      bodyMedium: TextStyle(fontSize: 14),
-      labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-    )),
+      // Typography
+      textTheme: AppTypography.lightTextTheme,
 
-    // CARD THEME (FIXED)
-    cardTheme: CardThemeData(
-      color: cardColor,
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+      // Component Themes
+      appBarTheme: _appBarThemeLight,
+      cardTheme: _cardThemeLight,
+      elevatedButtonTheme: _elevatedButtonTheme,
+      inputDecorationTheme: _inputDecorationTheme,
+      iconTheme: _iconThemeLight,
+      dividerTheme: const DividerThemeData(color: AppColors.grey200),
+    );
+  }
+
+  /// Returns the Dark Theme for UniHub.
+  static ThemeData get darkTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+
+      // Colors
+      colorScheme: ColorScheme.dark(
+        primary: primaryColor,
+        secondary: secondaryColor,
+        surface: AppColors.backgroundDark,
+        surfaceContainerHighest: AppColors.cardDark,
+        outlineVariant: AppColors.grey.withValues(alpha: 0.2),
+        onSurface: Colors.white,
+        onSurfaceVariant: Colors.white70,
+        error: AppColors.error,
       ),
-    ),
+      scaffoldBackgroundColor: AppColors.backgroundDark,
 
-    // BUTTON THEME
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: primaryColor,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        textStyle: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    ),
+      // Typography
+      textTheme: AppTypography.darkTextTheme,
 
-    // INPUT FIELDS
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: Colors.white,
-      contentPadding: const EdgeInsets.all(16),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: primaryColor),
-      ),
-    ),
+      // Component Themes
+      appBarTheme: _appBarThemeDark,
+      cardTheme: _cardThemeDark,
+      dividerTheme: DividerThemeData(color: AppColors.grey.withValues(alpha: 0.2)),
+    );
+  }
 
-    // ICON THEME
-    iconTheme: const IconThemeData(
-      color: Colors.black,
-      size: 24,
+  // --- COMPONENT THEME DEFINITIONS ---
+
+  static AppBarTheme get _appBarThemeLight => AppBarTheme(
+    backgroundColor: AppColors.white,
+    elevation: 0,
+    centerTitle: true,
+    iconTheme: const IconThemeData(color: AppColors.black),
+    titleTextStyle: TextStyle(
+      color: AppColors.black,
+      fontSize: 18,
+      fontWeight: FontWeight.bold,
+      fontFamily: AppTypography.fontFamily,
     ),
   );
 
-  // 🌙 DARK THEME (READY)
-  static ThemeData darkTheme = ThemeData(
-    useMaterial3: true,
-    brightness: Brightness.dark,
+  static AppBarTheme get _appBarThemeDark => const AppBarTheme(
+    backgroundColor: AppColors.backgroundDark,
+    elevation: 0,
+    centerTitle: true,
+  );
 
-    colorScheme: const ColorScheme.dark(
-      primary: primaryColor,
-      secondary: secondaryColor,
+  static CardThemeData get _cardThemeLight => CardThemeData(
+    color: cardColor,
+    elevation: 2,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
     ),
+  );
 
-    textTheme: GoogleFonts.plusJakartaSansTextTheme(const TextTheme(
-      displayLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-      displayMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-      titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-      titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-      bodyLarge: TextStyle(fontSize: 16),
-      bodyMedium: TextStyle(fontSize: 14),
-    )),
-
-    scaffoldBackgroundColor: const Color(0xFF0F172A),
-
-    appBarTheme: const AppBarTheme(
-      backgroundColor: Color(0xFF0F172A),
-      elevation: 0,
-      centerTitle: true,
+  static CardThemeData get _cardThemeDark => const CardThemeData(
+    color: AppColors.cardDark,
+    elevation: 2,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.all(Radius.circular(16)),
     ),
+  );
 
-    cardTheme: const CardThemeData(
-      color: Color(0xFF1E293B),
-      elevation: 2,
+  static ElevatedButtonThemeData get _elevatedButtonTheme => ElevatedButtonThemeData(
+    style: ElevatedButton.styleFrom(
+      backgroundColor: primaryColor,
+      foregroundColor: AppColors.white,
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(16)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      textStyle: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
       ),
     ),
+  );
+
+  static InputDecorationTheme get _inputDecorationTheme => InputDecorationTheme(
+    filled: true,
+    fillColor: AppColors.white,
+    contentPadding: const EdgeInsets.all(16),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide.none,
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.grey200),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: primaryColor, width: 2),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.error),
+    ),
+    hintStyle: const TextStyle(color: AppColors.grey400, fontSize: 14),
+  );
+
+  static IconThemeData get _iconThemeLight => const IconThemeData(
+    color: AppColors.black,
+    size: 24,
   );
 }

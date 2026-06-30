@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/trust/domain/models/professional_role.dart';
 import 'package:unihub_mobile/features/trust/domain/models/verification_application.dart';
 import 'package:unihub_mobile/features/trust/presentation/providers/trust_providers.dart';
@@ -46,35 +47,36 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       drawer: const AppDrawer(),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         leading: Builder(
           builder: (context) => IconButton(
-            icon: const Icon(Icons.menu_rounded, color: Colors.black),
+            icon: Icon(Icons.menu_rounded, color: theme.colorScheme.onSurface),
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
         title: Text(
           'Marketplace',
           style: GoogleFonts.plusJakartaSans(
-            color: Colors.black,
+            color: theme.colorScheme.onSurface,
             fontWeight: FontWeight.bold,
             fontSize: 22,
           ),
         ),
-        actions: [
-          const NotificationBadge(module: 'marketplace'),
-          const SizedBox(width: 8),
+        actions: const [
+          NotificationBadge(module: 'marketplace'),
+          SizedBox(width: 8),
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: Colors.indigo,
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: Colors.indigo,
+          labelColor: AppColors.secondary,
+          unselectedLabelColor: AppColors.grey,
+          indicatorColor: AppColors.secondary,
           labelStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14),
           tabs: const [
             Tab(text: 'Discover'),
@@ -86,7 +88,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
         onPressed: () => context.push('/add-listing'),
         icon: const Icon(Icons.add_shopping_cart_rounded),
         label: const Text('Post Listing'),
-        backgroundColor: Colors.indigo,
+        backgroundColor: AppColors.secondary,
         foregroundColor: Colors.white,
       ),
       body: TabBarView(
@@ -100,11 +102,11 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
   }
 
   Widget _buildDiscoverTab() {
+    final theme = Theme.of(context);
     final filterState = ref.watch(marketplaceControllerProvider);
     final controller = ref.read(marketplaceControllerProvider.notifier);
     final user = ref.watch(appUserProvider).valueOrNull;
 
-    // Use specific sections when no search/filter is active
     final bool isBrowsingHome = filterState.searchQuery.isEmpty && 
                                 filterState.selectedCategory == null &&
                                 filterState.selectedConditions.isEmpty &&
@@ -132,15 +134,18 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                   if (isBrowsingHome) ...[
                     _buildPopularCategories(),
                     _buildDiscoverySection(
+                      context: context,
                       title: 'Recently Viewed',
                       provider: recentlyViewedProvider,
                       emptyWidget: const SizedBox.shrink(),
                     ),
                     _buildDiscoverySection(
+                      context: context,
                       title: 'Recommended For You',
                       provider: recommendedListingsProvider,
                     ),
                     _buildDiscoverySection(
+                      context: context,
                       title: 'Trending in ${user?.university ?? 'Campus'}',
                       provider: trendingListingsProvider(user?.university),
                     ),
@@ -151,6 +156,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         letterSpacing: -0.5,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                   ] else ...[
@@ -167,7 +173,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+                            color: theme.colorScheme.onSurface,
                           ),
                         ),
                         TextButton.icon(
@@ -190,6 +196,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
   }
 
   Widget _buildSearchBar(MarketplaceController controller, ListingFilter filterState) {
+    final theme = Theme.of(context);
     return Row(
       children: [
         Expanded(
@@ -201,20 +208,20 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.grey.shade100),
+                border: Border.all(color: theme.colorScheme.outlineVariant),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.search_rounded, color: Colors.indigo),
+                  const Icon(Icons.search_rounded, color: AppColors.secondary),
                   const SizedBox(width: 12),
                   Text(
                     filterState.searchQuery.isEmpty 
                         ? 'What are you looking for?' 
                         : filterState.searchQuery,
                     style: GoogleFonts.plusJakartaSans(
-                      color: filterState.searchQuery.isEmpty ? Colors.grey.shade400 : Colors.black87,
+                      color: filterState.searchQuery.isEmpty ? AppColors.grey : theme.colorScheme.onSurface,
                     ),
                   ),
                 ],
@@ -225,9 +232,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
         const SizedBox(width: 10),
         IconButton(
           onPressed: () => _showFilterSheet(context, filterState, controller), 
-          icon: const Icon(Icons.tune_rounded, color: Colors.black),
+          icon: Icon(Icons.tune_rounded, color: theme.colorScheme.onSurface),
           style: IconButton.styleFrom(
-            backgroundColor: Colors.grey.shade50,
+            backgroundColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
             padding: const EdgeInsets.all(12),
           ),
         ),
@@ -236,7 +243,8 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
   }
 
   Widget _buildCategoryChips(ListingFilter filterState, MarketplaceController controller) {
-    const List<String> categories = MarketplaceCategories.mainFilters;
+    final theme = Theme.of(context);
+    const categories = MarketplaceCategories.mainFilters;
     return SizedBox(
       height: 44,
       child: ListView.builder(
@@ -254,7 +262,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                 cat,
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
-                  color: isSelected ? Colors.white : Colors.black87,
+                  color: isSelected ? Colors.white : theme.colorScheme.onSurface,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
@@ -264,15 +272,15 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                   controller.setCategory(cat);
                 }
               },
-              backgroundColor: Colors.grey.shade50,
-              selectedColor: Colors.indigo,
+              backgroundColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+              selectedColor: AppColors.secondary,
               showCheckmark: false,
               pressElevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
                 side: BorderSide(
-                  color: isSelected ? Colors.indigo : Colors.grey.shade200,
+                  color: isSelected ? AppColors.secondary : theme.colorScheme.outlineVariant,
                 ),
               ),
             ),
@@ -283,7 +291,8 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
   }
 
   Widget _buildPopularCategories() {
-    final categories = MarketplaceCategories.mainFilters;
+    final theme = Theme.of(context);
+    const categories = MarketplaceCategories.mainFilters;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -293,7 +302,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
           style: GoogleFonts.plusJakartaSans(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: Colors.black87,
+            color: theme.colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 12),
@@ -315,9 +324,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
+                          color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.grey.shade100),
+                          border: Border.all(color: theme.colorScheme.outlineVariant),
                         ),
                         alignment: Alignment.center,
                         child: Text(
@@ -331,7 +340,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 9,
                           fontWeight: FontWeight.w500,
-                          color: Colors.grey.shade700,
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                         maxLines: 1,
                       ),
@@ -347,10 +356,12 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
   }
 
   Widget _buildDiscoverySection({
+    required BuildContext context,
     required String title,
     required StreamProvider<List<Listing>> provider,
     Widget? emptyWidget,
   }) {
+    final theme = Theme.of(context);
     final asyncListings = ref.watch(provider);
     final sectionPrefix = title.replaceAll(' ', '_').toLowerCase();
 
@@ -371,6 +382,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     letterSpacing: -0.5,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
                 TextButton(
@@ -411,6 +423,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
   }
 
   Widget _buildListingsGrid(ListingFilter filter) {
+    final theme = Theme.of(context);
     final listingsAsync = ref.watch(listingsProvider(filter));
 
     return listingsAsync.when(
@@ -422,11 +435,11 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.search_off_rounded, size: 64, color: Colors.grey.shade200),
+                  Icon(Icons.search_off_rounded, size: 64, color: theme.colorScheme.outlineVariant),
                   const SizedBox(height: 16),
                   Text(
                     'No items found',
-                    style: GoogleFonts.plusJakartaSans(color: Colors.grey, fontSize: 16),
+                    style: GoogleFonts.plusJakartaSans(color: theme.colorScheme.onSurfaceVariant, fontSize: 16),
                   ),
                   const SizedBox(height: 16),
                   TextButton(
@@ -480,6 +493,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
   }
 
   Widget _buildMyListingsTab() {
+    final theme = Theme.of(context);
     final user = ref.watch(appUserProvider).valueOrNull;
     if (user == null) return const Center(child: Text('Please log in to see your listings'));
 
@@ -504,9 +518,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.shopping_bag_outlined, size: 64, color: Colors.grey.shade200),
+                      Icon(Icons.shopping_bag_outlined, size: 64, color: theme.colorScheme.outlineVariant),
                       const SizedBox(height: 16),
-                      const Text('You haven\'t posted any listings yet', style: TextStyle(color: Colors.grey)),
+                      Text('You haven\'t posted any listings yet', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
                       const SizedBox(height: 24),
                       ElevatedButton(
                         onPressed: () => context.push('/add-listing'),
@@ -551,13 +565,14 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
 
     final bool showIdentityIssue = !isVerified || isIdentityPending || isIdentityRejected;
 
+    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: (isRoleRejected || isIdentityRejected) ? Colors.red.shade50 : Colors.indigo.shade50,
+        color: (isRoleRejected || isIdentityRejected) ? theme.colorScheme.errorContainer : theme.colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: (isRoleRejected || isIdentityRejected) ? Colors.red.shade100 : Colors.indigo.shade100),
+        border: Border.all(color: (isRoleRejected || isIdentityRejected) ? theme.colorScheme.error : theme.colorScheme.primary.withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -566,7 +581,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
             children: [
               Icon(
                 (isRoleRejected || isIdentityRejected) ? Icons.error_outline : ((isRolePending || isIdentityPending) ? Icons.access_time : Icons.verified_user_outlined),
-                color: (isRoleRejected || isIdentityRejected) ? Colors.red : Colors.indigo,
+                color: (isRoleRejected || isIdentityRejected) ? theme.colorScheme.error : theme.colorScheme.primary,
               ),
               const SizedBox(width: 12),
               Text(
@@ -575,7 +590,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                   : (isRoleRejected ? 'Seller Application Rejected' : (isRolePending ? 'Review Pending' : 'Apply as Trusted Seller')),
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: (isRoleRejected || isIdentityRejected) ? Colors.red.shade900 : Colors.indigo.shade900,
+                  color: (isRoleRejected || isIdentityRejected) ? theme.colorScheme.onErrorContainer : theme.colorScheme.onPrimaryContainer,
                   fontSize: 16,
                 ),
               ),
@@ -596,7 +611,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                         : 'Get a verification badge next to your items and build trust with buyers.')),
             style: TextStyle(
               fontSize: 13,
-              color: (isRoleRejected || isIdentityRejected) ? Colors.red.shade700 : Colors.indigo.shade700,
+              color: (isRoleRejected || isIdentityRejected) ? theme.colorScheme.onErrorContainer.withOpacity(0.8) : theme.colorScheme.onPrimaryContainer.withOpacity(0.8),
             ),
           ),
           if (!isRolePending && !isIdentityPending) ...[
@@ -606,7 +621,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
               child: FilledButton(
                 onPressed: () => context.push(isVerified ? '/verify-professional/seller' : (isIdentityRejected ? '/trust-center' : '/verify-identity')),
                 style: FilledButton.styleFrom(
-                  backgroundColor: (isRoleRejected || isIdentityRejected) ? Colors.red : Colors.indigo,
+                  backgroundColor: (isRoleRejected || isIdentityRejected) ? theme.colorScheme.error : theme.colorScheme.primary,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: Text(showIdentityIssue ? (isIdentityRejected ? 'Go to Trust Center' : 'Verify Identity') : (isRoleRejected ? 'Re-apply Now' : 'Apply Now')),
@@ -622,108 +637,139 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
       builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
-          padding: const EdgeInsets.all(30),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Refine Search',
-                    style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.bold),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Text('Sort By', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<ListingSortType>(
-                value: state.sortBy,
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-                items: ListingSortType.values.map((s) => DropdownMenuItem(
-                  value: s,
-                  child: Text(s.name.replaceFirst(s.name[0], s.name[0].toUpperCase())),
-                )).toList(),
-                onChanged: (val) {
-                  if (val != null) {
-                    controller.setSortBy(val);
-                    setModalState(() {});
-                  }
-                },
-              ),
-              const SizedBox(height: 24),
-              Text('Condition', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: ['newCondition', 'likeNew', 'good', 'fair'].map((cond) {
-                  final isSelected = state.selectedConditions.contains(cond);
-                  return ChoiceChip(
-                    label: Text(cond.replaceFirst('newCondition', 'New')),
-                    selected: isSelected,
-                    onSelected: (_) {
-                      controller.toggleCondition(cond);
-                      setModalState(() {});
-                    },
-                    selectedColor: Colors.indigo.shade50,
-                    labelStyle: TextStyle(
-                      color: isSelected ? Colors.indigo : Colors.black87,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        builder: (context, setModalState) {
+          final mTheme = Theme.of(context);
+          return Container(
+            padding: const EdgeInsets.all(30),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Refine Search',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 22, 
+                        fontWeight: FontWeight.bold,
+                        color: mTheme.colorScheme.onSurface,
+                      ),
                     ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 24),
-              Text('Price Range (KES)', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 8),
-              RangeSlider(
-                values: state.priceRange ?? const RangeValues(0, 50000),
-                min: 0,
-                max: 100000,
-                divisions: 100,
-                activeColor: Colors.indigo,
-                inactiveColor: Colors.indigo.shade50,
-                labels: RangeLabels(
-                  '${state.priceRange?.start.toInt() ?? 0}',
-                  '${state.priceRange?.end.toInt() ?? 50000}',
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(Icons.close_rounded, color: mTheme.colorScheme.onSurface),
+                    ),
+                  ],
                 ),
-                onChanged: (val) {
-                  controller.setPriceRange(val);
-                  setModalState(() {});
-                },
-              ),
-              const SizedBox(height: 40),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: FilledButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.indigo,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                const SizedBox(height: 24),
+                Text(
+                  'Sort By', 
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.bold, 
+                    fontSize: 16,
+                    color: mTheme.colorScheme.onSurface,
                   ),
-                  child: const Text('Apply Filters', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
-              ),
-              const SizedBox(height: 10),
-            ],
-          ),
-        ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<ListingSortType>(
+                  value: state.sortBy,
+                  dropdownColor: mTheme.colorScheme.surface,
+                  style: TextStyle(color: mTheme.colorScheme.onSurface),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: mTheme.colorScheme.surfaceVariant.withOpacity(0.3),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                  items: ListingSortType.values.map((s) => DropdownMenuItem(
+                    value: s,
+                    child: Text(s.name.replaceFirst(s.name[0], s.name[0].toUpperCase())),
+                  )).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      controller.setSortBy(val);
+                      setModalState(() {});
+                    }
+                  },
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Condition', 
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.bold, 
+                    fontSize: 16,
+                    color: mTheme.colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: ['newCondition', 'likeNew', 'good', 'fair'].map((cond) {
+                    final isSelected = state.selectedConditions.contains(cond);
+                    return ChoiceChip(
+                      label: Text(cond.replaceFirst('newCondition', 'New')),
+                      selected: isSelected,
+                      onSelected: (_) {
+                        controller.toggleCondition(cond);
+                        setModalState(() {});
+                      },
+                      selectedColor: mTheme.colorScheme.primaryContainer,
+                      backgroundColor: mTheme.colorScheme.surfaceVariant.withOpacity(0.3),
+                      labelStyle: TextStyle(
+                        color: isSelected ? mTheme.colorScheme.primary : mTheme.colorScheme.onSurface,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Price Range (KES)', 
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.bold, 
+                    fontSize: 16,
+                    color: mTheme.colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                RangeSlider(
+                  values: state.priceRange ?? const RangeValues(0, 50000),
+                  min: 0,
+                  max: 100000,
+                  divisions: 100,
+                  activeColor: AppColors.secondary,
+                  inactiveColor: AppColors.secondary.withOpacity(0.2),
+                  labels: RangeLabels(
+                    '${state.priceRange?.start.toInt() ?? 0}',
+                    '${state.priceRange?.end.toInt() ?? 50000}',
+                  ),
+                  onChanged: (val) {
+                    controller.setPriceRange(val);
+                    setModalState(() {});
+                  },
+                ),
+                const SizedBox(height: 40),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.secondary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: const Text('Apply Filters', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

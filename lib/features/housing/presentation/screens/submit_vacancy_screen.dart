@@ -82,13 +82,14 @@ class _SubmitVacancyScreenState extends ConsumerState<SubmitVacancyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text('Report a Vacancy', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
+        title: Text('Report a Vacancy', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
-        foregroundColor: Colors.black,
+        foregroundColor: theme.colorScheme.onSurface,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -97,7 +98,7 @@ class _SubmitVacancyScreenState extends ConsumerState<SubmitVacancyScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(),
+              _buildHeader(context),
               const SizedBox(height: 32),
               _buildTypeDropdown(),
               const SizedBox(height: 24),
@@ -144,18 +145,19 @@ class _SubmitVacancyScreenState extends ConsumerState<SubmitVacancyScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Know an available room or moving out?',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
         ),
         const SizedBox(height: 8),
         Text(
           'Submit the details here. A verified Housing Plug will verify and list it for other students.',
-          style: TextStyle(color: Colors.blueGrey.shade600, height: 1.5),
+          style: TextStyle(color: theme.colorScheme.onSurfaceVariant, height: 1.5),
         ),
       ],
     );
@@ -185,40 +187,48 @@ class _SubmitVacancyScreenState extends ConsumerState<SubmitVacancyScreen> {
     TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+        Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
           maxLines: maxLines,
           keyboardType: keyboardType,
           validator: validator,
-          decoration: _inputDecoration().copyWith(hintText: hint),
+          style: TextStyle(color: theme.colorScheme.onSurface),
+          decoration: _inputDecoration().copyWith(
+            hintText: hint,
+            hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+          ),
         ),
       ],
     );
   }
 
   InputDecoration _inputDecoration() {
+    final theme = Theme.of(context);
     return InputDecoration(
       filled: true,
-      fillColor: const Color(0xFFF8FAFC),
+      fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFF1F5F9))),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withOpacity(0.5))),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.primary)),
     );
   }
 
   Widget _buildSubmitButton() {
+    final theme = Theme.of(context);
     return SizedBox(
       width: double.infinity,
       height: 58,
       child: FilledButton(
         onPressed: _isLoading ? null : _submit,
         style: FilledButton.styleFrom(
-          backgroundColor: const Color(0xFF1677F2),
+          backgroundColor: theme.colorScheme.primary,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         ),
         child: _isLoading 

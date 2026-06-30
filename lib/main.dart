@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/router/app_router.dart';
 import 'app/theme/app_theme.dart';
+import 'app/theme/theme_provider.dart';
 import 'features/auth/shared/providers.dart';
 import 'firebase_options.dart';
 

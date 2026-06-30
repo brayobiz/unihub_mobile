@@ -1,8 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import '../../domain/models/note.dart';
 import '../../shared/providers.dart';
@@ -23,6 +23,7 @@ class NoteCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final currentUserId = ref.watch(firebaseAuthProvider).currentUser?.uid;
     final isAuthor = currentUserId == note.authorId;
     
@@ -51,7 +52,7 @@ class NoteCard extends ConsumerWidget {
           margin: const EdgeInsets.only(bottom: 16),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: theme.colorScheme.surface,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
@@ -61,7 +62,7 @@ class NoteCard extends ConsumerWidget {
               ),
             ],
             border: Border.all(
-              color: isSameUni ? Colors.indigo.withOpacity(0.1) : Colors.grey.shade100,
+              color: isSameUni ? theme.colorScheme.primary.withOpacity(0.1) : theme.colorScheme.outlineVariant.withOpacity(0.5),
             ),
           ),
           child: Column(
@@ -75,14 +76,14 @@ class NoteCard extends ConsumerWidget {
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          _buildBadge(note.noteType, Colors.indigo.shade50, Colors.indigo),
+                          _buildBadge(note.noteType, theme.colorScheme.primary.withOpacity(0.1), theme.colorScheme.primary),
                           const SizedBox(width: 8),
                           if (isSameUni)
-                            _buildBadge('Your Campus', Colors.green.shade50, Colors.green.shade700, icon: Icons.verified_user_outlined),
+                            _buildBadge('Your Campus', AppColors.success.withOpacity(0.1), AppColors.success, icon: Icons.verified_user_outlined),
                           if (isPopular)
-                            _buildBadge('Popular', Colors.orange.shade50, Colors.orange.shade700, icon: Icons.trending_up),
+                            _buildBadge('Popular', AppColors.warning.withOpacity(0.1), AppColors.warning, icon: Icons.trending_up),
                           if (isRecent)
-                            _buildBadge('New', Colors.blue.shade50, Colors.blue.shade700),
+                            _buildBadge('New', theme.colorScheme.secondary.withOpacity(0.1), theme.colorScheme.secondary),
                         ],
                       ),
                     ),
@@ -92,14 +93,16 @@ class NoteCard extends ConsumerWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         _buildActionIcon(
+                          context,
                           icon: Icons.edit_outlined,
-                          color: Colors.indigo,
+                          color: theme.colorScheme.primary,
                           onTap: () => context.push('/add-note', extra: note),
                         ),
                         const SizedBox(width: 6),
                         _buildActionIcon(
+                          context,
                           icon: Icons.delete_outline,
-                          color: Colors.red,
+                          color: AppColors.error,
                           onTap: () => _confirmDelete(context, ref),
                         ),
                       ],
@@ -110,7 +113,7 @@ class NoteCard extends ConsumerWidget {
                       icon: Icon(
                         progressAsync.valueOrNull?.isBookmarked == true ? Icons.bookmark : Icons.bookmark_border,
                         size: 18,
-                        color: progressAsync.valueOrNull?.isBookmarked == true ? Colors.indigo : Colors.grey,
+                        color: progressAsync.valueOrNull?.isBookmarked == true ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
                       ),
                       onPressed: () => ref.read(studyControllerProvider).toggleBookmark(note.id),
                     ),
@@ -125,10 +128,10 @@ class NoteCard extends ConsumerWidget {
                     child: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.indigo.shade50,
+                        color: theme.colorScheme.primary.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.description_rounded, color: Colors.indigo, size: 28),
+                      child: Icon(Icons.description_rounded, color: theme.colorScheme.primary, size: 28),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -138,10 +141,10 @@ class NoteCard extends ConsumerWidget {
                       children: [
                         Text(
                           note.title,
-                          style: GoogleFonts.plusJakartaSans(
+                          style: theme.textTheme.titleMedium?.copyWith(
                             fontSize: 17,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+                            color: theme.colorScheme.onSurface,
                             height: 1.2,
                           ),
                           maxLines: 2,
@@ -151,12 +154,12 @@ class NoteCard extends ConsumerWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.indigo.shade50,
+                            color: theme.colorScheme.primary.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             note.unitCode,
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.indigo.shade700),
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: theme.colorScheme.primary),
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -164,13 +167,13 @@ class NoteCard extends ConsumerWidget {
                           note.unitName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                          style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface, fontWeight: FontWeight.w500),
                         ),
                         Text(
                           note.course,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                          style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
                         ),
                         if (note.description.isNotEmpty) ...[
                           const SizedBox(height: 8),
@@ -178,7 +181,7 @@ class NoteCard extends ConsumerWidget {
                             note.description,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 11, color: Colors.grey.shade600, height: 1.3),
+                            style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, height: 1.3),
                           ),
                         ],
                       ],
@@ -195,8 +198,8 @@ class NoteCard extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
                           value: progressAsync.valueOrNull!.progress,
-                          backgroundColor: Colors.indigo.shade50,
-                          valueColor: const AlwaysStoppedAnimation(Colors.indigo),
+                          backgroundColor: theme.colorScheme.surfaceVariant,
+                          valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
                           minHeight: 4,
                         ),
                       ),
@@ -204,22 +207,22 @@ class NoteCard extends ConsumerWidget {
                     const SizedBox(width: 8),
                     Text(
                       '${(progressAsync.valueOrNull!.progress * 100).toInt()}%',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.indigo.shade300),
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
                     ),
                   ],
                 ),
               ],
               const SizedBox(height: 16),
-              const Divider(height: 1),
+              Divider(height: 1, color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
               const SizedBox(height: 14),
               Row(
                 children: [
                   CircleAvatar(
                     radius: 14,
-                    backgroundColor: Colors.indigo.shade50,
+                    backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
                     child: Text(
                       note.authorName.isNotEmpty ? note.authorName[0].toUpperCase() : 'U',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -229,11 +232,11 @@ class NoteCard extends ConsumerWidget {
                       children: [
                         Text(
                           note.authorName,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
                         ),
                         Text(
                           note.university,
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                          style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -244,10 +247,10 @@ class NoteCard extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       if (note.price > 0)
-                        Text('KES ${note.price.toInt()}', style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.black87))
+                        Text('KES ${note.price.toInt()}', style: TextStyle(fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface))
                       else
-                        const Text('FREE', style: TextStyle(fontWeight: FontWeight.w900, color: Colors.green)),
-                      Text('${note.downloadsCount} readers', style: TextStyle(fontSize: 10, color: Colors.grey.shade400)),
+                        const Text('FREE', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.success)),
+                      Text('${note.downloadsCount} readers', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7))),
                     ],
                   ),
                 ],
@@ -259,7 +262,7 @@ class NoteCard extends ConsumerWidget {
     );
   }
 
-  Widget _buildActionIcon({required IconData icon, required Color color, required VoidCallback onTap}) {
+  Widget _buildActionIcon(BuildContext context, {required IconData icon, required Color color, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: ClipRRect(
@@ -269,9 +272,9 @@ class NoteCard extends ConsumerWidget {
           child: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.3),
+              color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white.withOpacity(0.2)),
+              border: Border.all(color: color.withOpacity(0.2)),
             ),
             child: Icon(icon, color: color, size: 16),
           ),

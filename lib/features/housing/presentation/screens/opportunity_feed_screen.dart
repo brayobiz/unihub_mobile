@@ -12,34 +12,41 @@ class OpportunityFeedScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final user = ref.watch(appUserProvider).valueOrNull;
     final isVerifiedPlug = user?.verifiedRoles.contains('housePlug') ?? false;
 
     if (!isVerifiedPlug) {
       return Scaffold(
-        backgroundColor: Colors.white,
-        appBar: AppBar(title: const Text('New Opportunities')),
+        backgroundColor: theme.colorScheme.surface,
+        appBar: AppBar(
+          title: Text('New Opportunities', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          backgroundColor: theme.colorScheme.surface,
+          foregroundColor: theme.colorScheme.onSurface,
+          elevation: 0,
+        ),
         body: Padding(
           padding: const EdgeInsets.all(32.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.lock_person_rounded, size: 64, color: Color(0xFF64748B)),
+              Icon(Icons.lock_person_rounded, size: 64, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
               const SizedBox(height: 24),
-              const Text(
+              Text(
                 'Exclusive Professional Access',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'The Opportunity Feed is reserved for verified Housing Plugs. Verify your role in the Trust Center to view and claim leads.',
-                style: TextStyle(color: Color(0xFF64748B), height: 1.5),
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant, height: 1.5),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
               FilledButton(
                 onPressed: () => context.push('/verify-professional/housePlug'),
+                style: FilledButton.styleFrom(backgroundColor: theme.colorScheme.primary),
                 child: const Text('Apply for Access'),
               ),
             ],
@@ -51,16 +58,16 @@ class OpportunityFeedScreen extends ConsumerWidget {
     final opportunitiesAsync = ref.watch(vacancyOpportunitiesProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text('New Opportunities', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
+        title: Text('New Opportunities', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
-        foregroundColor: Colors.black,
+        foregroundColor: theme.colorScheme.onSurface,
       ),
       body: opportunitiesAsync.when(
         data: (opportunities) => opportunities.isEmpty
-            ? _buildEmptyState()
+            ? _buildEmptyState(context)
             : ListView.builder(
                 padding: const EdgeInsets.all(20),
                 itemCount: opportunities.length,
@@ -72,28 +79,30 @@ class OpportunityFeedScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.auto_awesome_motion_rounded, size: 64, color: Colors.blueGrey.shade200),
+          Icon(Icons.auto_awesome_motion_rounded, size: 64, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
           const SizedBox(height: 16),
-          const Text('No new opportunities', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const Text('Check back later for new vacancy leads.', style: TextStyle(color: Colors.grey)),
+          Text('No new opportunities', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: theme.colorScheme.onSurface)),
+          Text('Check back later for new vacancy leads.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
         ],
       ),
     );
   }
 
   Widget _buildOpportunityCard(BuildContext context, VacancyRequest opp, WidgetRef ref) {
+    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -104,24 +113,24 @@ class OpportunityFeedScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1677F2).withOpacity(0.1),
+                  color: theme.colorScheme.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   opp.type.name.toUpperCase(),
-                  style: const TextStyle(color: Color(0xFF1677F2), fontSize: 10, fontWeight: FontWeight.w900),
+                  style: TextStyle(color: theme.colorScheme.primary, fontSize: 10, fontWeight: FontWeight.w900),
                 ),
               ),
               Text(
                 DateFormat.yMMMd().format(opp.createdAt),
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
               ),
             ],
           ),
           const SizedBox(height: 16),
           Text(
             '${opp.type.name} at ${opp.location}',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
           ),
           const SizedBox(height: 8),
           Row(
@@ -132,20 +141,20 @@ class OpportunityFeedScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Text(opp.description, style: const TextStyle(color: Colors.blueGrey, height: 1.4)),
+          Text(opp.description, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, height: 1.4)),
           const SizedBox(height: 20),
-          const Divider(),
+          Divider(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
           const SizedBox(height: 16),
           Row(
             children: [
-              const CircleAvatar(radius: 12, child: Icon(Icons.person, size: 14)),
+              CircleAvatar(radius: 12, backgroundColor: theme.colorScheme.surfaceVariant, child: Icon(Icons.person, size: 14, color: theme.colorScheme.onSurfaceVariant)),
               const SizedBox(width: 8),
-              Text('Lead from ${opp.providerName}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+              Text('Lead from ${opp.providerName}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: theme.colorScheme.onSurface)),
               const Spacer(),
               FilledButton(
                 onPressed: () => _showClaimDialog(context, opp, ref),
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF1677F2),
+                  backgroundColor: theme.colorScheme.primary,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text('Claim Lead'),

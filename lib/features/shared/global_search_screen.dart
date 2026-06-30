@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/dashboard/controllers/smart_feed_controller.dart';
 import 'package:unihub_mobile/widgets/feed/feed_type.dart';
 import 'package:go_router/go_router.dart';
@@ -24,32 +25,35 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final allFeedAsync = ref.watch(smartFeedProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FB),
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
-        foregroundColor: Colors.black,
+        foregroundColor: theme.colorScheme.onSurface,
         titleSpacing: 0,
         title: Container(
           height: 44,
           margin: const EdgeInsets.only(right: 20),
           decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9),
+            color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
           ),
           child: TextField(
             controller: _searchController,
             autofocus: true,
+            style: TextStyle(color: theme.colorScheme.onSurface),
             decoration: InputDecoration(
               hintText: 'Search marketplace, housing, notes...',
-              hintStyle: GoogleFonts.plusJakartaSans(
-                color: const Color(0xFF94A3B8),
+              hintStyle: TextStyle(
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                 fontSize: 14,
               ),
-              prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
+              prefixIcon: Icon(Icons.search_rounded, color: theme.colorScheme.onSurfaceVariant, size: 20),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(vertical: 10),
             ),
@@ -61,7 +65,7 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
         actions: [
           if (_query.isNotEmpty)
             IconButton(
-              icon: const Icon(Icons.clear_rounded, size: 20),
+              icon: Icon(Icons.clear_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
               onPressed: () {
                 _searchController.clear();
                 setState(() => _query = '');
@@ -70,7 +74,7 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
         ],
       ),
       body: _query.isEmpty 
-          ? _buildSearchSuggestions()
+          ? _buildSearchSuggestions(context)
           : allFeedAsync.when(
               data: (items) {
                 final filtered = items.where((item) {
@@ -79,7 +83,7 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
                 }).toList();
 
                 if (filtered.isEmpty) {
-                  return _buildNoResults();
+                  return _buildNoResults(context);
                 }
 
                 return ListView.builder(
@@ -94,13 +98,14 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
                   },
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
               error: (err, _) => Center(child: Text('Error: $err')),
             ),
     );
   }
 
-  Widget _buildSearchSuggestions() {
+  Widget _buildSearchSuggestions(BuildContext context) {
+    final theme = Theme.of(context);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -108,10 +113,10 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
         children: [
           Text(
             'Try searching for',
-            style: GoogleFonts.plusJakartaSans(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: const Color(0xFF64748B),
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 16),
@@ -119,10 +124,10 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
             spacing: 12,
             runSpacing: 12,
             children: [
-              _SuggestionChip(label: 'Calculus Notes', icon: Icons.description_rounded, color: Colors.green, onTap: () => _setQuery('Calculus')),
-              _SuggestionChip(label: 'iPhone 13', icon: Icons.smartphone_rounded, color: Colors.orange, onTap: () => _setQuery('iPhone')),
-              _SuggestionChip(label: 'Single Rooms', icon: Icons.home_rounded, color: Colors.blue, onTap: () => _setQuery('Single')),
-              _SuggestionChip(label: 'Graphic Design', icon: Icons.palette_rounded, color: Colors.purple, onTap: () => _setQuery('Design')),
+              _SuggestionChip(label: 'Calculus Notes', icon: Icons.description_rounded, color: AppColors.notes, onTap: () => _setQuery('Calculus')),
+              _SuggestionChip(label: 'iPhone 13', icon: Icons.smartphone_rounded, color: AppColors.marketplace, onTap: () => _setQuery('iPhone')),
+              _SuggestionChip(label: 'Single Rooms', icon: Icons.home_rounded, color: AppColors.housing, onTap: () => _setQuery('Single')),
+              _SuggestionChip(label: 'Graphic Design', icon: Icons.palette_rounded, color: AppColors.gigs, onTap: () => _setQuery('Design')),
             ],
           ),
           const SizedBox(height: 40),
@@ -130,26 +135,27 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
             title: 'Marketplace',
             subtitle: 'Find gadgets, books, and more',
             icon: Icons.shopping_bag_outlined,
-            color: Colors.orange,
+            color: AppColors.marketplace,
           ),
           _SearchCategoryRow(
             title: 'Campus Housing',
             subtitle: 'Rentals, roommates and hostels',
             icon: Icons.home_work_outlined,
-            color: Colors.blue,
+            color: AppColors.housing,
           ),
           _SearchCategoryRow(
             title: 'Study Materials',
             subtitle: 'Notes, past papers and guides',
             icon: Icons.menu_book_rounded,
-            color: Colors.green,
+            color: AppColors.notes,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildNoResults() {
+  Widget _buildNoResults(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -157,26 +163,26 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.grey.shade100,
+              color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.search_off_rounded, size: 48, color: Colors.grey.shade400),
+            child: Icon(Icons.search_off_rounded, size: 48, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
           ),
           const SizedBox(height: 24),
           Text(
             'No results for "$_query"',
-            style: GoogleFonts.plusJakartaSans(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFF1A1C1E),
+              color: theme.colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Try checking for typos or searching \nfor something else.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.plusJakartaSans(
-              color: const Color(0xFF94A3B8),
+            style: TextStyle(
+              color: theme.colorScheme.onSurfaceVariant,
               fontSize: 14,
             ),
           ),
@@ -224,9 +230,9 @@ class _SuggestionChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -235,7 +241,7 @@ class _SuggestionChip extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               label,
-              style: GoogleFonts.plusJakartaSans(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: color,
@@ -263,6 +269,7 @@ class _SearchCategoryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
       child: Row(
@@ -270,9 +277,9 @@ class _SearchCategoryRow extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: theme.colorScheme.surface,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFF1F5F9)),
+              border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
             ),
             child: Icon(icon, color: color, size: 24),
           ),
@@ -283,24 +290,24 @@ class _SearchCategoryRow extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFF1A1C1E),
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
                 Text(
                   subtitle,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: const Color(0xFF94A3B8),
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1)),
+          Icon(Icons.chevron_right_rounded, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
         ],
       ),
     );
@@ -318,14 +325,15 @@ class _SearchItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Material(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         clipBehavior: Clip.antiAlias,
         child: ListTile(
@@ -335,7 +343,7 @@ class _SearchItemCard extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: _getCategoryColor(item.model.type).withOpacity(0.1),
+              color: _getCategoryColor(item.model.type).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
@@ -345,23 +353,24 @@ class _SearchItemCard extends StatelessWidget {
           ),
           title: Text(
             item.model.title,
-            style: GoogleFonts.plusJakartaSans(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
+              color: theme.colorScheme.onSurface,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
           subtitle: Text(
             item.model.subtitle,
-            style: GoogleFonts.plusJakartaSans(
+            style: TextStyle(
               fontSize: 12,
-              color: const Color(0xFF64748B),
+              color: theme.colorScheme.onSurfaceVariant,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1)),
+          trailing: Icon(Icons.chevron_right_rounded, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
         ),
       ),
     );
@@ -379,11 +388,11 @@ class _SearchItemCard extends StatelessWidget {
 
   Color _getCategoryColor(FeedType type) {
     switch (type) {
-      case FeedType.marketplace: return Colors.orange;
-      case FeedType.housing: return Colors.blue;
-      case FeedType.notes: return Colors.green;
-      case FeedType.gig: return Colors.purple;
-      default: return Colors.grey;
+      case FeedType.marketplace: return AppColors.marketplace;
+      case FeedType.housing: return AppColors.housing;
+      case FeedType.notes: return AppColors.notes;
+      case FeedType.gig: return AppColors.gigs;
+      default: return AppColors.grey;
     }
   }
 }

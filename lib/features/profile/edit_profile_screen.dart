@@ -1,10 +1,10 @@
 import 'dart:io';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/shared/storage_repository.dart';
 
@@ -18,7 +18,6 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   
-  // Controllers
   late TextEditingController _nameController;
   late TextEditingController _usernameController;
   late TextEditingController _bioController;
@@ -29,11 +28,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late TextEditingController _whatsappController;
   late TextEditingController _phoneController;
   
-  // Lists
   late List<String> _skills;
   late List<String> _interests;
   
-  // Images
   File? _profileImage;
   
   bool _isLoading = false;
@@ -97,7 +94,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       
       String? photoUrl = user?.photoUrl;
 
-      // 1. Upload Profile Image if changed
       if (_profileImage != null) {
         photoUrl = await ref.read(storageRepositoryProvider).uploadFile(
           path: 'profiles/${currentUser.uid}',
@@ -130,7 +126,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     } catch (e) {
       debugPrint('Update Profile Error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -139,50 +135,50 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Edit Profile', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF1E293B))),
-        backgroundColor: Colors.white.withOpacity(0.9), // Performance: Avoid blur in AppBar
+        title: Text('Edit Profile', style: TextStyle(fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface)),
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF1E293B)),
+          icon: Icon(Icons.arrow_back_rounded, color: theme.colorScheme.onSurface),
           onPressed: () => context.pop(),
         ),
         actions: [
           if (_isLoading)
-            Center(child: Padding(padding: const EdgeInsets.all(16.0), child: Text('${(_uploadProgress * 100).toInt()}%', style: const TextStyle(color: Color(0xFF1677F2), fontWeight: FontWeight.w900))))
+            Center(child: Padding(padding: const EdgeInsets.all(16.0), child: Text('${(_uploadProgress * 100).toInt()}%', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w900))))
           else
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: TextButton(
                 onPressed: _save,
-                child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Color(0xFF1677F2))),
+                child: Text('Save', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: theme.colorScheme.primary)),
               ),
             ),
         ],
       ),
       body: Stack(
         children: [
-          // Background Decorative Blobs - Wrapped in RepaintBoundary for performance
           RepaintBoundary(
             child: Stack(
               children: [
                 Positioned(
                   top: -100,
                   right: -100,
-                  child: _buildBlob(300, const Color(0xFF1677F2).withOpacity(0.08)),
+                  child: _buildBlob(300, theme.colorScheme.primary.withValues(alpha: 0.08)),
                 ),
                 Positioned(
                   bottom: 200,
                   left: -150,
-                  child: _buildBlob(400, const Color(0xFF19D3C5).withOpacity(0.05)),
+                  child: _buildBlob(400, const Color(0xFF19D3C5).withValues(alpha: 0.05)),
                 ),
                 Positioned(
                   top: 400,
                   right: -50,
-                  child: _buildBlob(200, const Color(0xFF6366F1).withOpacity(0.06)),
+                  child: _buildBlob(200, theme.colorScheme.secondary.withValues(alpha: 0.06)),
                 ),
               ],
             ),
@@ -197,41 +193,43 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildImagePickers(),
+                    _buildImagePickers(context),
                     const SizedBox(height: 40),
                     
                     _buildGlassSection(
+                      context: context,
                       title: 'Basic Information',
                       icon: Icons.person_rounded,
                       children: [
-                        _buildTextField(_nameController, 'Full Name', Icons.badge_outlined, readOnly: true),
-                        _buildTextField(_usernameController, 'Username', Icons.alternate_email_rounded),
-                        _buildTextField(_bioController, 'Bio', Icons.description_outlined, maxLines: 3),
+                        _buildTextField(context, _nameController, 'Full Name', Icons.badge_outlined, readOnly: true),
+                        _buildTextField(context, _usernameController, 'Username', Icons.alternate_email_rounded),
+                        _buildTextField(context, _bioController, 'Bio', Icons.description_outlined, maxLines: 3),
                       ],
                     ),
                     
                     _buildGlassSection(
+                      context: context,
                       title: 'Academic Details',
                       icon: Icons.school_rounded,
                       children: [
-                        _buildTextField(_universityController, 'University', Icons.account_balance_outlined, readOnly: true),
-                        _buildTextField(_courseController, 'Course', Icons.menu_book_rounded, readOnly: true),
-                        _buildTextField(_yearController, 'Year of Study', Icons.calendar_today_rounded, readOnly: true),
+                        _buildTextField(context, _universityController, 'University', Icons.account_balance_outlined, readOnly: true),
+                        _buildTextField(context, _courseController, 'Course', Icons.menu_book_rounded, readOnly: true),
+                        _buildTextField(context, _yearController, 'Year of Study', Icons.calendar_today_rounded, readOnly: true),
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.indigo.withOpacity(0.05),
+                            color: theme.colorScheme.primary.withValues(alpha: 0.05),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.indigo.withOpacity(0.1)),
+                            border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.1)),
                           ),
-                          child: const Row(
+                          child: Row(
                             children: [
-                              Icon(Icons.lock_outline_rounded, size: 16, color: Color(0xFF6366F1)),
-                              SizedBox(width: 10),
+                              Icon(Icons.lock_outline_rounded, size: 16, color: theme.colorScheme.primary),
+                              const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
                                   'Identity fields are locked to preserve account integrity.',
-                                  style: TextStyle(fontSize: 11, color: Color(0xFF4338CA), fontWeight: FontWeight.w600),
+                                  style: TextStyle(fontSize: 11, color: theme.colorScheme.primary, fontWeight: FontWeight.w600),
                                 ),
                               ),
                             ],
@@ -241,27 +239,29 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     ),
 
                     _buildGlassSection(
+                      context: context,
                       title: 'Preferences & Contact',
                       icon: Icons.settings_accessibility_rounded,
                       children: [
-                        _buildTextField(_housingController, 'Housing Status', Icons.home_outlined),
-                        _buildTextField(_whatsappController, 'WhatsApp Number', Icons.phone_android_rounded),
-                        _buildTextField(_phoneController, 'Phone Number', Icons.local_phone_outlined),
+                        _buildTextField(context, _housingController, 'Housing Status', Icons.home_outlined),
+                        _buildTextField(context, _whatsappController, 'WhatsApp Number', Icons.phone_android_rounded),
+                        _buildTextField(context, _phoneController, 'Phone Number', Icons.local_phone_outlined),
                       ],
                     ),
 
                     _buildGlassSection(
+                      context: context,
                       title: 'Skills & Interests',
                       icon: Icons.auto_awesome_rounded,
                       children: [
-                        _buildChipSection('Skills', _skills, const Color(0xFF1677F2)),
+                        _buildChipSection(context, 'Skills', _skills, theme.colorScheme.primary),
                         const SizedBox(height: 24),
-                        _buildChipSection('Interests', _interests, const Color(0xFF10B981)),
+                        _buildChipSection(context, 'Interests', _interests, AppColors.success),
                       ],
                     ),
 
                     const SizedBox(height: 32),
-                    _buildGradientSaveButton(),
+                    _buildGradientSaveButton(context),
                     const SizedBox(height: 40),
                   ],
                 ),
@@ -282,23 +282,24 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         gradient: RadialGradient(
           colors: [
             color,
-            color.withOpacity(0),
+            color.withValues(alpha: 0),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildGlassSection({required String title, required IconData icon, required List<Widget> children}) {
+  Widget _buildGlassSection({required BuildContext context, required String title, required IconData icon, required List<Widget> children}) {
+    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9), // Increased opacity for better performance
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.white.withOpacity(0.5)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 15,
             offset: const Offset(0, 8),
           )
@@ -314,15 +315,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1677F2).withOpacity(0.1),
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(icon, size: 20, color: const Color(0xFF1677F2)),
+                  child: Icon(icon, size: 20, color: theme.colorScheme.primary),
                 ),
                 const SizedBox(width: 16),
                 Text(
                   title,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF1E293B), letterSpacing: -0.5),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface, letterSpacing: -0.5),
                 ),
               ],
             ),
@@ -334,7 +335,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     );
   }
 
-  Widget _buildImagePickers() {
+  Widget _buildImagePickers(BuildContext context) {
+    final theme = Theme.of(context);
     final user = ref.read(appUserProvider).valueOrNull;
     
     return Center(
@@ -344,15 +346,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0F172A), Color(0xFF1677F2), Color(0xFF19D3C5)],
+              gradient: LinearGradient(
+                colors: [const Color(0xFF0F172A), theme.colorScheme.primary, const Color(0xFF19D3C5)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF1677F2).withOpacity(0.3),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.3),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -360,10 +362,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             ),
             child: Container(
               padding: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+              decoration: BoxDecoration(color: theme.colorScheme.surface, shape: BoxShape.circle),
               child: CircleAvatar(
                 radius: 65,
-                backgroundColor: const Color(0xFFF1F5F9),
+                backgroundColor: theme.colorScheme.surfaceVariant,
                 backgroundImage: _profileImage != null 
                   ? FileImage(_profileImage!) as ImageProvider
                   : (user?.photoUrl != null ? CachedNetworkImageProvider(user!.photoUrl!) : null),
@@ -372,7 +374,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       user?.fullName != null && user!.fullName.isNotEmpty 
                           ? user.fullName[0].toUpperCase() 
                           : 'U',
-                      style: const TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: Color(0xFF1677F2)),
+                      style: TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: theme.colorScheme.primary),
                     )
                   : null,
               ),
@@ -383,18 +385,18 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
+                color: theme.colorScheme.onSurface,
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 3),
+                border: Border.all(color: theme.colorScheme.surface, width: 3),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   )
                 ],
               ),
-              child: const Icon(Icons.camera_enhance_rounded, color: Colors.white, size: 24),
+              child: Icon(Icons.camera_enhance_rounded, color: theme.colorScheme.surface, size: 24),
             ),
           ),
         ],
@@ -402,7 +404,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {int maxLines = 1, bool readOnly = false}) {
+  Widget _buildTextField(BuildContext context, TextEditingController controller, String label, IconData icon, {int maxLines = 1, bool readOnly = false}) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
@@ -413,7 +416,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w900,
-              color: readOnly ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              color: readOnly ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5) : theme.colorScheme.onSurfaceVariant,
               letterSpacing: 1.2,
             ),
           ),
@@ -425,26 +428,26 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: readOnly ? const Color(0xFF64748B) : const Color(0xFF1E293B),
+              color: readOnly ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.onSurface,
             ),
             decoration: InputDecoration(
-              prefixIcon: Icon(icon, size: 20, color: readOnly ? const Color(0xFFCBD5E1) : const Color(0xFF1677F2)),
+              prefixIcon: Icon(icon, size: 20, color: readOnly ? theme.colorScheme.outlineVariant : theme.colorScheme.primary),
               filled: true,
-              fillColor: readOnly ? const Color(0xFFF1F5F9).withOpacity(0.5) : Colors.white,
+              fillColor: readOnly ? theme.colorScheme.surfaceVariant.withValues(alpha: 0.2) : theme.colorScheme.surface,
               hintText: 'Enter $label',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.normal),
+              hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontWeight: FontWeight.normal),
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: const Color(0xFFE2E8F0).withOpacity(0.8)),
+                borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: const Color(0xFFE2E8F0).withOpacity(0.8)),
+                borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: Color(0xFF1677F2), width: 2),
+                borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
               ),
             ),
             validator: (v) => (label == 'Full Name' && (v == null || v.isEmpty)) ? 'Required' : null,
@@ -454,7 +457,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     );
   }
 
-  Widget _buildChipSection(String title, List<String> list, Color color) {
+  Widget _buildChipSection(BuildContext context, String title, List<String> list, Color color) {
+    final theme = Theme.of(context);
     final controller = TextEditingController();
     
     return Column(
@@ -462,7 +466,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       children: [
         Text(
           title.toUpperCase(),
-          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF64748B), letterSpacing: 1.2),
+          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurfaceVariant, letterSpacing: 1.2),
         ),
         const SizedBox(height: 12),
         Wrap(
@@ -471,9 +475,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           children: list.map((item) => Container(
             padding: const EdgeInsets.only(left: 12),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.08),
+              color: color.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: color.withOpacity(0.1)),
+              border: Border.all(color: color.withValues(alpha: 0.1)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -492,13 +496,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         const SizedBox(height: 12),
         TextField(
           controller: controller,
+          style: TextStyle(color: theme.colorScheme.onSurface),
           decoration: InputDecoration(
             hintText: 'Add new ${title.toLowerCase().substring(0, title.length-1)}...',
-            hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+            hintStyle: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: theme.colorScheme.surface,
             suffixIcon: IconButton(
-              icon: const Icon(Icons.add_circle_rounded, color: Color(0xFF1677F2)),
+              icon: Icon(Icons.add_circle_rounded, color: theme.colorScheme.primary),
               onPressed: () {
                 if (controller.text.isNotEmpty) {
                   setState(() => list.add(controller.text.trim()));
@@ -506,8 +511,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 }
               },
             ),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
           ),
           onSubmitted: (v) {
             if (v.isNotEmpty) {
@@ -520,20 +525,21 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     );
   }
 
-  Widget _buildGradientSaveButton() {
+  Widget _buildGradientSaveButton(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
       height: 58,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F172A), Color(0xFF1677F2), Color(0xFF19D3C5)],
+        gradient: LinearGradient(
+          colors: [const Color(0xFF0F172A), theme.colorScheme.primary, const Color(0xFF19D3C5)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1677F2).withOpacity(0.3),
+            color: theme.colorScheme.primary.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           )

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
@@ -106,6 +107,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final listing = widget.listing;
     final currencyFormat = NumberFormat.currency(symbol: 'KES ', decimalDigits: 0);
     final plugAsync = ref.watch(userByIdProvider(listing.plugId));
@@ -113,7 +115,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
     final isSaved = savedListingsAsync.valueOrNull?.any((l) => l.id == listing.id) ?? false;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       body: Stack(
         children: [
           CustomScrollView(
@@ -131,17 +133,17 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                       const SizedBox(height: 12),
                       Text(
                         listing.title,
-                        style: GoogleFonts.plusJakartaSans(fontSize: 24, fontWeight: FontWeight.w800),
+                        style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
                       ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          const Icon(Icons.location_on_rounded, size: 16, color: Color(0xFF6366F1)),
+                          Icon(Icons.location_on_rounded, size: 16, color: theme.colorScheme.primary),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
                               '${listing.campus} • ${listing.location}', 
-                              style: TextStyle(color: Colors.grey.shade600, fontSize: 14, fontWeight: FontWeight.w500),
+                              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14, fontWeight: FontWeight.w500),
                             ),
                           ),
                         ],
@@ -153,15 +155,15 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                         children: [
                           Text(
                             currencyFormat.format(listing.rent),
-                            style: GoogleFonts.plusJakartaSans(
+                            style: theme.textTheme.headlineMedium?.copyWith(
                               fontSize: 26, 
                               fontWeight: FontWeight.w900, 
-                              color: const Color(0xFF6366F1)
+                              color: theme.colorScheme.primary
                             ),
                           ),
                           Text(
                             ' / month',
-                            style: TextStyle(color: Colors.grey.shade500, fontSize: 14, fontWeight: FontWeight.w600),
+                            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14, fontWeight: FontWeight.w600),
                           ),
                         ],
                       ),
@@ -170,18 +172,18 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
                             'Deposit: ${currencyFormat.format(listing.deposit)}',
-                            style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.bold),
+                            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.bold),
                           ),
                         ),
                       const SizedBox(height: 24),
                       _buildSpecsGrid(),
                       const SizedBox(height: 32),
-                      Text('Description', style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text('Description', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 12),
                       Text(
                         listing.description,
                         maxLines: _isDescriptionExpanded ? null : 4,
-                        style: TextStyle(color: Colors.grey.shade700, height: 1.6, fontSize: 15),
+                        style: TextStyle(color: theme.colorScheme.onSurface, height: 1.6, fontSize: 15),
                       ),
                       if (listing.description.length > 150)
                         GestureDetector(
@@ -190,7 +192,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                             padding: const EdgeInsets.only(top: 8),
                             child: Text(
                               _isDescriptionExpanded ? 'Read less' : 'Read more',
-                              style: const TextStyle(color: Color(0xFF6366F1), fontWeight: FontWeight.bold),
+                              style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
                             ),
                           ),
                         ),
@@ -218,12 +220,13 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
   Widget _buildImageGallery(bool isSaved) {
     final images = widget.listing.images;
     final topPadding = MediaQuery.of(context).padding.top;
+    final theme = Theme.of(context);
     
     return SliverAppBar(
       expandedHeight: 420,
       pinned: true,
       elevation: 0,
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       automaticallyImplyLeading: false,
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
@@ -309,7 +312,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                   _buildCircleButton(
                     isSaved ? Icons.favorite : Icons.favorite_border, 
                     _toggleSave,
-                    iconColor: isSaved ? Colors.red : Colors.black,
+                    iconColor: isSaved ? AppColors.error : theme.colorScheme.onSurface,
                   ),
                 ],
               ),
@@ -347,15 +350,15 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: theme.colorScheme.surface,
                       borderRadius: BorderRadius.circular(20),
-                      boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
+                      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)],
                     ),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.play_circle_fill, color: Color(0xFF6366F1), size: 20),
-                        SizedBox(width: 6),
-                        Text('Video Tour', style: TextStyle(color: Color(0xFF6366F1), fontWeight: FontWeight.bold, fontSize: 12)),
+                        Icon(Icons.play_circle_fill, color: theme.colorScheme.primary, size: 20),
+                        const SizedBox(width: 6),
+                        Text('Video Tour', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 12)),
                       ],
                     ),
                   ),
@@ -368,11 +371,12 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
   }
 
   Widget _buildCircleButton(IconData icon, VoidCallback onTap, {Color? iconColor}) {
+    final theme = Theme.of(context);
     return Container(
       height: 40,
       width: 40,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
@@ -383,7 +387,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
         ],
       ),
       child: IconButton(
-        icon: Icon(icon, color: iconColor ?? Colors.black, size: 20),
+        icon: Icon(icon, color: iconColor ?? theme.colorScheme.onSurface, size: 20),
         onPressed: onTap,
         padding: EdgeInsets.zero,
       ),
@@ -391,6 +395,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
   }
 
   Widget _buildVerifiedBadgeRow(AsyncValue<AppUser?> plugAsync) {
+    final theme = Theme.of(context);
     return plugAsync.when(
       data: (plug) => Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -399,14 +404,14 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFFE8F5E9),
+                color: AppColors.verifiedSellerBg,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.verified, color: Color(0xFF4CAF50), size: 14),
+                  Icon(Icons.verified, color: AppColors.verifiedSellerIcon, size: 14),
                   SizedBox(width: 4),
-                  Text('Verified Plug', style: TextStyle(color: Color(0xFF4CAF50), fontSize: 11, fontWeight: FontWeight.bold)),
+                  Text('Verified Plug', style: TextStyle(color: AppColors.verifiedSellerIcon, fontSize: 11, fontWeight: FontWeight.bold)),
                 ],
               ),
             )
@@ -414,20 +419,20 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.shield_outlined, color: Colors.grey.shade600, size: 14),
+                  Icon(Icons.shield_outlined, color: theme.colorScheme.onSurfaceVariant, size: 14),
                   const SizedBox(width: 4),
-                  Text('Direct Listing', style: TextStyle(color: Colors.grey.shade600, fontSize: 11, fontWeight: FontWeight.bold)),
+                  Text('Direct Listing', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
           Text(
             'Posted ${DateFormatter.formatRelative(widget.listing.createdAt)}',
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
           ),
         ],
       ),
@@ -495,20 +500,21 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
   }
 
   Widget _specItem(IconData icon, String label, String value) {
+    final theme = Theme.of(context);
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade100),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 18, color: Colors.grey.shade700),
+            Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(height: 8),
-            Text(label, style: TextStyle(color: Colors.grey.shade500, fontSize: 10)),
-            Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(label, style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), fontSize: 10)),
+            Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: theme.colorScheme.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
           ],
         ),
       ),
@@ -516,12 +522,13 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
   }
 
   Widget _buildAmenitiesSection() {
+    final theme = Theme.of(context);
     if (widget.listing.amenities.isEmpty) return const SizedBox.shrink();
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Amenities', style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.bold)),
+        Text('Amenities', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
         Wrap(
           spacing: 10,
@@ -533,23 +540,24 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
   }
 
   Widget _buildAmenityCard(String amenity) {
+    final theme = Theme.of(context);
     IconData icon = _getAmenityIcon(amenity);
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: const Color(0xFF6366F1)),
+          Icon(icon, size: 18, color: theme.colorScheme.primary),
           const SizedBox(width: 10),
           Text(
             amenity, 
-            style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B)),
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
           ),
         ],
       ),
@@ -574,6 +582,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
   }
 
   Widget _buildPlugCard(AsyncValue<AppUser?> plugAsync) {
+    final theme = Theme.of(context);
     return plugAsync.when(
       data: (plug) {
         if (plug == null) return const SizedBox.shrink();
@@ -581,7 +590,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.grey.shade100),
+            border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
           ),
           child: Column(
             children: [
@@ -592,8 +601,8 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                       CircleAvatar(
                         radius: 30,
                         backgroundImage: plug.photoUrl != null ? NetworkImage(plug.photoUrl!) : null,
-                        backgroundColor: Colors.grey.shade100,
-                        child: plug.photoUrl == null ? Text(plug.fullName[0], style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)) : null,
+                        backgroundColor: theme.colorScheme.surfaceVariant,
+                        child: plug.photoUrl == null ? Text(plug.fullName[0], style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant)) : null,
                       ),
                       if (plug.isOnline)
                         Positioned(
@@ -603,9 +612,9 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                             width: 14,
                             height: 14,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF4CAF50),
+                              color: AppColors.success,
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
+                              border: Border.all(color: theme.colorScheme.surface, width: 2),
                             ),
                           ),
                         ),
@@ -621,14 +630,14 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                             Flexible(
                               child: Text(
                                 plug.fullName, 
-                                style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16),
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: theme.colorScheme.onSurface),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             if (plug.isVerifiedPlug) ...[
                               const SizedBox(width: 4),
-                              const Icon(Icons.verified, color: Color(0xFF6366F1), size: 16),
+                              Icon(Icons.verified, color: theme.colorScheme.primary, size: 16),
                             ],
                           ],
                         ),
@@ -640,12 +649,12 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                             const Icon(Icons.star, color: Colors.amber, size: 14),
                             const SizedBox(width: 4),
                             Text('${plug.averageRating} (${plug.ratingsCount} reviews)', 
-                              style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
                             const SizedBox(width: 8),
-                            Text('•', style: TextStyle(color: Colors.grey.shade400)),
+                            Text('•', style: TextStyle(color: theme.colorScheme.outlineVariant)),
                             const SizedBox(width: 8),
                             Text('${plug.displayTrustScore.toInt()}% Trust', 
-                              style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
                           ],
                         ),
                         ),
@@ -656,14 +665,14 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                     onPressed: () => context.push('/plug-profile/${plug.uid}'),
                     style: OutlinedButton.styleFrom(
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      side: BorderSide(color: Colors.grey.shade200),
+                      side: BorderSide(color: theme.colorScheme.outlineVariant),
                     ),
-                    child: const Text('View', style: TextStyle(fontSize: 12)),
+                    child: Text('View', style: TextStyle(fontSize: 12, color: theme.colorScheme.primary)),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-              const Divider(height: 1),
+              Divider(height: 1, color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
               const SizedBox(height: 16),
               _buildPlugDetailRow(Icons.bolt_rounded, 'Response rate', plug.responseRate),
               const SizedBox(height: 12),
@@ -683,51 +692,54 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
   }
 
   Widget _buildPlugDetailRow(IconData icon, String label, String value) {
+    final theme = Theme.of(context);
     return Row(
       children: [
-        Icon(icon, size: 16, color: Colors.grey.shade500),
+        Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7)),
         const SizedBox(width: 8),
-        Text(label, style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+        Text(label, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
         const Spacer(),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B))),
+        Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: theme.colorScheme.onSurface)),
       ],
     );
   }
 
 
   Widget _buildSafetyBanner() {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F7FF),
+        color: AppColors.safetyBannerBg,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: [
-          const Icon(Icons.shield_outlined, color: Color(0xFF4CAF50)),
+          const Icon(Icons.shield_outlined, color: AppColors.verifiedSellerIcon),
           const SizedBox(width: 16),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Secure Viewing Guarantee', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                Text('Only pay deposit after viewing and signing a lease.', style: TextStyle(color: Colors.black54, fontSize: 12)),
+                Text('Secure Viewing Guarantee', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface)),
+                Text('Only pay deposit after viewing and signing a lease.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
               ],
             ),
           ),
-          Icon(Icons.chevron_right, color: Colors.grey.shade400),
+          Icon(Icons.chevron_right, color: theme.colorScheme.outlineVariant),
         ],
       ),
     );
   }
 
   Widget _buildSimilarProperties() {
+    final theme = Theme.of(context);
     final similarAsync = ref.watch(housingListingsProvider(10)); // Simplified: just show top listings for now
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Similar Properties', style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.bold)),
+        Text('Similar Properties', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
         SizedBox(
           height: 240,
@@ -759,6 +771,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
   }
 
   Widget _buildStickyActionBar() {
+    final theme = Theme.of(context);
     final isTaken = widget.listing.status == HousingStatus.taken;
     
     return Positioned(
@@ -768,7 +781,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
       child: Container(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.colorScheme.surface,
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -5))],
         ),
         child: Row(
@@ -778,10 +791,10 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
               width: 56,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(color: theme.colorScheme.outlineVariant),
               ),
               child: IconButton(
-                icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF6366F1)),
+                icon: Icon(Icons.chat_bubble_outline, color: theme.colorScheme.primary),
                 onPressed: _handleChat,
               ),
             ),
@@ -792,7 +805,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                 child: FilledButton(
                   onPressed: isTaken ? null : _handleChat,
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF6366F1),
+                    backgroundColor: theme.colorScheme.primary,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   child: Text(

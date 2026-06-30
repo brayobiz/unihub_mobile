@@ -1,14 +1,12 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/marketplace/domain/models/listing.dart';
 import 'package:unihub_mobile/features/marketplace/presentation/controllers/add_listing_controller.dart';
 import 'package:unihub_mobile/features/marketplace/presentation/widgets/marketplace_card.dart';
 import 'package:unihub_mobile/features/marketplace/domain/models/marketplace_categories.dart';
-import 'package:unihub_mobile/features/auth/shared/providers.dart';
 
 class AddListingScreen extends ConsumerStatefulWidget {
   final Listing? listing;
@@ -25,7 +23,6 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   @override
   void initState() {
     super.initState();
-    // Use the state's current step if possible, but default to 0
     _pageController = PageController(initialPage: 0);
   }
 
@@ -37,19 +34,19 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final state = ref.watch(addListingControllerProvider(widget.listing));
     final controller = ref.read(addListingControllerProvider(widget.listing).notifier);
 
-    // Explicitly cast to int to be safe, though state.currentStep is int
     final int currentStep = (state.currentStep as dynamic) ?? 0;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.colorScheme.onSurface, size: 20),
           onPressed: () {
             if (currentStep > 0) {
               _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
@@ -63,7 +60,11 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
           children: [
             Text(
               widget.listing == null ? 'Post Listing' : 'Edit Listing',
-              style: GoogleFonts.plusJakartaSans(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16),
+              style: GoogleFonts.plusJakartaSans(
+                color: theme.colorScheme.onSurface, 
+                fontWeight: FontWeight.bold, 
+                fontSize: 16,
+              ),
             ),
             const SizedBox(height: 4),
             _buildStepIndicator(currentStep),
@@ -73,14 +74,14 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: IconButton(
-              icon: Icon(_showPreview ? Icons.edit_note_rounded : Icons.remove_red_eye_outlined, color: const Color(0xFF007BFF)),
+              icon: Icon(_showPreview ? Icons.edit_note_rounded : Icons.remove_red_eye_outlined, color: theme.colorScheme.primary),
               onPressed: () => setState(() => _showPreview = !_showPreview),
             ),
           ),
         ],
       ),
       body: state.isLoading 
-        ? const Center(child: CircularProgressIndicator(color: Color(0xFF007BFF)))
+        ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
         : Stack(
             children: [
               PageView(
@@ -101,6 +102,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   }
 
   Widget _buildStepIndicator(int currentStep) {
+    final theme = Theme.of(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(3, (index) {
@@ -110,7 +112,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
           height: 4,
           margin: const EdgeInsets.symmetric(horizontal: 2),
           decoration: BoxDecoration(
-            color: isActive ? const Color(0xFF007BFF) : Colors.grey.shade200,
+            color: isActive ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
             borderRadius: BorderRadius.circular(2),
           ),
         );
@@ -119,6 +121,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   }
 
   Widget _buildStep1(AddListingState state, AddListingController controller) {
+    final theme = Theme.of(context);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -126,9 +129,19 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
         children: [
           _buildQualityIndicator(state),
           const SizedBox(height: 32),
-          Text('What are you selling?', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800)),
+          Text(
+            'What are you selling?', 
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 22, 
+              fontWeight: FontWeight.w800,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text('Select a category and add photos of your item.', style: TextStyle(color: Colors.grey.shade600)),
+          Text(
+            'Select a category and add photos of your item.', 
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+          ),
           const SizedBox(height: 32),
           _buildCategoryGrid(state, controller),
           const SizedBox(height: 32),
@@ -139,14 +152,25 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   }
 
   Widget _buildStep2(AddListingState state, AddListingController controller) {
+    final theme = Theme.of(context);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Item Details', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800)),
+          Text(
+            'Item Details', 
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 22, 
+              fontWeight: FontWeight.w800,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text('Provide more information about your ${state.category.toLowerCase()}.', style: TextStyle(color: Colors.grey.shade600)),
+          Text(
+            'Provide more information about your ${state.category.toLowerCase()}.', 
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+          ),
           const SizedBox(height: 32),
           _buildTextField(
             label: 'Listing Title',
@@ -157,7 +181,14 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
           const SizedBox(height: 24),
           _buildConditionPicker(state, controller),
           const SizedBox(height: 32),
-          Text('Specifications', style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(
+            'Specifications', 
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 18, 
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
           const SizedBox(height: 16),
           _buildCategorySpecificFields(state, controller),
         ],
@@ -166,13 +197,21 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   }
 
   Widget _buildStep3(AddListingState state, AddListingController controller) {
+    final theme = Theme.of(context);
     final int quantity = (state.quantity as dynamic) ?? 1;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Final Details', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800)),
+          Text(
+            'Final Details', 
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 22, 
+              fontWeight: FontWeight.w800,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
           const SizedBox(height: 32),
           _buildTextField(
             label: 'Price (KES)',
@@ -189,10 +228,13 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
           SwitchListTile(
             value: state.isNegotiable,
             onChanged: (val) => controller.toggleNegotiable(val),
-            title: const Text('Negotiable', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text('Allow buyers to make offers'),
+            title: Text(
+              'Negotiable', 
+              style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+            ),
+            subtitle: Text('Allow buyers to make offers', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
             contentPadding: EdgeInsets.zero,
-            activeColor: const Color(0xFF007BFF),
+            activeTrackColor: theme.colorScheme.primary,
           ),
           const SizedBox(height: 24),
           _buildTextField(
@@ -227,7 +269,8 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   }
 
   Widget _buildCategoryGrid(AddListingState state, AddListingController controller) {
-    final categories = MarketplaceCategories.all;
+    final theme = Theme.of(context);
+    const categories = MarketplaceCategories.all;
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -245,10 +288,10 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
           onTap: () => controller.updateCategory(cat),
           child: Container(
             decoration: BoxDecoration(
-              color: isSelected ? const Color(0xFF007BFF).withOpacity(0.05) : Colors.grey.shade50,
+              color: isSelected ? theme.colorScheme.primary.withValues(alpha: 0.05) : theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: isSelected ? const Color(0xFF007BFF) : Colors.transparent,
+                color: isSelected ? theme.colorScheme.primary : Colors.transparent,
                 width: 2,
               ),
             ),
@@ -265,7 +308,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                      color: isSelected ? const Color(0xFF007BFF) : Colors.black87,
+                      color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -280,6 +323,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   }
 
   Widget _buildImageUploadSection(AddListingState state, AddListingController controller) {
+    final theme = Theme.of(context);
     final int totalPhotos = state.selectedImages.length + state.existingImageUrls.length;
 
     return Column(
@@ -288,8 +332,22 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Photos', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16)),
-            Text('$totalPhotos/10', style: TextStyle(color: Colors.grey.shade400, fontSize: 13, fontWeight: FontWeight.bold)),
+            Text(
+              'Photos', 
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.bold, 
+                fontSize: 16,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            Text(
+              '$totalPhotos/10', 
+              style: TextStyle(
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), 
+                fontSize: 13, 
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 16),
@@ -309,16 +367,23 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                   width: 120,
                   margin: const EdgeInsets.only(right: 12),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
+                    color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.grey.shade200, width: 2, style: BorderStyle.solid),
+                    border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 2, style: BorderStyle.solid),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.add_a_photo_outlined, color: Colors.grey.shade400, size: 32),
+                      Icon(Icons.add_a_photo_outlined, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), size: 32),
                       const SizedBox(height: 8),
-                      Text('Add Photo', style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.bold)),
+                      Text(
+                        'Add Photo', 
+                        style: TextStyle(
+                          fontSize: 12, 
+                          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), 
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -424,7 +489,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
       case MarketplaceCategories.shoes:
         return Column(
           children: [
-            _buildAttributeField('Brand', 'e.g. Nike, Zara', 'brand', state, controller),
+            _buildAttributeField('Brand', 'e.g. Zara', 'brand', state, controller),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -501,26 +566,34 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
     IconData? prefixIcon,
     int maxLines = 1,
   }) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
+        Text(
+          label, 
+          style: TextStyle(
+            fontSize: 14, 
+            fontWeight: FontWeight.bold, 
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
         const SizedBox(height: 8),
         TextFormField(
           initialValue: initialValue,
           onChanged: onChanged,
           keyboardType: keyboardType,
           maxLines: maxLines,
-          style: const TextStyle(fontSize: 16),
+          style: TextStyle(fontSize: 16, color: theme.colorScheme.onSurface),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: Colors.grey.shade400),
-            prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20) : null,
+            hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+            prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20, color: theme.colorScheme.onSurfaceVariant) : null,
             filled: true,
-            fillColor: Colors.grey.shade50,
+            fillColor: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
             contentPadding: const EdgeInsets.all(20),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: const BorderSide(color: Color(0xFF007BFF), width: 1.5)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5)),
           ),
         ),
       ],
@@ -528,10 +601,18 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   }
 
   Widget _buildConditionPicker(AddListingState state, AddListingController controller) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Condition', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
+        Text(
+          'Condition', 
+          style: TextStyle(
+            fontSize: 14, 
+            fontWeight: FontWeight.bold, 
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
         const SizedBox(height: 12),
         Row(
           children: ListingCondition.values.map((cond) {
@@ -543,7 +624,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFF007BFF) : Colors.grey.shade50,
+                    color: isSelected ? theme.colorScheme.primary : theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Center(
@@ -552,7 +633,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: isSelected ? Colors.white : Colors.black54,
+                        color: isSelected ? Colors.white : theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -566,13 +647,14 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   }
 
   Widget _buildQualityIndicator(AddListingState state) {
+    final theme = Theme.of(context);
     final double qualityScore = (state.qualityScore as dynamic) ?? 0.0;
-    final Color qualityColor = (state.qualityColor as dynamic) ?? Colors.grey;
+    final Color qualityColor = (state.qualityColor as dynamic) ?? AppColors.grey;
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: qualityColor.withOpacity(0.05),
+        color: qualityColor.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
@@ -597,7 +679,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
             child: LinearProgressIndicator(
               value: qualityScore,
               minHeight: 6,
-              backgroundColor: Colors.grey.shade200,
+              backgroundColor: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
               valueColor: AlwaysStoppedAnimation<Color>(qualityColor),
             ),
           ),
@@ -607,14 +689,15 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   }
 
   Widget _buildBottomAction(AddListingState state, AddListingController controller) {
+    final theme = Theme.of(context);
     final int currentStep = (state.currentStep as dynamic) ?? 0;
     final bool isLastStep = currentStep >= 2;
     
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade100)),
+        color: theme.colorScheme.surface,
+        border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
       ),
       child: Row(
         children: [
@@ -630,9 +713,12 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 18),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  side: BorderSide(color: Colors.grey.shade200),
+                  side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
                 ),
-                child: const Text('Back', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                child: Text(
+                  'Back', 
+                  style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+                ),
               ),
             ),
             const SizedBox(width: 16),
@@ -654,13 +740,13 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                 }
               },
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF007BFF),
+                backgroundColor: theme.colorScheme.primary,
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               ),
               child: Text(
                 isLastStep ? (widget.listing == null ? 'Publish Now' : 'Save Changes') : 'Continue',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
               ),
             ),
           ),
@@ -673,7 +759,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
     final int quantity = (state.quantity as dynamic) ?? 1;
     return Positioned.fill(
       child: Container(
-        color: Colors.black.withOpacity(0.9),
+        color: Colors.black.withValues(alpha: 0.9),
         child: Column(
           children: [
             const Spacer(),
@@ -718,12 +804,14 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   }
 
   void _handleExit(BuildContext context, AddListingController controller) {
+    final theme = Theme.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: theme.colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text('Save draft?'),
-        content: const Text('You can finish your listing later.'),
+        title: Text('Save draft?', style: TextStyle(color: theme.colorScheme.onSurface)),
+        content: Text('You can finish your listing later.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
         actions: [
           TextButton(
             onPressed: () {
@@ -731,14 +819,14 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
               Navigator.pop(context);
               context.pop();
             },
-            child: const Text('Discard', style: TextStyle(color: Colors.red)),
+            child: const Text('Discard', style: TextStyle(color: AppColors.error)),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               context.pop();
             },
-            child: const Text('Save Draft'),
+            child: Text('Save Draft', style: TextStyle(color: theme.colorScheme.primary)),
           ),
         ],
       ),
@@ -746,10 +834,12 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   }
 
   void _showSuccessDialog(BuildContext context) {
+    final theme = Theme.of(context);
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => Dialog(
+        backgroundColor: theme.colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -758,16 +848,23 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
             children: [
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(color: Color(0xFFE8F5E9), shape: BoxShape.circle),
-                child: const Icon(Icons.check_rounded, color: Color(0xFF4CAF50), size: 48),
+                decoration: const BoxDecoration(color: AppColors.verifiedSellerBg, shape: BoxShape.circle),
+                child: const Icon(Icons.check_rounded, color: AppColors.verifiedSellerIcon, size: 48),
               ),
               const SizedBox(height: 24),
-              Text('Live on UniHub!', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.bold)),
+              Text(
+                'Live on UniHub!', 
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 22, 
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'Your listing is now visible to everyone. Good luck with the sale!',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.black54, height: 1.5),
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant, height: 1.5),
               ),
               const SizedBox(height: 32),
               SizedBox(
@@ -778,11 +875,11 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                     context.pop();
                   },
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF007BFF),
+                    backgroundColor: theme.colorScheme.primary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                  child: const Text('Done', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text('Done', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                 ),
               ),
             ],

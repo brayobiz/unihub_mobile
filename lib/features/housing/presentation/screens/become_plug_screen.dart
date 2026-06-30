@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/trust/domain/models/professional_role.dart';
@@ -178,8 +179,12 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
 
     return appUserAsync.when(
       data: (user) {
+        final theme = Theme.of(context);
         if (user == null) {
-          return const Scaffold(body: Center(child: Text('Please log in to apply.')));
+          return Scaffold(
+            backgroundColor: theme.colorScheme.surface,
+            body: const Center(child: Text('Please log in to apply.')),
+          );
         }
 
         if (currentStep == 5) return _buildSuccessScreen();
@@ -204,17 +209,17 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
             return result ?? false;
           },
           child: Scaffold(
-            backgroundColor: Colors.white,
+            backgroundColor: theme.colorScheme.surface,
             appBar: AppBar(
-              backgroundColor: Colors.white,
+              backgroundColor: theme.colorScheme.surface,
               elevation: 0,
               leading: currentStep > 0 
                 ? IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.black),
+                    icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
                     onPressed: _prevPage,
                   )
                 : IconButton(
-                    icon: const Icon(Icons.close, color: Colors.black),
+                    icon: Icon(Icons.close, color: theme.colorScheme.onSurface),
                     onPressed: () {
                        ref.read(plugApplicationControllerProvider.notifier).reset();
                        context.pop();
@@ -223,8 +228,8 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
               title: currentStep > 0
                 ? Text(
                     'Step $currentStep of 4',
-                    style: GoogleFonts.plusJakartaSans(
-                      color: Colors.grey,
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurfaceVariant,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
@@ -239,8 +244,8 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: LinearProgressIndicator(
                       value: currentStep / 4,
-                      backgroundColor: const Color(0xFFF1F5F9),
-                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1677F2)),
+                      backgroundColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                      valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
@@ -269,12 +274,13 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
   }
 
   Widget _buildBottomBar(int currentStep) {
+    final theme = Theme.of(context);
     if (currentStep == 0) return const SizedBox.shrink();
 
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -290,14 +296,14 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
           child: FilledButton(
             onPressed: _isSubmitting ? null : (currentStep == 4 ? _submit : _nextPage),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF1677F2),
+              backgroundColor: theme.colorScheme.primary,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
             child: _isSubmitting
                 ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                 : Text(
                     currentStep == 4 ? 'Complete Onboarding' : 'Continue',
-                    style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
           ),
         ),
@@ -307,6 +313,7 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
 
   // --- Step 0: Welcome & Prerequisite Check ---
   Widget _buildWelcomeStep(AppUser user) {
+    final theme = Theme.of(context);
     final isVerified = user.isIdentityVerified && user.isStudentVerified;
     
     final bool identityPending = user.identityStatus == 'pending';
@@ -320,26 +327,26 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF1677F2).withOpacity(0.1),
+              color: theme.colorScheme.primary.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.home_work_rounded, color: Color(0xFF1677F2), size: 40),
+            child: Icon(Icons.home_work_rounded, color: theme.colorScheme.primary, size: 40),
           ),
           const SizedBox(height: 24),
           Text(
             'Welcome to the\nHousing Plug Network',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 28,
+            style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.w800,
               height: 1.2,
+              color: theme.colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 16),
           Text(
             'You\'re about to join UniHub\'s community of trusted housing specialists. Let\'s build your professional profile to help students find you.',
-            style: GoogleFonts.plusJakartaSans(
+            style: TextStyle(
               fontSize: 16,
-              color: const Color(0xFF64748B),
+              color: theme.colorScheme.onSurfaceVariant,
               height: 1.5,
             ),
           ),
@@ -367,9 +374,9 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -378,16 +385,16 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
                   children: [
                     Icon(
                       isVerified ? Icons.verified_user_rounded : Icons.shield_outlined,
-                      color: isVerified ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                      color: isVerified ? AppColors.success : theme.colorScheme.onSurfaceVariant,
                       size: 20,
                     ),
                     const SizedBox(width: 12),
                     Text(
                       'Platform Trust Status',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF1E293B),
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                   ],
@@ -397,10 +404,10 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
                   isVerified
                       ? 'Your platform identity is verified. You are eligible to complete your professional housing profile.'
                       : 'To ensure student safety and platform integrity, all professional service providers must complete UniHub Identity Verification before joining the network.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: const Color(0xFF64748B),
+                    color: theme.colorScheme.onSurfaceVariant,
                     height: 1.4,
                   ),
                 ),
@@ -410,15 +417,15 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFF1677F2)),
+                      Icon(Icons.info_outline_rounded, size: 14, color: theme.colorScheme.primary),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'You will return here automatically once verified.',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: const Color(0xFF1677F2),
+                            color: theme.colorScheme.primary,
                           ),
                         ),
                       ),
@@ -438,7 +445,7 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
                 ? _nextPage 
                 : (identityPending ? null : () => context.push('/trust-center')),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF1677F2),
+                backgroundColor: theme.colorScheme.primary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
               ),
               child: Row(
@@ -452,7 +459,7 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
                     identityPending 
                         ? 'Verification in Progress...' 
                         : (isVerified ? 'Continue to Professional Profile' : 'Start Housing Plug Journey'),
-                    style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16),
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
                   ),
                 ],
               ),
@@ -464,18 +471,19 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
   }
 
   Widget _buildInfoTile(IconData icon, String title, String subtitle) {
+    final theme = Theme.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: const Color(0xFF1677F2), size: 24),
+        Icon(icon, color: theme.colorScheme.primary, size: 24),
         const SizedBox(width: 16),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 16)),
+              Text(title, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: theme.colorScheme.onSurface)),
               const SizedBox(height: 4),
-              Text(subtitle, style: GoogleFonts.plusJakartaSans(color: const Color(0xFF64748B), fontSize: 13, height: 1.4)),
+              Text(subtitle, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13, height: 1.4)),
             ],
           ),
         ),
@@ -485,6 +493,7 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
 
   // --- Step 1: Professional Identity ---
   Widget _buildProfessionalIdentityStep(AppUser user) {
+    final theme = Theme.of(context);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Form(
@@ -492,10 +501,10 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Professional Identity', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800)),
+            Text('Professional Identity', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: theme.colorScheme.onSurface)),
             const SizedBox(height: 8),
             Text('Introduce yourself to the student community and set your primary campus.', 
-              style: GoogleFonts.plusJakartaSans(color: const Color(0xFF64748B))),
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
             const SizedBox(height: 32),
             _buildTextField(
               controller: _introController,
@@ -517,6 +526,7 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
 
   // --- Step 2: Service Coverage ---
   Widget _buildServiceCoverageStep() {
+    final theme = Theme.of(context);
     final state = ref.watch(plugApplicationControllerProvider);
     final notifier = ref.read(plugApplicationControllerProvider.notifier);
 
@@ -525,12 +535,12 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Service Coverage', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800)),
+          Text('Service Coverage', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: theme.colorScheme.onSurface)),
           const SizedBox(height: 8),
           Text('Select the areas where you actively help students find housing.', 
-            style: GoogleFonts.plusJakartaSans(color: const Color(0xFF64748B))),
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
           const SizedBox(height: 32),
-          Text('Primary Service Areas', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14)),
+          Text('Primary Service Areas', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface)),
           const SizedBox(height: 16),
           Wrap(
             spacing: 8,
@@ -541,23 +551,23 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
                 label: Text(area),
                 selected: isSelected,
                 onSelected: (_) => notifier.toggleArea(area),
-                selectedColor: const Color(0xFF1677F2).withOpacity(0.1),
+                selectedColor: theme.colorScheme.primary.withOpacity(0.1),
                 labelStyle: TextStyle(
-                  color: isSelected ? const Color(0xFF1677F2) : Colors.black87,
+                  color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: isSelected ? const Color(0xFF1677F2) : const Color(0xFFE2E8F0)),
+                  side: BorderSide(color: isSelected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant),
                 ),
               );
             }).toList(),
           ),
           const SizedBox(height: 40),
-          Text('Current Availability', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14)),
+          Text('Current Availability', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface)),
           const SizedBox(height: 8),
           Text('Let students know if you\'re actively taking inquiries.', 
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+            style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
           const SizedBox(height: 16),
           _buildChoiceTile(
             title: 'Accepting Inquiries',
@@ -581,6 +591,7 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
 
   // --- Step 3: Specialties & Contact ---
   Widget _buildSpecialtiesStep() {
+    final theme = Theme.of(context);
     final state = ref.watch(plugApplicationControllerProvider);
     final notifier = ref.read(plugApplicationControllerProvider.notifier);
 
@@ -589,12 +600,12 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Specialties & Contact', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800)),
+          Text('Specialties & Contact', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: theme.colorScheme.onSurface)),
           const SizedBox(height: 8),
           Text('What types of housing do you specialize in, and how should students reach you?', 
-            style: GoogleFonts.plusJakartaSans(color: const Color(0xFF64748B))),
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
           const SizedBox(height: 32),
-          Text('Accommodation Specialties', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14)),
+          Text('Accommodation Specialties', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface)),
           const SizedBox(height: 16),
           Wrap(
             spacing: 8,
@@ -605,20 +616,20 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
                 label: Text(type),
                 selected: isSelected,
                 onSelected: (_) => notifier.toggleSpecialty(type),
-                selectedColor: const Color(0xFF1677F2).withOpacity(0.1),
+                selectedColor: theme.colorScheme.primary.withOpacity(0.1),
                 labelStyle: TextStyle(
-                  color: isSelected ? const Color(0xFF1677F2) : Colors.black87,
+                  color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: isSelected ? const Color(0xFF1677F2) : const Color(0xFFE2E8F0)),
+                  side: BorderSide(color: isSelected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant),
                 ),
               );
             }).toList(),
           ),
           const SizedBox(height: 40),
-          Text('Preferred Contact Method', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14)),
+          Text('Preferred Contact Method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface)),
           const SizedBox(height: 16),
           _buildChoiceTile(
             title: 'In-App Chat',
@@ -642,6 +653,7 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
 
   // --- Step 4: Final Review ---
   Widget _buildFinalReviewStep(AppUser user) {
+    final theme = Theme.of(context);
     final state = ref.watch(plugApplicationControllerProvider);
 
     return SingleChildScrollView(
@@ -649,10 +661,10 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Review Your Profile', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800)),
+          Text('Review Your Profile', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: theme.colorScheme.onSurface)),
           const SizedBox(height: 8),
           Text('Take a moment to review how your profile will appear to the community.', 
-            style: GoogleFonts.plusJakartaSans(color: const Color(0xFF64748B))),
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
           const SizedBox(height: 32),
           
           _buildReviewSection(
@@ -697,7 +709,7 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
           const SizedBox(height: 32),
           Text(
             'By completing onboarding, you agree to provide accurate housing information and maintain a professional standard of service.',
-            style: GoogleFonts.plusJakartaSans(fontSize: 12, color: const Color(0xFF94A3B8), height: 1.5),
+            style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant, height: 1.5),
           ),
           const SizedBox(height: 16),
         ],
@@ -706,13 +718,14 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
   }
 
   Widget _buildReviewSection(String title, Widget content, {required VoidCallback onEdit}) {
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -720,10 +733,10 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF64748B))),
+              Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurfaceVariant)),
               GestureDetector(
                 onTap: onEdit,
-                child: const Text('Edit', style: TextStyle(color: Color(0xFF1677F2), fontWeight: FontWeight.bold, fontSize: 13)),
+                child: Text('Edit', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13)),
               ),
             ],
           ),
@@ -735,12 +748,13 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
   }
 
   Widget _buildReviewItem(String label, String value) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey.shade500, letterSpacing: 0.5)),
+        Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), letterSpacing: 0.5)),
         const SizedBox(height: 4),
-        Text(value, style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B))),
+        Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
       ],
     );
   }
@@ -756,8 +770,9 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
 
   // --- Success Screen ---
   Widget _buildSuccessScreen() {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -768,22 +783,22 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Colors.green.shade50,
+                  color: AppColors.success.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.check_circle_rounded, color: Colors.green.shade600, size: 80),
+                child: const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 80),
               ),
               const SizedBox(height: 32),
               Text(
                 'Onboarding Complete',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.plusJakartaSans(fontSize: 26, fontWeight: FontWeight.w800),
+                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 16),
               Text(
                 'Your Housing Plug profile is being processed. Students will soon be able to find you and your housing specialties.',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.plusJakartaSans(fontSize: 16, color: const Color(0xFF64748B), height: 1.5),
+                style: TextStyle(fontSize: 16, color: theme.colorScheme.onSurfaceVariant, height: 1.5),
               ),
               const Spacer(),
               SizedBox(
@@ -795,12 +810,12 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
                     context.go('/main');
                   },
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF0F172A),
+                    backgroundColor: theme.colorScheme.primary,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                   ),
-                  child: Text(
+                  child: const Text(
                     'Go to Dashboard',
-                    style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16),
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
                   ),
                 ),
               ),
@@ -820,18 +835,22 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
     TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.bold)),
+        Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
           maxLines: maxLines,
           keyboardType: keyboardType,
           validator: validator,
-          style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w500),
-          decoration: _inputDecoration().copyWith(hintText: hint),
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: theme.colorScheme.onSurface),
+          decoration: _inputDecoration().copyWith(
+            hintText: hint,
+            hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+          ),
         ),
       ],
     );
@@ -881,16 +900,17 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF1677F2).withOpacity(0.05) : Colors.white,
+          color: isSelected ? theme.colorScheme.primary.withOpacity(0.05) : theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? const Color(0xFF1677F2) : const Color(0xFFE2E8F0),
+            color: isSelected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -899,24 +919,24 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF1677F2).withOpacity(0.1) : const Color(0xFFF1F5F9),
+                color: isSelected ? theme.colorScheme.primary.withOpacity(0.1) : theme.colorScheme.surfaceVariant.withOpacity(0.3),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: isSelected ? const Color(0xFF1677F2) : const Color(0xFF64748B), size: 24),
+              child: Icon(icon, color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant, size: 24),
             ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 15, color: const Color(0xFF1E293B))),
+                  Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: theme.colorScheme.onSurface)),
                   const SizedBox(height: 4),
-                  Text(subtitle, style: GoogleFonts.plusJakartaSans(fontSize: 12, color: const Color(0xFF64748B))),
+                  Text(subtitle, style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
                 ],
               ),
             ),
             if (isSelected)
-              const Icon(Icons.check_circle_rounded, color: Color(0xFF1677F2)),
+              Icon(Icons.check_circle_rounded, color: theme.colorScheme.primary),
           ],
         ),
       ),
@@ -924,22 +944,23 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
   }
 
   InputDecoration _inputDecoration() {
+    final theme = Theme.of(context);
     return InputDecoration(
       filled: true,
-      fillColor: const Color(0xFFF8FAFC),
+      fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFFF1F5F9)),
+        borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFF1677F2), width: 1.5),
+        borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Colors.redAccent, width: 1),
+        borderSide: BorderSide(color: theme.colorScheme.error, width: 1),
       ),
     );
   }

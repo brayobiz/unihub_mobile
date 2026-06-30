@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
 import 'package:path/path.dart' as p;
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import '../../../auth/shared/providers.dart';
 import '../../domain/models/note.dart';
 import '../../shared/providers.dart';
@@ -204,20 +204,21 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FB),
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: Text(widget.note == null ? 'Share Study Notes' : 'Edit Study Note', 
-          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 18)),
-        backgroundColor: Colors.white,
+          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: 18)),
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
-        foregroundColor: Colors.black,
+        foregroundColor: theme.colorScheme.onSurface,
         centerTitle: true,
       ),
       body: SingleChildScrollView(
         child: Column(
           children: [
-            _buildHeaderHint(),
+            _buildHeaderHint(context),
             Padding(
               padding: const EdgeInsets.all(24),
               child: Form(
@@ -225,12 +226,13 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildFileSelector(),
+                    _buildFileSelector(context),
                     const SizedBox(height: 32),
                     
-                    _buildSectionHeader('Note Details', Icons.description_outlined),
+                    _buildSectionHeader(context, 'Note Details', Icons.description_outlined),
                     const SizedBox(height: 16),
                     _buildTextField(
+                      context,
                       controller: _titleController,
                       label: 'Title',
                       hint: 'e.g. Introduction to Database Systems',
@@ -238,6 +240,7 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(
+                      context,
                       controller: _descriptionController,
                       label: 'Brief Description',
                       hint: 'Help others understand what is covered...',
@@ -245,9 +248,10 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                     ),
                     
                     const SizedBox(height: 32),
-                    _buildSectionHeader('Academic Context', Icons.school_outlined),
+                    _buildSectionHeader(context, 'Academic Context', Icons.school_outlined),
                     const SizedBox(height: 16),
                     _buildTextField(
+                      context,
                       controller: _courseController,
                       label: 'Course / Program',
                       hint: 'e.g. BSc. Computer Science',
@@ -258,6 +262,7 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                       children: [
                         Expanded(
                           child: _buildTextField(
+                            context,
                             controller: _unitCodeController,
                             label: 'Unit Code',
                             hint: 'e.g. COM 2101',
@@ -267,9 +272,10 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                         const SizedBox(width: 16),
                         Expanded(
                           child: _buildDropdown(
+                            context: context,
                             label: 'Year of Study',
                             value: _selectedYear,
-                            items: ['1', '2', '3', '4', '5', '6'],
+                            items: const ['1', '2', '3', '4', '5', '6'],
                             onChanged: (v) => setState(() => _selectedYear = v!),
                           ),
                         ),
@@ -277,6 +283,7 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(
+                      context,
                       controller: _unitNameController,
                       label: 'Unit Name',
                       hint: 'e.g. Operating Systems',
@@ -284,9 +291,10 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                     ),
                     
                     const SizedBox(height: 32),
-                    _buildSectionHeader('Classification', Icons.category_outlined),
+                    _buildSectionHeader(context, 'Classification', Icons.category_outlined),
                     const SizedBox(height: 16),
                     _buildDropdown(
+                      context: context,
                       label: 'Subject Category',
                       value: _selectedCategory,
                       items: _categories,
@@ -294,18 +302,20 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                     ),
                     const SizedBox(height: 16),
                     _buildDropdown(
+                      context: context,
                       label: 'Note Type',
                       value: _selectedNoteType,
                       items: _noteTypes,
                       onChanged: (v) => setState(() => _selectedNoteType = v!),
                     ),
                     const SizedBox(height: 16),
-                    _buildTagsInput(),
+                    _buildTagsInput(context),
                     
                     const SizedBox(height: 32),
-                    _buildSectionHeader('Access & Pricing', Icons.payments_outlined),
+                    _buildSectionHeader(context, 'Access & Pricing', Icons.payments_outlined),
                     const SizedBox(height: 16),
                     _buildTextField(
+                      context,
                       controller: _priceController,
                       label: 'Price (KES)',
                       hint: 'Leave empty or 0 for FREE',
@@ -314,7 +324,7 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                     ),
                     
                     const SizedBox(height: 48),
-                    _buildSubmitButton(),
+                    _buildSubmitButton(context),
                     const SizedBox(height: 40),
                   ],
                 ),
@@ -326,19 +336,20 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     );
   }
 
-  Widget _buildHeaderHint() {
+  Widget _buildHeaderHint(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      color: Colors.indigo.shade50,
+      color: theme.colorScheme.primary.withValues(alpha: 0.05),
       child: Row(
         children: [
-          Icon(Icons.info_outline, size: 18, color: Colors.indigo.shade700),
+          Icon(Icons.info_outline, size: 18, color: theme.colorScheme.primary),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               'Help your fellow students by sharing high-quality .docx notes.',
-              style: TextStyle(fontSize: 12, color: Colors.indigo.shade900, fontWeight: FontWeight.w500),
+              style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface, fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -346,20 +357,22 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title, IconData icon) {
+  Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
+    final theme = Theme.of(context);
     return Row(
       children: [
-        Icon(icon, size: 20, color: Colors.indigo),
+        Icon(icon, size: 20, color: theme.colorScheme.primary),
         const SizedBox(width: 10),
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.black87),
+          style: theme.textTheme.titleMedium?.copyWith(fontSize: 15, fontWeight: FontWeight.w800, color: theme.colorScheme.onSurface),
         ),
       ],
     );
   }
 
-  Widget _buildFileSelector() {
+  Widget _buildFileSelector(BuildContext context) {
+    final theme = Theme.of(context);
     final bool hasFile = _selectedFile != null || widget.note != null;
     
     return InkWell(
@@ -370,14 +383,14 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
         decoration: BoxDecoration(
-          color: hasFile ? Colors.white : Colors.white,
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: hasFile ? Colors.green.shade300 : Colors.grey.shade200, 
+            color: hasFile ? AppColors.success : theme.colorScheme.outlineVariant, 
             width: 2, 
           ),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))
+            BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))
           ],
         ),
         child: Column(
@@ -385,20 +398,20 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
             if (!hasFile) ...[
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: Colors.indigo.shade50, shape: BoxShape.circle),
-                child: const Icon(Icons.upload_file_rounded, size: 32, color: Colors.indigo),
+                decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
+                child: Icon(Icons.upload_file_rounded, size: 32, color: theme.colorScheme.primary),
               ),
               const SizedBox(height: 16),
-              Text('Select Microsoft Word Document', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 15)),
+              Text('Select Microsoft Word Document', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: theme.colorScheme.onSurface)),
               const SizedBox(height: 4),
-              Text('Only .docx files are supported', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+              Text('Only .docx files are supported', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
             ] else ...[
               Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(12)),
-                    child: const Icon(Icons.check_circle_outline_rounded, color: Colors.green, size: 24),
+                    decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                    child: const Icon(Icons.check_circle_outline_rounded, color: AppColors.success, size: 24),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -407,15 +420,15 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                       children: [
                         Text(_fileName ?? 'Selected Document', 
                           maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface)),
                         Row(
                           children: [
-                            Text('.DOCX', style: TextStyle(color: Colors.grey.shade600, fontSize: 11, fontWeight: FontWeight.bold)),
+                            Text('.DOCX', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold)),
                             if (_fileSize != null) ...[
                               const SizedBox(width: 8),
-                              const CircleAvatar(radius: 2, backgroundColor: Colors.grey),
+                              CircleAvatar(radius: 2, backgroundColor: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
                               const SizedBox(width: 8),
-                              Text(_fileSize!, style: TextStyle(color: Colors.grey.shade600, fontSize: 11)),
+                              Text(_fileSize!, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
                             ],
                           ],
                         ),
@@ -424,7 +437,7 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                   ),
                   TextButton(
                     onPressed: _isLoading ? null : _pickFile,
-                    child: const Text('Change', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo)),
+                    child: Text('Change', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
                   ),
                 ],
               ),
@@ -435,23 +448,26 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     );
   }
 
-  Widget _buildTagsInput() {
+  Widget _buildTagsInput(BuildContext context) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Topics / Tags', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87)),
+        Text('Topics / Tags', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
         const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
               child: TextFormField(
                 controller: _tagController,
+                style: TextStyle(color: theme.colorScheme.onSurface),
                 decoration: InputDecoration(
                   hintText: 'Add a topic (e.g. Java, DBMS)...',
+                  hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
                 ),
                 onFieldSubmitted: (_) => _addTag(),
               ),
@@ -459,7 +475,7 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
             const SizedBox(width: 12),
             IconButton.filled(
               onPressed: _addTag,
-              style: IconButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white),
+              style: IconButton.styleFrom(backgroundColor: theme.colorScheme.primary, foregroundColor: Colors.white),
               icon: const Icon(Icons.add, size: 20),
             ),
           ],
@@ -472,9 +488,9 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
             children: _tags.map((tag) => Chip(
               label: Text(tag, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
               onDeleted: () => setState(() => _tags.remove(tag)),
-              backgroundColor: Colors.white,
-              side: BorderSide(color: Colors.indigo.shade100),
-              deleteIconColor: Colors.red.shade400,
+              backgroundColor: theme.colorScheme.surface,
+              side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
+              deleteIconColor: AppColors.error,
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
             )).toList(),
           ),
@@ -483,50 +499,53 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     );
   }
 
-  Widget _buildDropdown({required String label, required String value, required List<String> items, required void Function(String?) onChanged}) {
+  Widget _buildDropdown({required BuildContext context, required String label, required String value, required List<String> items, required void Function(String?) onChanged}) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87)),
+        Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           value: value,
-          items: items.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)))).toList(),
+          dropdownColor: theme.colorScheme.surface,
+          items: items.map((t) => DropdownMenuItem(value: t, child: Text(t, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: theme.colorScheme.onSurface)))).toList(),
           onChanged: onChanged,
           decoration: InputDecoration(
             filled: true,
-            fillColor: Colors.white,
+            fillColor: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
             contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildTextField({required TextEditingController controller, required String label, required String hint, int maxLines = 1, TextInputType? keyboardType, IconData? prefixIcon, String? Function(String?)? validator}) {
+  Widget _buildTextField(BuildContext context, {required TextEditingController controller, required String label, required String hint, int maxLines = 1, TextInputType? keyboardType, IconData? prefixIcon, String? Function(String?)? validator}) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87)),
+        Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
           maxLines: maxLines,
           keyboardType: keyboardType,
           validator: validator,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: Colors.grey.shade400, fontWeight: FontWeight.normal, fontSize: 13),
-            prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20, color: Colors.indigo.shade300) : null,
+            hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontWeight: FontWeight.normal, fontSize: 13),
+            prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20, color: theme.colorScheme.primary.withValues(alpha: 0.5)) : null,
             filled: true,
-            fillColor: Colors.white,
+            fillColor: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
             contentPadding: const EdgeInsets.all(18),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.indigo, width: 1.5)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5)),
             errorStyle: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
@@ -534,14 +553,15 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     );
   }
 
-  Widget _buildSubmitButton() {
+  Widget _buildSubmitButton(BuildContext context) {
+    final theme = Theme.of(context);
     return SizedBox(
       width: double.infinity,
       height: 60,
       child: FilledButton(
         onPressed: _isLoading ? null : _submit,
         style: FilledButton.styleFrom(
-          backgroundColor: Colors.indigo, 
+          backgroundColor: theme.colorScheme.primary, 
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           elevation: 0,
         ),
@@ -551,11 +571,11 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                 children: [
                   const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)), 
                   const SizedBox(width: 16), 
-                  Text('Uploading ${(_uploadProgress * 100).toInt()}%', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text('Uploading ${(_uploadProgress * 100).toInt()}%', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                 ]
               )
             : Text(widget.note == null ? 'Publish Study Material' : 'Save Changes', 
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
       ),
     );
   }

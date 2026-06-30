@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/housing/shared/providers.dart';
@@ -16,6 +17,7 @@ class PlugDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final user = ref.watch(appUserProvider).valueOrNull;
     if (user == null) return const Scaffold(body: Center(child: Text('Please log in')));
     
@@ -25,11 +27,11 @@ class PlugDashboardScreen extends ConsumerWidget {
       final applicationAsync = ref.watch(applicationByRoleProvider(ProfessionalRole.housePlug));
 
       return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.surface,
         appBar: AppBar(
-          title: Text('Plug Access', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black,
+          title: Text('Plug Access', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          backgroundColor: theme.colorScheme.surface,
+          foregroundColor: theme.colorScheme.onSurface,
           elevation: 0,
         ),
         body: applicationAsync.when(
@@ -44,12 +46,12 @@ class PlugDashboardScreen extends ConsumerWidget {
     final applicationAsync = ref.watch(applicationByRoleProvider(ProfessionalRole.housePlug));
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text('Plug Dashboard', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
+        title: Text('Plug Dashboard', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
-        foregroundColor: Colors.black,
+        foregroundColor: theme.colorScheme.onSurface,
         actions: const [
           NotificationBadge(module: 'housing'),
           SizedBox(width: 8),
@@ -60,7 +62,7 @@ class PlugDashboardScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildProfileSummary(user),
+            _buildProfileSummary(context, user),
             const SizedBox(height: 16),
             applicationAsync.when(
               data: (application) => _buildVerificationStatusCard(context, user, application),
@@ -70,12 +72,12 @@ class PlugDashboardScreen extends ConsumerWidget {
             const SizedBox(height: 24),
             _buildOpportunityCTA(context),
             const SizedBox(height: 24),
-            _buildStatsSection(listingsAsync),
+            _buildStatsSection(context, listingsAsync),
             const SizedBox(height: 32),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('My Listings', style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w800)),
+                Text('My Listings', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                 TextButton.icon(
                   onPressed: () => context.push('/add-housing'),
                   icon: const Icon(Icons.add, size: 18),
@@ -92,6 +94,7 @@ class PlugDashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildNoAccessBody(BuildContext context, WidgetRef ref, VerificationApplication? application) {
+    final theme = Theme.of(context);
     final user = ref.watch(appUserProvider).valueOrNull;
     final isVerified = user?.isVerified ?? false;
     final hasPendingApp = application?.status == VerificationStatus.pending;
@@ -105,7 +108,7 @@ class PlugDashboardScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: (isRejected ? Colors.red : const Color(0xFF1677F2)).withOpacity(0.1),
+              color: (isRejected ? AppColors.error : theme.colorScheme.primary).withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -116,7 +119,7 @@ class PlugDashboardScreen extends ConsumerWidget {
                       : hasPendingApp 
                           ? Icons.hourglass_empty_rounded 
                           : Icons.lock_person_rounded), 
-              color: isRejected ? Colors.red : const Color(0xFF1677F2), 
+              color: isRejected ? AppColors.error : theme.colorScheme.primary, 
               size: 64
             ),
           ),
@@ -129,7 +132,7 @@ class PlugDashboardScreen extends ConsumerWidget {
                     : hasPendingApp 
                         ? 'Application Pending' 
                         : 'Plug Access Required'),
-            style: GoogleFonts.plusJakartaSans(fontSize: 24, fontWeight: FontWeight.w800),
+            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
@@ -141,7 +144,7 @@ class PlugDashboardScreen extends ConsumerWidget {
                     : hasPendingApp
                         ? 'Your application is currently being reviewed. You will gain access to this dashboard once approved.'
                         : 'You must be a verified Housing Plug to access the professional dashboard and manage listings.'),
-            style: GoogleFonts.plusJakartaSans(fontSize: 16, color: const Color(0xFF64748B), height: 1.5),
+            style: TextStyle(fontSize: 16, color: theme.colorScheme.onSurfaceVariant, height: 1.5),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 40),
@@ -152,34 +155,35 @@ class PlugDashboardScreen extends ConsumerWidget {
               child: FilledButton(
                 onPressed: () => context.pushReplacement(isVerified ? '/verify-professional/housePlug' : '/trust-center'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF1677F2),
+                  backgroundColor: theme.colorScheme.primary,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                 ),
                 child: Text(
                   !isVerified 
                       ? 'Verify Identity' 
                       : (isRejected ? 'Update Application' : 'Apply for Plug Access'),
-                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16),
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
                 ),
               ),
             ),
           const SizedBox(height: 16),
           TextButton(
             onPressed: () => context.go('/main'),
-            child: Text('Return Home', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700)),
+            child: Text('Return Home', style: TextStyle(fontWeight: FontWeight.w700, color: theme.colorScheme.primary)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildProfileSummary(dynamic user) {
+  Widget _buildProfileSummary(BuildContext context, dynamic user) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 20, offset: const Offset(0, 10))
         ],
@@ -190,7 +194,7 @@ class PlugDashboardScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFF1677F2).withOpacity(0.2), width: 2),
+              border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2), width: 2),
             ),
             child: CircleAvatar(
               radius: 32,
@@ -203,17 +207,17 @@ class PlugDashboardScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(user.fullName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF1A1C1E))),
+                Text(user.fullName, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface)),
                 const SizedBox(height: 6),
                 Row(
                   children: [
                     if (user.isVerified)
-                      const Icon(Icons.verified_rounded, color: Color(0xFF1677F2), size: 16),
+                      Icon(Icons.verified_rounded, color: theme.colorScheme.primary, size: 16),
                     const SizedBox(width: 4),
                     Text(
                       user.isHousingPlug ? 'HOUSING PLUG' : 'HOUSING PARTNER', 
                       style: TextStyle(
-                        color: user.isVerified ? const Color(0xFF1677F2) : const Color(0xFF64748B), 
+                        color: user.isVerified ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant, 
                         fontSize: 10, 
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.5,
@@ -226,7 +230,7 @@ class PlugDashboardScreen extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: user.isVerified ? const Color(0xFF10B981).withOpacity(0.1) : const Color(0xFF94A3B8).withOpacity(0.1),
+                    color: user.isVerified ? AppColors.success.withOpacity(0.1) : theme.colorScheme.onSurfaceVariant.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -234,16 +238,16 @@ class PlugDashboardScreen extends ConsumerWidget {
                     style: TextStyle(
                       fontSize: 8,
                       fontWeight: FontWeight.bold,
-                      color: user.isVerified ? const Color(0xFF059669) : const Color(0xFF475569),
+                      color: user.isVerified ? AppColors.success : theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    const Icon(Icons.school_rounded, size: 12, color: Color(0xFF94A3B8)),
+                    Icon(Icons.school_rounded, size: 12, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7)),
                     const SizedBox(width: 4),
-                    Text('${user.university}', style: const TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.w600)),
+                    Text('${user.university}', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ],
@@ -252,10 +256,10 @@ class PlugDashboardScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFF1677F2).withOpacity(0.08),
+              color: theme.colorScheme.primary.withOpacity(0.08),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(Icons.qr_code_2_rounded, color: Color(0xFF1677F2), size: 24),
+            child: Icon(Icons.qr_code_2_rounded, color: theme.colorScheme.primary, size: 24),
           ),
         ],
       ),
@@ -263,19 +267,20 @@ class PlugDashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildOpportunityCTA(BuildContext context) {
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: () => context.push('/opportunities'),
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF1677F2), Color(0xFF0F172A)],
+          gradient: LinearGradient(
+            colors: [theme.colorScheme.primary, AppColors.backgroundDark],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
-            BoxShadow(color: const Color(0xFF1677F2).withOpacity(0.2), blurRadius: 20, offset: const Offset(0, 10))
+            BoxShadow(color: theme.colorScheme.primary.withOpacity(0.2), blurRadius: 20, offset: const Offset(0, 10))
           ],
         ),
         child: Row(
@@ -288,7 +293,7 @@ class PlugDashboardScreen extends ConsumerWidget {
                     children: [
                       const Icon(Icons.bolt_rounded, color: Colors.amber, size: 20),
                       const SizedBox(width: 8),
-                      Text('Opportunity Feed', style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+                      Text('Opportunity Feed', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -304,14 +309,15 @@ class PlugDashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildVerificationStatusCard(BuildContext context, dynamic user, VerificationApplication? application) {
+    final theme = Theme.of(context);
     // If the user is fully verified in their profile, show the Verified state
     if (user.isVerified) {
       return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFF10B981).withOpacity(0.2)),
+          border: Border.all(color: AppColors.success.withOpacity(0.2)),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
         ),
         child: Column(
@@ -320,16 +326,16 @@ class PlugDashboardScreen extends ConsumerWidget {
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: const Color(0xFF10B981).withOpacity(0.1), shape: BoxShape.circle),
-                  child: const Icon(Icons.verified_user_rounded, color: Color(0xFF10B981), size: 24),
+                  decoration: BoxDecoration(color: AppColors.success.withOpacity(0.1), shape: BoxShape.circle),
+                  child: const Icon(Icons.verified_user_rounded, color: AppColors.success, size: 24),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Platform Trusted Status', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16)),
-                      Text('Your identity is confirmed by UniHub Trust Engine.', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                      Text('Platform Trusted Status', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: theme.colorScheme.onSurface)),
+                      Text('Your identity is confirmed by UniHub Trust Engine.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
                     ],
                   ),
                 ),
@@ -356,23 +362,23 @@ class PlugDashboardScreen extends ConsumerWidget {
       VerificationStatus.pending => Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9),
+            color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
           ),
           child: Row(
             children: [
-              const Icon(Icons.hourglass_top_rounded, color: Color(0xFF64748B), size: 28),
+              Icon(Icons.hourglass_top_rounded, color: theme.colorScheme.onSurfaceVariant, size: 28),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Trust Review Pending', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16)),
+                    Text('Trust Review Pending', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: theme.colorScheme.onSurface)),
                     const SizedBox(height: 4),
                     Text(
                       'The platform Trust Engine is reviewing your application. Role activation follows identity confirmation.',
-                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12, height: 1.4),
+                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, height: 1.4),
                     ),
                   ],
                 ),
@@ -383,24 +389,24 @@ class PlugDashboardScreen extends ConsumerWidget {
       VerificationStatus.rejected => Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: const Color(0xFFFEF2F2),
+            color: AppColors.error.withOpacity(0.05),
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFFFEE2E2)),
+            border: Border.all(color: AppColors.error.withOpacity(0.2)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  const Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 28),
+                  const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 28),
                   const SizedBox(width: 16),
-                  Text('Application Rejected', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16, color: const Color(0xFF991B1B))),
+                  Text('Application Rejected', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.error)),
                 ],
               ),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'Unfortunately, your application was not approved. This is usually due to missing documents or unclear professional information.',
-                style: TextStyle(color: Color(0xFFB91C1C), fontSize: 12, height: 1.4),
+                style: TextStyle(color: AppColors.error.withOpacity(0.8), fontSize: 12, height: 1.4),
               ),
               const SizedBox(height: 16),
               SizedBox(
@@ -408,8 +414,8 @@ class PlugDashboardScreen extends ConsumerWidget {
                 child: OutlinedButton(
                   onPressed: () => context.push('/become-plug'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFEF4444),
-                    side: const BorderSide(color: Color(0xFFFCA5A5)),
+                    foregroundColor: AppColors.error,
+                    side: BorderSide(color: AppColors.error.withOpacity(0.5)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: const Text('Update & Resubmit', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -426,14 +432,15 @@ class PlugDashboardScreen extends ConsumerWidget {
   Widget _buildVerificationBadge(IconData icon, String label) {
     return Row(
       children: [
-        Icon(icon, size: 14, color: const Color(0xFF10B981)),
+        Icon(icon, size: 14, color: AppColors.success),
         const SizedBox(width: 6),
-        Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
+        Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.success)),
       ],
     );
   }
 
-  Widget _buildStatsSection(AsyncValue<List<HousingListing>> listingsAsync) {
+  Widget _buildStatsSection(BuildContext context, AsyncValue<List<HousingListing>> listingsAsync) {
+    final theme = Theme.of(context);
     return listingsAsync.when(
       data: (listings) {
         final active = listings.where((l) => l.status == HousingStatus.available).length;
@@ -442,11 +449,11 @@ class PlugDashboardScreen extends ConsumerWidget {
 
         return Row(
           children: [
-            _buildStatCard('Active', active.toString(), Colors.blue),
+            _buildStatCard(context, 'Active', active.toString(), theme.colorScheme.primary),
             const SizedBox(width: 12),
-            _buildStatCard('Total Views', views.toString(), Colors.indigo),
+            _buildStatCard(context, 'Total Views', views.toString(), theme.colorScheme.secondary),
             const SizedBox(width: 12),
-            _buildStatCard('Saves', saves.toString(), Colors.orange),
+            _buildStatCard(context, 'Saves', saves.toString(), AppColors.warning),
           ],
         );
       },
@@ -455,12 +462,13 @@ class PlugDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatCard(String label, String value, Color color) {
+  Widget _buildStatCard(BuildContext context, String label, String value, Color color) {
+    final theme = Theme.of(context);
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: color.withOpacity(0.1)),
           boxShadow: [
@@ -469,9 +477,9 @@ class PlugDashboardScreen extends ConsumerWidget {
         ),
         child: Column(
           children: [
-            Text(value, style: GoogleFonts.plusJakartaSans(fontSize: 26, fontWeight: FontWeight.w900, color: color)),
+            Text(value, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: color)),
             const SizedBox(height: 4),
-            Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w800, letterSpacing: 0.2)),
+            Text(label, style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w800, letterSpacing: 0.2)),
           ],
         ),
       ),
@@ -495,22 +503,23 @@ class PlugDashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildDashboardEmptyState(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
       child: Column(
         children: [
           const SizedBox(height: 40),
           Container(
             padding: const EdgeInsets.all(24),
-            decoration: const BoxDecoration(color: Color(0xFFF1F5F9), shape: BoxShape.circle),
-            child: const Icon(Icons.add_home_work_rounded, size: 48, color: Color(0xFF94A3B8)),
+            decoration: BoxDecoration(color: theme.colorScheme.surfaceVariant.withOpacity(0.3), shape: BoxShape.circle),
+            child: Icon(Icons.add_home_work_rounded, size: 48, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
           ),
           const SizedBox(height: 16),
-          const Text('No listings yet', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-          const Text('Start earning by listing properties', style: TextStyle(color: Color(0xFF64748B))),
+          Text('No listings yet', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: theme.colorScheme.onSurface)),
+          Text('Start earning by listing properties', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
           const SizedBox(height: 24),
           FilledButton(
             onPressed: () => context.push('/add-housing'),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF1677F2)),
+            style: FilledButton.styleFrom(backgroundColor: theme.colorScheme.primary),
             child: const Text('List First Property'),
           ),
         ],
@@ -519,14 +528,15 @@ class PlugDashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildDashboardCard(HousingListing listing, BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final statusColor = switch (listing.status) {
-      HousingStatus.available => Colors.green,
-      HousingStatus.taken => Colors.red,
-      HousingStatus.draft => Colors.grey,
-      HousingStatus.pendingReview => Colors.orange,
+      HousingStatus.available => AppColors.success,
+      HousingStatus.taken => AppColors.error,
+      HousingStatus.draft => theme.colorScheme.onSurfaceVariant,
+      HousingStatus.pendingReview => AppColors.warning,
       HousingStatus.reported => Colors.deepOrange,
       HousingStatus.archived => Colors.blueGrey,
-      HousingStatus.published => Colors.blue,
+      HousingStatus.published => theme.colorScheme.primary,
     };
 
     final statusLabel = listing.status.name.replaceAll(RegExp(r'(?=[A-Z])'), ' ').toUpperCase();
@@ -535,8 +545,9 @@ class PlugDashboardScreen extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
       ),
       child: Row(
@@ -552,9 +563,9 @@ class PlugDashboardScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(listing.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(listing.title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: theme.colorScheme.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 4),
-                Text('KES ${listing.rent.toInt()}', style: const TextStyle(color: Color(0xFF1677F2), fontWeight: FontWeight.w800)),
+                Text('KES ${listing.rent.toInt()}', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -563,7 +574,7 @@ class PlugDashboardScreen extends ConsumerWidget {
                     Expanded(
                       child: Text(
                         'Updated ${_formatTimeAgo(listing.updatedAt)}', 
-                        style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w500),
+                        style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), fontWeight: FontWeight.w500),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -574,6 +585,7 @@ class PlugDashboardScreen extends ConsumerWidget {
             ),
           ),
           PopupMenuButton<String>(
+            color: theme.colorScheme.surface,
             onSelected: (val) {
               if (val == 'status_available') {
                 ref.read(housingRepositoryProvider).updateListingStatus(listing.id, HousingStatus.available);
@@ -595,9 +607,9 @@ class PlugDashboardScreen extends ConsumerWidget {
               const PopupMenuItem(value: 'edit', child: Text('Edit Details')),
               if (listing.status != HousingStatus.archived)
                 const PopupMenuItem(value: 'status_archive', child: Text('Archive Listing')),
-              const PopupMenuItem(value: 'delete', child: Text('Delete Permanently', style: TextStyle(color: Colors.red))),
+              PopupMenuItem(value: 'delete', child: Text('Delete Permanently', style: TextStyle(color: AppColors.error))),
             ],
-            icon: const Icon(Icons.more_vert),
+            icon: Icon(Icons.more_vert, color: theme.colorScheme.onSurfaceVariant),
           ),
         ],
       ),

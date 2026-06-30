@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../controllers/auth_controller.dart';
 import '../widgets/auth_button.dart';
 import '../widgets/auth_text_field.dart';
@@ -55,26 +56,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black87),
+        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 80),
+            const SizedBox(height: 40),
 
             // Hero Section
-            const Text(
+            Text(
               'Welcome Back',
-              style: TextStyle(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
-                letterSpacing: -0.5,
+                letterSpacing: -1,
+                color: theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
@@ -82,7 +86,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               'Sign in to your campus marketplace',
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.grey.shade600,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
 
@@ -112,9 +116,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 onPressed: _localLoading ? null : () {
                   context.push('/forgot-password');
                 },
-                child: const Text(
+                child: Text(
                   'Forgot Password?',
-                  style: TextStyle(fontWeight: FontWeight.w500),
+                  style: TextStyle(fontWeight: FontWeight.w600, color: theme.colorScheme.primary),
                 ),
               ),
             ),
@@ -122,7 +126,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             const SizedBox(height: 28),
 
             if (_localLoading)
-              const Center(child: CircularProgressIndicator())
+              Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
             else
               AuthButton(
                 text: 'Sign In',
@@ -135,7 +139,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
             const SizedBox(height: 32),
 
-            // Professional Google Sign-In Button
             GoogleSignInButton(
               onPressed: _localLoading ? null : () async {
                 setState(() => _localLoading = true);
@@ -160,7 +163,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey.shade500,
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                   height: 1.4,
                 ),
               ),
@@ -171,14 +174,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text("Don't have an account?"),
+                Text("Don't have an account?", style: TextStyle(color: theme.colorScheme.onSurface)),
                 TextButton(
                   onPressed: _localLoading ? null : () {
                     context.push('/register');
                   },
-                  child: const Text(
+                  child: Text(
                     'Create Account',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                    style: TextStyle(fontWeight: FontWeight.w700, color: theme.colorScheme.primary),
                   ),
                 ),
               ],

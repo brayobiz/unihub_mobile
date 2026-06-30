@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../app/theme/app_colors.dart';
 import '../auth/shared/providers.dart';
 import '../marketplace/domain/models/listing.dart';
 import '../marketplace/shared/providers.dart';
@@ -44,8 +45,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FB),
+      backgroundColor: theme.scaffoldBackgroundColor,
       drawer: const AppDrawer(),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -89,7 +91,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
-                    color: const Color(0xFF1A1C1E),
+                    color: Theme.of(context).colorScheme.onSurface,
                     letterSpacing: -0.5,
                   ),
                 ),
@@ -120,15 +122,16 @@ class _DashboardAppBar extends ConsumerWidget {
       return 'Good Evening';
     }
 
+    final theme = Theme.of(context);
     return SliverAppBar(
       expandedHeight: 150,
       pinned: true,
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       elevation: 0,
       scrolledUnderElevation: 0,
       leading: Builder(
         builder: (context) => IconButton(
-          icon: const Icon(Icons.menu_rounded, color: Colors.black),
+          icon: Icon(Icons.menu_rounded, color: theme.colorScheme.onSurface),
           onPressed: () => Scaffold.of(context).openDrawer(),
         ),
       ),
@@ -138,9 +141,9 @@ class _DashboardAppBar extends ConsumerWidget {
       ],
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.indigo.shade800, Colors.indigo.shade500],
+              colors: [AppColors.primaryGradientStart, AppColors.primaryGradientEnd],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -192,7 +195,7 @@ class _QuickActions extends StatelessWidget {
             style: GoogleFonts.plusJakartaSans(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFF1A1C1E),
+              color: Theme.of(context).colorScheme.onSurface,
               letterSpacing: -0.5,
             ),
           ),
@@ -203,25 +206,25 @@ class _QuickActions extends StatelessWidget {
               _ActionItem(
                 icon: Icons.note_add_outlined,
                 label: 'Upload Notes',
-                color: Colors.green.shade700,
+                color: AppColors.notes,
                 onTap: () => context.push('/add-note'),
               ),
               _ActionItem(
                 icon: Icons.add_shopping_cart_outlined,
                 label: 'Sell Item',
-                color: Colors.orange.shade700,
+                color: AppColors.marketplace,
                 onTap: () => context.push('/add-listing'),
               ),
               _ActionItem(
                 icon: Icons.campaign_outlined,
                 label: 'Report Vacancy',
-                color: Colors.blue.shade700,
+                color: AppColors.housing,
                 onTap: () => context.push('/submit-vacancy'),
               ),
               _ActionItem(
                 icon: Icons.add_task_rounded,
                 label: 'Post Gig',
-                color: Colors.purple.shade700,
+                color: AppColors.gigs,
                 onTap: () {
                   Navigator.push(
                     context,
@@ -274,7 +277,7 @@ class _ActionItem extends StatelessWidget {
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: const Color(0xFF475569),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 1,
@@ -304,9 +307,9 @@ class _WhatsNewSection extends ConsumerWidget {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.orange.shade50,
+              color: AppColors.highlightOrangeBg,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.orange.shade100),
+              border: Border.all(color: AppColors.highlightOrangeBorder),
             ),
             child: Row(
               children: [
@@ -375,7 +378,7 @@ class _TrendingSection extends ConsumerWidget {
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFF1A1C1E),
+                  color: Theme.of(context).colorScheme.onSurface,
                   letterSpacing: -0.5,
                 ),
               ),
@@ -422,9 +425,9 @@ class _TrendingSection extends ConsumerWidget {
                     width: 160,
                     margin: const EdgeInsets.only(right: 16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFF1F5F9)),
+                      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.03),
@@ -475,7 +478,7 @@ class _TrendingSection extends ConsumerWidget {
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF1A1C1E),
+                                  color: Theme.of(context).colorScheme.onSurface,
                                 ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
@@ -557,15 +560,15 @@ class _TrendingSection extends ConsumerWidget {
   Color _getCategoryColor(FeedType type) {
     switch (type) {
       case FeedType.marketplace:
-        return Colors.orange;
+        return AppColors.marketplace;
       case FeedType.housing:
-        return Colors.blue;
+        return AppColors.housing;
       case FeedType.notes:
-        return Colors.green;
+        return AppColors.notes;
       case FeedType.gig:
-        return Colors.purple;
+        return AppColors.gigs;
       default:
-        return Colors.grey;
+        return AppColors.grey;
     }
   }
 }
@@ -636,9 +639,9 @@ class _ActivityItem extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFF1F5F9)),
+            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
           ),
           child: Row(
             children: [
@@ -725,11 +728,11 @@ class _ActivityItem extends StatelessWidget {
 
   Color _getCategoryColor(FeedType type) {
     switch (type) {
-      case FeedType.marketplace: return Colors.orange;
-      case FeedType.housing: return Colors.blue;
-      case FeedType.notes: return Colors.green;
-      case FeedType.gig: return Colors.purple;
-      default: return Colors.grey;
+      case FeedType.marketplace: return AppColors.marketplace;
+      case FeedType.housing: return AppColors.housing;
+      case FeedType.notes: return AppColors.notes;
+      case FeedType.gig: return AppColors.gigs;
+      default: return AppColors.grey;
     }
   }
 }
@@ -739,6 +742,7 @@ class _CampusPulseSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final pulseAsync = ref.watch(campusPulseProvider);
     final trendingAsync = ref.watch(trendingFeedProvider);
 
@@ -748,12 +752,12 @@ class _CampusPulseSection extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.indigo.shade50, Colors.white],
+            colors: [AppColors.highlightIndigoBg, Theme.of(context).colorScheme.surface],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.indigo.shade100.withOpacity(0.5)),
+          border: Border.all(color: AppColors.highlightIndigoBorder.withOpacity(0.5)),
         ),
         child: Column(
           children: [
@@ -761,11 +765,11 @@ class _CampusPulseSection extends ConsumerWidget {
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.indigo.shade100,
+                  decoration: const BoxDecoration(
+                    color: AppColors.highlightIndigoBorder,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.bolt_rounded, color: Colors.indigo.shade700, size: 20),
+                  child: const Icon(Icons.bolt_rounded, color: AppColors.secondaryDark, size: 20),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -777,7 +781,7 @@ class _CampusPulseSection extends ConsumerWidget {
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
-                          color: Colors.indigo.shade900,
+                          color: AppColors.secondaryDark,
                         ),
                       ),
                       pulseAsync.when(
@@ -788,7 +792,7 @@ class _CampusPulseSection extends ConsumerWidget {
                               '🔥 Trending: ${trendingItem.model.title}',
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 12,
-                                color: Colors.indigo.shade700,
+                                color: AppColors.secondary,
                                 fontWeight: FontWeight.w600,
                               ),
                               maxLines: 1,
@@ -799,7 +803,7 @@ class _CampusPulseSection extends ConsumerWidget {
                             'Active: ${stats['listings']} items, ${stats['notes']} notes',
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 12,
-                              color: Colors.indigo.shade700,
+                              color: AppColors.secondary,
                               fontWeight: FontWeight.w500,
                             ),
                           );
@@ -818,12 +822,12 @@ class _CampusPulseSection extends ConsumerWidget {
                     );
                   },
                   style: TextButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.indigo.shade700,
+                    backgroundColor: theme.colorScheme.surface,
+                    foregroundColor: AppColors.secondary,
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: Colors.indigo.shade100),
+                      side: BorderSide(color: AppColors.highlightIndigoBorder),
                     ),
                     textStyle: GoogleFonts.plusJakartaSans(
                       fontSize: 12,
@@ -863,7 +867,7 @@ class _HousingPreviewSection extends ConsumerWidget {
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
-                    color: const Color(0xFF1A1C1E),
+                    color: Theme.of(context).colorScheme.onSurface,
                     letterSpacing: -0.5,
                   ),
                 ),
@@ -1003,7 +1007,7 @@ class _ContinueReadingSection extends ConsumerWidget {
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
-                      color: const Color(0xFF1A1C1E),
+                      color: Theme.of(context).colorScheme.onSurface,
                       letterSpacing: -0.5,
                     ),
                   ),
@@ -1011,9 +1015,9 @@ class _ContinueReadingSection extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFF1F5F9)),
+                      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.04),
@@ -1028,10 +1032,10 @@ class _ContinueReadingSection extends ConsumerWidget {
                           width: 48,
                           height: 48,
                           decoration: BoxDecoration(
-                            color: Colors.indigo.shade50,
+                            color: AppColors.highlightIndigoBg,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(Icons.description_rounded, color: Colors.indigo),
+                          child: const Icon(Icons.description_rounded, color: AppColors.secondary),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -1105,7 +1109,7 @@ class _RecentlyViewedSection extends ConsumerWidget {
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFF1A1C1E),
+                  color: Theme.of(context).colorScheme.onSurface,
                   letterSpacing: -0.5,
                 ),
               ),
@@ -1134,9 +1138,9 @@ class _RecentlyViewedSection extends ConsumerWidget {
                       width: 70,
                       height: 70,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.surface,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFF1F5F9)),
+                        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
                         image: item.imageUrl != null 
                           ? DecorationImage(image: NetworkImage(item.imageUrl!), fit: BoxFit.cover)
                           : null,
@@ -1196,7 +1200,7 @@ class _SavedItemsSection extends ConsumerWidget {
             style: GoogleFonts.plusJakartaSans(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFF1A1C1E),
+              color: Theme.of(context).colorScheme.onSurface,
               letterSpacing: -0.5,
             ),
           ),
@@ -1249,9 +1253,9 @@ class _SavedItemCard extends StatelessWidget {
         width: 140,
         margin: const EdgeInsets.only(right: 16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFF1F5F9)),
+          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.02),
@@ -1276,7 +1280,7 @@ class _SavedItemCard extends StatelessWidget {
                 children: [
                   Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 4),
-                  Text(subtitle, style: TextStyle(fontSize: 11, color: Colors.indigo.shade700, fontWeight: FontWeight.w700)),
+                  Text(subtitle, style: const TextStyle(fontSize: 11, color: AppColors.secondary, fontWeight: FontWeight.w700)),
                 ],
               ),
             ),

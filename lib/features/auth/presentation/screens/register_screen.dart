@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../controllers/auth_controller.dart';
 import '../widgets/auth_button.dart';
 import '../widgets/auth_text_field.dart';
@@ -72,11 +73,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black87),
+        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -86,12 +89,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             const SizedBox(height: 20),
 
             // Hero Section
-            const Text(
+            Text(
               'Create Account',
-              style: TextStyle(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
-                letterSpacing: -0.5,
+                letterSpacing: -1,
+                color: theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
@@ -99,7 +103,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               'Join the campus marketplace',
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.grey.shade600,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
 
@@ -146,7 +150,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
             // Create Account Button
             if (_localLoading)
-              const Center(child: CircularProgressIndicator())
+              Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
             else
               AuthButton(
                 text: 'Create Account',
@@ -185,7 +189,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey.shade500,
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                   height: 1.4,
                 ),
               ),
@@ -197,14 +201,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text('Already have an account?'),
+                Text('Already have an account?', style: TextStyle(color: theme.colorScheme.onSurface)),
                 TextButton(
                   onPressed: _localLoading ? null : () {
                     context.push('/login');
                   },
-                  child: const Text(
+                  child: Text(
                     'Sign In',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                    style: TextStyle(fontWeight: FontWeight.w700, color: theme.colorScheme.primary),
                   ),
                 ),
               ],

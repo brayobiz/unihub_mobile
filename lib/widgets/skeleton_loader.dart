@@ -5,19 +5,24 @@ class SkeletonLoader extends StatelessWidget {
   final double width;
   final double height;
   final double borderRadius;
+  final Color? color;
 
   const SkeletonLoader({
     super.key,
     required this.width,
     required this.height,
     this.borderRadius = 12,
+    this.color,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     return Shimmer.fromColors(
-      baseColor: Colors.grey[300]!,
-      highlightColor: Colors.grey[100]!,
+      baseColor: color ?? (isDark ? Colors.grey[800]! : Colors.grey[300]!),
+      highlightColor: isDark ? Colors.grey[700]! : Colors.grey[100]!,
       child: Container(
         width: width,
         height: height,

@@ -2,20 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import '../../domain/models/note.dart';
 import '../../shared/providers.dart';
 import '../../../auth/shared/providers.dart';
-
-import '../../../../services/download_service.dart';
-import 'package:path/path.dart' as p;
-import 'package:open_filex/open_filex.dart';
-
-import '../../shared/providers.dart';
-import '../../../auth/shared/providers.dart';
 import '../../../../services/history_service.dart';
-
 import '../../../../services/download_service.dart';
 import 'package:path/path.dart' as p;
 import 'package:open_filex/open_filex.dart';
@@ -44,11 +36,12 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final note = widget.note;
     final progressAsync = ref.watch(noteProgressProvider(note.id));
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
@@ -59,24 +52,24 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildHeaderCard(progressAsync.valueOrNull?.progress ?? 0.0),
+                  _buildHeaderCard(context, progressAsync.valueOrNull?.progress ?? 0.0),
                   const SizedBox(height: 32),
-                  _buildSectionTitle('Academic Details'),
+                  _buildSectionTitle(context, 'Academic Details'),
                   const SizedBox(height: 16),
-                  _buildInfoRow('University', note.university, Icons.school_outlined),
-                  _buildInfoRow('Category', note.subjectCategory, Icons.category_outlined),
-                  _buildInfoRow('Type', note.noteType, Icons.label_outline),
-                  _buildInfoRow('Year', 'Year ${note.yearOfStudy}', Icons.calendar_today_outlined),
+                  _buildInfoRow(context, 'University', note.university, Icons.school_outlined),
+                  _buildInfoRow(context, 'Category', note.subjectCategory, Icons.category_outlined),
+                  _buildInfoRow(context, 'Type', note.noteType, Icons.label_outline),
+                  _buildInfoRow(context, 'Year', 'Year ${note.yearOfStudy}', Icons.calendar_today_outlined),
                   
                   const SizedBox(height: 32),
-                  _buildSectionTitle('Contributor Info'),
+                  _buildSectionTitle(context, 'Contributor Info'),
                   const SizedBox(height: 16),
-                  _buildInfoRow('Shared by', note.authorName, Icons.person_outline),
-                  _buildInfoRow('Date', DateFormat('MMM dd, yyyy').format(note.createdAt), Icons.event_available_outlined),
-                  _buildInfoRow('Price', note.price == 0 ? 'FREE' : 'KES ${note.price}', Icons.payments_outlined),
+                  _buildInfoRow(context, 'Shared by', note.authorName, Icons.person_outline),
+                  _buildInfoRow(context, 'Date', DateFormat('MMM dd, yyyy').format(note.createdAt), Icons.event_available_outlined),
+                  _buildInfoRow(context, 'Price', note.price == 0 ? 'FREE' : 'KES ${note.price}', Icons.payments_outlined),
                   
                   const SizedBox(height: 32),
-                  _buildSectionTitle('Topics covered'),
+                  _buildSectionTitle(context, 'Topics covered'),
                   const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
@@ -84,23 +77,23 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
                     children: note.tags.map((tag) => Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF8F9FB),
+                        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade100),
+                        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
                       ),
                       child: Text(
                         '#$tag', 
-                        style: TextStyle(fontSize: 13, color: Colors.indigo.shade700, fontWeight: FontWeight.bold)
+                        style: TextStyle(fontSize: 13, color: theme.colorScheme.primary, fontWeight: FontWeight.bold)
                       ),
                     )).toList(),
                   ),
 
                   const SizedBox(height: 32),
-                  _buildSectionTitle('Description'),
+                  _buildSectionTitle(context, 'Description'),
                   const SizedBox(height: 12),
                   Text(
                     note.description.isEmpty ? 'No additional description provided.' : note.description,
-                    style: const TextStyle(fontSize: 15, height: 1.6, color: Colors.black54),
+                    style: TextStyle(fontSize: 15, height: 1.6, color: theme.colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 100),
                 ],
@@ -114,6 +107,7 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
   }
 
   Widget _buildSliverAppBar(BuildContext context, WidgetRef ref, bool isBookmarked) {
+    final theme = Theme.of(context);
     final note = widget.note;
     final currentUser = ref.watch(firebaseAuthProvider).currentUser;
     final isAuthor = currentUser?.uid == note.authorId;
@@ -123,13 +117,13 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
       floating: false,
       pinned: true,
       elevation: 0,
-      backgroundColor: Colors.white,
-      foregroundColor: Colors.black,
+      backgroundColor: theme.colorScheme.surface,
+      foregroundColor: theme.colorScheme.onSurface,
       title: Text(
         'Study Resource',
-        style: GoogleFonts.plusJakartaSans(
+        style: theme.textTheme.titleMedium?.copyWith(
           fontWeight: FontWeight.bold,
-          color: Colors.black,
+          color: theme.colorScheme.onSurface,
           fontSize: 16,
         ),
       ),
@@ -137,18 +131,18 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
       actions: [
         if (isAuthor) ...[
           IconButton(
-            icon: const Icon(Icons.edit_outlined, color: Colors.indigo),
+            icon: Icon(Icons.edit_outlined, color: theme.colorScheme.primary),
             onPressed: () => context.push('/add-note', extra: note),
           ),
           IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.red),
+            icon: const Icon(Icons.delete_outline, color: AppColors.error),
             onPressed: () => _confirmDeletion(context, ref),
           ),
         ],
         IconButton(
           icon: Icon(
             isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-            color: isBookmarked ? Colors.indigo : Colors.black87,
+            color: isBookmarked ? theme.colorScheme.primary : theme.colorScheme.onSurface,
           ),
           onPressed: () => ref.read(studyControllerProvider).toggleBookmark(note.id),
         ),
@@ -157,9 +151,11 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
   }
 
   void _confirmDeletion(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: theme.colorScheme.surface,
         title: const Text('Delete Resource?'),
         content: const Text('This will permanently remove this study resource from UniHub. This action cannot be undone.'),
         actions: [
@@ -175,27 +171,28 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
                 );
               }
             },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: const Text('Delete', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildHeaderCard(double progress) {
+  Widget _buildHeaderCard(BuildContext context, double progress) {
+    final theme = Theme.of(context);
     final note = widget.note;
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.indigo.shade600, Colors.indigo.shade800],
+          colors: [theme.colorScheme.primary, theme.colorScheme.primary.withOpacity(0.8)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.indigo.withOpacity(0.3),
+            color: theme.colorScheme.primary.withOpacity(0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -223,7 +220,7 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
                   children: [
                     Text(
                       note.title,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: theme.textTheme.titleLarge?.copyWith(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -271,14 +268,16 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _buildSectionTitle(BuildContext context, String title) {
+    final theme = Theme.of(context);
     return Text(
       title, 
-      style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: -0.5)
+      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.5, color: theme.colorScheme.onSurface)
     );
   }
 
-  Widget _buildInfoRow(String label, String value, IconData icon) {
+  Widget _buildInfoRow(BuildContext context, String label, String value, IconData icon) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -286,17 +285,17 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.indigo.shade50,
+              color: theme.colorScheme.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, size: 18, color: Colors.indigo),
+            child: Icon(icon, size: 18, color: theme.colorScheme.primary),
           ),
           const SizedBox(width: 16),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w500)),
-              Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              Text(label, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w500)),
+              Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface)),
             ],
           ),
         ],
@@ -305,10 +304,11 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
   }
 
   Widget _buildBottomBar(BuildContext context, WidgetRef ref, double progress) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -5))],
       ),
       child: SafeArea(
@@ -323,7 +323,7 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)
             ),
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.indigo,
+              backgroundColor: theme.colorScheme.primary,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               elevation: 0,
             ),

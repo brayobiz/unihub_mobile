@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import 'package:unihub_mobile/features/marketplace/domain/models/review.dart';
@@ -25,12 +26,15 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
     final sellerAsync = ref.watch(otherUserProvider(widget.userId));
     final listingsAsync = ref.watch(sellerListingsProvider(widget.userId));
     final reviewsAsync = ref.watch(sellerReviewsProvider(widget.userId));
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: colorScheme.surface,
       body: sellerAsync.when(
         data: (seller) {
           if (seller == null) {
@@ -138,6 +142,9 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
   }
 
   Widget _buildAvatar(AppUser seller) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
@@ -155,12 +162,12 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
         children: [
           CircleAvatar(
             radius: avatarRadius,
-            backgroundColor: const Color(0xFFF1F5F9),
+            backgroundColor: colorScheme.surfaceVariant,
             backgroundImage: seller.photoUrl != null ? CachedNetworkImageProvider(seller.photoUrl!) : null,
             child: seller.photoUrl == null
                 ? Text(
                     seller.fullName.isNotEmpty ? seller.fullName[0].toUpperCase() : 'U',
-                    style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: Color(0xFF1677F2)),
+                    style: TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: colorScheme.primary),
                   )
                 : null,
           ),
@@ -171,7 +178,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
               child: Container(
                 padding: const EdgeInsets.all(2),
                 decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                child: const Icon(Icons.verified, color: Color(0xFF10B981), size: 24),
+                child: const Icon(Icons.verified, color: AppColors.success, size: 24),
               ),
             ),
           if (seller.isOnline == true)
@@ -182,7 +189,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                 width: 20,
                 height: 20,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981),
+                  color: AppColors.success,
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white, width: 3),
                 ),
@@ -194,6 +201,8 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
   }
 
   Widget _buildIdentityInfo(BuildContext context, AppUser seller) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final isOnline = seller.isOnline == true;
     final lastSeen = seller.lastSeen;
 
@@ -237,7 +246,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: isOnline ? Colors.green.shade400 : Colors.white24,
+                color: isOnline ? AppColors.success : Colors.white24,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -252,9 +261,9 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              _buildSmallInfoPill(Icons.school_rounded, seller.university ?? 'Uni'),
+              _buildSmallInfoPill(context, Icons.school_rounded, seller.university ?? 'Uni'),
               const SizedBox(width: 8),
-              _buildSmallInfoPill(Icons.calendar_today_rounded, seller.yearOfStudy ?? 'Year'),
+              _buildSmallInfoPill(context, Icons.calendar_today_rounded, seller.yearOfStudy ?? 'Year'),
             ],
           ),
         ),
@@ -270,21 +279,22 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
     );
   }
 
-  Widget _buildSmallInfoPill(IconData icon, String label) {
+  Widget _buildSmallInfoPill(BuildContext context, IconData icon, String label) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
         borderRadius: BorderRadius.circular(100),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: const Color(0xFF64748B)),
+          Icon(icon, size: 12, color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF475569), fontWeight: FontWeight.w700),
+            style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface, fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -295,18 +305,18 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF10B981).withOpacity(0.08),
+        color: AppColors.success.withOpacity(0.08),
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.1)),
+        border: Border.all(color: AppColors.success.withOpacity(0.1)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.shield_rounded, size: 14, color: Color(0xFF10B981)),
+          const Icon(Icons.shield_rounded, size: 14, color: AppColors.success),
           const SizedBox(width: 6),
           Text(
             'Trust Score $score%',
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF059669)),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.success),
           ),
         ],
       ),
@@ -317,18 +327,18 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFF59E0B).withOpacity(0.08),
+        color: AppColors.warning.withOpacity(0.08),
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.1)),
+        border: Border.all(color: AppColors.warning.withOpacity(0.1)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.star_rounded, size: 14, color: Color(0xFFF59E0B)),
+          const Icon(Icons.star_rounded, size: 14, color: AppColors.warning),
           const SizedBox(width: 6),
           Text(
             '${rating.toStringAsFixed(1)} ($count)',
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFFD97706)),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.warning),
           ),
         ],
       ),
@@ -336,11 +346,13 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
   }
 
   Widget _buildStatsSection(AppUser seller) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
@@ -367,18 +379,19 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
   }
 
   Widget _buildStatItem(IconData icon, String value, String label) {
+    final theme = Theme.of(context);
     return Expanded(
       child: Column(
         children: [
-          Icon(icon, size: 22, color: const Color(0xFF6366F1)),
+          Icon(icon, size: 22, color: theme.colorScheme.primary),
           const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface),
           ),
           Text(
             label,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+            style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -386,16 +399,18 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
   }
 
   Widget _buildVerticalDivider() {
-    return VerticalDivider(color: Colors.grey.withOpacity(0.1), thickness: 1, indent: 8, endIndent: 8);
+    return VerticalDivider(color: Theme.of(context).colorScheme.outlineVariant, thickness: 1, indent: 8, endIndent: 8);
   }
 
   Widget _buildSectionCard(String title, Widget content, {IconData? icon, Widget? trailing}) {
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.02),
@@ -413,12 +428,12 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
               Row(
                 children: [
                   if (icon != null) ...[
-                    Icon(icon, size: 20, color: const Color(0xFF6366F1)),
+                    Icon(icon, size: 20, color: theme.colorScheme.primary),
                     const SizedBox(width: 12),
                   ],
                   Text(
                     title,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF1E293B), letterSpacing: -0.5),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface, letterSpacing: -0.5),
                   ),
                 ],
               ),
@@ -457,15 +472,16 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
   }
 
   Widget _buildVerificationRow(IconData icon, String title, String status, bool isVerified) {
+    final theme = Theme.of(context);
     return Row(
       children: [
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: (isVerified ? const Color(0xFF10B981) : Colors.grey).withOpacity(0.1),
+            color: (isVerified ? AppColors.success : theme.colorScheme.outlineVariant).withOpacity(0.1),
             shape: BoxShape.circle,
           ),
-          child: Icon(icon, color: isVerified ? const Color(0xFF10B981) : Colors.grey, size: 18),
+          child: Icon(icon, color: isVerified ? AppColors.success : theme.colorScheme.onSurfaceVariant, size: 18),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -473,11 +489,11 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-              Text(status, style: TextStyle(color: isVerified ? const Color(0xFF059669) : Colors.grey.shade600, fontSize: 12, fontWeight: FontWeight.w500)),
+              Text(status, style: TextStyle(color: isVerified ? AppColors.success : theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w500)),
             ],
           ),
         ),
-        if (isVerified) const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 18),
+        if (isVerified) const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 18),
       ],
     );
   }
@@ -496,22 +512,23 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
   }
 
   Widget _buildInfoItem(IconData icon, String label, String value) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: const Color(0xFF6366F1).withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
-            child: Icon(icon, size: 18, color: const Color(0xFF6366F1)),
+            decoration: BoxDecoration(color: theme.colorScheme.primary.withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, size: 18, color: theme.colorScheme.primary),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label.toUpperCase(), style: const TextStyle(fontSize: 9, color: Color(0xFF94A3B8), fontWeight: FontWeight.w800, letterSpacing: 1.0)),
-                Text(value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Color(0xFF1E293B))),
+                Text(label.toUpperCase(), style: TextStyle(fontSize: 9, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w800, letterSpacing: 1.0)),
+                Text(value, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: theme.colorScheme.onSurface)),
               ],
             ),
           ),
@@ -552,11 +569,12 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
   }
 
   Widget _buildListingCard(BuildContext context, Listing listing) {
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: () => context.push('/listing-detail', extra: listing),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
+          color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -578,7 +596,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(listing.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                  Text('KES ${NumberFormat('#,###').format(listing.price)}', style: const TextStyle(color: Color(0xFF6366F1), fontWeight: FontWeight.w900, fontSize: 13)),
+                  Text('KES ${NumberFormat('#,###').format(listing.price)}', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w900, fontSize: 13)),
                 ],
               ),
             ),
@@ -605,6 +623,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
   }
 
   Widget _buildReviewItem(Review review) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -612,8 +631,8 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundColor: const Color(0xFF6366F1).withOpacity(0.1),
-            child: Text(review.reviewerName[0].toUpperCase(), style: const TextStyle(color: Color(0xFF6366F1), fontWeight: FontWeight.bold, fontSize: 12)),
+            backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+            child: Text(review.reviewerName[0].toUpperCase(), style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 12)),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -624,13 +643,13 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(review.reviewerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    Row(children: List.generate(5, (index) => Icon(Icons.star_rounded, size: 12, color: index < review.rating ? const Color(0xFFF59E0B) : Colors.grey[300]))),
+                    Row(children: List.generate(5, (index) => Icon(Icons.star_rounded, size: 12, color: index < review.rating ? AppColors.warning : theme.colorScheme.outlineVariant))),
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(review.comment, style: const TextStyle(fontSize: 13, color: Color(0xFF475569))),
+                Text(review.comment, style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant)),
                 const SizedBox(height: 4),
-                Text(DateFormat('MMM dd, yyyy').format(review.createdAt), style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                Text(DateFormat('MMM dd, yyyy').format(review.createdAt), style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7))),
               ],
             ),
           ),
@@ -640,10 +659,11 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
   }
 
   Widget _buildStickyActionBar(BuildContext context, AppUser seller) {
+    final theme = Theme.of(context);
     return Container(
       padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(context).padding.bottom + 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -674,15 +694,15 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
               },
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                side: const BorderSide(color: Color(0xFF6366F1)),
+                side: BorderSide(color: theme.colorScheme.primary),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.chat_bubble_outline, size: 20, color: Color(0xFF6366F1)),
-                  SizedBox(width: 8),
-                  Text('In-App Chat', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6366F1))),
+                  Icon(Icons.chat_bubble_outline, size: 20, color: theme.colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Text('In-App Chat', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
                 ],
               ),
             ),
@@ -747,6 +767,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
   }
 
   void _showAllListings(BuildContext context, String name, List<Listing> listings) {
+    final theme = Theme.of(context);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -756,11 +777,11 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
         maxChildSize: 0.95,
         minChildSize: 0.5,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(color: Color(0xFFF8FAFC), borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+          decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(30))),
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: theme.colorScheme.outlineVariant, borderRadius: BorderRadius.circular(2))),
               const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -813,8 +834,9 @@ class _ExpandableBioState extends State<_ExpandableBio> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     if (widget.bio == null || widget.bio!.trim().isEmpty) {
-      return const Text('This seller has not provided a bio yet.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 15, fontStyle: FontStyle.italic, height: 1.6));
+      return Text('This seller has not provided a bio yet.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 15, fontStyle: FontStyle.italic, height: 1.6));
     }
     final bioText = widget.bio!;
     const int maxChars = 160;
@@ -827,14 +849,14 @@ class _ExpandableBioState extends State<_ExpandableBio> {
           curve: Curves.easeInOut,
           child: Text(
             canExpand && !isExpanded ? '${bioText.substring(0, maxChars)}...' : bioText,
-            style: const TextStyle(fontSize: 15, color: Color(0xFF475569), height: 1.6, fontWeight: FontWeight.w500),
+            style: TextStyle(fontSize: 15, color: theme.colorScheme.onSurface, height: 1.6, fontWeight: FontWeight.w500),
           ),
         ),
         if (canExpand) ...[
           const SizedBox(height: 8),
           InkWell(
             onTap: () => setState(() => isExpanded = !isExpanded),
-            child: Text(isExpanded ? 'Show Less' : 'Read More', style: const TextStyle(color: Color(0xFF1677F2), fontWeight: FontWeight.w800, fontSize: 14)),
+            child: Text(isExpanded ? 'Show Less' : 'Read More', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w800, fontSize: 14)),
           ),
         ],
       ],

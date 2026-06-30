@@ -10,15 +10,16 @@ class SavedHousingScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final savedListingsAsync = ref.watch(savedHousingProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text('Saved Housing', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
+        title: Text('Saved Housing', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
-        foregroundColor: Colors.black,
+        foregroundColor: theme.colorScheme.onSurface,
       ),
       body: savedListingsAsync.when(
         data: (listings) => listings.isEmpty
@@ -38,24 +39,25 @@ class SavedHousingScreen extends ConsumerWidget {
   }
 
   Widget _buildEmptyState(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
             padding: const EdgeInsets.all(32),
-            decoration: const BoxDecoration(color: Color(0xFFF1F5F9), shape: BoxShape.circle),
-            child: const Icon(Icons.favorite_rounded, size: 64, color: Color(0xFF94A3B8)),
+            decoration: BoxDecoration(color: theme.colorScheme.surfaceVariant.withOpacity(0.3), shape: BoxShape.circle),
+            child: Icon(Icons.favorite_rounded, size: 64, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
           ),
           const SizedBox(height: 24),
-          const Text('Your wishlist is empty', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: Color(0xFF1A1C1E))),
+          Text('Your wishlist is empty', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: theme.colorScheme.onSurface)),
           const SizedBox(height: 8),
-          const Text('Save properties to keep track of them here', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+          Text('Save properties to keep track of them here', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500)),
           const SizedBox(height: 32),
           FilledButton(
             onPressed: () => context.pop(),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF1677F2),
+              backgroundColor: theme.colorScheme.primary,
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),

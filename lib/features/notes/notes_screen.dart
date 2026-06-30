@@ -33,31 +33,32 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FB),
+      backgroundColor: theme.colorScheme.surface,
       drawer: const AppDrawer(),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         leading: Builder(
           builder: (context) => IconButton(
-            icon: const Icon(Icons.menu_rounded, color: Colors.black),
+            icon: Icon(Icons.menu_rounded, color: theme.colorScheme.onSurface),
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
         title: Text(
           'UniHub Study',
-          style: GoogleFonts.plusJakartaSans(
-            color: Colors.black,
+          style: theme.textTheme.titleLarge?.copyWith(
+            color: theme.colorScheme.onSurface,
             fontWeight: FontWeight.bold,
           ),
         ),
         bottom: TabBar(
           controller: _tabController,
-          labelColor: Colors.indigo,
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: Colors.indigo,
-          labelStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14),
+          labelColor: theme.colorScheme.primary,
+          unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
+          indicatorColor: theme.colorScheme.primary,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
           tabs: const [
             Tab(text: 'Discover'),
             Tab(text: 'Library'),
@@ -66,16 +67,16 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
         actions: [
           const NotificationBadge(module: 'notes'),
           IconButton(
-            icon: const Icon(Icons.tune, color: Colors.black87),
+            icon: Icon(Icons.tune, color: theme.colorScheme.onSurface),
             onPressed: () => _showFilterSheet(),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/add-note'),
-        backgroundColor: Colors.indigo,
-        label: const Text('Share Notes', style: TextStyle(fontWeight: FontWeight.bold)),
-        icon: const Icon(Icons.add),
+        backgroundColor: theme.colorScheme.primary,
+        label: const Text('Share Notes', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        icon: const Icon(Icons.add, color: Colors.white),
       ),
       body: TabBarView(
         controller: _tabController,
@@ -102,6 +103,7 @@ class NoteFilterSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final selectedType = ref.watch(notesTypeFilterProvider);
     final selectedYear = ref.watch(notesYearFilterProvider);
     final selectedUni = ref.watch(notesUniversityFilterProvider);
@@ -116,6 +118,7 @@ class NoteFilterSheet extends ConsumerWidget {
       maxChildSize: 0.95,
       expand: false,
       builder: (context, scrollController) => Container(
+        decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(30))),
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
         child: Column(
           children: [
@@ -123,7 +126,7 @@ class NoteFilterSheet extends ConsumerWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: theme.colorScheme.outlineVariant,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -131,7 +134,7 @@ class NoteFilterSheet extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Advanced Filters', style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.bold)),
+                Text('Advanced Filters', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
                 TextButton(
                   onPressed: () {
                     ref.read(notesTypeFilterProvider.notifier).state = 'All';
@@ -147,12 +150,12 @@ class NoteFilterSheet extends ConsumerWidget {
                 controller: scrollController,
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 children: [
-                  const Text('Institution', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text('Institution', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
                   const SizedBox(height: 12),
-                  _buildUniFilter(ref, selectedUni, user?.university),
+                  _buildUniFilter(context, ref, selectedUni, user?.university),
                   
                   const SizedBox(height: 32),
-                  const Text('Note Type', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text('Note Type', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
                   const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
@@ -160,13 +163,14 @@ class NoteFilterSheet extends ConsumerWidget {
                       label: Text(t),
                       selected: selectedType == t,
                       onSelected: (val) => ref.read(notesTypeFilterProvider.notifier).state = t,
-                      selectedColor: Colors.indigo,
-                      labelStyle: TextStyle(color: selectedType == t ? Colors.white : Colors.black87),
+                      selectedColor: theme.colorScheme.primary,
+                      checkmarkColor: Colors.white,
+                      labelStyle: TextStyle(color: selectedType == t ? Colors.white : theme.colorScheme.onSurface),
                     )).toList(),
                   ),
                   
                   const SizedBox(height: 32),
-                  const Text('Year of Study', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text('Year of Study', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
                   const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
@@ -174,8 +178,9 @@ class NoteFilterSheet extends ConsumerWidget {
                       label: Text(y == 'All' ? 'All Years' : 'Year $y'),
                       selected: selectedYear == y,
                       onSelected: (val) => ref.read(notesYearFilterProvider.notifier).state = y,
-                      selectedColor: Colors.indigo,
-                      labelStyle: TextStyle(color: selectedYear == y ? Colors.white : Colors.black87),
+                      selectedColor: theme.colorScheme.primary,
+                      checkmarkColor: Colors.white,
+                      labelStyle: TextStyle(color: selectedYear == y ? Colors.white : theme.colorScheme.onSurface),
                     )).toList(),
                   ),
                   
@@ -191,10 +196,10 @@ class NoteFilterSheet extends ConsumerWidget {
                 child: FilledButton(
                   onPressed: () => Navigator.pop(context),
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.indigo,
+                    backgroundColor: theme.colorScheme.primary,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                  child: const Text('Apply Filters', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text('Apply Filters', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                 ),
               ),
             ),
@@ -204,22 +209,25 @@ class NoteFilterSheet extends ConsumerWidget {
     );
   }
 
-  Widget _buildUniFilter(WidgetRef ref, String? selected, String? userUni) {
+  Widget _buildUniFilter(BuildContext context, WidgetRef ref, String? selected, String? userUni) {
+    final theme = Theme.of(context);
     return Column(
       children: [
         RadioListTile<String?>(
-          title: const Text('All Institutions'),
+          title: Text('All Institutions', style: TextStyle(color: theme.colorScheme.onSurface)),
           value: null,
           groupValue: selected,
+          activeColor: theme.colorScheme.primary,
           onChanged: (val) => ref.read(notesUniversityFilterProvider.notifier).state = val,
           contentPadding: EdgeInsets.zero,
           dense: true,
         ),
         if (userUni != null)
           RadioListTile<String?>(
-            title: Text('My University ($userUni)'),
+            title: Text('My University ($userUni)', style: TextStyle(color: theme.colorScheme.onSurface)),
             value: userUni,
             groupValue: selected,
+            activeColor: theme.colorScheme.primary,
             onChanged: (val) => ref.read(notesUniversityFilterProvider.notifier).state = val,
             contentPadding: EdgeInsets.zero,
             dense: true,

@@ -110,14 +110,16 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black87),
+        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: Icon(Icons.logout, color: theme.colorScheme.primary),
             onPressed: () => ref.read(authControllerProvider.notifier).signOut(),
           )
         ],
@@ -128,12 +130,13 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 20),
-            const Text(
+            Text(
               'Complete Your Profile',
-              style: TextStyle(
+              style: theme.textTheme.displaySmall?.copyWith(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
                 letterSpacing: -0.6,
+                color: theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
@@ -141,7 +144,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
               'Help us personalize your campus experience',
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.grey.shade600,
+                color: theme.colorScheme.onSurfaceVariant,
                 height: 1.4,
               ),
             ),
@@ -155,10 +158,10 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                     onTap: _localLoading ? null : _pickImage,
                     child: CircleAvatar(
                       radius: 58,
-                      backgroundColor: Colors.grey.shade200,
+                      backgroundColor: theme.colorScheme.surfaceVariant,
                       backgroundImage: _selectedImage != null ? FileImage(_selectedImage!) : null,
                       child: _selectedImage == null 
-                          ? const Icon(Icons.person, size: 60, color: Colors.grey) 
+                          ? Icon(Icons.person, size: 60, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)) 
                           : null,
                     ),
                   ),
@@ -179,7 +182,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).primaryColor,
+                          color: theme.colorScheme.primary,
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.camera_alt, size: 20, color: Colors.white),
@@ -195,7 +198,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
                     'Uploading: ${(_uploadProgress * 100).toInt()}%',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -228,13 +231,14 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
               width: double.infinity,
               height: 56,
               child: _localLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
                   : FilledButton(
                       onPressed: _onContinue,
                       style: FilledButton.styleFrom(
+                        backgroundColor: theme.colorScheme.primary,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: const Text('Continue', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                      child: const Text('Continue', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Colors.white)),
                     ),
             ),
             const SizedBox(height: 40),
@@ -242,7 +246,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
               child: Text(
                 'This information helps tailor marketplace,\nhousing, and community recommendations.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12.5, color: Colors.grey.shade500, height: 1.5),
+                style: TextStyle(fontSize: 12.5, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), height: 1.5),
               ),
             ),
           ],

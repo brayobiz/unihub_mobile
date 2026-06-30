@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
@@ -9,7 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
-
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import '../../../auth/shared/providers.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/message.dart';
@@ -191,6 +192,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final messagesAsync = ref.watch(messagesStreamProvider(widget.conversationId));
     final conversationAsync = ref.watch(conversationProvider(widget.conversationId));
     final currentUser = ref.watch(authStateProvider).valueOrNull;
@@ -224,25 +226,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final effectiveContext = widget.chatContext ?? conversation?.context;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FB),
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0.5,
         centerTitle: false,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.colorScheme.onSurface, size: 20),
           onPressed: () => context.pop(),
         ),
         title: Row(
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundColor: Colors.indigo.shade50,
+              backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
               backgroundImage: otherUser?.photoUrl != null ? NetworkImage(otherUser!.photoUrl!) : null,
               child: otherUser?.photoUrl == null 
                 ? Text(
                     widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : '?',
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.indigo),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
                   )
                 : null,
             ),
@@ -256,13 +258,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       Flexible(
                         child: Text(
                           widget.otherUserName,
-                          style: GoogleFonts.plusJakartaSans(fontSize: 15, color: Colors.black, fontWeight: FontWeight.bold),
+                          style: theme.textTheme.titleSmall?.copyWith(fontSize: 15, color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (otherUser?.isVerified == true) ...[
                         const SizedBox(width: 4),
-                        const Icon(Icons.verified, color: Color(0xFF6366F1), size: 14),
+                        Icon(Icons.verified, color: theme.colorScheme.primary, size: 14),
                       ],
                     ],
                   ),
@@ -270,9 +272,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     isOtherTyping 
                         ? 'typing...' 
                         : (isOnline ? 'Online' : (lastSeen != null ? 'Last seen ${_formatLastSeen(lastSeen)}' : 'Offline')),
-                    style: GoogleFonts.plusJakartaSans(
+                    style: TextStyle(
                       fontSize: 11, 
-                      color: isOtherTyping || isOnline ? Colors.green : Colors.grey,
+                      color: isOtherTyping || isOnline ? AppColors.success : theme.colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w600
                     ),
                   ),
@@ -283,7 +285,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.more_vert_rounded, color: Colors.black),
+            icon: Icon(Icons.more_vert_rounded, color: theme.colorScheme.onSurface),
             onPressed: () => _showConversationMenu(),
           ),
         ],
@@ -291,7 +293,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       body: Column(
         children: [
           if (effectiveContext != null && effectiveContext.type != 'support') 
-            _buildContextBanner(effectiveContext),
+            _buildContextBanner(context, effectiveContext),
           
           if (conversation?.expiresAt != null)
             _buildExpirationBanner(conversation!.expiresAt!),
@@ -300,7 +302,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             child: messagesAsync.when(
               data: (messages) {
                 if (messages.isEmpty) {
-                  return _buildEmptyState();
+                  return _buildEmptyState(context);
                 }
                 return ListView.builder(
                   controller: _scrollController,
@@ -314,86 +316,88 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     
                     return GestureDetector(
                       onLongPress: () => _onLongPressMessage(message, isMe),
-                      child: _buildMessageBubble(message, isMe, !isSameSenderAsNext),
+                      child: _buildMessageBubble(context, message, isMe, !isSameSenderAsNext),
                     );
                   },
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator(color: Colors.indigo)),
+              loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
               error: (err, stack) => Center(child: Text('Error: $err')),
             ),
           ),
           
           if (_isUploading)
-            const Padding(
-              padding: EdgeInsets.all(8.0),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                  SizedBox(width: 8),
-                  Text('Uploading attachment...', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.primary)),
+                  const SizedBox(width: 8),
+                  Text('Uploading attachment...', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
                 ],
               ),
             ),
 
-          _buildQuickReplies(effectiveContext?.type),
+          _buildQuickReplies(context, effectiveContext?.type),
           
-          _buildInputArea(),
+          _buildInputArea(context),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.chat_bubble_outline_rounded, size: 48, color: Colors.grey.shade300),
+          Icon(Icons.chat_bubble_outline_rounded, size: 48, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.2)),
           const SizedBox(height: 16),
           Text(
             'Say hello to ${widget.otherUserName}!',
-            style: GoogleFonts.plusJakartaSans(color: Colors.grey.shade600, fontSize: 14),
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildContextBanner(ChatContext context) {
+  Widget _buildContextBanner(BuildContext context, ChatContext chatContext) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white, 
-        border: Border(bottom: BorderSide(color: Colors.grey.shade200))
+        color: theme.colorScheme.surface, 
+        border: Border(bottom: BorderSide(color: theme.colorScheme.outlineVariant.withOpacity(0.5)))
       ),
       child: Row(
         children: [
-          if (context.thumbnail != null)
+          if (chatContext.thumbnail != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
-              child: OptimizedImage(imageUrl: context.thumbnail!, width: 40, height: 40, fit: BoxFit.cover),
+              child: OptimizedImage(imageUrl: chatContext.thumbnail!, width: 40, height: 40, fit: BoxFit.cover),
             )
           else
             Container(
               width: 40, height: 40, 
-              decoration: BoxDecoration(color: Colors.indigo.shade50, borderRadius: BorderRadius.circular(8)), 
-              child: Icon(_getContextIcon(context.type), color: Colors.indigo, size: 20)
+              decoration: BoxDecoration(color: theme.colorScheme.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(8)), 
+              child: Icon(_getContextIcon(chatContext.type), color: theme.colorScheme.primary, size: 20)
             ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start, 
               children: [
-                Text(context.type.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
-                Text(context.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(chatContext.type.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant)),
+                Text(chatContext.title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: theme.colorScheme.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
               ]
             )
           ),
           TextButton(
-            onPressed: () => _navigateToContext(context), 
-            child: const Text('View', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))
+            onPressed: () => _navigateToContext(chatContext), 
+            child: Text('View', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.primary))
           ),
         ],
       ),
@@ -448,17 +452,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: Colors.amber.shade50,
+      color: AppColors.warning.withOpacity(0.1),
       child: Row(
         children: [
-          Icon(Icons.timer_outlined, size: 16, color: Colors.amber.shade900),
+          const Icon(Icons.timer_outlined, size: 16, color: AppColors.warning),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               'This conversation expires in ${remaining.inHours}h due to inactivity. Send a message to keep it active.',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.amber.shade900,
+                color: AppColors.warning.withOpacity(0.9),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -468,34 +472,36 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Widget _buildInputArea() {
+  Widget _buildInputArea(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
         boxShadow: [
-          BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -2))
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -2))
         ]
       ),
       child: SafeArea(
         child: Row(
           children: [
             IconButton(
-              icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF6366F1), size: 28),
+              icon: Icon(Icons.add_circle_outline_rounded, color: theme.colorScheme.primary, size: 28),
               onPressed: () => _showAttachmentMenu(),
             ),
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
+                  color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
                 ),
                 child: TextField(
                   controller: _messageController,
-                  style: GoogleFonts.plusJakartaSans(fontSize: 14),
+                  style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurface),
                   decoration: InputDecoration(
                     hintText: 'Type a message...',
-                    hintStyle: GoogleFonts.plusJakartaSans(color: Colors.grey.shade500, fontSize: 14),
+                    hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5), fontSize: 14),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   ),
@@ -507,8 +513,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               onTap: () => _sendMessage(),
               child: Container(
                 padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF6366F1),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
@@ -521,15 +527,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _showAttachmentMenu() {
+    final theme = Theme.of(context);
     showModalBottomSheet(
       context: context,
+      backgroundColor: theme.colorScheme.surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.image_outlined, color: Colors.indigo),
+              leading: Icon(Icons.image_outlined, color: theme.colorScheme.primary),
               title: const Text('Send Photo'),
               onTap: () {
                 Navigator.pop(context);
@@ -537,7 +545,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.description_outlined, color: Colors.indigo),
+              leading: Icon(Icons.description_outlined, color: theme.colorScheme.primary),
               title: const Text('Send Document'),
               onTap: () {
                 Navigator.pop(context);
@@ -551,15 +559,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _showConversationMenu() {
+    final theme = Theme.of(context);
     showModalBottomSheet(
       context: context,
+      backgroundColor: theme.colorScheme.surface,
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.delete_outline_rounded, color: Colors.red),
-              title: const Text('Delete Conversation', style: TextStyle(color: Colors.red)),
+              leading: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+              title: const Text('Delete Conversation', style: TextStyle(color: AppColors.error)),
               onTap: () {
                 ref.read(chatRepositoryProvider).deleteConversation(widget.conversationId);
                 context.pop(); // pop sheet
@@ -572,7 +582,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Widget _buildMessageBubble(Message message, bool isMe, bool showTail) {
+  Widget _buildMessageBubble(BuildContext context, Message message, bool isMe, bool showTail) {
+    final theme = Theme.of(context);
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -580,13 +591,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: isMe ? const Color(0xFF6366F1) : Colors.white,
+          color: isMe ? theme.colorScheme.primary : theme.colorScheme.surfaceVariant.withOpacity(0.3),
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
             bottomLeft: Radius.circular(isMe ? 16 : (showTail ? 4 : 16)),
             bottomRight: Radius.circular(isMe ? (showTail ? 4 : 16) : 16),
           ),
+          border: isMe ? null : Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
           boxShadow: [
             if (!isMe)
               BoxShadow(
@@ -599,7 +611,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         child: Column(
           crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
-            _buildMessageContent(message, isMe),
+            _buildMessageContent(context, message, isMe),
             const SizedBox(height: 4),
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -609,7 +621,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   style: TextStyle(
                     fontSize: 9, 
                     fontWeight: FontWeight.w500,
-                    color: isMe ? Colors.white70 : Colors.grey.shade500,
+                    color: isMe ? Colors.white.withOpacity(0.7) : theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
                   ),
                 ),
                 if (isMe) ...[
@@ -645,7 +657,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return Icon(icon, size: 12, color: color);
   }
 
-  Widget _buildMessageContent(Message message, bool isMe) {
+  Widget _buildMessageContent(BuildContext context, Message message, bool isMe) {
+    final theme = Theme.of(context);
     switch (message.type) {
       case MessageType.image:
         return GestureDetector(
@@ -665,12 +678,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.description_rounded, color: isMe ? Colors.white : Colors.indigo),
+              Icon(Icons.description_rounded, color: isMe ? Colors.white : theme.colorScheme.primary),
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
                   'Document',
-                  style: TextStyle(color: isMe ? Colors.white : Colors.black87, decoration: TextDecoration.underline),
+                  style: TextStyle(color: isMe ? Colors.white : theme.colorScheme.onSurface, decoration: TextDecoration.underline),
                 ),
               ),
             ],
@@ -679,8 +692,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       default:
         return Text(
           message.content, 
-          style: GoogleFonts.plusJakartaSans(
-            color: isMe ? Colors.white : const Color(0xFF1E293B), 
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: isMe ? Colors.white : theme.colorScheme.onSurface, 
             fontSize: 14,
             height: 1.4,
           ),
@@ -706,7 +719,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return DateFormat('MMM d').format(lastSeen);
   }
 
-  Widget _buildQuickReplies(String? contextType) {
+  Widget _buildQuickReplies(BuildContext context, String? contextType) {
+    final theme = Theme.of(context);
     List<String> replies;
     if (contextType == 'marketplace') {
       replies = ["Is this available?", "Last price?", "Can we meet today?"];
@@ -716,8 +730,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       replies = ["Hello!", "I have a question", "Thank you"];
     }
 
-    return SizedBox(
+    return Container(
       height: 40,
+      color: theme.colorScheme.surface,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -727,8 +742,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           child: ActionChip(
             label: Text(replies[index], style: const TextStyle(fontSize: 12)),
             onPressed: () => _sendMessage(replies[index]),
-            backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: Colors.grey.shade200)),
+            backgroundColor: theme.colorScheme.surface,
+            labelStyle: TextStyle(color: theme.colorScheme.onSurface),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: theme.colorScheme.outlineVariant.withOpacity(0.5))),
           ),
         ),
       ),

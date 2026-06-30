@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/dashboard/controllers/smart_feed_controller.dart';
 import 'package:unihub_mobile/widgets/feed/feed_type.dart';
 import 'package:go_router/go_router.dart';
@@ -11,20 +12,21 @@ class CampusPulseScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final pulseAsync = ref.watch(campusPulseProvider);
     final trendingAsync = ref.watch(trendingFeedProvider);
     final recentAsync = ref.watch(recentActivityProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FB),
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         title: Text(
           'Campus Pulse',
-          style: GoogleFonts.plusJakartaSans(
+          style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.bold,
-            color: Colors.black,
+            color: theme.colorScheme.onSurface,
           ),
         ),
         centerTitle: true,
@@ -39,13 +41,13 @@ class CampusPulseScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildStatsGrid(pulseAsync),
+              _buildStatsGrid(context, pulseAsync),
               const SizedBox(height: 32),
-              _sectionHeader('Trending on Campus'),
+              _sectionHeader(context, 'Trending on Campus'),
               const SizedBox(height: 16),
               _buildTrendingList(context, trendingAsync),
               const SizedBox(height: 32),
-              _sectionHeader('Live Activity Feed'),
+              _sectionHeader(context, 'Live Activity Feed'),
               const SizedBox(height: 16),
               _buildRecentActivity(context, recentAsync),
               const SizedBox(height: 40),
@@ -56,19 +58,20 @@ class CampusPulseScreen extends ConsumerWidget {
     );
   }
 
-  Widget _sectionHeader(String title) {
+  Widget _sectionHeader(BuildContext context, String title) {
+    final theme = Theme.of(context);
     return Text(
       title,
-      style: GoogleFonts.plusJakartaSans(
+      style: theme.textTheme.titleMedium?.copyWith(
         fontSize: 18,
         fontWeight: FontWeight.w800,
-        color: const Color(0xFF1A1C1E),
+        color: theme.colorScheme.onSurface,
         letterSpacing: -0.5,
       ),
     );
   }
 
-  Widget _buildStatsGrid(AsyncValue<Map<String, int>> pulseAsync) {
+  Widget _buildStatsGrid(BuildContext context, AsyncValue<Map<String, int>> pulseAsync) {
     return pulseAsync.when(
       data: (stats) => GridView.count(
         shrinkWrap: true,
@@ -78,10 +81,10 @@ class CampusPulseScreen extends ConsumerWidget {
         crossAxisSpacing: 16,
         childAspectRatio: 1.5,
         children: [
-          _StatCard(label: 'Marketplace', value: stats['listings'] ?? 0, icon: Icons.shopping_bag_outlined, color: Colors.orange),
-          _StatCard(label: 'Study Notes', value: stats['notes'] ?? 0, icon: Icons.description_outlined, color: Colors.green),
-          _StatCard(label: 'Campus Gigs', value: stats['gigs'] ?? 0, icon: Icons.work_outline, color: Colors.purple),
-          _StatCard(label: 'Housing', value: stats['housing'] ?? 0, icon: Icons.home_work_outlined, color: Colors.blue),
+          _StatCard(label: 'Marketplace', value: stats['listings'] ?? 0, icon: Icons.shopping_bag_outlined, color: AppColors.marketplace),
+          _StatCard(label: 'Study Notes', value: stats['notes'] ?? 0, icon: Icons.description_outlined, color: AppColors.notes),
+          _StatCard(label: 'Campus Gigs', value: stats['gigs'] ?? 0, icon: Icons.work_outline, color: AppColors.gigs),
+          _StatCard(label: 'Housing', value: stats['housing'] ?? 0, icon: Icons.home_work_outlined, color: AppColors.housing),
         ],
       ),
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -138,12 +141,13 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -153,18 +157,18 @@ class _StatCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value.toString(),
-            style: GoogleFonts.plusJakartaSans(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFF1A1C1E),
+              color: theme.colorScheme.onSurface,
             ),
           ),
           Text(
             label,
-            style: GoogleFonts.plusJakartaSans(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: const Color(0xFF64748B),
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -180,25 +184,26 @@ class _TrendingPulseItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFF1F5F9)),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
+                color: AppColors.error.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.local_fire_department_rounded, color: Colors.red.shade700, size: 16),
+              child: const Icon(Icons.local_fire_department_rounded, color: AppColors.error, size: 16),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -207,20 +212,20 @@ class _TrendingPulseItem extends StatelessWidget {
                 children: [
                   Text(
                     item.model.title,
-                    style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w700),
+                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700, color: theme.colorScheme.onSurface),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     item.model.subtitle,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+            Icon(Icons.chevron_right_rounded, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
           ],
         ),
       ),
@@ -235,6 +240,7 @@ class _ActivityPulseItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final createdAt = item.originalData?.createdAt as DateTime?;
     final timeStr = createdAt != null ? DateFormat('HH:mm').format(createdAt) : '--:--';
 
@@ -249,16 +255,16 @@ class _ActivityPulseItem extends StatelessWidget {
               children: [
                 Text(
                   timeStr,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Colors.indigo,
+                    color: theme.colorScheme.primary,
                   ),
                 ),
                 Container(
                   width: 2,
                   height: 40,
-                  color: Colors.indigo.withOpacity(0.1),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
                 ),
               ],
             ),
@@ -267,21 +273,21 @@ class _ActivityPulseItem extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: theme.colorScheme.surface,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFF1F5F9)),
+                  border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       item.model.title,
-                      style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w700),
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: theme.colorScheme.onSurface),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Posted in ${item.model.type.name.capitalize()}',
-                      style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                      style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
                     ),
                   ],
                 ),

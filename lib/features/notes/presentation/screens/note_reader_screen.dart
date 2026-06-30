@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:path/path.dart' as p;
 import 'package:open_filex/open_filex.dart';
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import '../../domain/models/note.dart';
 import '../../shared/providers.dart';
 import '../../../../services/download_service.dart';
@@ -258,20 +259,21 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final progressAsync = ref.watch(noteProgressProvider(widget.note.id));
     final isBookmarked = progressAsync.valueOrNull?.isBookmarked ?? false;
 
     return Scaffold(
-      backgroundColor: _isPdf ? const Color(0xFF1A1A1A) : Colors.white,
+      backgroundColor: _isPdf ? const Color(0xFF1A1A1A) : theme.colorScheme.surface,
       body: Stack(
         children: [
           // Main Reader Content
           GestureDetector(
             onTap: _toggleUI,
             child: _isError 
-              ? _buildErrorView()
+              ? _buildErrorView(context)
               : _isDownloading 
-                ? _buildDownloadView() 
+                ? _buildDownloadView(context) 
                 : (_isPdf ? _buildPdfView() : _buildWebView()),
           ),
 
@@ -282,7 +284,7 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
             top: _showUI ? 0 : -100,
             left: 0,
             right: 0,
-            child: _buildHeader(isBookmarked),
+            child: _buildHeader(context, isBookmarked),
           ),
 
           // Footer (Progress Controls)
@@ -293,7 +295,7 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
               bottom: _showUI ? 0 : -120,
               left: 0,
               right: 0,
-              child: _buildFooter(),
+              child: _buildFooter(context),
             ),
 
           // Permanent slim progress indicator at the bottom
@@ -305,7 +307,7 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
               child: LinearProgressIndicator(
                 value: (_currentPage + 1) / _totalPages,
                 backgroundColor: Colors.transparent,
-                valueColor: AlwaysStoppedAnimation(Colors.indigoAccent.withOpacity(0.5)),
+                valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary.withOpacity(0.5)),
                 minHeight: 3,
               ),
             ),
@@ -314,11 +316,12 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
     );
   }
 
-  Widget _buildHeader(bool isBookmarked) {
+  Widget _buildHeader(BuildContext context, bool isBookmarked) {
+    final theme = Theme.of(context);
     return Container(
       padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top, bottom: 8),
       decoration: BoxDecoration(
-        color: _isPdf ? Colors.black.withOpacity(0.85) : Colors.indigo,
+        color: _isPdf ? Colors.black.withOpacity(0.85) : theme.colorScheme.primary,
         boxShadow: [
           if (_showUI) BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10)
         ],
@@ -336,7 +339,7 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
               children: [
                 Text(
                   widget.note.title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: theme.textTheme.titleMedium?.copyWith(
                     fontSize: 15, 
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -377,7 +380,8 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
     );
   }
 
-  Widget _buildFooter() {
+  Widget _buildFooter(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
       decoration: BoxDecoration(
@@ -396,7 +400,7 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
               ),
               Text(
                 '${((_currentPage + 1) / _totalPages * 100).toInt()}%',
-                style: const TextStyle(color: Colors.indigoAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                style: TextStyle(color: theme.colorScheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -412,7 +416,7 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
                     trackHeight: 4,
                     thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
                     overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
-                    activeTrackColor: Colors.indigoAccent,
+                    activeTrackColor: theme.colorScheme.primary,
                     inactiveTrackColor: Colors.white24,
                     thumbColor: Colors.white,
                   ),
@@ -469,10 +473,11 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
     );
   }
 
-  Widget _buildDownloadView() {
+  Widget _buildDownloadView(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      color: _isPdf ? const Color(0xFF1A1A1A) : Colors.white,
+      color: _isPdf ? const Color(0xFF1A1A1A) : theme.colorScheme.surface,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -486,19 +491,19 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
             child: Container(
               padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
-                color: Colors.indigo.withOpacity(0.1),
+                color: theme.colorScheme.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.auto_stories, size: 64, color: Colors.indigo),
+              child: Icon(Icons.auto_stories, size: 64, color: theme.colorScheme.primary),
             ),
           ),
           const SizedBox(height: 40),
           Text(
             'Preparing Your Study Session',
-            style: GoogleFonts.plusJakartaSans(
+            style: theme.textTheme.titleLarge?.copyWith(
               fontSize: 20, 
               fontWeight: FontWeight.bold,
-              color: _isPdf ? Colors.white : Colors.black87,
+              color: _isPdf ? Colors.white : theme.colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 12),
@@ -508,18 +513,18 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
               'Optimizing "${widget.note.title}" for high-quality reading...',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: _isPdf ? Colors.white60 : Colors.grey.shade600,
+                color: _isPdf ? Colors.white60 : theme.colorScheme.onSurfaceVariant,
                 fontSize: 14,
                 height: 1.5,
               ),
             ),
           ),
           const SizedBox(height: 48),
-          const SizedBox(
+          SizedBox(
             width: 140,
             child: LinearProgressIndicator(
               backgroundColor: Colors.white12,
-              valueColor: AlwaysStoppedAnimation(Colors.indigoAccent),
+              valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
               minHeight: 4,
             ),
           ),
@@ -533,34 +538,35 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
       children: [
         WebViewWidget(controller: _webViewController!),
         if (_isWebLoading)
-          _buildDownloadView(), // Reuse download view for web loading
+          _buildDownloadView(context), // Reuse download view for web loading
       ],
     );
   }
 
-  Widget _buildErrorView() {
+  Widget _buildErrorView(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(32),
-      color: _isPdf ? const Color(0xFF1A1A1A) : Colors.white,
+      color: _isPdf ? const Color(0xFF1A1A1A) : theme.colorScheme.surface,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.error_outline_rounded, size: 80, color: Colors.redAccent),
+          const Icon(Icons.error_outline_rounded, size: 80, color: AppColors.error),
           const SizedBox(height: 24),
           Text(
             'Unable to Load Document',
-            style: GoogleFonts.plusJakartaSans(
+            style: theme.textTheme.titleLarge?.copyWith(
               fontSize: 20, 
               fontWeight: FontWeight.bold,
-              color: _isPdf ? Colors.white : Colors.black87,
+              color: _isPdf ? Colors.white : theme.colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 12),
           Text(
             _errorMessage,
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14),
           ),
           const SizedBox(height: 40),
           SizedBox(
@@ -577,7 +583,7 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
               icon: const Icon(Icons.refresh),
               label: const Text('Try Again', style: TextStyle(fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo,
+                backgroundColor: theme.colorScheme.primary,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
@@ -586,7 +592,7 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
           const SizedBox(height: 12),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Go Back', style: TextStyle(color: Colors.grey)),
+            child: Text('Go Back', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
           ),
         ],
       ),

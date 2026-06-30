@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import '../../../auth/shared/providers.dart';
 import '../../domain/models/housing_listing.dart';
 import '../../domain/models/vacancy_request.dart';
@@ -222,12 +223,14 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
     final isVerified = user.isVerified;
 
     if (!isVerifiedPlug) {
+      final theme = Theme.of(context);
       return Scaffold(
+        backgroundColor: theme.colorScheme.surface,
         appBar: AppBar(
           title: Text(!isVerified ? 'Verification Required' : 'Role Application Required'),
-          backgroundColor: Colors.white,
+          backgroundColor: theme.colorScheme.surface,
           elevation: 0,
-          foregroundColor: Colors.black,
+          foregroundColor: theme.colorScheme.onSurface,
         ),
         body: Padding(
           padding: const EdgeInsets.all(32.0),
@@ -237,15 +240,15 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1677F2).withOpacity(0.1),
+                  color: theme.colorScheme.primary.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(!isVerified ? Icons.verified_user_rounded : Icons.home_work_rounded, size: 64, color: const Color(0xFF1677F2)),
+                child: Icon(!isVerified ? Icons.verified_user_rounded : Icons.home_work_rounded, size: 64, color: theme.colorScheme.primary),
               ),
               const SizedBox(height: 32),
               Text(
                 !isVerified ? 'Identity Verification Required' : 'Housing Plug Role Required',
-                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: -0.5),
+                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -0.5),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -253,7 +256,7 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
                 !isVerified 
                     ? 'To list properties on UniHub, you must first verify your platform identity via the Trust Center.'
                     : 'To list properties on UniHub, you must activate the Housing Plug role for your account.',
-                style: const TextStyle(color: Color(0xFF64748B), fontSize: 16, height: 1.5),
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 16, height: 1.5),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 40),
@@ -263,7 +266,7 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
                 child: FilledButton(
                   onPressed: () => context.push(isVerified ? '/verify-professional/housePlug' : '/trust-center'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF1677F2),
+                    backgroundColor: theme.colorScheme.primary,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                   ),
                   child: Text(!isVerified ? 'Go to Trust Center' : 'Apply for Role', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
@@ -272,7 +275,7 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
               const SizedBox(height: 16),
               TextButton(
                 onPressed: () => context.pop(),
-                child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+                child: Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700, color: theme.colorScheme.onSurfaceVariant)),
               ),
             ],
           ),
@@ -280,13 +283,14 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
       );
     }
 
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text('List Property', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
+        title: Text('List Property', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
-        foregroundColor: Colors.black,
+        foregroundColor: theme.colorScheme.onSurface,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -384,9 +388,9 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
               if (_isLoading)
                 Column(
                   children: [
-                    LinearProgressIndicator(value: _uploadProgress, color: const Color(0xFF1677F2)),
+                    LinearProgressIndicator(value: _uploadProgress, color: theme.colorScheme.primary),
                     const SizedBox(height: 8),
-                    Text('Uploading media... ${(100 * _uploadProgress).toInt()}%'),
+                    Text('Uploading media... ${(100 * _uploadProgress).toInt()}%', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
                     const SizedBox(height: 16),
                   ],
                 ),
@@ -491,15 +495,17 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
     required String subtitle,
     bool isDone = false,
   }) {
+    final theme = Theme.of(context);
+    final color = isDone ? AppColors.success : theme.colorScheme.primary;
     return GestureDetector(
       onTap: _isLoading ? null : onTap,
       child: Container(
         width: 120,
         decoration: BoxDecoration(
-          color: isDone ? const Color(0xFF10B981).withOpacity(0.05) : const Color(0xFF1677F2).withOpacity(0.05),
+          color: color.withOpacity(0.05),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isDone ? const Color(0xFF10B981).withOpacity(0.2) : const Color(0xFF1677F2).withOpacity(0.2), 
+            color: color.withOpacity(0.2), 
             width: 2,
             style: BorderStyle.solid,
           ),
@@ -507,11 +513,11 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: isDone ? const Color(0xFF10B981) : const Color(0xFF1677F2), size: 28),
+            Icon(icon, color: color, size: 28),
             const SizedBox(height: 8),
-            Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: isDone ? const Color(0xFF10B981) : const Color(0xFF1677F2))),
+            Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color)),
             const SizedBox(height: 4),
-            Text(subtitle, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDone ? const Color(0xFF10B981).withOpacity(0.7) : const Color(0xFF1677F2).withOpacity(0.7))),
+            Text(subtitle, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color.withOpacity(0.7))),
           ],
         ),
       ),
@@ -586,13 +592,14 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
   }
 
   Widget _buildAmenitiesWrap() {
+    final theme = Theme.of(context);
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: _allAmenities.map((a) {
         final isSelected = _selectedAmenities.contains(a);
         return FilterChip(
-          label: Text(a, style: TextStyle(fontSize: 12, color: isSelected ? Colors.white : Colors.black87)),
+          label: Text(a, style: TextStyle(fontSize: 12, color: isSelected ? Colors.white : theme.colorScheme.onSurface)),
           selected: isSelected,
           onSelected: (val) {
             setState(() {
@@ -600,7 +607,7 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
               else _selectedAmenities.remove(a);
             });
           },
-          selectedColor: const Color(0xFF1677F2),
+          selectedColor: theme.colorScheme.primary,
           checkmarkColor: Colors.white,
         );
       }).toList(),
@@ -608,9 +615,10 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
   }
 
   InputDecoration _inputDecoration() {
+    final theme = Theme.of(context);
     return InputDecoration(
       filled: true,
-      fillColor: const Color(0xFFF8FAFC),
+      fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16), 
@@ -618,15 +626,15 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16), 
-        borderSide: const BorderSide(color: Color(0xFFF1F5F9), width: 1),
+        borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withOpacity(0.5), width: 1),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16), 
-        borderSide: const BorderSide(color: Color(0xFF1677F2), width: 1.5),
+        borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16), 
-        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1),
+        borderSide: BorderSide(color: theme.colorScheme.error, width: 1),
       ),
     );
   }
@@ -654,19 +662,22 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
     IconData? prefixIcon,
     String? Function(String?)? validator,
   }) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+        Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
           maxLines: maxLines,
           keyboardType: keyboardType,
           validator: validator,
+          style: TextStyle(color: theme.colorScheme.onSurface),
           decoration: _inputDecoration().copyWith(
             hintText: hint,
-            prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20, color: const Color(0xFF1677F2).withOpacity(0.5)) : null,
+            hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+            prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20, color: theme.colorScheme.primary.withOpacity(0.5)) : null,
           ),
         ),
       ],
@@ -674,13 +685,14 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
   }
 
   Widget _buildSubmitButton() {
+    final theme = Theme.of(context);
     return SizedBox(
       width: double.infinity,
       height: 58,
       child: FilledButton(
         onPressed: _isLoading ? null : _submit,
         style: FilledButton.styleFrom(
-          backgroundColor: const Color(0xFF1677F2),
+          backgroundColor: theme.colorScheme.primary,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         ),
         child: _isLoading

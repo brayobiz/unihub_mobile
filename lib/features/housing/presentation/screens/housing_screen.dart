@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/widgets/app_drawer.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import 'package:unihub_mobile/widgets/skeleton_loader.dart';
@@ -68,6 +69,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final user = ref.watch(appUserProvider).valueOrNull;
     final isVerifiedPlug = user?.verifiedRoles.contains('housePlug') ?? false;
     final applicationAsync = ref.watch(applicationByRoleProvider(ProfessionalRole.housePlug));
@@ -78,7 +80,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
                             ref.watch(housingMaxRentFilterProvider) != null;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: theme.colorScheme.surface,
       drawer: const AppDrawer(),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -104,7 +106,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
                   if (!isVerifiedPlug) ...[
                     applicationAsync.when(
                       data: (application) => _buildBecomePlugCTA(application),
-                      loading: () => const SkeletonLoader(width: double.infinity, height: 150, borderRadius: 24),
+                      loading: () => SkeletonLoader(width: double.infinity, height: 150, borderRadius: 24, color: theme.colorScheme.surfaceVariant),
                       error: (_, __) => _buildBecomePlugCTA(null),
                     ),
                     const SizedBox(height: 16),
@@ -135,7 +137,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
     ),
       floatingActionButton: isVerifiedPlug ? FloatingActionButton.extended(
         onPressed: () => context.push('/add-housing'),
-        backgroundColor: const Color(0xFF1677F2),
+        backgroundColor: theme.colorScheme.primary,
         elevation: 4,
         icon: const Icon(Icons.add_home_work_rounded, color: Colors.white),
         label: const Text('List Property', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
@@ -144,16 +146,17 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
   }
 
   Widget _buildSliverAppBar(bool isPlug) {
+    final theme = Theme.of(context);
     return SliverAppBar(
       expandedHeight: 100,
       floating: true,
       pinned: true,
       elevation: 0,
-      backgroundColor: Colors.white,
-      surfaceTintColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
+      surfaceTintColor: Colors.transparent,
       leading: Builder(
         builder: (context) => IconButton(
-          icon: const Icon(Icons.menu_rounded, color: Colors.black),
+          icon: Icon(Icons.menu_rounded, color: theme.colorScheme.onSurface),
           onPressed: () => Scaffold.of(context).openDrawer(),
         ),
       ),
@@ -163,8 +166,8 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
         expandedTitleScale: 1.2,
         title: Text(
           'UniHub Housing',
-          style: GoogleFonts.plusJakartaSans(
-            color: const Color(0xFF1A1C1E),
+          style: theme.textTheme.titleLarge?.copyWith(
+            color: theme.colorScheme.onSurface,
             fontWeight: FontWeight.w800,
             fontSize: 20,
           ),
@@ -174,17 +177,17 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
         const NotificationBadge(module: 'housing'),
         if (!isPlug)
           IconButton(
-            icon: const Icon(Icons.add_business_outlined, color: Color(0xFF1A1C1E)),
+            icon: Icon(Icons.add_business_outlined, color: theme.colorScheme.onSurface),
             onPressed: () => context.push('/submit-vacancy'),
             tooltip: 'Report a Vacancy',
           ),
         IconButton(
-          icon: const Icon(Icons.favorite_outline_rounded, color: Color(0xFF1A1C1E)),
+          icon: Icon(Icons.favorite_outline_rounded, color: theme.colorScheme.onSurface),
           onPressed: () => context.push('/saved-housing'),
         ),
         if (isPlug)
           IconButton(
-            icon: const Icon(Icons.dashboard_customize_outlined, color: Color(0xFF1A1C1E)),
+            icon: Icon(Icons.dashboard_customize_outlined, color: theme.colorScheme.onSurface),
             onPressed: () => context.push('/plug-dashboard'),
           ),
       ],
@@ -192,6 +195,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
   }
 
   Widget _buildBecomePlugCTA(VerificationApplication? application) {
+    final theme = Theme.of(context);
     final user = ref.watch(appUserProvider).valueOrNull;
     final isVerified = user?.isVerified ?? false;
     final hasPendingApp = application?.status == VerificationStatus.pending;
@@ -202,17 +206,17 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: isRejected 
-              ? [const Color(0xFFEF4444), const Color(0xFF991B1B)]
+              ? [AppColors.error, AppColors.error.withOpacity(0.8)]
               : hasPendingApp 
-                  ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-                  : [const Color(0xFF1677F2), const Color(0xFF19D3C5)],
+                  ? [theme.colorScheme.secondary, theme.colorScheme.secondary.withOpacity(0.8)]
+                  : [theme.colorScheme.primary, const Color(0xFF19D3C5)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: (isRejected ? Colors.red : const Color(0xFF1677F2)).withOpacity(0.2), 
+            color: (isRejected ? AppColors.error : theme.colorScheme.primary).withOpacity(0.2), 
             blurRadius: 20, 
             offset: const Offset(0, 10)
           )
@@ -242,8 +246,8 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white,
               disabledBackgroundColor: Colors.white.withOpacity(0.8),
-              foregroundColor: isRejected ? Colors.red : const Color(0xFF1677F2),
-              disabledForegroundColor: const Color(0xFF1677F2).withOpacity(0.6),
+              foregroundColor: isRejected ? AppColors.error : theme.colorScheme.primary,
+              disabledForegroundColor: theme.colorScheme.primary.withOpacity(0.6),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 0,
@@ -268,43 +272,44 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
   }
 
   Widget _buildReportVacancyCTA() {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: const BoxDecoration(
-              color: Color(0xFFF1F5F9),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.add_business_rounded, color: Color(0xFF1677F2), size: 24),
+            child: Icon(Icons.add_business_rounded, color: theme.colorScheme.primary, size: 24),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Know an available room?',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xFF1A1C1E)),
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: theme.colorScheme.onSurface),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Report it here and help a fellow student find a home.',
-                  style: TextStyle(color: const Color(0xFF64748B), fontSize: 12, height: 1.3),
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, height: 1.3),
                 ),
               ],
             ),
           ),
           TextButton(
             onPressed: () => context.push('/submit-vacancy'),
-            child: const Text('Report', style: TextStyle(fontWeight: FontWeight.w800)),
+            child: Text('Report', style: TextStyle(fontWeight: FontWeight.w800, color: theme.colorScheme.primary)),
           ),
         ],
       ),
@@ -312,6 +317,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
   }
 
   Widget _buildSearchBar() {
+    final theme = Theme.of(context);
     return Row(
       children: [
         Expanded(
@@ -319,24 +325,25 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             height: 56,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: theme.colorScheme.surface,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: theme.colorScheme.outlineVariant),
               boxShadow: [
                 BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
               ],
             ),
             child: Row(
               children: [
-                const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 22),
+                Icon(Icons.search_rounded, color: theme.colorScheme.onSurfaceVariant, size: 22),
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextField(
                     controller: _searchController,
-                    decoration: const InputDecoration(
+                    style: TextStyle(color: theme.colorScheme.onSurface),
+                    decoration: InputDecoration(
                       hintText: 'Search campus, area or hostel...',
                       border: InputBorder.none,
-                      hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontWeight: FontWeight.w500),
+                      hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6), fontSize: 14, fontWeight: FontWeight.w500),
                     ),
                     onChanged: (value) {
                       setState(() {});
@@ -352,7 +359,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
                 ),
                 if (_searchController.text.isNotEmpty)
                   IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF64748B)),
+                    icon: Icon(Icons.close_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
                     onPressed: () {
                       _searchController.clear();
                       ref.read(housingLocationFilterProvider.notifier).state = null;
@@ -370,10 +377,10 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
             height: 56,
             width: 56,
             decoration: BoxDecoration(
-              color: const Color(0xFF1677F2),
+              color: theme.colorScheme.primary,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
-                BoxShadow(color: const Color(0xFF1677F2).withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4)),
+                BoxShadow(color: theme.colorScheme.primary.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4)),
               ],
             ),
             child: const Icon(Icons.tune_rounded, color: Colors.white, size: 22),
@@ -384,16 +391,17 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
   }
 
   Widget _buildRecentSearches() {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Recent Searches', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+            Text('Recent Searches', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: theme.colorScheme.onSurfaceVariant)),
             GestureDetector(
               onTap: _clearRecentSearches,
-              child: const Text('Clear', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF1677F2))),
+              child: Text('Clear', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: theme.colorScheme.primary)),
             ),
           ],
         ),
@@ -410,15 +418,15 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
+                color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.history_rounded, size: 14, color: Color(0xFF64748B)),
+                  Icon(Icons.history_rounded, size: 14, color: theme.colorScheme.onSurfaceVariant),
                   const SizedBox(width: 4),
-                  Text(s, style: const TextStyle(fontSize: 12, color: Color(0xFF475569), fontWeight: FontWeight.w600)),
+                  Text(s, style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface, fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
@@ -444,21 +452,22 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
   }
 
   Widget _buildFilterChip(String label, VoidCallback onRemove) {
+    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(right: 8),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF1677F2).withOpacity(0.05),
+        color: theme.colorScheme.primary.withOpacity(0.05),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF1677F2).withOpacity(0.1)),
+        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.1)),
       ),
       child: Row(
         children: [
-          Text(label, style: const TextStyle(color: Color(0xFF1677F2), fontSize: 11, fontWeight: FontWeight.bold)),
+          Text(label, style: TextStyle(color: theme.colorScheme.primary, fontSize: 11, fontWeight: FontWeight.bold)),
           const SizedBox(width: 4),
           GestureDetector(
             onTap: onRemove,
-            child: const Icon(Icons.close_rounded, size: 14, color: Color(0xFF1677F2)),
+            child: Icon(Icons.close_rounded, size: 14, color: theme.colorScheme.primary),
           ),
         ],
       ),
@@ -482,6 +491,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
   }
 
   Widget _buildCategoryChip(String label, HousingType? type) {
+    final theme = Theme.of(context);
     final isSelected = ref.watch(housingTypeFilterProvider) == type;
     return GestureDetector(
       onTap: () => ref.read(housingTypeFilterProvider.notifier).state = type,
@@ -489,20 +499,20 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
         margin: const EdgeInsets.only(right: 12),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF1677F2) : Colors.white,
+          color: isSelected ? theme.colorScheme.primary : theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? const Color(0xFF1677F2) : const Color(0xFFE2E8F0),
+            color: isSelected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
             width: 1.5,
           ),
           boxShadow: isSelected ? [
-            BoxShadow(color: const Color(0xFF1677F2).withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4))
+            BoxShadow(color: theme.colorScheme.primary.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4))
           ] : null,
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : const Color(0xFF475569),
+            color: isSelected ? Colors.white : theme.colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w800,
             fontSize: 13,
           ),
@@ -578,7 +588,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1677F2),
+                        color: Theme.of(context).colorScheme.primary,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Text('FEATURED', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w900)),
@@ -608,7 +618,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
                     const SizedBox(height: 12),
                     Text(
                       'KES ${listing.rent.toInt()}/mo',
-                      style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.w900, fontSize: 18),
+                      style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.w900, fontSize: 18),
                     ),
                   ],
                 ),
@@ -621,21 +631,22 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
   }
 
   Widget _buildSectionTitle(String title) {
+    final theme = Theme.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
+          style: theme.textTheme.titleLarge?.copyWith(
             fontSize: 20,
             fontWeight: FontWeight.w800,
-            color: const Color(0xFF1A1C1E),
+            color: theme.colorScheme.onSurface,
           ),
         ),
         if (title == 'Recently Added')
           TextButton(
             onPressed: () {},
-            child: const Text('See All', style: TextStyle(color: Color(0xFF1677F2), fontWeight: FontWeight.w800)),
+            child: Text('See All', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w800)),
           ),
       ],
     );
@@ -663,22 +674,23 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
   }
 
   Widget _buildEmptyState() {
+    final theme = Theme.of(context);
     return Center(
       child: Column(
         children: [
           const SizedBox(height: 60),
           Container(
             padding: const EdgeInsets.all(24),
-            decoration: const BoxDecoration(
-              color: Color(0xFFF1F5F9),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.house_siding_rounded, size: 64, color: const Color(0xFF94A3B8)),
+            child: Icon(Icons.house_siding_rounded, size: 64, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
           ),
           const SizedBox(height: 24),
-          const Text('No listings found', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: Color(0xFF1A1C1E))),
+          Text('No listings found', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: theme.colorScheme.onSurface)),
           const SizedBox(height: 8),
-          const Text('Try adjusting your search or filters', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+          Text('Try adjusting your search or filters', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500)),
           const SizedBox(height: 24),
           OutlinedButton(
             onPressed: () {
@@ -699,6 +711,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
   }
 
   Widget _buildFeaturedSkeleton() {
+    final theme = Theme.of(context);
     return Container(
       height: 240,
       margin: const EdgeInsets.only(top: 16),
@@ -709,9 +722,9 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
           width: 300,
           margin: const EdgeInsets.only(right: 20),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: theme.colorScheme.surface,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
           ),
         ),
       ),
@@ -719,10 +732,11 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
   }
 
   Widget _buildListingsSkeleton() {
+    final theme = Theme.of(context);
     return Column(
-      children: List.generate(3, (index) => const Padding(
-        padding: EdgeInsets.only(bottom: 20),
-        child: SkeletonLoader(width: double.infinity, height: 350, borderRadius: 24),
+      children: List.generate(3, (index) => Padding(
+        padding: const EdgeInsets.only(bottom: 20),
+        child: SkeletonLoader(width: double.infinity, height: 350, borderRadius: 24, color: theme.colorScheme.surfaceVariant),
       )),
     );
   }
@@ -742,11 +756,12 @@ class HousingFilterSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -757,7 +772,7 @@ class HousingFilterSheet extends ConsumerWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: const Color(0xFFE2E8F0),
+                color: theme.colorScheme.outlineVariant,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -766,7 +781,7 @@ class HousingFilterSheet extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Filters', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF1A1C1E))),
+              Text('Filters', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface)),
               TextButton(
                 onPressed: () {
                   ref.read(housingTypeFilterProvider.notifier).state = null;
@@ -774,12 +789,12 @@ class HousingFilterSheet extends ConsumerWidget {
                   ref.read(housingMaxRentFilterProvider.notifier).state = null;
                   Navigator.pop(context);
                 },
-                child: const Text('Reset All', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w800)),
+                child: const Text('Reset All', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w800)),
               ),
             ],
           ),
           const SizedBox(height: 32),
-          _buildSectionHeader('Accommodation Type'),
+          _buildSectionHeader(context, 'Accommodation Type'),
           const SizedBox(height: 16),
           Wrap(
             spacing: 10,
@@ -787,6 +802,7 @@ class HousingFilterSheet extends ConsumerWidget {
             children: HousingType.values.map((type) {
               final isSelected = ref.watch(housingTypeFilterProvider) == type;
               return _buildChoiceChip(
+                context,
                 label: type.name.replaceAll(RegExp(r'(?=[A-Z])'), ' '),
                 isSelected: isSelected,
                 onSelected: (val) => ref.read(housingTypeFilterProvider.notifier).state = val ? type : null,
@@ -794,7 +810,7 @@ class HousingFilterSheet extends ConsumerWidget {
             }).toList(),
           ),
           const SizedBox(height: 32),
-          _buildSectionHeader('Gender Restriction'),
+          _buildSectionHeader(context, 'Gender Restriction'),
           const SizedBox(height: 16),
           Wrap(
             spacing: 10,
@@ -802,6 +818,7 @@ class HousingFilterSheet extends ConsumerWidget {
             children: GenderRestriction.values.map((g) {
               final isSelected = ref.watch(housingGenderFilterProvider) == g;
               return _buildChoiceChip(
+                context,
                 label: g.name.replaceAll(RegExp(r'(?=[A-Z])'), ' '),
                 isSelected: isSelected,
                 onSelected: (val) => ref.read(housingGenderFilterProvider.notifier).state = val ? g : null,
@@ -815,7 +832,7 @@ class HousingFilterSheet extends ConsumerWidget {
             child: FilledButton(
               onPressed: () => Navigator.pop(context),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF1677F2),
+                backgroundColor: theme.colorScheme.primary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                 elevation: 0,
               ),
@@ -828,30 +845,31 @@ class HousingFilterSheet extends ConsumerWidget {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(BuildContext context, String title) {
     return Text(
       title,
-      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF1A1C1E)),
+      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.onSurface),
     );
   }
 
-  Widget _buildChoiceChip({required String label, required bool isSelected, required Function(bool) onSelected}) {
+  Widget _buildChoiceChip(BuildContext context, {required String label, required bool isSelected, required Function(bool) onSelected}) {
+    final theme = Theme.of(context);
     return FilterChip(
       label: Text(label),
       selected: isSelected,
       onSelected: onSelected,
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : const Color(0xFF475569),
+        color: isSelected ? Colors.white : theme.colorScheme.onSurfaceVariant,
         fontWeight: FontWeight.w700,
         fontSize: 13,
       ),
-      backgroundColor: Colors.white,
-      selectedColor: const Color(0xFF1677F2),
+      backgroundColor: theme.colorScheme.surface,
+      selectedColor: theme.colorScheme.primary,
       checkmarkColor: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: isSelected ? const Color(0xFF1677F2) : const Color(0xFFE2E8F0),
+          color: isSelected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
           width: 1.5,
         ),
       ),

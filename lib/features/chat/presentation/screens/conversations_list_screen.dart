@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import '../../../auth/shared/providers.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/message.dart';
 import '../../shared/providers.dart';
+import '../../../../widgets/skeleton_loader.dart';
 
 class ConversationsListScreen extends ConsumerStatefulWidget {
   const ConversationsListScreen({super.key});
@@ -27,8 +29,9 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final user = ref.watch(authStateProvider).valueOrNull;
-    if (user == null) return const Scaffold(body: Center(child: Text('Please login to view chats')));
+    if (user == null) return Scaffold(backgroundColor: theme.colorScheme.surface, body: const Center(child: Text('Please login to view chats')));
 
     final conversationsAsync = ref.watch(conversationsProvider(user.uid));
 
@@ -45,19 +48,19 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
     });
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FB),
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: Text(
           'Messages',
-          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, color: Colors.black),
+          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         centerTitle: false,
       ),
       body: Column(
         children: [
-          _buildSearchBox(),
+          _buildSearchBox(context),
           Expanded(
             child: conversationsAsync.when(
               data: (conversations) {
@@ -68,7 +71,7 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
                 }).toList();
 
                 if (filtered.isEmpty) {
-                  return _buildEmptyState();
+                  return _buildEmptyState(context);
                 }
 
                 return RefreshIndicator(
@@ -87,7 +90,10 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
                   ),
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => ListView.builder(
+                itemCount: 8,
+                itemBuilder: (context, index) => const _ConversationLoadingTile(),
+              ),
               error: (err, stack) => Center(child: Text('Error: $err')),
             ),
           ),
@@ -96,22 +102,25 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
     );
   }
 
-  Widget _buildSearchBox() {
+  Widget _buildSearchBox(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
-      color: Colors.white,
+      color: theme.colorScheme.surface,
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
+          color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
         ),
         child: TextField(
           controller: _searchController,
+          style: TextStyle(color: theme.colorScheme.onSurface),
           onChanged: (val) => setState(() => _searchQuery = val),
           decoration: InputDecoration(
             hintText: 'Search conversations...',
-            hintStyle: GoogleFonts.plusJakartaSans(color: Colors.grey, fontSize: 14),
-            prefixIcon: const Icon(Icons.search, color: Colors.grey),
+            hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5), fontSize: 14),
+            prefixIcon: Icon(Icons.search, color: theme.colorScheme.onSurfaceVariant),
             border: InputBorder.none,
             contentPadding: const EdgeInsets.symmetric(vertical: 12),
           ),
@@ -120,28 +129,29 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.chat_bubble_outline_rounded, size: 64, color: Colors.grey.shade300),
+          Icon(Icons.chat_bubble_outline_rounded, size: 64, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.2)),
           const SizedBox(height: 16),
           Text(
             'No conversations yet',
-            style: GoogleFonts.plusJakartaSans(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade600,
+              color: theme.colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Messages from marketplace and housing\nwill appear here.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.plusJakartaSans(
+            style: TextStyle(
               fontSize: 13,
-              color: Colors.grey.shade500,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -161,6 +171,7 @@ class _ConversationTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final otherUserId = conversation.participants.firstWhere(
       (id) => id != currentUserId,
       orElse: () => '',
@@ -186,11 +197,11 @@ class _ConversationTile extends ConsumerWidget {
             children: [
               CircleAvatar(
                 radius: 28,
-                backgroundColor: Colors.indigo.shade50,
+                backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
                 backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
                 child: photoUrl == null
                     ? Text(displayName[0].toUpperCase(),
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo))
+                        style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary))
                     : null,
               ),
               if (otherUser?.isOnline == true)
@@ -201,9 +212,9 @@ class _ConversationTile extends ConsumerWidget {
                     width: 14,
                     height: 14,
                     decoration: BoxDecoration(
-                      color: Colors.green,
+                      color: AppColors.success,
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+                      border: Border.all(color: theme.colorScheme.surface, width: 2),
                     ),
                   ),
                 ),
@@ -214,9 +225,10 @@ class _ConversationTile extends ConsumerWidget {
               Expanded(
                 child: Text(
                   displayName,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.w600,
                     fontSize: 15,
+                    color: theme.colorScheme.onSurface,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -224,9 +236,9 @@ class _ConversationTile extends ConsumerWidget {
               ),
               Text(
                 _formatTime(conversation.lastMessageTime),
-                style: GoogleFonts.plusJakartaSans(
+                style: TextStyle(
                   fontSize: 11,
-                  color: unreadCount > 0 ? Colors.indigo : Colors.grey.shade500,
+                  color: unreadCount > 0 ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
                   fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
@@ -257,9 +269,9 @@ class _ConversationTile extends ConsumerWidget {
                   Expanded(
                     child: Text(
                       conversation.context.title,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: Colors.grey.shade600,
+                        color: theme.colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w500,
                       ),
                       maxLines: 1,
@@ -275,15 +287,15 @@ class _ConversationTile extends ConsumerWidget {
                 child: Row(
                   children: [
                     if (conversation.lastMessageSenderId == currentUserId) ...[
-                      _buildStatusIcon(conversation.lastMessageStatus ?? MessageStatus.sent),
+                      _buildStatusIcon(context, conversation.lastMessageStatus ?? MessageStatus.sent),
                       const SizedBox(width: 4),
                     ],
                     Expanded(
                       child: Text(
                         conversation.lastMessage ?? 'No messages yet',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: TextStyle(
                           fontSize: 13,
-                          color: unreadCount > 0 ? Colors.black87 : Colors.grey.shade600,
+                          color: unreadCount > 0 ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant,
                           fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
                         ),
                         maxLines: 1,
@@ -298,7 +310,7 @@ class _ConversationTile extends ConsumerWidget {
                       margin: const EdgeInsets.only(left: 8),
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.indigo,
+                        color: theme.colorScheme.primary,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
@@ -317,9 +329,10 @@ class _ConversationTile extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatusIcon(MessageStatus status) {
+  Widget _buildStatusIcon(BuildContext context, MessageStatus status) {
+    final theme = Theme.of(context);
     IconData icon;
-    Color color = Colors.grey;
+    Color color = theme.colorScheme.onSurfaceVariant;
     switch (status) {
       case MessageStatus.sending:
         icon = Icons.access_time;
@@ -332,7 +345,7 @@ class _ConversationTile extends ConsumerWidget {
         break;
       case MessageStatus.read:
         icon = Icons.done_all;
-        color = Colors.blue;
+        color = theme.colorScheme.primary;
         break;
     }
     return Icon(icon, size: 14, color: color);
@@ -341,9 +354,9 @@ class _ConversationTile extends ConsumerWidget {
   Color _getContextColor(String type) {
     switch (type.toLowerCase()) {
       case 'marketplace':
-        return Colors.orange;
+        return AppColors.marketplace;
       case 'housing':
-        return Colors.blue;
+        return AppColors.housing;
       case 'support':
         return Colors.purple;
       default:
@@ -369,10 +382,14 @@ class _ConversationLoadingTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return ListTile(
-      leading: CircleAvatar(radius: 28, backgroundColor: Colors.grey.shade200),
-      title: Container(height: 12, width: 100, color: Colors.grey.shade200),
-      subtitle: Container(height: 10, width: 150, color: Colors.grey.shade100, margin: const EdgeInsets.only(top: 8)),
+      leading: SkeletonLoader(width: 56, height: 56, borderRadius: 28, color: theme.colorScheme.surfaceVariant),
+      title: SkeletonLoader(width: 120, height: 16, color: theme.colorScheme.surfaceVariant),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 8.0),
+        child: SkeletonLoader(width: 200, height: 12, color: theme.colorScheme.surfaceVariant),
+      ),
     );
   }
 }

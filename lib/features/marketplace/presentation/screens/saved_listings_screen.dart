@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import '../../shared/providers.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/marketplace_card.dart';
@@ -60,6 +61,7 @@ class _SavedListingsScreenState extends ConsumerState<SavedListingsScreen> with 
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final collectionNamesAsync = ref.watch(collectionNamesProvider);
 
     return collectionNamesAsync.when(
@@ -70,30 +72,33 @@ class _SavedListingsScreenState extends ConsumerState<SavedListingsScreen> with 
         }
 
         return Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: theme.scaffoldBackgroundColor,
           appBar: AppBar(
-            backgroundColor: Colors.white,
+            backgroundColor: theme.colorScheme.surface,
             elevation: 0,
             title: Text(
               'Wishlist & Collections',
-              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, color: Colors.black),
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.bold, 
+                color: theme.colorScheme.onSurface,
+              ),
             ),
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black),
+              icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.colorScheme.onSurface),
               onPressed: () => Navigator.pop(context),
             ),
             actions: [
               IconButton(
                 onPressed: _createNewCollection,
-                icon: const Icon(Icons.create_new_folder_outlined, color: Colors.indigo),
+                icon: const Icon(Icons.create_new_folder_outlined, color: AppColors.secondary),
               ),
             ],
             bottom: TabBar(
               controller: _tabController,
               isScrollable: true,
-              labelColor: Colors.indigo,
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: Colors.indigo,
+              labelColor: AppColors.secondary,
+              unselectedLabelColor: AppColors.grey,
+              indicatorColor: AppColors.secondary,
               tabs: [
                 const Tab(text: 'All Saved'),
                 ...names.map((name) => Tab(text: name)),
@@ -109,8 +114,14 @@ class _SavedListingsScreenState extends ConsumerState<SavedListingsScreen> with 
           ),
         );
       },
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
+      loading: () => Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: Center(child: Text('Error: $e', style: TextStyle(color: theme.colorScheme.onSurface))),
+      ),
     );
   }
 

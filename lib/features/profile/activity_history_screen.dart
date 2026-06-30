@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import '../../services/history_service.dart';
 import '../marketplace/shared/providers.dart';
 import '../housing/shared/providers.dart';
@@ -19,34 +20,35 @@ class _ActivityHistoryScreenState extends ConsumerState<ActivityHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final history = ref.watch(recentHistoryProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Activity History',
-          style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
+          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF1E293B)),
+          icon: Icon(Icons.arrow_back_rounded, color: theme.colorScheme.onSurface),
           onPressed: () => context.pop(),
         ),
         actions: [
           if (history.isNotEmpty)
             TextButton(
               onPressed: () => _showClearConfirm(context, ref),
-              child: const Text('Clear', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+              child: const Text('Clear', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold)),
             ),
         ],
       ),
       body: Stack(
         children: [
           history.isEmpty
-              ? _buildEmptyState()
+              ? _buildEmptyState(context)
               : ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: history.length,
@@ -57,8 +59,8 @@ class _ActivityHistoryScreenState extends ConsumerState<ActivityHistoryScreen> {
                   },
                 ),
           if (_isLoading)
-            const Center(
-              child: CircularProgressIndicator(color: Color(0xFF6366F1)),
+            Center(
+              child: CircularProgressIndicator(color: theme.colorScheme.primary),
             ),
         ],
       ),
@@ -66,13 +68,14 @@ class _ActivityHistoryScreenState extends ConsumerState<ActivityHistoryScreen> {
   }
 
   Widget _buildHistoryCard(BuildContext context, HistoryItem item) {
+    final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Material(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         clipBehavior: Clip.antiAlias,
         child: ListTile(
@@ -81,14 +84,14 @@ class _ActivityHistoryScreenState extends ConsumerState<ActivityHistoryScreen> {
             width: 50,
             height: 50,
             decoration: BoxDecoration(
-              color: _getCategoryColor(item.type).withOpacity(0.1),
+              color: _getCategoryColor(item.type).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(_getCategoryIcon(item.type), color: _getCategoryColor(item.type)),
           ),
         title: Text(
           item.title,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: theme.colorScheme.onSurface),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -108,11 +111,11 @@ class _ActivityHistoryScreenState extends ConsumerState<ActivityHistoryScreen> {
             const SizedBox(height: 2),
             Text(
               DateFormat('MMM d, h:mm a').format(item.timestamp),
-              style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+              style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
             ),
           ],
         ),
-        trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1)),
+        trailing: Icon(Icons.chevron_right_rounded, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
         onTap: () => _navigateToDetail(item),
       ),
     ),
@@ -164,15 +167,16 @@ class _ActivityHistoryScreenState extends ConsumerState<ActivityHistoryScreen> {
 
   Color _getCategoryColor(String type) {
     switch (type) {
-      case 'listing': return const Color(0xFF6366F1);
-      case 'housing': return const Color(0xFF10B981);
-      case 'note': return const Color(0xFFF59E0B);
-      case 'gig': return const Color(0xFF8B5CF6);
-      default: return const Color(0xFF64748B);
+      case 'listing': return AppColors.marketplace;
+      case 'housing': return AppColors.housing;
+      case 'note': return AppColors.notes;
+      case 'gig': return AppColors.gigs;
+      default: return AppColors.grey;
     }
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -180,27 +184,27 @@ class _ActivityHistoryScreenState extends ConsumerState<ActivityHistoryScreen> {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: theme.colorScheme.surface,
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
+                  color: Colors.black.withValues(alpha: 0.02),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 )
               ],
             ),
-            child: const Icon(Icons.history_rounded, size: 64, color: Color(0xFFCBD5E1)),
+            child: Icon(Icons.history_rounded, size: 64, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
           ),
           const SizedBox(height: 24),
-          const Text(
+          Text(
             'No Recent Activity',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Items you view will appear here.',
-            style: TextStyle(color: Color(0xFF64748B)),
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
           ),
         ],
       ),
@@ -211,6 +215,7 @@ class _ActivityHistoryScreenState extends ConsumerState<ActivityHistoryScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: const Text('Clear History?'),
         content: const Text('Are you sure you want to clear your activity history?'),
         actions: [
@@ -220,7 +225,7 @@ class _ActivityHistoryScreenState extends ConsumerState<ActivityHistoryScreen> {
               ref.read(recentHistoryProvider.notifier).clear();
               Navigator.pop(context);
             },
-            child: const Text('Clear All', style: TextStyle(color: Colors.red)),
+            child: const Text('Clear All', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),

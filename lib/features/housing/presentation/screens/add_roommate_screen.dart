@@ -77,13 +77,14 @@ class _AddRoommateScreenState extends ConsumerState<AddRoommateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text('Find a Roommate', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
+        title: Text('Find a Roommate', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
-        foregroundColor: Colors.black,
+        foregroundColor: theme.colorScheme.onSurface,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -92,8 +93,9 @@ class _AddRoommateScreenState extends ConsumerState<AddRoommateScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSectionLabel('Your Requirements'),
+              _buildSectionLabel(context, 'Your Requirements'),
               _buildTextField(
+                context,
                 controller: _budgetController,
                 label: 'Monthly Budget (KES)',
                 hint: 'e.g. 10000',
@@ -102,13 +104,14 @@ class _AddRoommateScreenState extends ConsumerState<AddRoommateScreen> {
               ),
               const SizedBox(height: 20),
               _buildTextField(
+                context,
                 controller: _locationController,
                 label: 'Preferred Location',
                 hint: 'e.g. Near West Gate, Juja',
                 prefixIcon: Icons.location_on_outlined,
               ),
               const SizedBox(height: 32),
-              _buildSectionLabel('Lifestyle & Preferences'),
+              _buildSectionLabel(context, 'Lifestyle & Preferences'),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -123,20 +126,25 @@ class _AddRoommateScreenState extends ConsumerState<AddRoommateScreen> {
                         else _selectedLifestyle.remove(opt);
                       });
                     },
-                    selectedColor: Colors.indigo.shade100,
-                    checkmarkColor: Colors.indigo,
+                    selectedColor: theme.colorScheme.primary.withOpacity(0.1),
+                    checkmarkColor: theme.colorScheme.primary,
+                    labelStyle: TextStyle(
+                      color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
                   );
                 }).toList(),
               ),
               const SizedBox(height: 32),
               _buildTextField(
+                context,
                 controller: _bioController,
                 label: 'About You',
                 hint: 'Describe yourself and what you look for in a roommate...',
                 maxLines: 4,
               ),
               const SizedBox(height: 40),
-              _buildSubmitButton(),
+              _buildSubmitButton(context),
             ],
           ),
         ),
@@ -144,21 +152,23 @@ class _AddRoommateScreenState extends ConsumerState<AddRoommateScreen> {
     );
   }
 
-  Widget _buildSectionLabel(String label) {
+  Widget _buildSectionLabel(BuildContext context, String label) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
         label,
-        style: GoogleFonts.plusJakartaSans(
+        style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w800,
-          color: Colors.indigo,
+          color: theme.colorScheme.primary,
         ),
       ),
     );
   }
 
-  Widget _buildTextField({
+  Widget _buildTextField(
+    BuildContext context, {
     required TextEditingController controller,
     required String label,
     required String hint,
@@ -166,36 +176,41 @@ class _AddRoommateScreenState extends ConsumerState<AddRoommateScreen> {
     TextInputType? keyboardType,
     IconData? prefixIcon,
   }) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+        Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
           maxLines: maxLines,
           keyboardType: keyboardType,
+          style: TextStyle(color: theme.colorScheme.onSurface),
           decoration: InputDecoration(
             hintText: hint,
-            prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20, color: Colors.indigo.shade300) : null,
+            hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+            prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20, color: theme.colorScheme.primary.withOpacity(0.5)) : null,
             filled: true,
-            fillColor: const Color(0xFFF8F9FB),
+            fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
             contentPadding: const EdgeInsets.all(18),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withOpacity(0.5))),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildSubmitButton() {
+  Widget _buildSubmitButton(BuildContext context) {
+    final theme = Theme.of(context);
     return SizedBox(
       width: double.infinity,
       height: 56,
       child: FilledButton(
         onPressed: _isLoading ? null : _submit,
         style: FilledButton.styleFrom(
-          backgroundColor: Colors.indigo,
+          backgroundColor: theme.colorScheme.primary,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
         child: _isLoading

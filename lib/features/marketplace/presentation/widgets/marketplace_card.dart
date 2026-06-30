@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import '../../domain/models/listing.dart';
@@ -23,11 +24,11 @@ class MarketplaceCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final currentUserId = ref.watch(firebaseAuthProvider).currentUser?.uid;
     final isOwner = currentUserId == listing.sellerId;
     final user = ref.watch(appUserProvider).valueOrNull;
     
-    // Ensure the tag is unique to this instance
     final effectiveHeroTag = heroTag ?? 'listing_img_${listing.id}_$index';
 
     return TweenAnimationBuilder<double>(
@@ -54,11 +55,11 @@ class MarketplaceCard extends ConsumerWidget {
         },
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: theme.colorScheme.surface,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               ),
@@ -75,7 +76,7 @@ class MarketplaceCard extends ConsumerWidget {
                       child: Container(
                         width: double.infinity,
                         decoration: BoxDecoration(
-                          color: Colors.indigo.shade50.withOpacity(0.5),
+                          color: theme.colorScheme.primary.withValues(alpha: 0.05),
                         ),
                         child: listing.imageUrls.isNotEmpty
                             ? OptimizedImage(
@@ -86,7 +87,7 @@ class MarketplaceCard extends ConsumerWidget {
                             : Center(
                                 child: Icon(
                                   Icons.shopping_bag_outlined,
-                                  color: Colors.indigo.shade200,
+                                  color: theme.colorScheme.primary.withValues(alpha: 0.2),
                                   size: 40,
                                 ),
                               ),
@@ -99,11 +100,11 @@ class MarketplaceCard extends ConsumerWidget {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.amber,
+                            color: AppColors.warning,
                             borderRadius: BorderRadius.circular(8),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.amber.withOpacity(0.3),
+                                color: AppColors.warning.withValues(alpha: 0.3),
                                 blurRadius: 8,
                                 offset: const Offset(0, 4),
                               ),
@@ -128,24 +129,26 @@ class MarketplaceCard extends ConsumerWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               _buildActionIcon(
+                                context,
                                 icon: Icons.edit_outlined,
-                                color: Colors.indigo,
+                                color: theme.colorScheme.primary,
                                 onTap: () => context.push('/add-listing', extra: listing),
                               ),
                               const SizedBox(width: 6),
                               _buildActionIcon(
+                                context,
                                 icon: Icons.delete_outline,
-                                color: Colors.red,
+                                color: AppColors.error,
                                 onTap: () => _confirmDelete(context, ref),
                               ),
                             ],
                           )
                         : Material(
-                            color: Colors.white.withOpacity(0.9),
+                            color: theme.colorScheme.surface.withValues(alpha: 0.9),
                             shape: const CircleBorder(),
                             child: IconButton(
                               icon: const Icon(Icons.favorite_rounded, size: 18),
-                              color: Colors.grey.shade400,
+                              color: theme.colorScheme.outlineVariant,
                               onPressed: () {
                                 if (user != null) {
                                   ref.read(marketplaceRepositoryProvider).toggleSaveListing(user.uid, listing.id);
@@ -166,23 +169,22 @@ class MarketplaceCard extends ConsumerWidget {
                       listing.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontWeight: FontWeight.bold,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold, 
                         fontSize: 14,
-                        color: Colors.black87,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'KES ${NumberFormat('#,###').format(listing.price)}',
-                      style: GoogleFonts.plusJakartaSans(
-                        color: Colors.indigo,
+                      style: TextStyle(
+                        color: theme.colorScheme.primary,
                         fontWeight: FontWeight.w900,
                         fontSize: 16,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // REAL-TIME SELLER TRUST DATA
                     Consumer(
                       builder: (context, ref, child) {
                         final sellerAsync = ref.watch(otherUserProvider(listing.sellerId));
@@ -194,12 +196,12 @@ class MarketplaceCard extends ConsumerWidget {
                                 children: [
                                   CircleAvatar(
                                     radius: 8,
-                                    backgroundColor: Colors.indigo.shade50,
+                                    backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
                                     backgroundImage: seller.photoUrl != null ? NetworkImage(seller.photoUrl!) : null,
                                     child: seller.photoUrl == null 
                                       ? Text(
                                           seller.fullName[0].toUpperCase(),
-                                          style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.indigo),
+                                          style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
                                         )
                                       : null,
                                   ),
@@ -212,16 +214,16 @@ class MarketplaceCard extends ConsumerWidget {
                                             seller.fullName,
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
-                                            style: GoogleFonts.plusJakartaSans(
+                                            style: TextStyle(
                                               fontSize: 10,
-                                              color: Colors.grey.shade700,
+                                              color: theme.colorScheme.onSurfaceVariant,
                                               fontWeight: FontWeight.w600,
                                             ),
                                           ),
                                         ),
                                         if (seller.isVerifiedSeller) ...[
                                           const SizedBox(width: 4),
-                                          const Icon(Icons.verified, color: Colors.indigo, size: 10),
+                                          Icon(Icons.verified, color: theme.colorScheme.primary, size: 10),
                                         ],
                                       ],
                                     ),
@@ -234,14 +236,14 @@ class MarketplaceCard extends ConsumerWidget {
                                   Icon(
                                     Icons.shield_rounded, 
                                     size: 10, 
-                                    color: seller.displayTrustScore > 80 ? Colors.green.shade400 : Colors.orange.shade400
+                                    color: seller.displayTrustScore > 80 ? AppColors.success : AppColors.warning
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
                                     'Trust ${seller.displayTrustScore.toInt()}%',
-                                    style: GoogleFonts.plusJakartaSans(
+                                    style: TextStyle(
                                       fontSize: 9,
-                                      color: Colors.grey.shade500,
+                                      color: theme.colorScheme.onSurfaceVariant,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -249,10 +251,10 @@ class MarketplaceCard extends ConsumerWidget {
                               ),
                             ],
                           ),
-                          loading: () => const SizedBox(height: 24), // Avoid layout jump
+                          loading: () => const SizedBox(height: 24),
                           error: (_, __) => Text(
                             'By Student',
-                            style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                            style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
                           ),
                         );
                       },
@@ -267,7 +269,7 @@ class MarketplaceCard extends ConsumerWidget {
     );
   }
 
-  Widget _buildActionIcon({required IconData icon, required Color color, required VoidCallback onTap}) {
+  Widget _buildActionIcon(BuildContext context, {required IconData icon, required Color color, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: ClipRRect(
@@ -277,9 +279,9 @@ class MarketplaceCard extends ConsumerWidget {
           child: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.3),
+              color: Colors.white.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white.withOpacity(0.2)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
             ),
             child: Icon(icon, color: color, size: 16),
           ),

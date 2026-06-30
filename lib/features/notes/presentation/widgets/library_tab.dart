@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path/path.dart' as p;
+import 'package:unihub_mobile/app/theme/app_colors.dart';
 import '../../shared/providers.dart';
 import '../../domain/models/study_progress.dart';
 import '../../domain/models/note.dart';
@@ -15,6 +16,7 @@ class LibraryTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final continueReading = ref.watch(continueReadingProvider);
     final recentlyOpened = ref.watch(recentlyOpenedProvider);
     final uploads = ref.watch(userNotesProvider);
@@ -32,7 +34,6 @@ class LibraryTab extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 20),
       children: [
-        // 1. Continue Reading (Primary Section)
         continueReading.when(
           data: (data) => data.isEmpty 
             ? const SizedBox.shrink()
@@ -41,7 +42,6 @@ class LibraryTab extends ConsumerWidget {
           error: (e, _) => const SizedBox.shrink(),
         ),
 
-        // 2. Recently Opened
         recentlyOpened.when(
           data: (data) => data.isEmpty
             ? const SizedBox.shrink()
@@ -50,16 +50,14 @@ class LibraryTab extends ConsumerWidget {
           error: (e, _) => const SizedBox.shrink(),
         ),
 
-        // 3. My Uploads
         uploads.when(
           data: (data) => data.isEmpty
             ? const SizedBox.shrink()
             : _buildHorizontalSection(context, ref, 'My Uploads', data, isUploads: true),
-          loading: () => const SizedBox(height: 140, child: Center(child: CircularProgressIndicator())),
+          loading: () => SizedBox(height: 140, child: Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))),
           error: (e, _) => const SizedBox.shrink(),
         ),
 
-        // 4. Bookmarks
         bookmarks.when(
           data: (data) => data.isEmpty 
             ? const SizedBox.shrink()
@@ -69,7 +67,7 @@ class LibraryTab extends ConsumerWidget {
                   const SizedBox(height: 16),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: _buildSectionHeader('Saved for Later', Icons.bookmark_border),
+                    child: _buildSectionHeader(context, 'Saved for Later', Icons.bookmark_border),
                   ),
                   const SizedBox(height: 16),
                   Padding(
@@ -78,7 +76,7 @@ class LibraryTab extends ConsumerWidget {
                   ),
                 ],
               ),
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
           error: (e, _) => const SizedBox.shrink(),
         ),
       ],
@@ -86,6 +84,7 @@ class LibraryTab extends ConsumerWidget {
   }
 
   Widget _buildContinueReadingSection(BuildContext context, WidgetRef ref, List<StudyProgress> items) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -93,7 +92,7 @@ class LibraryTab extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Text(
             'Continue Reading',
-            style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+            style: theme.textTheme.titleLarge?.copyWith(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: -0.5),
           ),
         ),
         SizedBox(
@@ -119,6 +118,7 @@ class LibraryTab extends ConsumerWidget {
   }
 
   Widget _buildHorizontalSection(BuildContext context, WidgetRef ref, String title, List<dynamic> items, {bool isRecentlyOpened = false, bool isUploads = false}) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -129,12 +129,12 @@ class LibraryTab extends ConsumerWidget {
             children: [
               Text(
                 title,
-                style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.bold),
+                style: theme.textTheme.titleMedium?.copyWith(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               if (isRecentlyOpened)
                 TextButton(
                   onPressed: () => _showClearHistoryDialog(context, ref),
-                  child: Text('Clear', style: TextStyle(color: Colors.indigo.shade400, fontSize: 12)),
+                  child: Text('Clear', style: TextStyle(color: theme.colorScheme.primary, fontSize: 12)),
                 ),
             ],
           ),
@@ -169,6 +169,7 @@ class LibraryTab extends ConsumerWidget {
   }
 
   Widget _buildProminentContinueCard(BuildContext context, WidgetRef ref, NoteListing note, StudyProgress progress) {
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: () => _resumeNote(context, ref, note),
       onLongPress: () => _showRemoveFromHistoryDialog(context, ref, note),
@@ -178,13 +179,13 @@ class LibraryTab extends ConsumerWidget {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.indigo.shade700, Colors.indigo.shade900],
+            colors: [theme.colorScheme.primary, theme.colorScheme.primary.withValues(alpha: 0.8)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
-            BoxShadow(color: Colors.indigo.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8))
+            BoxShadow(color: theme.colorScheme.primary.withValues(alpha: 0.3), blurRadius: 15, offset: const Offset(0, 8))
           ],
         ),
         child: Column(
@@ -195,7 +196,7 @@ class LibraryTab extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(Icons.menu_book_rounded, color: Colors.white, size: 20),
@@ -213,7 +214,7 @@ class LibraryTab extends ConsumerWidget {
                       ),
                       Text(
                         note.unitCode,
-                        style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
@@ -239,7 +240,7 @@ class LibraryTab extends ConsumerWidget {
               borderRadius: BorderRadius.circular(6),
               child: LinearProgressIndicator(
                 value: progress.progress,
-                backgroundColor: Colors.white.withOpacity(0.1),
+                backgroundColor: Colors.white.withValues(alpha: 0.1),
                 valueColor: const AlwaysStoppedAnimation(Colors.white),
                 minHeight: 8,
               ),
@@ -251,6 +252,7 @@ class LibraryTab extends ConsumerWidget {
   }
 
   Widget _buildRecentCard(BuildContext context, WidgetRef ref, NoteListing note, StudyProgress progress) {
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: () => _resumeNote(context, ref, note),
       child: Container(
@@ -258,11 +260,11 @@ class LibraryTab extends ConsumerWidget {
         margin: const EdgeInsets.only(left: 4, right: 12, bottom: 8),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.grey.shade100),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 4))
+            BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 4))
           ],
         ),
         child: Column(
@@ -270,25 +272,25 @@ class LibraryTab extends ConsumerWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.access_time_rounded, size: 14, color: Colors.indigo.shade300),
+                Icon(Icons.access_time_rounded, size: 14, color: theme.colorScheme.primary.withValues(alpha: 0.7)),
                 const SizedBox(width: 4),
                 Text(
                   _formatTimeAgo(progress.lastAccessed),
-                  style: TextStyle(fontSize: 10, color: Colors.grey.shade500, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
             const Spacer(),
             Text(
               note.title,
-              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13, height: 1.2),
+              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: 13, height: 1.2, color: theme.colorScheme.onSurface),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 4),
             Text(
               note.unitCode,
-              style: TextStyle(color: Colors.indigo.shade400, fontSize: 10, fontWeight: FontWeight.w900),
+              style: TextStyle(color: theme.colorScheme.primary, fontSize: 10, fontWeight: FontWeight.w900),
             ),
           ],
         ),
@@ -304,6 +306,7 @@ class LibraryTab extends ConsumerWidget {
   }
 
   Widget _buildSimpleNoteCard(BuildContext context, WidgetRef ref, NoteListing note) {
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: () => _resumeNote(context, ref, note),
       child: Container(
@@ -311,12 +314,12 @@ class LibraryTab extends ConsumerWidget {
         margin: const EdgeInsets.only(left: 4, right: 12, bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))
+            BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))
           ],
-          border: Border.all(color: Colors.grey.shade100),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -326,21 +329,23 @@ class LibraryTab extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.indigo.shade50,
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.description_rounded, color: Colors.indigo, size: 18),
+                  child: Icon(Icons.description_rounded, color: theme.colorScheme.primary, size: 18),
                 ),
                 const Spacer(),
                 _buildActionIcon(
+                  context,
                   icon: Icons.edit_outlined,
-                  color: Colors.indigo,
+                  color: theme.colorScheme.primary,
                   onTap: () => context.push('/add-note', extra: note),
                 ),
                 const SizedBox(width: 4),
                 _buildActionIcon(
+                  context,
                   icon: Icons.delete_outline,
-                  color: Colors.red,
+                  color: AppColors.error,
                   onTap: () => _confirmDelete(context, ref, note),
                 ),
               ],
@@ -348,14 +353,14 @@ class LibraryTab extends ConsumerWidget {
             const Spacer(),
             Text(
               note.title,
-              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13, height: 1.2),
+              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: 13, height: 1.2, color: theme.colorScheme.onSurface),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 6),
             Text(
               note.unitCode,
-              style: TextStyle(color: Colors.indigo.shade400, fontSize: 10, fontWeight: FontWeight.w900),
+              style: TextStyle(color: theme.colorScheme.primary, fontSize: 10, fontWeight: FontWeight.w900),
             ),
           ],
         ),
@@ -363,13 +368,13 @@ class LibraryTab extends ConsumerWidget {
     );
   }
 
-  Widget _buildActionIcon({required IconData icon, required Color color, required VoidCallback onTap}) {
+  Widget _buildActionIcon(BuildContext context, {required IconData icon, required Color color, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(icon, color: color, size: 14),
@@ -390,21 +395,22 @@ class LibraryTab extends ConsumerWidget {
               Navigator.pop(context);
               await ref.read(notesRepositoryProvider).deleteNote(note.id);
             },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: const Text('Delete', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title, IconData icon) {
+  Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
+    final theme = Theme.of(context);
     return Row(
       children: [
-        Icon(icon, size: 20, color: Colors.indigo),
+        Icon(icon, size: 20, color: theme.colorScheme.primary),
         const SizedBox(width: 8),
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.bold),
+          style: theme.textTheme.titleMedium?.copyWith(fontSize: 18, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
         ),
       ],
     );
@@ -427,6 +433,7 @@ class LibraryTab extends ConsumerWidget {
   }
 
   Widget _buildFullEmptyState(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32.0),
@@ -436,21 +443,21 @@ class LibraryTab extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
-                color: Colors.indigo.shade50,
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.auto_stories_outlined, size: 80, color: Colors.indigo.shade200),
+              child: Icon(Icons.auto_stories_outlined, size: 80, color: theme.colorScheme.primary.withValues(alpha: 0.3)),
             ),
             const SizedBox(height: 32),
             Text(
               'Your Library is empty',
-              style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.bold),
+              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
             ),
             const SizedBox(height: 12),
             Text(
               'Start reading notes from the Discover tab and they will automatically appear here.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade600, height: 1.5, fontSize: 15),
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, height: 1.6, fontSize: 15),
             ),
           ],
         ),
@@ -471,7 +478,7 @@ class LibraryTab extends ConsumerWidget {
               ref.read(studyControllerProvider).clearHistory();
               Navigator.pop(context);
             },
-            child: const Text('Clear All', style: TextStyle(color: Colors.red)),
+            child: const Text('Clear All', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
@@ -479,30 +486,31 @@ class LibraryTab extends ConsumerWidget {
   }
 
   void _showRemoveFromHistoryDialog(BuildContext context, WidgetRef ref, dynamic note) {
+    final theme = Theme.of(context);
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const SizedBox(height: 8),
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: theme.colorScheme.outlineVariant, borderRadius: BorderRadius.circular(2))),
             const SizedBox(height: 20),
             Text(
               note.title,
-              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16),
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: 16, color: theme.colorScheme.onSurface),
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 12),
-            const Divider(),
+            Divider(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: Colors.red),
-              title: const Text('Remove from Library', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
-              subtitle: const Text('This will clear your study progress for this document.'),
+              leading: const Icon(Icons.delete_outline, color: AppColors.error),
+              title: const Text('Remove from Library', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w600)),
+              subtitle: Text('This will clear your study progress for this document.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
               onTap: () {
                 ref.read(studyControllerProvider).removeFromHistory(note.id);
                 Navigator.pop(context);

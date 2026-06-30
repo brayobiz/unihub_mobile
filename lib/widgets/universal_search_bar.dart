@@ -13,32 +13,33 @@ class UniversalSearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
           ],
-          border: Border.all(color: const Color(0xFFF1F5F9)),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
         ),
         child: Row(
           children: [
-            const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 22),
+            Icon(Icons.search_rounded, color: theme.colorScheme.onSurfaceVariant, size: 22),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 hintText ?? 'Search marketplace, housing, notes...',
                 style: GoogleFonts.plusJakartaSans(
-                  color: const Color(0xFF94A3B8),
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
@@ -49,10 +50,10 @@ class UniversalSearchBar extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
+                color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.tune_rounded, color: Color(0xFF64748B), size: 16),
+              child: Icon(Icons.tune_rounded, color: theme.colorScheme.onSurfaceVariant, size: 16),
             ),
           ],
         ),

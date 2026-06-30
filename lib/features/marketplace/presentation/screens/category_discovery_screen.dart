@@ -17,10 +17,11 @@ class CategoryDiscoveryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final isAll = category == 'All';
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
@@ -32,6 +33,7 @@ class CategoryDiscoveryScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildSection(
+                    context,
                     title: isAll ? 'Most Popular Items' : 'Trending $category',
                     provider: listingsProvider(ListingFilter(
                       selectedCategory: isAll ? null : category,
@@ -40,6 +42,7 @@ class CategoryDiscoveryScreen extends ConsumerWidget {
                     )),
                   ),
                   _buildSection(
+                    context,
                     title: 'Best Deals',
                     provider: listingsProvider(ListingFilter(
                       selectedCategory: isAll ? null : category,
@@ -50,7 +53,7 @@ class CategoryDiscoveryScreen extends ConsumerWidget {
                   const SizedBox(height: 24),
                   Text(
                     isAll ? 'Everything on Marketplace' : 'All $category',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: theme.textTheme.titleLarge?.copyWith(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -66,32 +69,35 @@ class CategoryDiscoveryScreen extends ConsumerWidget {
   }
 
   Widget _buildSliverAppBar(BuildContext context) {
+    final theme = Theme.of(context);
     return SliverAppBar(
       expandedHeight: 120,
       pinned: true,
       elevation: 0,
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       flexibleSpace: FlexibleSpaceBar(
         title: Text(
           category == 'All' ? 'Discover All' : category,
-          style: GoogleFonts.plusJakartaSans(
-            color: Colors.black,
+          style: theme.textTheme.titleLarge?.copyWith(
+            color: theme.colorScheme.onSurface,
             fontWeight: FontWeight.bold,
           ),
         ),
         titlePadding: const EdgeInsets.only(left: 60, bottom: 16),
       ),
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black),
+        icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.colorScheme.onSurface),
         onPressed: () => Navigator.pop(context),
       ),
     );
   }
 
-  Widget _buildSection({
+  Widget _buildSection(
+    BuildContext context, {
     required String title,
     required StreamProvider<List<Listing>> provider,
   }) {
+    final theme = Theme.of(context);
     return Consumer(
       builder: (context, ref, child) {
         final asyncListings = ref.watch(provider);
@@ -104,7 +110,7 @@ class CategoryDiscoveryScreen extends ConsumerWidget {
                 const SizedBox(height: 24),
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: theme.textTheme.titleLarge?.copyWith(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     letterSpacing: -0.5,
@@ -133,7 +139,7 @@ class CategoryDiscoveryScreen extends ConsumerWidget {
               ],
             );
           },
-          loading: () => const SkeletonLoader(width: double.infinity, height: 200),
+          loading: () => SkeletonLoader(width: double.infinity, height: 200, color: theme.colorScheme.surfaceVariant),
           error: (_, __) => const SizedBox.shrink(),
         );
       },
