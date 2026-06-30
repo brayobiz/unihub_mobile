@@ -108,117 +108,131 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final listing = widget.listing;
-    final currencyFormat = NumberFormat.currency(symbol: 'KES ', decimalDigits: 0);
-    final plugAsync = ref.watch(userByIdProvider(listing.plugId));
-    final savedListingsAsync = ref.watch(savedHousingProvider);
-    final isSaved = savedListingsAsync.valueOrNull?.any((l) => l.id == listing.id) ?? false;
+    final initialListing = widget.listing;
+    
+    // Watch real-time housing listing updates for views, status, etc.
+    final listingAsync = ref.watch(housingListingProvider(initialListing.id));
+    
+    return listingAsync.when(
+      data: (listing) {
+        if (listing == null) {
+          return const Scaffold(body: Center(child: Text('Property no longer available.')));
+        }
 
-    return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      body: Stack(
-        children: [
-          CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              _buildImageGallery(isSaved),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 20),
-                      _buildVerifiedBadgeRow(plugAsync),
-                      const SizedBox(height: 12),
-                      Text(
-                        listing.title,
-                        style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
+        final currencyFormat = NumberFormat.currency(symbol: 'KES ', decimalDigits: 0);
+        final plugAsync = ref.watch(userByIdProvider(listing.plugId));
+        final savedListingsAsync = ref.watch(savedHousingProvider);
+        final isSaved = savedListingsAsync.valueOrNull?.any((l) => l.id == listing.id) ?? false;
+
+        return Scaffold(
+          backgroundColor: theme.colorScheme.surface,
+          body: Stack(
+            children: [
+              CustomScrollView(
+                physics: const BouncingScrollPhysics(),
+                slivers: [
+                  _buildImageGallery(isSaved, listing),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.location_on_rounded, size: 16, color: theme.colorScheme.primary),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              '${listing.campus} • ${listing.location}', 
-                              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14, fontWeight: FontWeight.w500),
-                            ),
+                          const SizedBox(height: 20),
+                          _buildVerifiedBadgeRow(plugAsync, listing),
+                          const SizedBox(height: 12),
+                          Text(
+                            listing.title,
+                            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
                           ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(Icons.location_on_rounded, size: 16, color: theme.colorScheme.primary),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  '${listing.campus} • ${listing.location}', 
+                                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14, fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                currencyFormat.format(listing.rent),
+                                style: theme.textTheme.headlineMedium?.copyWith(
+                                  fontSize: 26, 
+                                  fontWeight: FontWeight.w900, 
+                                  color: theme.colorScheme.primary
+                                ),
+                              ),
+                              Text(
+                                ' / month',
+                                style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                          if (listing.deposit > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                'Deposit: ${currencyFormat.format(listing.deposit)}',
+                                style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          const SizedBox(height: 24),
+                          _buildSpecsGrid(listing),
+                          const SizedBox(height: 32),
+                          Text('Description', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 12),
+                          Text(
+                            listing.description,
+                            maxLines: _isDescriptionExpanded ? null : 4,
+                            style: TextStyle(color: theme.colorScheme.onSurface, height: 1.6, fontSize: 15),
+                          ),
+                          if (listing.description.length > 150)
+                            GestureDetector(
+                              onTap: () => setState(() => _isDescriptionExpanded = !_isDescriptionExpanded),
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  _isDescriptionExpanded ? 'Read less' : 'Read more',
+                                  style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          const SizedBox(height: 32),
+                          _buildAmenitiesSection(listing),
+                          const SizedBox(height: 32),
+                          _buildPlugCard(plugAsync, listing),
+                          const SizedBox(height: 24),
+                          _buildSafetyBanner(),
+                          const SizedBox(height: 32),
+                          _buildSimilarProperties(listing),
+                          const SizedBox(height: 120),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(
-                            currencyFormat.format(listing.rent),
-                            style: theme.textTheme.headlineMedium?.copyWith(
-                              fontSize: 26, 
-                              fontWeight: FontWeight.w900, 
-                              color: theme.colorScheme.primary
-                            ),
-                          ),
-                          Text(
-                            ' / month',
-                            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14, fontWeight: FontWeight.w600),
-                          ),
-                        ],
-                      ),
-                      if (listing.deposit > 0)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            'Deposit: ${currencyFormat.format(listing.deposit)}',
-                            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      const SizedBox(height: 24),
-                      _buildSpecsGrid(),
-                      const SizedBox(height: 32),
-                      Text('Description', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 12),
-                      Text(
-                        listing.description,
-                        maxLines: _isDescriptionExpanded ? null : 4,
-                        style: TextStyle(color: theme.colorScheme.onSurface, height: 1.6, fontSize: 15),
-                      ),
-                      if (listing.description.length > 150)
-                        GestureDetector(
-                          onTap: () => setState(() => _isDescriptionExpanded = !_isDescriptionExpanded),
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              _isDescriptionExpanded ? 'Read less' : 'Read more',
-                              style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 32),
-                      _buildAmenitiesSection(),
-                      const SizedBox(height: 32),
-                      _buildPlugCard(plugAsync),
-                      const SizedBox(height: 24),
-                      _buildSafetyBanner(),
-                      const SizedBox(height: 32),
-                      _buildSimilarProperties(),
-                      const SizedBox(height: 120),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
+              _buildStickyActionBar(listing),
             ],
           ),
-          _buildStickyActionBar(),
-        ],
-      ),
+        );
+      },
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
     );
   }
 
-  Widget _buildImageGallery(bool isSaved) {
-    final images = widget.listing.images;
+  Widget _buildImageGallery(bool isSaved, HousingListing listing) {
+    final images = listing.images;
     final topPadding = MediaQuery.of(context).padding.top;
     final theme = Theme.of(context);
     
@@ -245,7 +259,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                         itemCount: images.isEmpty ? 1 : images.length,
                         itemBuilder: (context, index) {
                           return Hero(
-                            tag: index == 0 ? (widget.heroTag ?? 'housing_img_${widget.listing.id}') : 'housing_img_${widget.listing.id}_$index',
+                            tag: index == 0 ? (widget.heroTag ?? 'housing_img_${listing.id}') : 'housing_img_${listing.id}_$index',
                             child: OptimizedImage(
                               imageUrl: images.isEmpty ? '' : images[index],
                               fit: BoxFit.cover,
@@ -307,7 +321,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
               right: 16,
               child: Row(
                 children: [
-                  _buildCircleButton(Icons.ios_share, () => Share.share('Check out this ${widget.listing.type.name} at ${widget.listing.location} on UniHub!')),
+                  _buildCircleButton(Icons.ios_share, () => Share.share('Check out this ${listing.type.name} at ${listing.location} on UniHub!')),
                   const SizedBox(width: 12),
                   _buildCircleButton(
                     isSaved ? Icons.favorite : Icons.favorite_border, 
@@ -336,13 +350,13 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                   ),
                 ),
               ),
-            if (widget.listing.videoUrl != null)
+            if (listing.videoUrl != null)
                Positioned(
                 bottom: 24,
                 right: images.length > 1 ? MediaQuery.of(context).size.width * 0.32 : 24,
                 child: GestureDetector(
                   onTap: () async {
-                    final url = Uri.parse(widget.listing.videoUrl!);
+                    final url = Uri.parse(listing.videoUrl!);
                     if (await canLaunchUrl(url)) {
                       await launchUrl(url, mode: LaunchMode.externalApplication);
                     }
@@ -394,7 +408,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
     );
   }
 
-  Widget _buildVerifiedBadgeRow(AsyncValue<AppUser?> plugAsync) {
+  Widget _buildVerifiedBadgeRow(AsyncValue<AppUser?> plugAsync, HousingListing listing) {
     final theme = Theme.of(context);
     return plugAsync.when(
       data: (plug) => Row(
@@ -430,9 +444,18 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                 ],
               ),
             ),
-          Text(
-            'Posted ${DateFormatter.formatRelative(widget.listing.createdAt)}',
-            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                'Posted ${DateFormatter.formatRelative(listing.createdAt)}',
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+              Text(
+                '${listing.views} views',
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), fontSize: 10),
+              ),
+            ],
           ),
         ],
       ),
@@ -441,7 +464,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
     );
   }
 
-  Widget _buildSpecsGrid() {
+  Widget _buildSpecsGrid(HousingListing listing) {
     final listing = widget.listing;
     final List<Map<String, dynamic>> specItems = [];
 
@@ -521,9 +544,9 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
     );
   }
 
-  Widget _buildAmenitiesSection() {
+  Widget _buildAmenitiesSection(HousingListing listing) {
     final theme = Theme.of(context);
-    if (widget.listing.amenities.isEmpty) return const SizedBox.shrink();
+    if (listing.amenities.isEmpty) return const SizedBox.shrink();
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -533,7 +556,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
         Wrap(
           spacing: 10,
           runSpacing: 10,
-          children: widget.listing.amenities.map((amenity) => _buildAmenityCard(amenity)).toList(),
+          children: listing.amenities.map((amenity) => _buildAmenityCard(amenity)).toList(),
         ),
       ],
     );
@@ -581,7 +604,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
     return Icons.check_circle_outline_rounded;
   }
 
-  Widget _buildPlugCard(AsyncValue<AppUser?> plugAsync) {
+  Widget _buildPlugCard(AsyncValue<AppUser?> plugAsync, HousingListing listing) {
     final theme = Theme.of(context);
     return plugAsync.when(
       data: (plug) {
@@ -596,29 +619,11 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
             children: [
               Row(
                 children: [
-                  Stack(
-                    children: [
-                      CircleAvatar(
-                        radius: 30,
-                        backgroundImage: plug.photoUrl != null ? NetworkImage(plug.photoUrl!) : null,
-                        backgroundColor: theme.colorScheme.surfaceVariant,
-                        child: plug.photoUrl == null ? Text(plug.fullName[0], style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant)) : null,
-                      ),
-                      if (plug.isOnline)
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: Container(
-                            width: 14,
-                            height: 14,
-                            decoration: BoxDecoration(
-                              color: AppColors.success,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: theme.colorScheme.surface, width: 2),
-                            ),
-                          ),
-                        ),
-                    ],
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundImage: plug.photoUrl != null ? NetworkImage(plug.photoUrl!) : null,
+                    backgroundColor: theme.colorScheme.surfaceVariant,
+                    child: plug.photoUrl == null ? Text(plug.fullName[0], style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant)) : null,
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -638,6 +643,33 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                             if (plug.isVerifiedPlug) ...[
                               const SizedBox(width: 4),
                               Icon(Icons.verified, color: theme.colorScheme.primary, size: 16),
+                            ],
+                            if (plug.isOnline) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange,
+                                  borderRadius: BorderRadius.circular(6),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.orange.withOpacity(0.3),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.bolt_rounded, color: Colors.white, size: 10),
+                                    SizedBox(width: 2),
+                                    Text(
+                                      'Available Now', 
+                                      style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ],
                           ],
                         ),
@@ -732,7 +764,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
     );
   }
 
-  Widget _buildSimilarProperties() {
+  Widget _buildSimilarProperties(HousingListing listing) {
     final theme = Theme.of(context);
     final similarAsync = ref.watch(housingListingsProvider(10)); // Simplified: just show top listings for now
     
@@ -745,7 +777,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
           height: 240,
           child: similarAsync.when(
             data: (listings) {
-              final filtered = listings.where((l) => l.id != widget.listing.id).toList();
+              final filtered = listings.where((l) => l.id != listing.id).toList();
               if (filtered.isEmpty) return const Center(child: Text('No similar properties found'));
               
               return ListView.builder(
@@ -770,9 +802,9 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
     );
   }
 
-  Widget _buildStickyActionBar() {
+  Widget _buildStickyActionBar(HousingListing listing) {
     final theme = Theme.of(context);
-    final isTaken = widget.listing.status == HousingStatus.taken;
+    final isTaken = listing.status == HousingStatus.taken;
     
     return Positioned(
       bottom: 0,

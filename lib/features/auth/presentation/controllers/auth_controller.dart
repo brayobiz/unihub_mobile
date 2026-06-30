@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../shared/providers.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -60,11 +61,19 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
 
   Future<void> signOut() async {
     state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
+    try {
+      // 1. Attempt token cleanup (now with internal timeouts)
       await _ref.read(notificationServiceProvider).deleteToken();
+    } catch (e) {
+      debugPrint('SignOut: Notification token cleanup failed: $e');
+    }
+
+    // 2. Perform actual sign out from repositories
+    state = await AsyncValue.guard(() async {
       await _authRepository.signOut();
-      // Additional cleanup if needed
+      // Reset other states if necessary
     });
+
     if (!state.hasError) {
       resetState();
     }

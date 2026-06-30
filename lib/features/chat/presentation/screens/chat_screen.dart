@@ -241,7 +241,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               radius: 18,
               backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
               backgroundImage: otherUser?.photoUrl != null ? NetworkImage(otherUser!.photoUrl!) : null,
-              child: otherUser?.photoUrl == null 
+              child: otherUser?.photoUrl == null
                 ? Text(
                     widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : '?',
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),

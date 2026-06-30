@@ -110,12 +110,24 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> signOut() async {
     try {
-      await _googleSignIn.signOut();
+      // 1. Sign out from Google (with timeout to prevent hanging)
+      try {
+        await _googleSignIn.signOut().timeout(const Duration(seconds: 3));
+      } catch (e) {
+        debugPrint('Google SignOut error or timeout: $e');
+      }
+
+      // 2. Sign out from Firebase
       await _firebaseAuth.signOut();
+      
+      debugPrint('✅ Auth: Sign out successful');
     } catch (e) {
-      debugPrint('Error during sign out: $e');
-      // Still attempt to sign out from Firebase if Google sign out fails
-      await _firebaseAuth.signOut();
+      debugPrint('❌ Auth: Error during sign out: $e');
+      // Final attempt to sign out from Firebase regardless of previous errors
+      try {
+        await _firebaseAuth.signOut();
+      } catch (_) {}
+      rethrow;
     }
   }
 

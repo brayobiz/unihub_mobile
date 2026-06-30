@@ -206,7 +206,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               children: [
                 Text('Already have an account?', style: TextStyle(color: theme.colorScheme.onSurface)),
                 TextButton(
-                  onPressed: _localLoading ? null : () {
+                  onPressed: isLoading ? null : () {
                     context.push('/login');
                   },
                   child: Text(

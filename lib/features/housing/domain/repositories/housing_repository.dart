@@ -24,6 +24,8 @@ abstract class HousingRepository {
 
   Future<HousingListing?> getListingById(String id);
 
+  Stream<HousingListing?> watchListingById(String id);
+
   Future<void> createListing(HousingListing listing);
 
   Future<void> updateListing(HousingListing listing);

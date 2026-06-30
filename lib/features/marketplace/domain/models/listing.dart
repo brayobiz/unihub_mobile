@@ -38,9 +38,11 @@ class Listing {
   final bool isPromoted;
   final int viewsCount;
   final int savesCount;
+  final int sharesCount;
   final int chatsStartedCount;
   
   final DateTime createdAt;
+  final DateTime? updatedAt;
   final DateTime expiresAt;
   final List<PriceHistory> priceHistory;
 
@@ -70,8 +72,10 @@ class Listing {
     this.isPromoted = false,
     this.viewsCount = 0,
     this.savesCount = 0,
+    this.sharesCount = 0,
     this.chatsStartedCount = 0,
     required this.createdAt,
+    this.updatedAt,
     required this.expiresAt,
     this.priceHistory = const [],
   });
@@ -103,8 +107,10 @@ class Listing {
       'isPromoted': isPromoted,
       'viewsCount': viewsCount,
       'savesCount': savesCount,
+      'sharesCount': sharesCount,
       'chatsStartedCount': chatsStartedCount,
       'createdAt': Timestamp.fromDate(createdAt),
+      'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
       'expiresAt': Timestamp.fromDate(expiresAt),
       'priceHistory': priceHistory.map((e) => e.toJson()).toList(),
       'searchKeywords': title.toLowerCase().split(' '),
@@ -171,10 +177,14 @@ class Listing {
       isPromoted: safeBool(json['isPromoted'], false),
       viewsCount: safeInt(json['viewsCount'], 0),
       savesCount: safeInt(json['savesCount'], 0),
+      sharesCount: safeInt(json['sharesCount'], 0),
       chatsStartedCount: safeInt(json['chatsStartedCount'], 0),
       createdAt: (json['createdAt'] is Timestamp) 
           ? (json['createdAt'] as Timestamp).toDate() 
           : DateTime.now(),
+      updatedAt: (json['updatedAt'] is Timestamp)
+          ? (json['updatedAt'] as Timestamp).toDate()
+          : null,
       expiresAt: (json['expiresAt'] is Timestamp) 
           ? (json['expiresAt'] as Timestamp).toDate() 
           : DateTime.now().add(const Duration(days: 30)),

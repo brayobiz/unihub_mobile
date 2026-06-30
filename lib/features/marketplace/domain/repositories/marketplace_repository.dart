@@ -15,6 +15,7 @@ abstract class MarketplaceRepository {
     String? searchQuery,
     ListingSortType? sortBy,
     ListingStatus? status,
+    Map<String, dynamic>? categoryAttributes,
   });
   
   Stream<List<Listing>> watchSellerListings(String sellerId);
@@ -22,6 +23,7 @@ abstract class MarketplaceRepository {
   
   // Discovery & Sections
   Stream<List<Listing>> watchRecentlyViewed(String userId);
+  Future<void> clearRecentlyViewed(String userId);
   Stream<List<Listing>> watchTrendingListings({String? university, int limit = 10});
   Stream<List<Listing>> watchRecommendedListings(String userId, {int limit = 10});
   Stream<List<Listing>> watchSimilarListings(Listing listing, {int limit = 6});
@@ -44,6 +46,8 @@ abstract class MarketplaceRepository {
   Future<List<String>> getSearchSuggestions(String query);
   Future<void> saveSearchQuery(String userId, String query);
   Stream<List<String>> watchRecentSearches(String userId);
+  Future<void> clearRecentSearches(String userId);
+  Future<List<String>> getPopularSearches();
 
   // Seller Dashboard & Performance
   Future<Map<String, dynamic>> getSellerStats(String userId);
@@ -51,6 +55,7 @@ abstract class MarketplaceRepository {
 
   Future<List<Listing>> getListings({int limit = 20, Listing? startAfter});
   Future<Listing?> getListingById(String id);
+  Stream<Listing?> watchListingById(String id);
 
   Future<void> createListing(Listing listing);
   Future<void> updateListing(Listing listing);
@@ -60,6 +65,7 @@ abstract class MarketplaceRepository {
   Future<void> recordView(String listingId, {String? userId});
   Future<void> recordSave(String listingId, bool isSaved);
   Future<void> recordChatStarted(String listingId);
+  Future<void> recordShare(String listingId);
   Future<void> updateListingStatus(String listingId, ListingStatus status);
   Future<void> updateListingPrice(String listingId, double newPrice);
   

@@ -4,14 +4,35 @@ import '../../../auth/shared/providers.dart';
 import '../../domain/models/listing.dart';
 import '../../domain/repositories/marketplace_repository.dart';
 import '../../shared/providers.dart';
-
 import '../../domain/models/listing_filter.dart';
 
 class MarketplaceController extends StateNotifier<ListingFilter> {
-  MarketplaceController() : super(ListingFilter());
+  final Ref _ref;
+  
+  MarketplaceController(this._ref) : super(ListingFilter());
 
   void setSearchQuery(String query) {
     state = state.copyWith(searchQuery: query);
+    
+    // Auto-save search if user is logged in
+    final user = _ref.read(appUserProvider).valueOrNull;
+    if (user != null && query.isNotEmpty) {
+      _ref.read(marketplaceRepositoryProvider).saveSearchQuery(user.uid, query);
+    }
+  }
+  
+  Future<void> clearRecentSearches() async {
+    final user = _ref.read(appUserProvider).valueOrNull;
+    if (user != null) {
+      await _ref.read(marketplaceRepositoryProvider).clearRecentSearches(user.uid);
+    }
+  }
+
+  Future<void> clearRecentlyViewed() async {
+    final user = _ref.read(appUserProvider).valueOrNull;
+    if (user != null) {
+      await _ref.read(marketplaceRepositoryProvider).clearRecentlyViewed(user.uid);
+    }
   }
 
   void setCategory(String? category) {
@@ -42,6 +63,16 @@ class MarketplaceController extends StateNotifier<ListingFilter> {
     state = state.copyWith(status: status);
   }
 
+  void updateAttribute(String key, dynamic value) {
+    final current = Map<String, dynamic>.from(state.categoryAttributes);
+    if (value == null) {
+      current.remove(key);
+    } else {
+      current[key] = value;
+    }
+    state = state.copyWith(categoryAttributes: current);
+  }
+
   void resetFilters() {
     state = ListingFilter();
   }
@@ -49,7 +80,7 @@ class MarketplaceController extends StateNotifier<ListingFilter> {
 
 final marketplaceControllerProvider = 
     StateNotifierProvider<MarketplaceController, ListingFilter>((ref) {
-  return MarketplaceController();
+  return MarketplaceController(ref);
 });
 
 final scoredListingsProvider = Provider<AsyncValue<List<Listing>>>((ref) {

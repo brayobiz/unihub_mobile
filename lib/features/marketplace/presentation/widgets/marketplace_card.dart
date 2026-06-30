@@ -121,6 +121,15 @@ class MarketplaceCard extends ConsumerWidget {
                           ),
                         ),
                       ),
+                    
+                    // Availability / Status Badge
+                    if (listing.status != ListingStatus.active || DateTime.now().difference(listing.createdAt).inHours < 48)
+                      Positioned(
+                        bottom: 12,
+                        left: 12,
+                        child: _buildStatusBadge(listing),
+                      ),
+
                     Positioned(
                       top: 8,
                       right: 8,
@@ -198,7 +207,7 @@ class MarketplaceCard extends ConsumerWidget {
                                     radius: 8,
                                     backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
                                     backgroundImage: seller.photoUrl != null ? NetworkImage(seller.photoUrl!) : null,
-                                    child: seller.photoUrl == null 
+                                    child: seller.photoUrl == null
                                       ? Text(
                                           seller.fullName[0].toUpperCase(),
                                           style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
@@ -224,6 +233,10 @@ class MarketplaceCard extends ConsumerWidget {
                                         if (seller.isVerifiedSeller) ...[
                                           const SizedBox(width: 4),
                                           Icon(Icons.verified, color: theme.colorScheme.primary, size: 10),
+                                        ],
+                                        if (seller.isOnline) ...[
+                                          const SizedBox(width: 4),
+                                          Icon(Icons.bolt_rounded, color: Colors.orange, size: 12),
                                         ],
                                       ],
                                     ),
@@ -285,6 +298,49 @@ class MarketplaceCard extends ConsumerWidget {
             ),
             child: Icon(icon, color: color, size: 16),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(Listing listing) {
+    Color color;
+    String label;
+    final isRecent = DateTime.now().difference(listing.createdAt).inHours < 48;
+
+    if (listing.status == ListingStatus.sold) {
+      color = AppColors.error;
+      label = 'SOLD';
+    } else if (listing.status == ListingStatus.reserved) {
+      color = Colors.orange;
+      label = 'RESERVED';
+    } else if (isRecent) {
+      color = AppColors.secondary;
+      label = 'NEW';
+    } else {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(6),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.3),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 8,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.5,
         ),
       ),
     );

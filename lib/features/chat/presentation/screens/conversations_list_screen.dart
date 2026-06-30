@@ -193,32 +193,14 @@ class _ConversationTile extends ConsumerWidget {
               'context': conversation.context,
             });
           },
-          leading: Stack(
-            children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-                backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
-                child: photoUrl == null
-                    ? Text(displayName[0].toUpperCase(),
-                        style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary))
-                    : null,
-              ),
-              if (otherUser?.isOnline == true)
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: AppColors.success,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: theme.colorScheme.surface, width: 2),
-                    ),
-                  ),
-                ),
-            ],
+          leading: CircleAvatar(
+            radius: 28,
+            backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+            backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+            child: photoUrl == null
+                ? Text(displayName[0].toUpperCase(),
+                    style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary))
+                : null,
           ),
           title: Row(
             children: [

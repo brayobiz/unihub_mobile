@@ -13,6 +13,7 @@ class ListingFilter {
   final ListingSortType sortBy;
   final ListingStatus status;
   final String? university;
+  final Map<String, dynamic> categoryAttributes;
 
   ListingFilter({
     this.searchQuery = '',
@@ -24,6 +25,7 @@ class ListingFilter {
     ListingSortType? sortBy,
     ListingStatus? status,
     this.university,
+    this.categoryAttributes = const {},
   })  : sortBy = sortBy ?? ListingSortType.newest,
         status = status ?? ListingStatus.active;
 
@@ -37,6 +39,7 @@ class ListingFilter {
     ListingSortType? sortBy,
     ListingStatus? status,
     ValueGetter<String?>? university,
+    Map<String, dynamic>? categoryAttributes,
   }) {
     return ListingFilter(
       searchQuery: searchQuery ?? this.searchQuery,
@@ -48,6 +51,7 @@ class ListingFilter {
       sortBy: sortBy ?? this.sortBy,
       status: status ?? this.status,
       university: university != null ? university() : this.university,
+      categoryAttributes: categoryAttributes ?? this.categoryAttributes,
     );
   }
 
@@ -64,7 +68,8 @@ class ListingFilter {
           itemsLimit == other.itemsLimit &&
           sortBy == other.sortBy &&
           status == other.status &&
-          university == other.university;
+          university == other.university &&
+          mapEquals(categoryAttributes, other.categoryAttributes);
 
   @override
   int get hashCode => Object.hash(
@@ -77,5 +82,6 @@ class ListingFilter {
         sortBy,
         status,
         university,
+        categoryAttributes,
       );
 }

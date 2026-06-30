@@ -122,6 +122,15 @@ class HousingRepositoryImpl implements HousingRepository {
   }
 
   @override
+  Stream<HousingListing?> watchListingById(String id) {
+    if (id.isEmpty) return Stream.value(null);
+    return _firestore.collection('housing_listings').doc(id).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      return HousingListing.fromFirestore(doc);
+    });
+  }
+
+  @override
   Future<void> createListing(HousingListing listing) async {
     final batch = _firestore.batch();
     

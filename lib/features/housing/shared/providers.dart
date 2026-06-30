@@ -63,6 +63,10 @@ final plugListingsProvider = StreamProvider.family<List<HousingListing>, String>
   return ref.watch(housingRepositoryProvider).watchPlugListings(plugId);
 });
 
+final housingListingProvider = StreamProvider.family<HousingListing?, String>((ref, id) {
+  return ref.watch(housingRepositoryProvider).watchListingById(id);
+});
+
 final plugReviewsProvider = StreamProvider.family<List<HousingReview>, String>((ref, plugId) {
   return ref.watch(housingRepositoryProvider).watchPlugReviews(plugId);
 });

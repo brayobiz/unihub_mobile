@@ -29,6 +29,7 @@ final listingsProvider = StreamProvider.family<List<Listing>, ListingFilter>((re
     searchQuery: filter.searchQuery,
     sortBy: filter.sortBy,
     status: filter.status,
+    categoryAttributes: filter.categoryAttributes,
   );
 });
 
@@ -73,6 +74,10 @@ final sellerListingsProvider = StreamProvider.family<List<Listing>, String>((ref
   return ref.watch(marketplaceRepositoryProvider).watchSellerListings(sellerId);
 });
 
+final listingProvider = StreamProvider.family<Listing?, String>((ref, id) {
+  return ref.watch(marketplaceRepositoryProvider).watchListingById(id);
+});
+
 final topListingsProvider = StreamProvider<List<Listing>>((ref) {
   return ref.watch(listingsProvider(ListingFilter()).stream);
 });
@@ -81,6 +86,56 @@ final savedListingsProvider = StreamProvider<List<Listing>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
   if (user == null) return Stream.value([]);
   return ref.watch(marketplaceRepositoryProvider).watchSavedListings(user.uid);
+});
+
+class MarketplaceDiscoveryData {
+  final List<Listing> recentlyViewed;
+  final List<Listing> recommended;
+  final List<Listing> trending;
+
+  MarketplaceDiscoveryData({
+    required this.recentlyViewed,
+    required this.recommended,
+    required this.trending,
+  });
+}
+
+final marketplaceDiscoveryProvider = Provider<AsyncValue<MarketplaceDiscoveryData>>((ref) {
+  final user = ref.watch(appUserProvider).valueOrNull;
+  final recentlyViewedAsync = ref.watch(recentlyViewedProvider);
+  final recommendedAsync = ref.watch(recommendedListingsProvider);
+  final trendingAsync = ref.watch(trendingListingsProvider(user?.university));
+
+  if (recentlyViewedAsync.isLoading || recommendedAsync.isLoading || trendingAsync.isLoading) {
+    return const AsyncValue.loading();
+  }
+
+  if (recentlyViewedAsync.hasError) return AsyncValue.error(recentlyViewedAsync.error!, recentlyViewedAsync.stackTrace!);
+  if (recommendedAsync.hasError) return AsyncValue.error(recommendedAsync.error!, recommendedAsync.stackTrace!);
+  if (trendingAsync.hasError) return AsyncValue.error(trendingAsync.error!, trendingAsync.stackTrace!);
+
+  final seenIds = <String>{};
+  
+  // 1. Recently Viewed (High priority for the user)
+  final recentlyViewed = recentlyViewedAsync.value ?? [];
+  final uniqueRecentlyViewed = recentlyViewed.where((l) => seenIds.add(l.id)).toList();
+  
+  // 2. Recommended (Filter out what they just saw)
+  final recommended = recommendedAsync.value ?? [];
+  final uniqueRecommended = recommended.where((l) => !seenIds.contains(l.id)).toList();
+  for (var l in uniqueRecommended) {
+    seenIds.add(l.id);
+  }
+  
+  // 3. Trending (Filter out recently viewed and recommended)
+  final trending = trendingAsync.value ?? [];
+  final uniqueTrending = trending.where((l) => !seenIds.contains(l.id)).toList();
+
+  return AsyncValue.data(MarketplaceDiscoveryData(
+    recentlyViewed: uniqueRecentlyViewed,
+    recommended: uniqueRecommended,
+    trending: uniqueTrending,
+  ));
 });
 
 final sellerReviewsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, sellerId) {
@@ -97,6 +152,10 @@ final sellerReviewsProvider = StreamProvider.family<List<Map<String, dynamic>>, 
 
 final similarListingsProvider = StreamProvider.family<List<Listing>, Listing>((ref, currentListing) {
   return ref.watch(marketplaceRepositoryProvider).watchSimilarListings(currentListing);
+});
+
+final moreFromSellerProvider = StreamProvider.family<List<Listing>, String>((ref, sellerId) {
+  return ref.watch(marketplaceRepositoryProvider).watchSellerListingsByStatus(sellerId, ListingStatus.active);
 });
 
 final otherUserProvider = StreamProvider.family<AppUser, String>((ref, userId) {

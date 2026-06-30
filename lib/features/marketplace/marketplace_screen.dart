@@ -133,32 +133,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                   const SizedBox(height: 12),
                   if (isBrowsingHome) ...[
                     _buildPopularCategories(),
-                    _buildDiscoverySection(
-                      context: context,
-                      title: 'Recently Viewed',
-                      provider: recentlyViewedProvider,
-                      emptyWidget: const SizedBox.shrink(),
-                    ),
-                    _buildDiscoverySection(
-                      context: context,
-                      title: 'Recommended For You',
-                      provider: recommendedListingsProvider,
-                    ),
-                    _buildDiscoverySection(
-                      context: context,
-                      title: 'Trending in ${user?.university ?? 'Campus'}',
-                      provider: trendingListingsProvider(user?.university),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Recently Added',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: -0.5,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
+                    _buildDiscoveryContent(ref),
                   ] else ...[
                     const SizedBox(height: 8),
                     _buildCategoryChips(filterState, controller),
@@ -355,70 +330,103 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
     );
   }
 
+  Widget _buildDiscoveryContent(WidgetRef ref) {
+    final discoveryAsync = ref.watch(marketplaceDiscoveryProvider);
+    final user = ref.watch(appUserProvider).valueOrNull;
+
+    return discoveryAsync.when(
+      data: (data) => Column(
+        children: [
+          _buildDiscoverySection(
+            context: context,
+            title: 'Continue Browsing',
+            listings: data.recentlyViewed,
+            emptyWidget: const SizedBox.shrink(),
+          ),
+          _buildDiscoverySection(
+            context: context,
+            title: 'Recommended For You',
+            listings: data.recommended,
+          ),
+          _buildDiscoverySection(
+            context: context,
+            title: 'Trending in ${user?.university ?? 'Campus'}',
+            listings: data.trending,
+          ),
+        ],
+      ),
+      loading: () => const Column(
+        children: [
+          SizedBox(height: 24),
+          SkeletonLoader(width: double.infinity, height: 200),
+          SizedBox(height: 24),
+          SkeletonLoader(width: double.infinity, height: 200),
+        ],
+      ),
+      error: (e, _) => const SizedBox.shrink(),
+    );
+  }
+
   Widget _buildDiscoverySection({
     required BuildContext context,
     required String title,
-    required StreamProvider<List<Listing>> provider,
+    required List<Listing> listings,
     Widget? emptyWidget,
   }) {
     final theme = Theme.of(context);
-    final asyncListings = ref.watch(provider);
     final sectionPrefix = title.replaceAll(' ', '_').toLowerCase();
 
-    return asyncListings.when(
-      data: (listings) {
-        if (listings.isEmpty) return emptyWidget ?? const SizedBox.shrink();
-        
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    if (listings.isEmpty) return emptyWidget ?? const SizedBox.shrink();
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 24),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: -0.5,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {}, // Show all
-                  child: const Text('See All'),
-                ),
-              ],
+            Text(
+              title,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.5,
+                color: theme.colorScheme.onSurface,
+              ),
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 200,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: listings.length,
-                itemBuilder: (context, index) => Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: SizedBox(
-                    width: 160,
-                    child: MarketplaceCard(
-                      listing: listings[index], 
-                      index: index,
-                      heroTag: 'hero_${sectionPrefix}_${listings[index].id}',
-                    ),
-                  ),
+            if (title == 'Continue Browsing')
+              TextButton(
+                onPressed: () => ref.read(marketplaceControllerProvider.notifier).clearRecentlyViewed(),
+                child: Text('Clear', style: TextStyle(color: theme.colorScheme.error)),
+              )
+            else
+              TextButton(
+                onPressed: () {}, // Show all
+                child: const Text('See All'),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 200,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: listings.length,
+            itemBuilder: (context, index) => Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: SizedBox(
+                width: 160,
+                child: MarketplaceCard(
+                  listing: listings[index], 
+                  index: index,
+                  heroTag: 'hero_${sectionPrefix}_${listings[index].id}',
                 ),
               ),
             ),
-          ],
-        );
-      },
-      loading: () => const Padding(
-        padding: EdgeInsets.only(top: 24),
-        child: SkeletonLoader(width: double.infinity, height: 200),
-      ),
-      error: (e, _) => const SizedBox.shrink(),
+          ),
+        ),
+      ],
     );
   }
 
@@ -432,21 +440,61 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
           return SliverFillRemaining(
             hasScrollBody: false,
             child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.search_off_rounded, size: 64, color: theme.colorScheme.outlineVariant),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No items found',
-                    style: GoogleFonts.plusJakartaSans(color: theme.colorScheme.onSurfaceVariant, fontSize: 16),
-                  ),
-                  const SizedBox(height: 16),
-                  TextButton(
-                    onPressed: () => ref.read(marketplaceControllerProvider.notifier).resetFilters(),
-                    child: const Text('Clear all filters'),
-                  ),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.all(40),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.search_off_rounded, size: 64, color: theme.colorScheme.primary),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'No items match your search',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: theme.colorScheme.onSurface, 
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Try clearing your filters or explore another category to find what you\'re looking for.',
+                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 32),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () => ref.read(marketplaceControllerProvider.notifier).resetFilters(),
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Clear Filters'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        FilledButton(
+                          onPressed: () => ref.read(marketplaceControllerProvider.notifier).setCategory('All'),
+                          child: const Text('Explore All'),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -633,6 +681,126 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
     );
   }
 
+  Widget _buildCategorySpecificFilters(BuildContext context, ListingFilter state, MarketplaceController controller, StateSetter setModalState) {
+    final theme = Theme.of(context);
+    final category = state.selectedCategory;
+    
+    List<Widget> filterWidgets = [];
+
+    if (category == 'Phones') {
+      filterWidgets.addAll([
+        _buildFilterDropdown(
+          label: 'Brand',
+          value: state.categoryAttributes['brand'],
+          options: ['Apple', 'Samsung', 'Google', 'Xiaomi', 'Oppo', 'Other'],
+          onChanged: (val) => controller.updateAttribute('brand', val),
+          setModalState: setModalState,
+        ),
+        _buildFilterDropdown(
+          label: 'Storage',
+          value: state.categoryAttributes['storage'],
+          options: ['64GB', '128GB', '256GB', '512GB', '1TB'],
+          onChanged: (val) => controller.updateAttribute('storage', val),
+          setModalState: setModalState,
+        ),
+      ]);
+    } else if (category == 'Shoes') {
+      filterWidgets.addAll([
+        _buildFilterDropdown(
+          label: 'Brand',
+          value: state.categoryAttributes['brand'],
+          options: ['Nike', 'Adidas', 'Puma', 'Jordan', 'New Balance', 'Other'],
+          onChanged: (val) => controller.updateAttribute('brand', val),
+          setModalState: setModalState,
+        ),
+        _buildFilterDropdown(
+          label: 'Size',
+          value: state.categoryAttributes['size'],
+          options: ['38', '39', '40', '41', '42', '43', '44', '45'],
+          onChanged: (val) => controller.updateAttribute('size', val),
+          setModalState: setModalState,
+        ),
+      ]);
+    } else if (category == 'Vehicles') {
+      filterWidgets.addAll([
+        _buildFilterDropdown(
+          label: 'Fuel Type',
+          value: state.categoryAttributes['fuelType'],
+          options: ['Petrol', 'Diesel', 'Electric', 'Hybrid'],
+          onChanged: (val) => controller.updateAttribute('fuelType', val),
+          setModalState: setModalState,
+        ),
+      ]);
+    } else if (category == 'Furniture') {
+      filterWidgets.addAll([
+        _buildFilterDropdown(
+          label: 'Material',
+          value: state.categoryAttributes['material'],
+          options: ['Wood', 'Metal', 'Plastic', 'Glass', 'Fabric', 'Leather'],
+          onChanged: (val) => controller.updateAttribute('material', val),
+          setModalState: setModalState,
+        ),
+        _buildFilterDropdown(
+          label: 'Type',
+          value: state.categoryAttributes['type'],
+          options: ['Chair', 'Table', 'Bed', 'Desk', 'Sofa', 'Storage'],
+          onChanged: (val) => controller.updateAttribute('type', val),
+          setModalState: setModalState,
+        ),
+      ]);
+    }
+
+    if (filterWidgets.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$category Filters', 
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.bold, 
+            fontSize: 16,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...filterWidgets,
+      ],
+    );
+  }
+
+  Widget _buildFilterDropdown({
+    required String label,
+    required dynamic value,
+    required List<String> options,
+    required Function(String?) onChanged,
+    required StateSetter setModalState,
+  }) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: DropdownButtonFormField<String>(
+        value: value,
+        hint: Text('Select $label'),
+        dropdownColor: theme.colorScheme.surface,
+        style: TextStyle(color: theme.colorScheme.onSurface),
+        decoration: InputDecoration(
+          labelText: label,
+          filled: true,
+          fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        ),
+        items: [
+          const DropdownMenuItem<String>(value: null, child: Text('Any')),
+          ...options.map((o) => DropdownMenuItem(value: o, child: Text(o))),
+        ],
+        onChanged: (val) {
+          onChanged(val);
+          setModalState(() {});
+        },
+      ),
+    );
+  }
   void _showFilterSheet(BuildContext context, ListingFilter state, MarketplaceController controller) {
     showModalBottomSheet(
       context: context,
@@ -695,6 +863,10 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                     }
                   },
                 ),
+                if (state.selectedCategory != null) ...[
+                  const SizedBox(height: 24),
+                  _buildCategorySpecificFilters(context, state, controller, setModalState),
+                ],
                 const SizedBox(height: 24),
                 Text(
                   'Condition', 
@@ -820,6 +992,7 @@ class MarketplaceSearchDelegate extends SearchDelegate<String?> {
 
   @override
   Widget buildSuggestions(BuildContext context) {
+    final theme = Theme.of(context);
     final user = ref.watch(appUserProvider).valueOrNull;
     final recentSearchesAsync = ref.watch(recentSearchesProvider);
 
@@ -835,14 +1008,24 @@ class MarketplaceSearchDelegate extends SearchDelegate<String?> {
                 children: [
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-                    child: Text(
-                      'Recent Searches',
-                      style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Recent Searches',
+                          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        TextButton(
+                          onPressed: () => ref.read(marketplaceControllerProvider.notifier).clearRecentSearches(),
+                          child: Text('Clear All', style: TextStyle(color: theme.colorScheme.error, fontSize: 12)),
+                        ),
+                      ],
                     ),
                   ),
                   ...searches.take(5).map((s) => ListTile(
                     leading: const Icon(Icons.history_rounded, size: 20),
                     title: Text(s),
+                    trailing: const Icon(Icons.north_west_rounded, size: 16, color: AppColors.grey),
                     onTap: () {
                       query = s;
                       showResults(context);
@@ -853,6 +1036,39 @@ class MarketplaceSearchDelegate extends SearchDelegate<String?> {
             },
             loading: () => const SizedBox.shrink(),
             error: (_, __) => const SizedBox.shrink(),
+          ),
+          FutureBuilder<List<String>>(
+            future: ref.read(marketplaceRepositoryProvider).getPopularSearches(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData || snapshot.data!.isEmpty) return const SizedBox.shrink();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                    child: Text(
+                      'Popular Searches',
+                      style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 0,
+                      children: snapshot.data!.map((s) => ActionChip(
+                        label: Text(s, style: const TextStyle(fontSize: 12)),
+                        padding: EdgeInsets.zero,
+                        onPressed: () {
+                          query = s;
+                          showResults(context);
+                        },
+                      )).toList(),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),

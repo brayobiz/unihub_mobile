@@ -179,7 +179,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               children: [
                 Text("Don't have an account?", style: TextStyle(color: theme.colorScheme.onSurface)),
                 TextButton(
-                  onPressed: _localLoading ? null : () {
+                  onPressed: isLoading ? null : () {
                     context.push('/register');
                   },
                   child: Text(

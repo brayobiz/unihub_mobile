@@ -121,21 +121,39 @@ class NotificationService {
   Future<void> deleteToken() async {
     try {
       final user = _ref.read(authStateProvider).valueOrNull;
-      String? token = await _messaging.getToken();
+      
+      // Get token with a short timeout to prevent hanging on logout
+      String? token;
+      try {
+        token = await _messaging.getToken().timeout(const Duration(seconds: 2));
+      } catch (e) {
+        debugPrint('Timeout/error getting token during deletion: $e');
+      }
       
       if (user != null && token != null) {
+        // Attempt to delete from Firestore, but don't hang if network is slow
         await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
             .collection('tokens')
             .doc(token)
-            .delete();
+            .delete()
+            .timeout(const Duration(seconds: 2))
+            .catchError((e) {
+          debugPrint('Firestore token deletion failed: $e');
+          return null;
+        });
       }
       
-      await _messaging.deleteToken();
+      // Delete FCM token from device/server
+      await _messaging.deleteToken().timeout(const Duration(seconds: 2)).catchError((e) {
+        debugPrint('FCM deleteToken failed: $e');
+        return null;
+      });
+      
       _isInitialized = false;
     } catch (e) {
-      debugPrint('Error deleting FCM token: $e');
+      debugPrint('Error during notification token cleanup: $e');
     }
   }
 

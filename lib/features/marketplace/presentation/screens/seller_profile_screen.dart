@@ -181,20 +181,6 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                 child: const Icon(Icons.verified, color: AppColors.success, size: 24),
               ),
             ),
-          if (seller.isOnline == true)
-            Positioned(
-              right: 6,
-              top: 6,
-              child: Container(
-                width: 20,
-                height: 20,
-                decoration: BoxDecoration(
-                  color: AppColors.success,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 3),
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -243,17 +229,43 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: isOnline ? AppColors.success : Colors.white24,
-                borderRadius: BorderRadius.circular(4),
+            if (isOnline)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.orange,
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.bolt_rounded, color: Colors.white, size: 12),
+                    SizedBox(width: 4),
+                    Text(
+                      'AVAILABLE NOW',
+                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.white),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  lastSeen != null ? _formatLastSeen(lastSeen).toUpperCase() : 'OFFLINE',
+                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.white),
+                ),
               ),
-              child: Text(
-                isOnline ? 'ONLINE' : (lastSeen != null ? _formatLastSeen(lastSeen).toUpperCase() : 'OFFLINE'),
-                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.white),
-              ),
-            ),
           ],
         ),
         const SizedBox(height: 12),
