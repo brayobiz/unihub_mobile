@@ -321,44 +321,48 @@ class _SearchItemCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFF1F5F9)),
       ),
-      child: ListTile(
-        onTap: onTap,
-        contentPadding: const EdgeInsets.all(12),
-        leading: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: _getCategoryColor(item.model.type).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          onTap: onTap,
+          contentPadding: const EdgeInsets.all(12),
+          leading: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: _getCategoryColor(item.model.type).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              _getCategoryIcon(item.model.type),
+              color: _getCategoryColor(item.model.type),
+            ),
           ),
-          child: Icon(
-            _getCategoryIcon(item.model.type),
-            color: _getCategoryColor(item.model.type),
+          title: Text(
+            item.model.title,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
+          subtitle: Text(
+            item.model.subtitle,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              color: const Color(0xFF64748B),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1)),
         ),
-        title: Text(
-          item.model.title,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Text(
-          item.model.subtitle,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 12,
-            color: const Color(0xFF64748B),
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1)),
       ),
     );
   }

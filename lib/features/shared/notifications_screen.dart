@@ -177,7 +177,7 @@ class _NotificationTile extends ConsumerWidget {
       onDismissed: (_) {
         ref.read(notificationRepositoryProvider).deleteNotification(userId, notification.id);
       },
-      child: Container(
+      child: Material(
         color: notification.isRead ? Colors.transparent : Colors.indigo.withOpacity(0.03),
         child: ListTile(
           onTap: () async {

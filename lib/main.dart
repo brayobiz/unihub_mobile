@@ -10,6 +10,7 @@ import 'firebase_options.dart';
 
 import 'features/profile/settings_screen.dart';
 import 'services/notification_service.dart';
+import 'services/presence_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -57,6 +58,13 @@ class UniHubApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Initialize presence when user is logged in
+    ref.listen(authStateProvider, (previous, next) {
+      if (next.value != null) {
+        ref.read(presenceServiceProvider).init();
+      }
+    });
+
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
     

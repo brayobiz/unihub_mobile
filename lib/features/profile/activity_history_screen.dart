@@ -68,21 +68,24 @@ class _ActivityHistoryScreenState extends ConsumerState<ActivityHistoryScreen> {
   Widget _buildHistoryCard(BuildContext context, HistoryItem item) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFF1F5F9)),
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(12),
-        leading: Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            color: _getCategoryColor(item.type).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          contentPadding: const EdgeInsets.all(12),
+          leading: Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: _getCategoryColor(item.type).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(_getCategoryIcon(item.type), color: _getCategoryColor(item.type)),
           ),
-          child: Icon(_getCategoryIcon(item.type), color: _getCategoryColor(item.type)),
-        ),
         title: Text(
           item.title,
           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
@@ -112,8 +115,9 @@ class _ActivityHistoryScreenState extends ConsumerState<ActivityHistoryScreen> {
         trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1)),
         onTap: () => _navigateToDetail(item),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Future<void> _navigateToDetail(HistoryItem item) async {
     setState(() => _isLoading = true);

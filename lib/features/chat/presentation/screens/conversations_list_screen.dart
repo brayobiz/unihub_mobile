@@ -32,6 +32,18 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
 
     final conversationsAsync = ref.watch(conversationsProvider(user.uid));
 
+    // Mark messages as delivered when they appear in the list
+    ref.listen(conversationsProvider(user.uid), (previous, next) {
+      if (next.hasValue) {
+        for (final conv in next.value!) {
+          if (conv.lastMessageSenderId != user.uid && 
+              conv.lastMessageStatus == MessageStatus.sent) {
+            ref.read(chatRepositoryProvider).markAsDelivered(conv.id, user.uid);
+          }
+        }
+      }
+    });
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FB),
       appBar: AppBar(

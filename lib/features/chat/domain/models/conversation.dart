@@ -13,6 +13,7 @@ class Conversation {
   final Map<String, int> unreadCounts;
   final Map<String, dynamic> typing;
   final bool isSupport;
+  final DateTime? expiresAt;
 
   Conversation({
     required this.id,
@@ -25,6 +26,7 @@ class Conversation {
     required this.unreadCounts,
     this.typing = const {},
     this.isSupport = false,
+    this.expiresAt,
   });
 
   Map<String, dynamic> toJson() {
@@ -39,6 +41,7 @@ class Conversation {
       'unreadCounts': unreadCounts,
       'typing': typing,
       'isSupport': isSupport,
+      'expiresAt': expiresAt != null ? Timestamp.fromDate(expiresAt!) : null,
     };
   }
 
@@ -56,6 +59,7 @@ class Conversation {
       unreadCounts: Map<String, int>.from(json['unreadCounts'] ?? {}),
       typing: Map<String, dynamic>.from(json['typing'] ?? {}),
       isSupport: json['isSupport'] ?? false,
+      expiresAt: (json['expiresAt'] as Timestamp?)?.toDate(),
     );
   }
 }

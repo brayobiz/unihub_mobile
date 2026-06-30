@@ -16,4 +16,5 @@ abstract class ChatRepository {
   Future<void> deleteMessage(String conversationId, String messageId);
   Future<void> deleteConversation(String conversationId);
   Future<void> updateTypingStatus(String conversationId, String userId, bool isTyping);
+  Future<void> markAsDelivered(String conversationId, String userId);
 }

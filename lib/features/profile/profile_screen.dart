@@ -638,28 +638,32 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
   Widget _buildActionButton(IconData icon, String title, VoidCallback onTap, {bool isDestructive = false}) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFFF1F5F9)),
       ),
-      child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: (isDestructive ? Colors.red : const Color(0xFF6366F1)).withOpacity(0.05),
-            borderRadius: BorderRadius.circular(12),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: (isDestructive ? Colors.red : const Color(0xFF6366F1)).withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: isDestructive ? Colors.red : const Color(0xFF6366F1), size: 20),
           ),
-          child: Icon(icon, color: isDestructive ? Colors.red : const Color(0xFF6366F1), size: 20),
+          title: Text(title, style: TextStyle(
+            fontWeight: FontWeight.w700, 
+            fontSize: 15,
+            color: isDestructive ? Colors.red : const Color(0xFF1E293B),
+          )),
+          trailing: Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400, size: 20),
+          onTap: onTap,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         ),
-        title: Text(title, style: TextStyle(
-          fontWeight: FontWeight.w700, 
-          fontSize: 15,
-          color: isDestructive ? Colors.red : const Color(0xFF1E293B),
-        )),
-        trailing: Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400, size: 20),
-        onTap: onTap,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
     );
   }

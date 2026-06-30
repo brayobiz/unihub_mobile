@@ -16,6 +16,10 @@ import '../../domain/models/message.dart';
 import '../../domain/models/chat_context.dart';
 import '../../shared/providers.dart';
 import '../../../shared/storage_repository.dart';
+import '../../../../features/marketplace/domain/models/listing.dart';
+import '../../../../features/housing/domain/models/housing_listing.dart';
+import '../../../../features/marketplace/shared/providers.dart';
+import '../../../../features/housing/shared/providers.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -94,12 +98,31 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       senderId: user.uid,
       content: content,
       type: type,
-      status: MessageStatus.sending, // Start with sending status for optimistic UI
+      status: MessageStatus.sending, // UI shows clock icon
       timestamp: DateTime.now(),
     );
 
-    ref.read(chatRepositoryProvider).sendMessage(widget.conversationId, message);
+    // Reset typing status immediately
+    if (_isTyping) {
+      _isTyping = false;
+      _typingTimer?.cancel();
+      ref.read(chatRepositoryProvider).updateTypingStatus(widget.conversationId, user.uid, false);
+    }
+
+    // Optimistically clear input
     _messageController.clear();
+
+    // Send to repository - fire and forget, Firestore handles local update
+    ref.read(chatRepositoryProvider).sendMessage(widget.conversationId, message);
+
+    // Scroll to bottom if not already there
+    if (_scrollController.hasClients && _scrollController.offset > 50) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   Future<void> _attachImage() async {
@@ -270,6 +293,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           if (effectiveContext != null && effectiveContext.type != 'support') 
             _buildContextBanner(effectiveContext),
           
+          if (conversation?.expiresAt != null)
+            _buildExpirationBanner(conversation!.expiresAt!),
+          
           Expanded(
             child: messagesAsync.when(
               data: (messages) {
@@ -382,12 +408,64 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
-  void _navigateToContext(ChatContext chatContext) {
-    if (chatContext.type == 'marketplace') {
-      context.push('/listing-detail', extra: {'id': chatContext.id}); // Assumes router handles ID or we need full listing
-    } else if (chatContext.type == 'housing') {
-      context.push('/housing-detail', extra: {'id': chatContext.id});
+  Future<void> _navigateToContext(ChatContext chatContext) async {
+    try {
+      if (chatContext.type == 'marketplace') {
+        final listing = await ref.read(marketplaceRepositoryProvider).getListingById(chatContext.id);
+        if (listing != null && mounted) {
+          context.push('/listing-detail', extra: listing);
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Marketplace item no longer available'))
+          );
+        }
+      } else if (chatContext.type == 'housing') {
+        final housing = await ref.read(housingRepositoryProvider).getListingById(chatContext.id);
+        if (housing != null && mounted) {
+          context.push('/housing-detail', extra: housing);
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Housing listing no longer available'))
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading details: $e'))
+        );
+      }
     }
+  }
+
+  Widget _buildExpirationBanner(DateTime expiresAt) {
+    final now = DateTime.now();
+    final remaining = expiresAt.difference(now);
+    
+    // Only show if less than 12 hours remaining
+    if (remaining.inHours > 12 || remaining.isNegative) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: Colors.amber.shade50,
+      child: Row(
+        children: [
+          Icon(Icons.timer_outlined, size: 16, color: Colors.amber.shade900),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'This conversation expires in ${remaining.inHours}h due to inactivity. Send a message to keep it active.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.amber.shade900,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildInputArea() {
