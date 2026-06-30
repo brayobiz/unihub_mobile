@@ -37,30 +37,6 @@ final notesListingsProvider = StreamProvider.family<List<NoteListing>, int>((ref
   );
 });
 
-final topNotesProvider = StreamProvider<List<NoteListing>>((ref) {
-  return ref.watch(notesListingsProvider(40).stream);
-});
-
-final trendingNotesProvider = StreamProvider<List<NoteListing>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
-  // In a real app, the repository would handle "trending" logic
-  // For now, we'll fetch notes with a higher limit and sort by downloads in UI if needed,
-  // or assume watchNotes supports some sorting (though not in the current interface).
-  // We'll just use the watchNotes with a limit for now.
-  return ref.watch(notesRepositoryProvider).watchNotes(
-    university: user?.university,
-    limit: 10,
-  );
-});
-
-final recentNotesProvider = StreamProvider<List<NoteListing>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
-  return ref.watch(notesRepositoryProvider).watchNotes(
-    university: user?.university,
-    limit: 10,
-  );
-});
-
 final userNotesProvider = StreamProvider<List<NoteListing>>((ref) {
   final user = ref.watch(authStateProvider).valueOrNull;
   if (user == null) return Stream.value([]);

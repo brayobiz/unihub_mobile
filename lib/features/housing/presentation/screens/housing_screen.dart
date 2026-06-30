@@ -51,6 +51,14 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
     }
   }
 
+  Future<void> _clearRecentSearches() async {
+    final prefs = ref.read(sharedPreferencesProvider);
+    await prefs.remove('recent_housing_searches');
+    setState(() {
+      _recentSearches = [];
+    });
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -379,7 +387,16 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Recent Searches', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Recent Searches', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+            GestureDetector(
+              onTap: _clearRecentSearches,
+              child: const Text('Clear', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF1677F2))),
+            ),
+          ],
+        ),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,

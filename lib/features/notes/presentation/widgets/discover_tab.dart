@@ -33,8 +33,6 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
   @override
   Widget build(BuildContext context) {
     final notesAsync = ref.watch(notesListingsProvider(50));
-    final trendingAsync = ref.watch(trendingNotesProvider);
-    final recentAsync = ref.watch(recentNotesProvider);
     
     final user = ref.watch(appUserProvider).valueOrNull;
     final selectedCategory = ref.watch(notesCategoryFilterProvider);
@@ -45,8 +43,6 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(notesListingsProvider);
-        ref.invalidate(trendingNotesProvider);
-        ref.invalidate(recentNotesProvider);
       },
       child: CustomScrollView(
         slivers: [
@@ -60,30 +56,6 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
           ),
           
           if (!isSearching) ...[
-            // Trending Section
-            SliverToBoxAdapter(
-              child: _buildHorizontalSection(
-                context, 
-                ref, 
-                'Trending Resources', 
-                trendingAsync,
-                Icons.trending_up,
-                Colors.orange,
-              ),
-            ),
-            
-            // Recently Uploaded Section
-            SliverToBoxAdapter(
-              child: _buildHorizontalSection(
-                context, 
-                ref, 
-                'Recently Uploaded', 
-                recentAsync,
-                Icons.history,
-                Colors.blue,
-              ),
-            ),
-
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
               sliver: SliverToBoxAdapter(
@@ -169,113 +141,6 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
     } else {
       context.push('/note-detail', extra: note);
     }
-  }
-
-  Widget _buildHorizontalSection(
-    BuildContext context, 
-    WidgetRef ref, 
-    String title, 
-    AsyncValue<List<NoteListing>> notesAsync,
-    IconData icon,
-    Color iconColor,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, size: 16, color: iconColor),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                title,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 16, 
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.3,
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(
-          height: 160,
-          child: notesAsync.when(
-            data: (notes) => notes.isEmpty
-              ? const SizedBox.shrink()
-              : ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: notes.length,
-                  itemBuilder: (context, index) => _buildCompactNoteCard(notes[index]),
-                ),
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => const SizedBox.shrink(),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCompactNoteCard(NoteListing note) {
-    return GestureDetector(
-      onTap: () => _handleNoteTap(note),
-      child: Container(
-        width: 180,
-        margin: const EdgeInsets.only(left: 4, right: 12, bottom: 8),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))
-          ],
-          border: Border.all(color: Colors.grey.shade100),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.indigo.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.description_rounded, color: Colors.indigo, size: 16),
-                ),
-                const Spacer(),
-                if (note.price == 0)
-                  const Text('FREE', style: TextStyle(color: Colors.green, fontSize: 9, fontWeight: FontWeight.w900))
-                else
-                  Text('KES ${note.price.toInt()}', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900)),
-              ],
-            ),
-            const Spacer(),
-            Text(
-              note.title,
-              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 12, height: 1.2),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              note.unitCode,
-              style: TextStyle(color: Colors.indigo.shade400, fontSize: 9, fontWeight: FontWeight.w900),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Widget _buildSearchBar() {

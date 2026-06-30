@@ -37,7 +37,7 @@ class LibraryTab extends ConsumerWidget {
           data: (data) => data.isEmpty 
             ? const SizedBox.shrink()
             : _buildContinueReadingSection(context, ref, data),
-          loading: () => const SizedBox(height: 180, child: Center(child: CircularProgressIndicator())),
+          loading: () => const SizedBox.shrink(),
           error: (e, _) => const SizedBox.shrink(),
         ),
 
@@ -46,7 +46,7 @@ class LibraryTab extends ConsumerWidget {
           data: (data) => data.isEmpty
             ? const SizedBox.shrink()
             : _buildHorizontalSection(context, ref, 'Recently Opened', data, isRecentlyOpened: true),
-          loading: () => const SizedBox(height: 140, child: Center(child: CircularProgressIndicator())),
+          loading: () => const SizedBox.shrink(),
           error: (e, _) => const SizedBox.shrink(),
         ),
 
