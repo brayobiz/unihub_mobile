@@ -18,6 +18,7 @@ import '../../core/utils/debouncer.dart';
 import '../../widgets/app_drawer.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/notification_badge.dart';
+import '../../services/notification_service.dart';
 
 class MarketplaceScreen extends ConsumerStatefulWidget {
   const MarketplaceScreen({super.key});
@@ -68,9 +69,16 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
             fontSize: 22,
           ),
         ),
-        actions: const [
-          NotificationBadge(module: 'marketplace'),
-          SizedBox(width: 8),
+        actions: [
+          const NotificationBadge(module: 'marketplace'),
+          const SizedBox(width: 4),
+          if (ref.watch(appUserProvider).valueOrNull?.isAdmin ?? false)
+            IconButton(
+              icon: const Icon(Icons.campaign_outlined, color: AppColors.secondary),
+              tooltip: 'Broadcast Marketplace Reminder',
+              onPressed: () => _showBroadcastConfirm(context, ref),
+            ),
+          const SizedBox(width: 8),
         ],
         bottom: TabBar(
           controller: _tabController,
@@ -801,6 +809,37 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
       ),
     );
   }
+  void _showBroadcastConfirm(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Broadcast Reminder?'),
+        content: const Text(
+          'This will send a random marketplace push notification to ALL UniHub users. Are you sure?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await ref.read(notificationServiceProvider).triggerMarketplaceReminder();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Marketplace reminder broadcast triggered!')),
+                );
+              }
+            },
+            style: FilledButton.styleFrom(backgroundColor: AppColors.secondary),
+            child: const Text('Broadcast Now'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showFilterSheet(BuildContext context, ListingFilter state, MarketplaceController controller) {
     showModalBottomSheet(
       context: context,

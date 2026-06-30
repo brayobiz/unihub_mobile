@@ -30,9 +30,20 @@ class NotificationService {
       return;
     }
 
+    // Listen to auth state to save token when user logs in
+    _ref.listen(authStateProvider, (previous, next) {
+      if (next.value != null) {
+        _saveToken();
+      }
+    });
+
     // 1. Init Local Notifications for Foreground
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosInit = DarwinInitializationSettings();
+    const iosInit = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
     const initSettings = InitializationSettings(android: androidInit, iOS: iosInit);
 
     await _localNotifications.initialize(
@@ -55,13 +66,19 @@ class NotificationService {
     });
 
     // Check if app was opened from a terminated state via a notification
-    RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
-    if (initialMessage != null) {
-      _handleRemoteMessageTap(initialMessage);
-    }
+    // We add a small delay to ensure the router and state are ready
+    Future.delayed(const Duration(milliseconds: 500), () async {
+      RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+      if (initialMessage != null) {
+        _handleRemoteMessageTap(initialMessage);
+      }
+    });
 
     // 4. Save Token if already logged in
     await _saveToken();
+    
+    // Subscribe to broadcast topic
+    await _messaging.subscribeToTopic('all_users');
     
     _tokenSubscription?.cancel();
     _tokenSubscription = _messaging.onTokenRefresh.listen((token) => _updateTokenInFirestore(token));
@@ -328,11 +345,13 @@ class NotificationService {
     required String title,
     required String body,
     Map<String, dynamic>? data,
+    bool isBroadcast = false,
   }) async {
     try {
       // We add to a 'notifications_queue' which the backend processes
       await FirebaseFirestore.instance.collection('notifications_queue').add({
-        'recipientId': recipientId,
+        'recipientId': isBroadcast ? null : recipientId,
+        'isBroadcast': isBroadcast,
         'title': title,
         'body': body,
         'data': data ?? {},
@@ -342,6 +361,41 @@ class NotificationService {
     } catch (e) {
       debugPrint('Error triggering push notification: $e');
     }
+  }
+
+  /// Triggers a random marketplace reminder to all users.
+  Future<void> triggerMarketplaceReminder() async {
+    final messages = [
+      {
+        'title': 'New Deals Alert! 🛍️',
+        'body': 'Fresh items just landed in the marketplace. See what you can find today!',
+      },
+      {
+        'title': 'UniHub Marketplace 🎓',
+        'body': 'Looking for something specific? Your campus mates might be selling exactly what you need!',
+      },
+      {
+        'title': 'Save Money Today! 💸',
+        'body': 'Why buy new when you can get quality items from fellow students? Check out the marketplace.',
+      },
+      {
+        'title': 'Tired of the same old stuff? 📦',
+        'body': 'Discover hidden gems and great bargains in the marketplace right now!',
+      },
+    ];
+
+    final randomMessage = (messages..shuffle()).first;
+
+    await triggerPushNotification(
+      recipientId: '', // Ignored for broadcast
+      isBroadcast: true,
+      title: randomMessage['title']!,
+      body: randomMessage['body']!,
+      data: {
+        'route': '/marketplace',
+        'targetType': 'marketplace',
+      },
+    );
   }
 
   // --- Notification Foundation ---
