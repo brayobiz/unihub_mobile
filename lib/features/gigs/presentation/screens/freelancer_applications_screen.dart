@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../auth/shared/providers.dart';
 import '../../domain/models/gig_application.dart';
 import '../../shared/providers.dart';
+import 'package:unihub_mobile/features/ads/ads_module.dart';
 
 final freelancerApplicationsProvider = StreamProvider<List<GigApplication>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
@@ -16,14 +17,23 @@ class FreelancerApplicationsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final appsAsync = ref.watch(freelancerApplicationsProvider);
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: theme.scaffoldBackgroundColor,
+      bottomNavigationBar: const SafeArea(
+        top: false,
+        child: BannerAdWidget(),
+      ),
       appBar: AppBar(
-        title: const Text('My Gig Applications', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        title: Text('My Gig Applications', 
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+          )),
+        backgroundColor: theme.colorScheme.surface,
+        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
         elevation: 0,
       ),
       body: appsAsync.when(
@@ -33,15 +43,19 @@ class FreelancerApplicationsScreen extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.assignment_outlined, size: 64, color: Colors.grey.shade300),
+                  Icon(Icons.assignment_outlined, size: 64, color: theme.colorScheme.outlineVariant),
                   const SizedBox(height: 16),
                   Text(
                     'You haven\'t applied for any gigs yet.',
-                    style: TextStyle(color: Colors.grey.shade600),
+                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 24),
                   FilledButton(
                     onPressed: () => context.go('/gigs'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                     child: const Text('Browse Gigs'),
                   ),
                 ],
@@ -58,22 +72,24 @@ class FreelancerApplicationsScreen extends ConsumerWidget {
             },
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: $err')),
+        loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
+        error: (err, _) => Center(child: Text('Error: $err', style: TextStyle(color: theme.colorScheme.error))),
       ),
     );
   }
 
   Widget _applicationCard(BuildContext context, GigApplication app) {
+    final theme = Theme.of(context);
     Color statusColor = Colors.amber;
     if (app.status == ApplicationStatus.accepted) statusColor = Colors.green;
-    if (app.status == ApplicationStatus.rejected) statusColor = Colors.red;
+    if (app.status == ApplicationStatus.rejected) statusColor = theme.colorScheme.error;
 
     return Card(
       elevation: 0,
+      color: theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -89,7 +105,7 @@ class FreelancerApplicationsScreen extends ConsumerWidget {
                     children: [
                       Text(
                         app.gigTitle,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: theme.colorScheme.onSurface),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -123,25 +139,25 @@ class FreelancerApplicationsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             
-            const Text(
+            Text(
               'Your Cover Letter:',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 12),
+              style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
             ),
             const SizedBox(height: 4),
             Text(
               app.coverLetter,
-              style: TextStyle(color: Colors.grey.shade800, height: 1.4),
+              style: TextStyle(color: theme.colorScheme.onSurface, height: 1.4),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
             
-            const Divider(height: 32),
+            Divider(height: 32, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
             
             Row(
               children: [
                 Text(
                   'Applied on ${app.createdAt.day}/${app.createdAt.month}/${app.createdAt.year}',
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
                 ),
                 const Spacer(),
                 if (app.status == ApplicationStatus.accepted && app.conversationId != null)
@@ -155,7 +171,7 @@ class FreelancerApplicationsScreen extends ConsumerWidget {
                     icon: const Icon(Icons.chat_bubble_outline, size: 18),
                     label: const Text('Open Chat'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.indigo,
+                      backgroundColor: theme.colorScheme.primary,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                   ),

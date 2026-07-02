@@ -36,6 +36,10 @@ class MyListingsScreen extends ConsumerWidget {
                   const SizedBox(height: 20),
                   FilledButton(
                     onPressed: () => Navigator.pop(context),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: Colors.white,
+                    ),
                     child: const Text('Go to Marketplace'),
                   ),
                 ],
@@ -52,8 +56,8 @@ class MyListingsScreen extends ConsumerWidget {
             },
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: $err')),
+        loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
+        error: (err, _) => Center(child: Text('Error: $err', style: TextStyle(color: theme.colorScheme.error))),
       ),
     );
   }
@@ -73,7 +77,7 @@ class _MyListingCard extends ConsumerWidget {
       color: theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16), 
-        side: BorderSide(color: theme.colorScheme.outlineVariant),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -85,7 +89,7 @@ class _MyListingCard extends ConsumerWidget {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: listing.imageUrls.isNotEmpty
@@ -93,7 +97,7 @@ class _MyListingCard extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(12),
                           child: Image.network(listing.imageUrls.first, fit: BoxFit.cover),
                         )
-                      : Icon(Icons.shopping_bag_outlined, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+                      : Icon(Icons.shopping_bag_outlined, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -111,13 +115,18 @@ class _MyListingCard extends ConsumerWidget {
                       const SizedBox(height: 4),
                       Text(
                         'KES ${NumberFormat('#,###').format(listing.price)}', 
-                        style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          color: theme.brightness == Brightness.dark ? Colors.greenAccent : Colors.green.shade700, 
+                          fontWeight: FontWeight.bold
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: listing.status == ListingStatus.active ? theme.colorScheme.primaryContainer : theme.colorScheme.surfaceVariant,
+                          color: listing.status == ListingStatus.active 
+                            ? theme.colorScheme.primary.withValues(alpha: 0.1) 
+                            : theme.colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -147,7 +156,7 @@ class _MyListingCard extends ConsumerWidget {
                             content: Text('This action cannot be undone.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
                             actions: [
                               TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                              TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+                              TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Delete', style: TextStyle(color: theme.colorScheme.error))),
                             ],
                           ),
                         );
@@ -168,23 +177,23 @@ class _MyListingCard extends ConsumerWidget {
                         context.push('/add-listing', extra: listing);
                       }
                     } catch (e) {
-                      messenger.showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                      messenger.showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: theme.colorScheme.error));
                     }
                   },
                   itemBuilder: (context) => [
-                    const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                    PopupMenuItem(value: 'edit', child: Text('Edit', style: TextStyle(color: theme.colorScheme.onSurface))),
                     if (listing.status == ListingStatus.active)
-                      const PopupMenuItem(value: 'sold', child: Text('Mark as Sold')),
+                      PopupMenuItem(value: 'sold', child: Text('Mark as Sold', style: TextStyle(color: theme.colorScheme.onSurface))),
                     if (listing.status == ListingStatus.active)
-                      const PopupMenuItem(value: 'pause', child: Text('Pause Listing'))
+                      PopupMenuItem(value: 'pause', child: Text('Pause Listing', style: TextStyle(color: theme.colorScheme.onSurface)))
                     else if (listing.status == ListingStatus.paused)
-                      const PopupMenuItem(value: 'activate', child: Text('Re-activate')),
-                    const PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: Colors.red))),
+                      PopupMenuItem(value: 'activate', child: Text('Re-activate', style: TextStyle(color: theme.colorScheme.onSurface))),
+                    PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: theme.colorScheme.error))),
                   ],
                 ),
               ],
             ),
-            const Divider(height: 24),
+            Divider(height: 24, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -224,6 +233,7 @@ class _MyListingCard extends ConsumerWidget {
                     label: const Text('Boost Ad'),
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
                       minimumSize: const Size(0, 36),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
@@ -231,7 +241,10 @@ class _MyListingCard extends ConsumerWidget {
                 else
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.1), 
+                      borderRadius: BorderRadius.circular(8)
+                    ),
                     child: const Row(
                       children: [
                         Icon(Icons.bolt, color: Colors.orange, size: 16),

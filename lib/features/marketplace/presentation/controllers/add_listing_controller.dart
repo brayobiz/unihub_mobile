@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import '../../../../core/constants/campus_constants.dart';
 import '../../domain/models/listing.dart';
 import 'package:unihub_mobile/features/marketplace/shared/providers.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
@@ -384,7 +385,7 @@ class AddListingController extends StateNotifier<AddListingState> {
         id: state.id,
         sellerId: user.uid,
         sellerName: user.fullName,
-        sellerUniversity: user.university ?? 'Campus',
+        sellerUniversity: CampusConstants.resolveToId(user.university) ?? user.university ?? 'Campus',
         sellerTrustScore: user.trustScore,
         title: state.title,
         description: state.description,

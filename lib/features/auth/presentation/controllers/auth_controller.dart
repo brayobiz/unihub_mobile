@@ -4,6 +4,8 @@ import '../../shared/providers.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../../../services/notification_service.dart';
 
+import '../../../../core/constants/campus_constants.dart';
+
 class AuthController extends StateNotifier<AsyncValue<void>> {
   final AuthRepository _authRepository;
   final Ref _ref;
@@ -96,10 +98,13 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
     final user = _ref.read(firebaseAuthProvider).currentUser;
     if (user == null) return;
 
+    // Resolve university to canonical ID if possible
+    final String? resolvedUniversity = CampusConstants.resolveToId(university) ?? university;
+
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => _authRepository.updateProfile(
       uid: user.uid,
-      university: university,
+      university: resolvedUniversity,
       campus: campus,
       course: course,
       yearOfStudy: yearOfStudy,
@@ -162,6 +167,26 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
       uid: user.uid,
       notificationSettings: settings,
     ));
+    if (!state.hasError) {
+      resetState();
+    }
+  }
+
+  Future<void> blockUser(String blockedUid) async {
+    final user = _ref.read(firebaseAuthProvider).currentUser;
+    if (user == null) return;
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() => _authRepository.blockUser(user.uid, blockedUid));
+    if (!state.hasError) {
+      resetState();
+    }
+  }
+
+  Future<void> unblockUser(String blockedUid) async {
+    final user = _ref.read(firebaseAuthProvider).currentUser;
+    if (user == null) return;
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() => _authRepository.unblockUser(user.uid, blockedUid));
     if (!state.hasError) {
       resetState();
     }

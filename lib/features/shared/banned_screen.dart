@@ -52,7 +52,7 @@ class BannedScreen extends ConsumerWidget {
             ],
             const SizedBox(height: 48),
             const Text(
-              'If you believe this is a mistake, please contact support at support@unihub.com',
+              'If you believe this is a mistake, please contact support via the official UniHub support form.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.grey600),
             ),

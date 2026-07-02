@@ -3,6 +3,8 @@ import '../../auth/shared/providers.dart';
 import '../../shared/notification_repository.dart';
 import '../data/repositories/gigs_repository_impl.dart';
 import '../domain/repositories/gigs_repository.dart';
+import '../../shared/feed_repository.dart';
+import '../../../models/feed_type.dart';
 
 import 'package:unihub_mobile/services/notification_service.dart';
 
@@ -11,4 +13,12 @@ final gigsRepositoryProvider = Provider<GigsRepository>((ref) {
     ref.watch(firestoreProvider),
     ref.watch(notificationServiceProvider),
   );
+});
+
+final gigsFeedProvider = StreamProvider<List<FeedItem>>((ref) {
+  final user = ref.watch(appUserProvider).valueOrNull;
+  return ref.watch(feedRepositoryProvider).watchFeed(FeedType.gig).map((items) {
+    if (user == null || user.blockedUids.isEmpty) return items;
+    return items.where((item) => !user.blockedUids.contains(item.authorId)).toList();
+  });
 });

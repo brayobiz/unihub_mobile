@@ -50,6 +50,7 @@ import '../../features/shared/feed_item_detail_screen.dart';
 import '../../features/shared/global_search_screen.dart';
 import '../../features/shared/campus_pulse_screen.dart';
 import '../../features/shared/banned_screen.dart';
+import '../../features/shared/maintenance_screen.dart';
 import '../../features/community/community_screen.dart';
 import '../../features/gigs/gigs_screen.dart';
 import '../../features/confessions/confessions_screen.dart';
@@ -61,9 +62,19 @@ import '../../features/admin/presentation/screens/verification_detail_screen.dar
 import '../../features/admin/presentation/screens/report_queue_screen.dart';
 import '../../features/admin/presentation/screens/report_detail_screen.dart';
 import '../../features/admin/presentation/screens/feature_moderation_screen.dart';
+import '../../features/admin/presentation/screens/user_management_screen.dart';
+import '../../features/admin/presentation/screens/user_detail_admin_screen.dart';
+import '../../features/admin/presentation/screens/audit_log_screen.dart';
+import '../../features/admin/presentation/screens/support_center_screen.dart';
+import '../../features/admin/presentation/screens/support_conversation_admin_screen.dart';
+import '../../features/admin/presentation/screens/announcement_management_screen.dart';
+import '../../features/admin/presentation/screens/system_settings_screen.dart';
+import '../../features/admin/shared/providers.dart';
 import '../../features/admin/domain/models/verification_request.dart';
 import '../../features/admin/domain/models/report.dart';
 import '../../features/admin/domain/models/moderation_content.dart';
+import '../../features/chat/domain/models/conversation.dart';
+import '../../features/auth/domain/models/app_user.dart';
 
 import '../../features/gigs/presentation/screens/gig_details_screen.dart';
 import '../../features/gigs/presentation/screens/apply_gig_screen.dart';
@@ -82,6 +93,7 @@ class RouterNotifier extends ChangeNotifier {
   RouterNotifier(this._ref) {
     _ref.listen(authStateProvider, (_, __) => notifyListeners());
     _ref.listen(appUserProvider, (_, __) => notifyListeners());
+    _ref.listen(systemSettingsProvider, (_, __) => notifyListeners());
     _ref.listen(deviceOnboardingCompletedProvider, (_, __) => notifyListeners());
   }
 
@@ -89,11 +101,22 @@ class RouterNotifier extends ChangeNotifier {
     final authState = _ref.read(authStateProvider);
     final appUserAsync = _ref.read(appUserProvider);
     final isDeviceOnboardingDone = _ref.read(deviceOnboardingCompletedProvider);
+    final settingsAsync = _ref.read(systemSettingsProvider);
 
     final isSplash = state.matchedLocation == '/splash';
 
     if (authState.isLoading || authState.isRefreshing) {
       return isSplash ? null : '/splash';
+    }
+
+    final appUser = appUserAsync.valueOrNull;
+    final isAdmin = appUser?.isAdmin ?? false;
+    final settings = settingsAsync.valueOrNull;
+
+    // Maintenance Mode Check
+    if (settings?.maintenanceMode == true && !isAdmin) {
+      if (state.matchedLocation != '/maintenance') return '/maintenance';
+      return null;
     }
 
     final isLoggedIn = authState.valueOrNull != null;
@@ -117,8 +140,6 @@ class RouterNotifier extends ChangeNotifier {
       return isSplash ? null : '/splash';
     }
 
-    final appUser = appUserAsync.valueOrNull;
-    
     if (appUser == null) {
       if (state.matchedLocation != '/complete-profile') return '/complete-profile';
       return null;
@@ -213,6 +234,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const BannedScreen(),
       ),
       GoRoute(
+        path: '/maintenance',
+        builder: (context, state) => const MaintenanceScreen(),
+      ),
+      GoRoute(
         path: '/global-search',
         name: 'global-search',
         builder: (context, state) => const GlobalSearchScreen(),
@@ -228,8 +253,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/add-listing',
         builder: (context, state) {
-          final listing = state.extra as Listing?;
-          return AddListingScreen(listing: listing);
+          final extra = state.extra;
+          if (extra is Listing) {
+            return AddListingScreen(listing: extra);
+          }
+          if (extra is Map<String, dynamic>) {
+            return AddListingScreen(listing: Listing.fromJson(extra));
+          }
+          return const AddListingScreen();
         },
       ),
       GoRoute(
@@ -250,12 +281,9 @@ final routerProvider = Provider<GoRouter>((ref) {
                 heroTag: extra['heroTag'] as String?,
               );
             }
-            // If it's a raw map from Firestore or elsewhere
             try {
               return ListingDetailScreen(listing: Listing.fromJson(extra));
-            } catch (_) {
-              // fall through to error
-            }
+            } catch (_) {}
           }
           return const Scaffold(
             body: Center(child: Text('Invalid listing data')),
@@ -265,8 +293,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/seller-profile',
         builder: (context, state) {
-          final userId = state.extra as String;
-          return SellerProfileScreen(userId: userId);
+          final extra = state.extra;
+          if (extra is String) {
+            return SellerProfileScreen(userId: extra);
+          }
+          return const Scaffold(
+            body: Center(child: Text('Invalid user profile data')),
+          );
         },
       ),
       GoRoute(
@@ -276,21 +309,53 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/chat',
         builder: (context, state) {
-          final extras = state.extra as Map<String, dynamic>;
+          final Object? extra = state.extra;
+          
+          if (extra is! Map) {
+            debugPrint('GoRouter: /chat route extra is not a Map: $extra');
+            return const Scaffold(
+              body: Center(child: Text('Invalid chat navigation data')),
+            );
+          }
+          
+          final extras = extra;
+          final dynamic chatContextData = extras['context'];
+          
+          ChatContext? chatContext;
+          try {
+            if (chatContextData is ChatContext) {
+              chatContext = chatContextData;
+            } else if (chatContextData is Map) {
+              chatContext = ChatContext.fromJson(Map<String, dynamic>.from(chatContextData));
+            }
+          } catch (e) {
+            debugPrint('GoRouter: Error parsing ChatContext in /chat route: $e');
+          }
+
+          final String convId = (extras['conversationId'] ?? '').toString();
+          final String otherName = (extras['otherUserName'] ?? 'Chat').toString();
+
+          if (convId.isEmpty) {
+            return const Scaffold(
+              body: Center(child: Text('Conversation ID missing')),
+            );
+          }
+
           return ChatScreen(
-            conversationId: extras['conversationId'],
-            otherUserName: extras['otherUserName'],
-            chatContext: extras['context'] as ChatContext?,
+            conversationId: convId,
+            otherUserName: otherName,
+            chatContext: chatContext,
           );
         },
       ),
       GoRoute(
         path: '/add-housing',
         builder: (context, state) {
-          if (state.extra is HousingListing) {
-            return AddHousingScreen(listing: state.extra as HousingListing);
-          } else if (state.extra is VacancyRequest) {
-            return AddHousingScreen(opportunity: state.extra as VacancyRequest);
+          final extra = state.extra;
+          if (extra is HousingListing) {
+            return AddHousingScreen(listing: extra);
+          } else if (extra is VacancyRequest) {
+            return AddHousingScreen(opportunity: extra);
           }
           return const AddHousingScreen();
         },
@@ -302,8 +367,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/housing-detail',
         builder: (context, state) {
-          final housing = state.extra as HousingListing;
-          return HousingDetailsScreen(listing: housing);
+          final extra = state.extra;
+          if (extra is HousingListing) {
+            return HousingDetailsScreen(listing: extra);
+          }
+          return const Scaffold(
+            body: Center(child: Text('Invalid housing data')),
+          );
         },
       ),
       GoRoute(
@@ -340,15 +410,29 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/add-note',
         builder: (context, state) {
-          final note = state.extra as NoteListing?;
-          return AddNoteScreen(note: note);
+          final extra = state.extra;
+          if (extra is NoteListing) {
+            return AddNoteScreen(note: extra);
+          }
+          if (extra is Map<String, dynamic>) {
+            return AddNoteScreen(note: NoteListing.fromJson(extra));
+          }
+          return const AddNoteScreen();
         },
       ),
       GoRoute(
         path: '/note-detail',
         builder: (context, state) {
-          final note = state.extra as NoteListing;
-          return NoteDetailScreen(note: note);
+          final extra = state.extra;
+          if (extra is NoteListing) {
+            return NoteDetailScreen(note: extra);
+          }
+          if (extra is Map<String, dynamic>) {
+            return NoteDetailScreen(note: NoteListing.fromJson(extra));
+          }
+          return const Scaffold(
+            body: Center(child: Text('Invalid note data')),
+          );
         },
       ),
       GoRoute(
@@ -358,7 +442,14 @@ final routerProvider = Provider<GoRouter>((ref) {
           if (extra is! Map) {
             return const Scaffold(body: Center(child: Text('Invalid data passed to reader')));
           }
-          final note = extra['note'] as NoteListing?;
+          final noteData = extra['note'];
+          NoteListing? note;
+          if (noteData is NoteListing) {
+            note = noteData;
+          } else if (noteData is Map<String, dynamic>) {
+            note = NoteListing.fromJson(noteData);
+          }
+
           if (note == null) {
             return const Scaffold(body: Center(child: Text('Note data missing')));
           }
@@ -414,8 +505,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/feed-detail',
         builder: (context, state) {
-          final item = state.extra as FeedItem;
-          return FeedItemDetailScreen(item: item);
+          final extra = state.extra;
+          if (extra is FeedItem) {
+            return FeedItemDetailScreen(item: extra);
+          }
+          if (extra is Map<String, dynamic>) {
+            return FeedItemDetailScreen(item: FeedItem.fromJson(extra));
+          }
+          return const Scaffold(
+            body: Center(child: Text('Invalid feed item data')),
+          );
         },
       ),
       GoRoute(
@@ -433,15 +532,31 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/gig-detail',
         builder: (context, state) {
-          final gig = state.extra as FeedItem;
-          return GigDetailsScreen(gig: gig);
+          final extra = state.extra;
+          if (extra is FeedItem) {
+            return GigDetailsScreen(gig: extra);
+          }
+          if (extra is Map<String, dynamic>) {
+            return GigDetailsScreen(gig: FeedItem.fromJson(extra));
+          }
+          return const Scaffold(
+            body: Center(child: Text('Invalid gig data')),
+          );
         },
       ),
       GoRoute(
         path: '/apply-gig',
         builder: (context, state) {
-          final gig = state.extra as FeedItem;
-          return ApplyGigScreen(gig: gig);
+          final extra = state.extra;
+          if (extra is FeedItem) {
+            return ApplyGigScreen(gig: extra);
+          }
+          if (extra is Map<String, dynamic>) {
+            return ApplyGigScreen(gig: FeedItem.fromJson(extra));
+          }
+          return const Scaffold(
+            body: Center(child: Text('Invalid gig data')),
+          );
         },
       ),
       GoRoute(
@@ -487,8 +602,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/verifications/:id',
         builder: (context, state) {
-          final request = state.extra as AdminVerificationRequest;
-          return VerificationDetailScreen(request: request);
+          final extra = state.extra;
+          if (extra is AdminVerificationRequest) {
+            return VerificationDetailScreen(request: extra);
+          }
+          return const Scaffold(
+            body: Center(child: Text('Invalid verification data')),
+          );
         },
       ),
       GoRoute(
@@ -498,21 +618,86 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/reports/:id',
         builder: (context, state) {
-          final report = state.extra as AdminReport;
-          return ReportDetailScreen(report: report);
+          final extra = state.extra;
+          if (extra is AdminReport) {
+            return ReportDetailScreen(report: extra);
+          }
+          return const Scaffold(
+            body: Center(child: Text('Invalid report data')),
+          );
         },
       ),
       GoRoute(
         path: '/admin/marketplace',
-        builder: (context, state) => const FeatureModerationScreen(contentType: ContentType.marketplace),
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return FeatureModerationScreen(
+            contentType: ContentType.marketplace,
+            initialUserId: extra?['userId'] as String?,
+          );
+        },
       ),
       GoRoute(
         path: '/admin/housing',
-        builder: (context, state) => const FeatureModerationScreen(contentType: ContentType.housing),
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return FeatureModerationScreen(
+            contentType: ContentType.housing,
+            initialUserId: extra?['userId'] as String?,
+          );
+        },
       ),
       GoRoute(
         path: '/admin/notes',
-        builder: (context, state) => const FeatureModerationScreen(contentType: ContentType.notes),
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return FeatureModerationScreen(
+            contentType: ContentType.notes,
+            initialUserId: extra?['userId'] as String?,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/admin/users',
+        builder: (context, state) => const UserManagementScreen(),
+      ),
+      GoRoute(
+        path: '/admin/audit-logs',
+        builder: (context, state) => const AuditLogScreen(),
+      ),
+      GoRoute(
+        path: '/admin/announcements',
+        builder: (context, state) => const AnnouncementManagementScreen(),
+      ),
+      GoRoute(
+        path: '/admin/settings',
+        builder: (context, state) => const SystemSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/support',
+        builder: (context, state) => const SupportCenterScreen(),
+      ),
+      GoRoute(
+        path: '/admin/support/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          final extra = state.extra;
+          return SupportConversationAdminScreen(
+            conversationId: id,
+            initialConversation: extra is Conversation ? extra : null,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/admin/users/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          final extra = state.extra;
+          return UserDetailAdminScreen(
+            userId: id,
+            initialUser: extra is AppUser ? extra : null,
+          );
+        },
       ),
     ],
   );

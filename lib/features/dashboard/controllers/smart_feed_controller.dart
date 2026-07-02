@@ -3,12 +3,14 @@ import 'package:unihub_mobile/features/marketplace/domain/models/listing_filter.
 import '../../marketplace/shared/providers.dart';
 import '../../housing/shared/providers.dart';
 import '../../notes/shared/providers.dart';
-import '../../gigs/gigs_screen.dart'; // For gigsFeedProvider
-import '../../community/community_screen.dart'; // For communityFeedProvider
+import '../../gigs/shared/providers.dart';
+import '../../community/shared/providers.dart';
 import '../../../widgets/feed/feed_item_model.dart';
-import '../../../widgets/feed/feed_type.dart' as widgets;
+import '../../../models/feed_type.dart' as widgets;
 import '../../auth/shared/providers.dart';
 import '../../../services/history_service.dart';
+import '../../campus_filter/shared/providers.dart';
+import '../../../../core/constants/campus_constants.dart';
 
 enum SmartFeedSource { personalized, trending, fresh, sponsored }
 
@@ -137,28 +139,37 @@ final campusPulseProvider = Provider<AsyncValue<Map<String, int>>>((ref) {
 final personalizedRecommendationsProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
   final allFeedAsync = ref.watch(smartFeedProvider);
+  final browsingCampus = ref.watch(effectiveCampusFilterProvider);
 
   return allFeedAsync.whenData((items) {
     if (user == null) return items;
 
-    // Filter items based on user's campus or university
+    // Use browsing campus if set, otherwise fallback to user's university for personalization
+    // Normalize both to IDs
+    final targetUniversity = browsingCampus ?? CampusConstants.resolveToId(user.university) ?? user.university;
+    final userCampus = CampusConstants.resolveToId(user.campus) ?? user.campus;
+
+    // Filter items based on target campus or university
     final personalizedItems = items.where((item) {
       final data = item.originalData;
       if (data == null) return true;
 
       // Check if it's housing and near campus
       if (item.model.type == widgets.FeedType.housing) {
-        return data.university == user.university || data.location.contains(user.campus ?? '');
+        final itemUni = CampusConstants.resolveToId(data.university) ?? data.university;
+        return itemUni == targetUniversity || (userCampus != null && data.location.contains(userCampus));
       }
 
       // Check if it's notes and same course/uni
       if (item.model.type == widgets.FeedType.notes) {
-        return data.university == user.university || data.course == user.course;
+        final itemUni = CampusConstants.resolveToId(data.university) ?? data.university;
+        return itemUni == targetUniversity || data.course == user.course;
       }
 
       // Check if it's marketplace and same uni
       if (item.model.type == widgets.FeedType.marketplace) {
-        return data.sellerUniversity == user.university;
+        final itemUni = CampusConstants.resolveToId(data.sellerUniversity) ?? data.sellerUniversity;
+        return itemUni == targetUniversity;
       }
 
       return true;

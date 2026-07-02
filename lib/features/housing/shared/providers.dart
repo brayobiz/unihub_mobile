@@ -9,15 +9,18 @@ import '../domain/repositories/housing_repository.dart';
 
 import '../../../services/notification_service.dart';
 
+import '../../campus_filter/shared/providers.dart';
+
 final housingRepositoryProvider = Provider<HousingRepository>((ref) {
+  final campus = ref.watch(effectiveCampusFilterProvider);
   return HousingRepositoryImpl(
     ref.watch(firestoreProvider),
+    campus,
     ref.watch(notificationServiceProvider),
   );
 });
 
 // Filters
-final housingCampusFilterProvider = StateProvider<String?>((ref) => null);
 final housingLocationFilterProvider = StateProvider<String?>((ref) => null);
 final housingTypeFilterProvider = StateProvider<HousingType?>((ref) => null);
 final housingMinRentFilterProvider = StateProvider<double?>((ref) => null);
@@ -27,16 +30,15 @@ final housingFurnishedFilterProvider = StateProvider<bool?>((ref) => null);
 
 // Housing Listings Stream
 final housingListingsProvider = StreamProvider.family<List<HousingListing>, int>((ref, limit) {
-  final campus = ref.watch(housingCampusFilterProvider);
   final location = ref.watch(housingLocationFilterProvider);
   final type = ref.watch(housingTypeFilterProvider);
   final minRent = ref.watch(housingMinRentFilterProvider);
   final maxRent = ref.watch(housingMaxRentFilterProvider);
   final gender = ref.watch(housingGenderFilterProvider);
   final furnished = ref.watch(housingFurnishedFilterProvider);
+  final user = ref.watch(appUserProvider).valueOrNull;
 
   return ref.watch(housingRepositoryProvider).watchListings(
-    campus: campus,
     location: location,
     type: type,
     minRent: minRent,
@@ -44,7 +46,10 @@ final housingListingsProvider = StreamProvider.family<List<HousingListing>, int>
     genderRestriction: gender,
     isFurnished: furnished,
     limit: limit,
-  );
+  ).map((listings) {
+    if (user == null || user.blockedUids.isEmpty) return listings;
+    return listings.where((l) => !user.blockedUids.contains(l.plugId)).toList();
+  });
 });
 
 final topHousingProvider = StreamProvider<List<HousingListing>>((ref) {
@@ -53,10 +58,14 @@ final topHousingProvider = StreamProvider<List<HousingListing>>((ref) {
 
 // Featured listings (could be based on verification or a 'featured' flag, or just most viewed)
 final featuredHousingProvider = StreamProvider<List<HousingListing>>((ref) {
+  final user = ref.watch(appUserProvider).valueOrNull;
   return ref.watch(housingRepositoryProvider).watchListings(
     limit: 10,
     // Add logic for featured here if needed
-  );
+  ).map((listings) {
+    if (user == null || user.blockedUids.isEmpty) return listings;
+    return listings.where((l) => !user.blockedUids.contains(l.plugId)).toList();
+  });
 });
 
 final plugListingsProvider = StreamProvider.family<List<HousingListing>, String>((ref, plugId) {
@@ -79,14 +88,12 @@ final savedHousingProvider = StreamProvider<List<HousingListing>>((ref) {
 
 final roommateProfilesProvider = StreamProvider<List<RoommateProfile>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
-  return ref.watch(housingRepositoryProvider).watchRoommates(
-    campus: user?.campus,
-  );
+  return ref.watch(housingRepositoryProvider).watchRoommates().map((profiles) {
+    if (user == null || user.blockedUids.isEmpty) return profiles;
+    return profiles.where((p) => !user.blockedUids.contains(p.userId)).toList();
+  });
 });
 
 final vacancyOpportunitiesProvider = StreamProvider<List<VacancyRequest>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
-  return ref.watch(housingRepositoryProvider).watchVacancyOpportunities(
-    campus: user?.university,
-  );
+  return ref.watch(housingRepositoryProvider).watchVacancyOpportunities();
 });

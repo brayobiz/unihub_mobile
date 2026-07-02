@@ -1,4 +1,4 @@
-import 'feed_type.dart';
+import '../../models/feed_type.dart';
 
 class FeedItemModel {
   final FeedType type;

@@ -12,6 +12,7 @@ import 'package:unihub_mobile/app/theme/app_colors.dart';
 import '../../domain/models/note.dart';
 import '../../shared/providers.dart';
 import '../../../../services/download_service.dart';
+import 'package:unihub_mobile/features/ads/ads_module.dart';
 
 class NoteReaderScreen extends ConsumerStatefulWidget {
   final NoteListing note;
@@ -265,6 +266,13 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
 
     return Scaffold(
       backgroundColor: _isPdf ? const Color(0xFF1A1A1A) : theme.colorScheme.surface,
+      bottomNavigationBar: Container(
+        color: _isPdf ? Colors.black : theme.colorScheme.surface,
+        child: const SafeArea(
+          top: false,
+          child: BannerAdWidget(),
+        ),
+      ),
       body: Stack(
         children: [
           // Main Reader Content

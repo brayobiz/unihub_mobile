@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/trust/domain/models/professional_role.dart';
 import 'package:unihub_mobile/features/trust/domain/models/verification_application.dart';
@@ -14,11 +13,17 @@ import 'presentation/controllers/marketplace_controller.dart';
 import 'shared/providers.dart';
 import 'domain/models/listing_filter.dart';
 import 'presentation/widgets/marketplace_card.dart';
+import '../campus_filter/domain/models/browsing_scope.dart';
+import '../campus_filter/shared/providers.dart';
+import '../campus_filter/presentation/widgets/campus_filter_selector.dart';
+import '../../core/constants/campus_constants.dart';
 import '../../core/utils/debouncer.dart';
 import '../../widgets/app_drawer.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/notification_badge.dart';
 import '../../services/notification_service.dart';
+import 'package:unihub_mobile/features/announcements/presentation/widgets/announcement_display.dart';
+import 'package:unihub_mobile/features/ads/ads_module.dart';
 
 class MarketplaceScreen extends ConsumerStatefulWidget {
   const MarketplaceScreen({super.key});
@@ -63,8 +68,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
         ),
         title: Text(
           'Marketplace',
-          style: GoogleFonts.plusJakartaSans(
-            color: theme.colorScheme.onSurface,
+          style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.bold,
             fontSize: 22,
           ),
@@ -85,7 +89,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
           labelColor: AppColors.secondary,
           unselectedLabelColor: AppColors.grey,
           indicatorColor: AppColors.secondary,
-          labelStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14),
+          labelStyle: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: 14),
           tabs: const [
             Tab(text: 'Discover'),
             Tab(text: 'My Listings'),
@@ -93,6 +97,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'marketplace_fab',
         onPressed: () => context.push('/add-listing'),
         icon: const Icon(Icons.add_shopping_cart_rounded),
         label: const Text('Post Listing'),
@@ -113,7 +118,6 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
     final theme = Theme.of(context);
     final filterState = ref.watch(marketplaceControllerProvider);
     final controller = ref.read(marketplaceControllerProvider.notifier);
-    final user = ref.watch(appUserProvider).valueOrNull;
 
     final bool isBrowsingHome = filterState.searchQuery.isEmpty && 
                                 filterState.selectedCategory == null &&
@@ -131,6 +135,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
         slivers: [
+          const SliverToBoxAdapter(
+            child: RelevantAnnouncementsWidget(feature: 'marketplace'),
+          ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -138,6 +145,8 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildSearchBar(controller, filterState),
+                  const SizedBox(height: 16),
+                  const CampusFilterSelector(),
                   const SizedBox(height: 12),
                   if (isBrowsingHome) ...[
                     _buildPopularCategories(),
@@ -145,27 +154,6 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                   ] else ...[
                     const SizedBox(height: 8),
                     _buildCategoryChips(filterState, controller),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          filterState.searchQuery.isNotEmpty 
-                            ? 'Results for "${filterState.searchQuery}"'
-                            : 'Browsing ${filterState.selectedCategory ?? 'Items'}',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.onSurface,
-                          ),
-                        ),
-                        TextButton.icon(
-                          onPressed: () => controller.resetFilters(),
-                          icon: const Icon(Icons.refresh_rounded, size: 16),
-                          label: const Text('Reset'),
-                        ),
-                      ],
-                    ),
                   ],
                 ],
               ),
@@ -203,7 +191,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                     filterState.searchQuery.isEmpty 
                         ? 'What are you looking for?' 
                         : filterState.searchQuery,
-                    style: GoogleFonts.plusJakartaSans(
+                    style: theme.textTheme.bodyMedium?.copyWith(
                       color: filterState.searchQuery.isEmpty ? AppColors.grey : theme.colorScheme.onSurface,
                     ),
                   ),
@@ -243,7 +231,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
             child: ChoiceChip(
               label: Text(
                 cat,
-                style: GoogleFonts.plusJakartaSans(
+                style: theme.textTheme.bodySmall?.copyWith(
                   fontSize: 13,
                   color: isSelected ? Colors.white : theme.colorScheme.onSurface,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -282,10 +270,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
         const SizedBox(height: 24),
         Text(
           'Shop by Category',
-          style: GoogleFonts.plusJakartaSans(
+          style: theme.textTheme.titleMedium?.copyWith(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: theme.colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 12),
@@ -320,7 +307,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                       const SizedBox(height: 4),
                       Text(
                         cat,
-                        style: GoogleFonts.plusJakartaSans(
+                        style: theme.textTheme.labelSmall?.copyWith(
                           fontSize: 9,
                           fontWeight: FontWeight.w500,
                           color: theme.colorScheme.onSurfaceVariant,
@@ -340,7 +327,20 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
 
   Widget _buildDiscoveryContent(WidgetRef ref) {
     final discoveryAsync = ref.watch(marketplaceDiscoveryProvider);
+    final scope = ref.watch(browsingScopeProvider);
     final user = ref.watch(appUserProvider).valueOrNull;
+
+    String trendingTitle = 'Trending';
+    if (scope.type == BrowsingScopeType.myCampus) {
+      final uniName = CampusConstants.getDisplayName(
+        CampusConstants.resolveToId(user?.university)
+      );
+      trendingTitle = 'Trending in $uniName';
+    } else if (scope.type == BrowsingScopeType.specific) {
+      trendingTitle = 'Trending in ${CampusConstants.getDisplayName(scope.campusId)}';
+    } else {
+      trendingTitle = 'Trending across Campuses';
+    }
 
     return discoveryAsync.when(
       data: (data) => Column(
@@ -356,9 +356,13 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
             title: 'Recommended For You',
             listings: data.recommended,
           ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 20),
+            child: BannerAdWidget(),
+          ),
           _buildDiscoverySection(
             context: context,
-            title: 'Trending in ${user?.university ?? 'Campus'}',
+            title: trendingTitle,
             listings: data.trending,
           ),
         ],
@@ -395,11 +399,10 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
           children: [
             Text(
               title,
-              style: GoogleFonts.plusJakartaSans(
+              style: theme.textTheme.titleLarge?.copyWith(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 letterSpacing: -0.5,
-                color: theme.colorScheme.onSurface,
               ),
             ),
             if (title == 'Continue Browsing')
@@ -441,6 +444,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
   Widget _buildListingsGrid(ListingFilter filter) {
     final theme = Theme.of(context);
     final listingsAsync = ref.watch(listingsProvider(filter));
+    final controller = ref.read(marketplaceControllerProvider.notifier);
 
     return listingsAsync.when(
       data: (listings) {
@@ -464,8 +468,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                     const SizedBox(height: 24),
                     Text(
                       'No items match your search',
-                      style: GoogleFonts.plusJakartaSans(
-                        color: theme.colorScheme.onSurface, 
+                      style: theme.textTheme.titleLarge?.copyWith(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
@@ -473,8 +476,8 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Try clearing your filters or explore another category to find what you\'re looking for.',
-                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14),
+                      'Try switching to "All Campuses" or explore another category to find what you\'re looking for.',
+                      style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: 14),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 32),
@@ -482,7 +485,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         OutlinedButton.icon(
-                          onPressed: () => ref.read(marketplaceControllerProvider.notifier).resetFilters(),
+                          onPressed: () => controller.resetFilters(),
                           icon: const Icon(Icons.refresh_rounded),
                           label: const Text('Clear Filters'),
                           style: OutlinedButton.styleFrom(
@@ -492,7 +495,10 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                         ),
                         const SizedBox(width: 12),
                         FilledButton(
-                          onPressed: () => ref.read(marketplaceControllerProvider.notifier).setCategory('All'),
+                          onPressed: () {
+                            controller.resetFilters();
+                            ref.read(browsingScopeProvider.notifier).reset();
+                          },
                           child: const Text('Explore All'),
                           style: FilledButton.styleFrom(
                             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -507,24 +513,82 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
             ),
           );
         }
-        return SliverPadding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              childAspectRatio: 0.75,
-            ),
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => MarketplaceCard(
-                listing: listings[index], 
-                index: index,
-                heroTag: 'hero_grid_${listings[index].id}',
+
+        final bool isSearching = filter.searchQuery.isNotEmpty || filter.selectedCategory != null;
+
+        // Adaptive chunking to insert ads using central config
+        final List<Widget> gridChunks = [];
+        const int adInterval = AdConfig.marketplaceAdInterval;
+
+        for (int i = 0; i < listings.length; i += adInterval) {
+          final int end = (i + adInterval < listings.length) ? i + adInterval : listings.length;
+          final chunk = listings.sublist(i, end);
+
+          gridChunks.add(
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 16,
+                  childAspectRatio: 0.75,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => MarketplaceCard(
+                    listing: chunk[index],
+                    index: i + index,
+                    heroTag: 'hero_grid_${chunk[index].id}',
+                  ),
+                  childCount: chunk.length,
+                ),
               ),
-              childCount: listings.length,
             ),
-          ),
+          );
+
+          // Add banner ad between chunks, but not at the very top (i=0) or very end if no more items
+          if (end < listings.length) {
+            gridChunks.add(
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: const BannerAdWidget(),
+                ),
+              ),
+            );
+          }
+        }
+
+        return SliverMainAxisGroup(
+          slivers: [
+            if (isSearching)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        filter.searchQuery.isNotEmpty 
+                          ? 'Results for "${filter.searchQuery}"'
+                          : 'Browsing ${filter.selectedCategory ?? 'Items'}',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => controller.resetFilters(),
+                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                        label: const Text('Reset'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ...gridChunks,
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          ],
         );
       },
       loading: () => SliverPadding(
@@ -765,10 +829,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
       children: [
         Text(
           '$category Filters', 
-          style: GoogleFonts.plusJakartaSans(
+          style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold, 
             fontSize: 16,
-            color: theme.colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 12),
@@ -860,10 +923,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                   children: [
                     Text(
                       'Refine Search',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: mTheme.textTheme.titleLarge?.copyWith(
                         fontSize: 22, 
                         fontWeight: FontWeight.bold,
-                        color: mTheme.colorScheme.onSurface,
                       ),
                     ),
                     IconButton(
@@ -875,10 +937,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                 const SizedBox(height: 24),
                 Text(
                   'Sort By', 
-                  style: GoogleFonts.plusJakartaSans(
+                  style: mTheme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold, 
                     fontSize: 16,
-                    color: mTheme.colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -909,10 +970,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                 const SizedBox(height: 24),
                 Text(
                   'Condition', 
-                  style: GoogleFonts.plusJakartaSans(
+                  style: mTheme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold, 
                     fontSize: 16,
-                    color: mTheme.colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -940,10 +1000,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                 const SizedBox(height: 24),
                 Text(
                   'Price Range (KES)', 
-                  style: GoogleFonts.plusJakartaSans(
+                  style: mTheme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold, 
                     fontSize: 16,
-                    color: mTheme.colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -1032,7 +1091,6 @@ class MarketplaceSearchDelegate extends SearchDelegate<String?> {
   @override
   Widget buildSuggestions(BuildContext context) {
     final theme = Theme.of(context);
-    final user = ref.watch(appUserProvider).valueOrNull;
     final recentSearchesAsync = ref.watch(recentSearchesProvider);
 
     return Column(
@@ -1052,7 +1110,7 @@ class MarketplaceSearchDelegate extends SearchDelegate<String?> {
                       children: [
                         Text(
                           'Recent Searches',
-                          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16),
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                         TextButton(
                           onPressed: () => ref.read(marketplaceControllerProvider.notifier).clearRecentSearches(),
@@ -1087,7 +1145,7 @@ class MarketplaceSearchDelegate extends SearchDelegate<String?> {
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
                     child: Text(
                       'Popular Searches',
-                      style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                   ),
                   Padding(
@@ -1113,7 +1171,7 @@ class MarketplaceSearchDelegate extends SearchDelegate<String?> {
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
             child: Text(
               'Popular Categories',
-              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16),
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: 16),
             ),
           ),
           Padding(

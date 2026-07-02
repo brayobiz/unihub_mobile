@@ -6,19 +6,19 @@ import '../../domain/repositories/notes_repository.dart';
 
 class NotesRepositoryImpl implements NotesRepository {
   final FirebaseFirestore _firestore;
+  final String? _browsingCampus;
 
-  NotesRepositoryImpl(this._firestore);
+  NotesRepositoryImpl(this._firestore, this._browsingCampus);
 
   @override
   Stream<List<NoteListing>> watchNotes({
-    String? university,
     String? subjectCategory,
     String? noteType,
     String? yearOfStudy,
     String? query,
     int? limit,
   }) {
-    debugPrint('📖 Firestore: Watching notes. Category: $subjectCategory, Type: $noteType');
+    debugPrint('📖 Firestore: Watching notes. Category: $subjectCategory, Type: $noteType, Global Campus: $_browsingCampus');
     
     Query queryRef = _firestore.collection('notes');
 
@@ -28,6 +28,10 @@ class NotesRepositoryImpl implements NotesRepository {
 
     if (noteType != null && noteType != 'All') {
       queryRef = queryRef.where('noteType', isEqualTo: noteType);
+    }
+
+    if (_browsingCampus != null && _browsingCampus!.isNotEmpty) {
+      queryRef = queryRef.where('university', isEqualTo: _browsingCampus);
     }
 
     // REMOVED: queryRef = queryRef.orderBy('createdAt', descending: true);
@@ -40,17 +44,8 @@ class NotesRepositoryImpl implements NotesRepository {
           .map((doc) => NoteListing.fromJson(doc.data() as Map<String, dynamic>))
           .toList();
 
-      // 1. Sort in-memory (Newest first)
-      items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      // 2. Sorting is newest first by default in the list
       
-      // 2. Client-side filtering
-      if (university != null && university.isNotEmpty) {
-        // Prioritize items from the same university but show all for better discovery
-        // Or keep it strict if that's the app's policy. 
-        // Based on user feedback, let's make discovery wider.
-        // items = items.where((n) => n.university == university).toList();
-      }
-
       if (yearOfStudy != null && yearOfStudy != 'All') {
         items = items.where((n) => n.yearOfStudy == yearOfStudy).toList();
       }
@@ -82,14 +77,10 @@ class NotesRepositoryImpl implements NotesRepository {
     NoteListing? startAfter,
   }) async {
     Query queryRef = _firestore.collection('notes')
-        .orderBy('createdAt', descending: true)
-        .limit(limit);
+        .orderBy('createdAt', descending: true);
 
-    if (startAfter != null) {
-      final doc = await _firestore.collection('notes').doc(startAfter.id).get();
-      if (doc.exists) {
-        queryRef = queryRef.startAfterDocument(doc);
-      }
+    if (_browsingCampus != null && _browsingCampus!.isNotEmpty) {
+      queryRef = queryRef.where('university', isEqualTo: _browsingCampus);
     }
 
     final snapshot = await queryRef.get(const GetOptions(source: Source.serverAndCache));

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../../core/constants/campus_constants.dart';
 
 class RoommateProfile {
   final String id;
@@ -41,8 +42,8 @@ class RoommateProfile {
       id: doc.id,
       userId: data['userId'] ?? '',
       name: data['name'] ?? '',
-      university: data['university'] ?? '',
-      campus: data['campus'] ?? '',
+      university: CampusConstants.resolveToId(data['university']?.toString()) ?? (data['university'] ?? '').toString(),
+      campus: CampusConstants.resolveToId(data['campus']?.toString()) ?? (data['campus'] ?? '').toString(),
       course: data['course'] ?? '',
       yearOfStudy: data['yearOfStudy'] ?? 1,
       budget: (data['budget'] ?? 0).toDouble(),

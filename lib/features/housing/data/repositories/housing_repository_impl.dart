@@ -9,13 +9,13 @@ import '../../../shared/domain/models/uni_notification.dart';
 
 class HousingRepositoryImpl implements HousingRepository {
   final FirebaseFirestore _firestore;
+  final String? _browsingCampus;
   final NotificationService? _notificationService;
 
-  HousingRepositoryImpl(this._firestore, [this._notificationService]);
+  HousingRepositoryImpl(this._firestore, this._browsingCampus, [this._notificationService]);
 
   @override
   Stream<List<HousingListing>> watchListings({
-    String? campus,
     String? location,
     HousingType? type,
     double? minRent,
@@ -31,8 +31,8 @@ class HousingRepositoryImpl implements HousingRepository {
       query = query.where('status', isEqualTo: HousingStatus.available.name);
     }
 
-    if (campus != null && campus.isNotEmpty) {
-      query = query.where('university', isEqualTo: campus);
+    if (_browsingCampus != null && _browsingCampus!.isNotEmpty) {
+      query = query.where('university', isEqualTo: _browsingCampus);
     }
 
     if (type != null) {
@@ -88,15 +88,15 @@ class HousingRepositoryImpl implements HousingRepository {
   }
 
   @override
-  Stream<List<RoommateProfile>> watchRoommates({String? campus, int limit = 30}) {
+  Stream<List<RoommateProfile>> watchRoommates({int limit = 30}) {
     Query query = _firestore.collection('roommates')
         .orderBy('createdAt', descending: true)
         .limit(limit);
 
     return query.snapshots().map((snapshot) {
       var profiles = snapshot.docs.map((doc) => RoommateProfile.fromFirestore(doc)).toList();
-      if (campus != null) {
-        profiles = profiles.where((p) => p.campus == campus).toList();
+      if (_browsingCampus != null && _browsingCampus!.isNotEmpty) {
+        profiles = profiles.where((p) => p.campus == _browsingCampus).toList();
       }
       return profiles;
     });
@@ -330,6 +330,14 @@ class HousingRepositoryImpl implements HousingRepository {
       'status': 'pending',
     });
 
+    if (_notificationService != null) {
+      await _notificationService!.notifyAdmins(
+        title: 'Housing Report 🏠',
+        body: 'A property has been reported for: $reason',
+        route: '/admin/reports',
+      );
+    }
+
     // Notify plug that their listing is under review
     final listingDoc = await _firestore.collection('housing_listings').doc(listingId).get();
     if (listingDoc.exists) {
@@ -395,13 +403,19 @@ class HousingRepositoryImpl implements HousingRepository {
           final listingIds = snapshot.docs.map((doc) => doc.id).toList();
           if (listingIds.isEmpty) return [];
           
-          // Firestore 'in' query supports up to 10 IDs
-          // For simplicity in Phase 1, we fetch them individually or use chunks if needed
-          final listings = <HousingListing>[];
-          for (final id in listingIds) {
-            final listing = await getListingById(id);
-            if (listing != null) listings.add(listing);
-          }
+          // Use whereIn for efficiency (limited to 30 items as per policy)
+          final limitedIds = listingIds.take(30).toList();
+          final listingsSnapshot = await _firestore
+              .collection('housing_listings')
+              .where(FieldPath.documentId, whereIn: limitedIds)
+              .get();
+
+          final listings = listingsSnapshot.docs
+              .map((doc) => HousingListing.fromFirestore(doc))
+              .toList();
+          
+          // Maintain original sort order from savedAt
+          listings.sort((a, b) => limitedIds.indexOf(a.id).compareTo(limitedIds.indexOf(b.id)));
           return listings;
         });
   }
@@ -412,12 +426,12 @@ class HousingRepositoryImpl implements HousingRepository {
   }
 
   @override
-  Stream<List<VacancyRequest>> watchVacancyOpportunities({String? campus}) {
+  Stream<List<VacancyRequest>> watchVacancyOpportunities() {
     Query query = _firestore.collection('housing_vacancy_requests')
         .where('status', isEqualTo: VacancyRequestStatus.open.name);
     
-    if (campus != null && campus.isNotEmpty) {
-      query = query.where('university', isEqualTo: campus);
+    if (_browsingCampus != null && _browsingCampus!.isNotEmpty) {
+      query = query.where('university', isEqualTo: _browsingCampus);
     }
 
     return query.snapshots().map((snapshot) {

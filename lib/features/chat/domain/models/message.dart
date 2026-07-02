@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'chat_context.dart';
 
 enum MessageType { text, image, file, quickReply }
 enum MessageStatus { sending, sent, delivered, read }
@@ -11,6 +12,7 @@ class Message {
   final MessageStatus status;
   final DateTime timestamp;
   final Map<String, dynamic>? metadata;
+  final ChatContext? context;
 
   Message({
     required this.id,
@@ -20,6 +22,7 @@ class Message {
     this.status = MessageStatus.sent,
     required this.timestamp,
     this.metadata,
+    this.context,
   });
 
   Map<String, dynamic> toJson() {
@@ -31,6 +34,7 @@ class Message {
       'status': status.name,
       'timestamp': Timestamp.fromDate(timestamp),
       'metadata': metadata,
+      'context': context?.toJson(),
     };
   }
 
@@ -43,6 +47,7 @@ class Message {
       status: MessageStatus.values.firstWhere((e) => e.name == json['status'], orElse: () => MessageStatus.sent),
       timestamp: (json['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
       metadata: json['metadata'],
+      context: json['context'] != null ? ChatContext.fromJson(json['context']) : null,
     );
   }
 
@@ -54,6 +59,7 @@ class Message {
     MessageStatus? status,
     DateTime? timestamp,
     Map<String, dynamic>? metadata,
+    ChatContext? context,
   }) {
     return Message(
       id: id ?? this.id,
@@ -63,6 +69,7 @@ class Message {
       status: status ?? this.status,
       timestamp: timestamp ?? this.timestamp,
       metadata: metadata ?? this.metadata,
+      context: context ?? this.context,
     );
   }
 }

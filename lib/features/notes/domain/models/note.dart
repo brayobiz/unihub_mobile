@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../../core/constants/campus_constants.dart';
 
 class NoteListing {
   final String id;
@@ -66,7 +67,7 @@ class NoteListing {
       id: json['id'] ?? '',
       authorId: json['authorId'] ?? '',
       authorName: json['authorName'] ?? 'Unknown',
-      university: json['university'] ?? '',
+      university: CampusConstants.resolveToId(json['university']?.toString()) ?? (json['university'] ?? '').toString(),
       course: json['course'] ?? '',
       unitCode: json['unitCode'] ?? '',
       unitName: json['unitName'] ?? '',

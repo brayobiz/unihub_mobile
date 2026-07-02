@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../layout/admin_layout.dart';
 import '../../shared/providers.dart';
+import '../../domain/models/audit_log.dart';
 
 class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
@@ -10,6 +13,7 @@ class AdminDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(adminStatsProvider);
+    final auditLogsAsync = ref.watch(adminAuditLogsProvider(10));
 
     return AdminLayout(
       title: 'Admin Dashboard',
@@ -26,7 +30,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                 const SizedBox(height: 32),
                 _buildStatsGrid(context, stats),
                 const SizedBox(height: 32),
-                _buildRecentActivityPlaceholder(context),
+                _buildRecentActivity(context, auditLogsAsync),
               ],
             ),
           ),
@@ -45,14 +49,13 @@ class AdminDashboardScreen extends ConsumerWidget {
           'Overview',
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.bold,
-            color: AppColors.black,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           'Real-time metrics from the UniHub database.',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: AppColors.grey600,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
       ],
@@ -73,7 +76,14 @@ class AdminDashboardScreen extends ConsumerWidget {
           value: stats.totalUsers.toString(),
           icon: Icons.people,
           color: AppColors.primary,
-          trend: '+5% this week', // Placeholder for now until we have historical data
+          trend: stats.newUsersToday > 0 ? '+${stats.newUsersToday} today' : 'Stable',
+        ),
+        _SummaryCard(
+          title: 'Resolved Reports',
+          value: stats.resolvedReports.toString(),
+          icon: Icons.check_circle,
+          color: AppColors.success,
+          trend: 'Platform health',
         ),
         _SummaryCard(
           title: 'Pending Verifications',
@@ -107,11 +117,24 @@ class AdminDashboardScreen extends ConsumerWidget {
           color: AppColors.error,
           trend: 'Urgent',
         ),
+        _SummaryCard(
+          title: 'Support Tickets',
+          value: stats.openSupportTickets.toString(),
+          icon: Icons.support_agent,
+          color: AppColors.secondary,
+          trend: stats.openSupportTickets > 0 ? 'Action needed' : 'All clear',
+        ),
+        _SummaryCard(
+          title: 'Active Announcements',
+          value: stats.activeAnnouncements.toString(),
+          icon: Icons.campaign,
+          color: AppColors.secondaryDark,
+        ),
       ],
     );
   }
 
-  Widget _buildRecentActivityPlaceholder(BuildContext context) {
+  Widget _buildRecentActivity(BuildContext context, AsyncValue<List<AdminAuditLog>> logsAsync) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
@@ -123,33 +146,98 @@ class AdminDashboardScreen extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Recent Platform Activity',
+                  'Recent Administrative Activity',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () => context.push('/admin/audit-logs'),
                   child: const Text('View All'),
                 ),
               ],
             ),
             const Divider(),
-            const SizedBox(height: 16),
-            const Center(
-              child: Padding(
+            logsAsync.when(
+              data: (logs) {
+                if (logs.isEmpty) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32.0),
+                      child: Text('No recent activity found.', style: TextStyle(color: AppColors.grey600)),
+                    ),
+                  );
+                }
+                return ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: logs.length,
+                  separatorBuilder: (_, __) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final log = logs[index];
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: _buildActionIcon(log.actionType),
+                      title: Text(
+                        _getActionDescription(log),
+                        style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                      ),
+                      subtitle: Text(
+                        'By ${log.adminName} • ${DateFormat('MMM dd, HH:mm').format(log.timestamp)}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      trailing: log.reason != null 
+                          ? Tooltip(message: log.reason, child: const Icon(Icons.info_outline, size: 16))
+                          : null,
+                    );
+                  },
+                );
+              },
+              loading: () => const Center(child: Padding(
                 padding: EdgeInsets.all(32.0),
-                child: Column(
-                  children: [
-                    Icon(Icons.history, size: 48, color: AppColors.grey400),
-                    SizedBox(height: 16),
-                    Text('Activity logs will appear here in Phase 6', style: TextStyle(color: AppColors.grey600)),
-                  ],
-                ),
-              ),
+                child: CircularProgressIndicator(),
+              )),
+              error: (err, _) => Center(child: Text('Error: $err')),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildActionIcon(AdminActionType type) {
+    IconData icon;
+    Color color;
+    switch (type) {
+      case AdminActionType.verificationApproval:
+        icon = Icons.verified; color = AppColors.success; break;
+      case AdminActionType.verificationRejection:
+        icon = Icons.cancel; color = AppColors.error; break;
+      case AdminActionType.userBan:
+        icon = Icons.block; color = AppColors.error; break;
+      case AdminActionType.contentRemoval:
+        icon = Icons.delete_forever; color = AppColors.error; break;
+      case AdminActionType.reportResolution:
+        icon = Icons.check_circle; color = AppColors.primary; break;
+      default:
+        icon = Icons.admin_panel_settings; color = AppColors.grey600;
+    }
+    return CircleAvatar(
+      radius: 16,
+      backgroundColor: color.withOpacity(0.1),
+      child: Icon(icon, size: 16, color: color),
+    );
+  }
+
+  String _getActionDescription(AdminAuditLog log) {
+    switch (log.actionType) {
+      case AdminActionType.verificationApproval: return 'Approved ${log.targetType} verification';
+      case AdminActionType.verificationRejection: return 'Rejected ${log.targetType} verification';
+      case AdminActionType.userBan: return 'Banned user';
+      case AdminActionType.userSuspension: return 'Suspended user';
+      case AdminActionType.contentRemoval: return 'Removed ${log.targetType} content';
+      case AdminActionType.reportResolution: return 'Resolved report';
+      case AdminActionType.bulkAction: return log.reason ?? 'Performed bulk action';
+      default: return 'Performed administrative action';
+    }
   }
 }
 
@@ -174,7 +262,7 @@ class _SummaryCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.grey200),
+        side: BorderSide(color: Theme.of(context).dividerColor),
       ),
       child: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -219,8 +307,8 @@ class _SummaryCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: AppColors.grey600,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 14,
                   ),
                 ),

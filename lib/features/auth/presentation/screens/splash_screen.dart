@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
@@ -29,7 +28,7 @@ class SplashScreen extends StatelessWidget {
               const SizedBox(height: 32),
               Text(
                 'UniHub',
-                style: GoogleFonts.plusJakartaSans(
+                style: theme.textTheme.displayLarge?.copyWith(
                   fontSize: 40,
                   fontWeight: FontWeight.w900,
                   color: theme.colorScheme.onSurface,
@@ -39,7 +38,7 @@ class SplashScreen extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 'Your Campus, Your Opportunities',
-                style: GoogleFonts.plusJakartaSans(
+                style: theme.textTheme.bodyMedium?.copyWith(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                   color: theme.colorScheme.onSurfaceVariant,

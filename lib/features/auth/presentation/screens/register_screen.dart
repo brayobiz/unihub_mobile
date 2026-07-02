@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../controllers/auth_controller.dart';
 import '../widgets/auth_button.dart';
 import '../widgets/auth_text_field.dart';
@@ -70,6 +70,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
   }
 
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -81,7 +88,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -93,11 +99,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             // Hero Section
             Text(
               'Create Account',
-              style: GoogleFonts.plusJakartaSans(
+              style: theme.textTheme.displayLarge?.copyWith(
                 fontSize: 32,
-                fontWeight: FontWeight.bold,
                 letterSpacing: -1,
-                color: theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
@@ -187,14 +191,33 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
             // Privacy Note
             Center(
-              child: Text(
-                'We respect your privacy.\nOnly minimal data is used for personalization.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                  height: 1.4,
-                ),
+              child: Column(
+                children: [
+                  Text(
+                    'By creating an account, you agree to our',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      TextButton(
+                        onPressed: () => _launchUrl('https://unihub-3663e.web.app/terms'),
+                        style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                        child: Text('Terms of Service', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+                      ),
+                      Text(' and ', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7))),
+                      TextButton(
+                        onPressed: () => _launchUrl('https://unihub-3663e.web.app/privacy'),
+                        style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                        child: Text('Privacy Policy', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
 

@@ -7,6 +7,7 @@ import 'package:unihub_mobile/widgets/app_drawer.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import 'package:unihub_mobile/features/trust/domain/models/professional_role.dart';
+import 'package:unihub_mobile/features/trust/domain/models/badge.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -508,30 +509,41 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
   Widget _buildTrustSummary() {
     final user = widget.user;
     final theme = Theme.of(context);
+    final badges = user.activeBadges;
+
     return _buildSectionCard('Trust & Verification', Column(children: [
       _buildVerificationRow(Icons.school_rounded, 'Student Status', user.isStudentVerified ? 'Verified Student' : 'Not Verified', user.isStudentVerified),
       const SizedBox(height: 16),
       _buildVerificationRow(Icons.badge_rounded, 'Identity Status', user.isIdentityVerified ? 'Identity Confirmed' : 'Not Verified', user.isIdentityVerified),
-      if (user.verifiedRoles.isNotEmpty) ...[
+      
+      if (badges.isNotEmpty) ...[
         Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Divider(height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
         Row(children: [
           Icon(Icons.workspace_premium_rounded, size: 16, color: theme.colorScheme.primary),
           const SizedBox(width: 8),
-          Text('Verified Professional Roles', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant)),
+          Text('Active Badges & Roles', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant)),
         ]),
         const SizedBox(height: 12),
-        Wrap(spacing: 8, runSpacing: 8, children: user.verifiedRoles.map((roleName) {
-          final role = ProfessionalRole.values.firstWhere((e) => e.name == roleName, orElse: () => ProfessionalRole.seller);
-          return Container(
+        Wrap(
+          spacing: 8, 
+          runSpacing: 8, 
+          children: badges.map((badge) => Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10), border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.1))),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.verified_rounded, size: 14, color: theme.colorScheme.primary),
-              const SizedBox(width: 6),
-              Text(role.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: theme.colorScheme.primary)),
-            ]),
-          );
-        }).toList()),
+            decoration: BoxDecoration(
+              color: badge.color.withValues(alpha: 0.08), 
+              borderRadius: BorderRadius.circular(10), 
+              border: Border.all(color: badge.color.withValues(alpha: 0.1)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min, 
+              children: [
+                Icon(badge.icon, size: 14, color: badge.color),
+                const SizedBox(width: 6),
+                Text(badge.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: badge.color)),
+              ],
+            ),
+          )).toList(),
+        ),
       ],
     ]), icon: Icons.verified_user_outlined);
   }

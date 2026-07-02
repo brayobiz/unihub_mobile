@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import '../../../auth/shared/providers.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/message.dart';
 import '../../domain/models/chat_context.dart';
@@ -91,8 +92,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final content = quickContent ?? _messageController.text.trim();
     if (content.isEmpty) return;
 
-    final user = ref.read(authStateProvider).valueOrNull;
+    final user = ref.read(appUserProvider).valueOrNull;
     if (user == null) return;
+
+    final conversation = ref.read(conversationProvider(widget.conversationId)).valueOrNull;
+    final otherUserId = conversation?.participants.firstWhere((id) => id != user.uid, orElse: () => '');
+    
+    if (user.blockedUids.contains(otherUserId)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unblock this user to send a message.')));
+      return;
+    }
+
+    final effectiveContext = widget.chatContext ?? conversation?.context;
 
     final message = Message(
       id: const Uuid().v4(),
@@ -101,6 +112,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       type: type,
       status: MessageStatus.sending, // UI shows clock icon
       timestamp: DateTime.now(),
+      context: effectiveContext,
+      metadata: {
+        'senderName': user.fullName,
+      },
     );
 
     // Reset typing status immediately
@@ -222,6 +237,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final lastSeen = otherUser?.lastSeen;
     
     final bool isOtherTyping = conversation?.typing[otherUserId] != null;
+    final bool isResolved = conversation?.supportStatus == 'resolved' || conversation?.supportStatus == 'closed';
 
     final effectiveContext = widget.chatContext ?? conversation?.context;
 
@@ -295,7 +311,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           if (effectiveContext != null && effectiveContext.type != 'support') 
             _buildContextBanner(context, effectiveContext),
           
-          if (conversation?.expiresAt != null)
+          if (isResolved)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: AppColors.success.withValues(alpha: 0.1),
+              child: const Row(
+                children: [
+                  Icon(Icons.check_circle_outline, size: 16, color: AppColors.success),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'This support session has been resolved. If you still need help, please start a new request.',
+                      style: TextStyle(fontSize: 12, color: AppColors.success, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else if (conversation?.expiresAt != null)
             _buildExpirationBanner(conversation!.expiresAt!),
           
           Expanded(
@@ -314,9 +348,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     final isMe = message.senderId == currentUser?.uid;
                     final bool isSameSenderAsNext = index > 0 && messages[index - 1].senderId == message.senderId;
                     
-                    return GestureDetector(
-                      onLongPress: () => _onLongPressMessage(message, isMe),
-                      child: _buildMessageBubble(context, message, isMe, !isSameSenderAsNext),
+                    // Context Divider Logic
+                    bool showContextDivider = false;
+                    if (message.context != null) {
+                      if (index == messages.length - 1) {
+                        showContextDivider = true;
+                      } else {
+                        final olderMessage = messages[index + 1];
+                        if (olderMessage.context?.id != message.context?.id) {
+                          showContextDivider = true;
+                        }
+                      }
+                    }
+
+                    return Column(
+                      children: [
+                        if (showContextDivider) 
+                          _buildContextDivider(context, message.context!),
+                        GestureDetector(
+                          onLongPress: () => _onLongPressMessage(message, isMe),
+                          child: _buildMessageBubble(context, message, isMe, !isSameSenderAsNext),
+                        ),
+                      ],
                     );
                   },
                 );
@@ -339,9 +392,132 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             ),
 
-          _buildQuickReplies(context, effectiveContext?.type),
+          if (!isResolved)
+            _buildQuickReplies(context, effectiveContext?.type),
           
-          _buildInputArea(context),
+          if (isResolved)
+            Container(
+              padding: const EdgeInsets.all(24),
+              color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.1),
+              child: SafeArea(
+                child: Center(
+                  child: Text(
+                    'SESSION RESOLVED',
+                    style: TextStyle(
+                      letterSpacing: 2, 
+                      fontWeight: FontWeight.bold, 
+                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
+                    ),
+                  ),
+                ),
+              ),
+            )
+          else
+            _buildInputArea(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContextDivider(BuildContext context, ChatContext chatContext) {
+    final theme = Theme.of(context);
+    final isSupport = chatContext.type == 'support';
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 20, horizontal: 4),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Expanded(child: Divider(height: 1, thickness: 0.5)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  chatContext.type.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: theme.colorScheme.onSurfaceVariant.withOpacity(0.4),
+                    letterSpacing: 2.0,
+                  ),
+                ),
+              ),
+              const Expanded(child: Divider(height: 1, thickness: 0.5)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (!isSupport)
+            InkWell(
+              onTap: () => _navigateToContext(chatContext),
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.3)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    )
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    if (chatContext.thumbnail != null)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: OptimizedImage(imageUrl: chatContext.thumbnail!, width: 52, height: 52, fit: BoxFit.cover),
+                      )
+                    else
+                      Container(
+                        width: 52, height: 52,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(_getContextIcon(chatContext.type), color: theme.colorScheme.primary, size: 24),
+                      ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            chatContext.title,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Text(
+                                'Tap to view details',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: theme.colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(Icons.arrow_forward_ios_rounded, size: 10, color: theme.colorScheme.primary),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: 4),
         ],
       ),
     );
@@ -408,6 +584,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     switch (type.toLowerCase()) {
       case 'marketplace': return Icons.storefront;
       case 'housing': return Icons.home_work;
+      case 'support': return Icons.headset_mic_rounded;
+      case 'notes': return Icons.description_rounded;
+      case 'plug': return Icons.electrical_services_rounded;
       default: return Icons.info_outline;
     }
   }
@@ -560,6 +739,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   void _showConversationMenu() {
     final theme = Theme.of(context);
+    final user = ref.read(appUserProvider).valueOrNull;
+    final otherUserId = ref.watch(conversationProvider(widget.conversationId)).valueOrNull?.participants.firstWhere((id) => id != user?.uid, orElse: () => '');
+    final isBlocked = user?.blockedUids.contains(otherUserId) ?? false;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: theme.colorScheme.surface,
@@ -567,6 +750,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            ListTile(
+              leading: Icon(isBlocked ? Icons.check_circle_outline : Icons.block_flipped, color: isBlocked ? AppColors.success : AppColors.error),
+              title: Text(isBlocked ? 'Unblock User' : 'Block User', style: TextStyle(color: isBlocked ? AppColors.success : AppColors.error)),
+              onTap: () {
+                if (otherUserId != null && otherUserId.isNotEmpty) {
+                  if (isBlocked) {
+                    ref.read(authControllerProvider.notifier).unblockUser(otherUserId);
+                  } else {
+                    ref.read(authControllerProvider.notifier).blockUser(otherUserId);
+                  }
+                }
+                Navigator.pop(context);
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
               title: const Text('Delete Conversation', style: TextStyle(color: AppColors.error)),
@@ -659,19 +856,36 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Widget _buildMessageContent(BuildContext context, Message message, bool isMe) {
     final theme = Theme.of(context);
-    switch (message.type) {
-      case MessageType.image:
-        return GestureDetector(
-          onTap: () => _openUrl(message.content),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: OptimizedImage(
-              imageUrl: message.content,
-              fit: BoxFit.cover,
-              thumbnailWidth: 500,
-            ),
+    
+    // Auto-detect image URLs in text messages
+    bool isLikelyImage = message.type == MessageType.image;
+    if (message.type == MessageType.text) {
+      final content = message.content.trim();
+      if (content.startsWith('http') && 
+          (content.contains('cloudinary.com') || 
+           content.toLowerCase().endsWith('.jpg') || 
+           content.toLowerCase().endsWith('.jpeg') || 
+           content.toLowerCase().endsWith('.png') || 
+           content.toLowerCase().endsWith('.webp'))) {
+        isLikelyImage = true;
+      }
+    }
+
+    if (isLikelyImage) {
+      return GestureDetector(
+        onTap: () => _viewImage(message.content),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: OptimizedImage(
+            imageUrl: message.content,
+            fit: BoxFit.cover,
+            thumbnailWidth: 500,
           ),
-        );
+        ),
+      );
+    }
+
+    switch (message.type) {
       case MessageType.file:
         return InkWell(
           onTap: () => _openUrl(message.content),
@@ -699,6 +913,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
         );
     }
+  }
+
+  void _viewImage(String url) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (context) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.close, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: OptimizedImage(
+                imageUrl: url,
+                fit: BoxFit.contain,
+                useCloudinaryTransform: false,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _openUrl(String urlString) async {

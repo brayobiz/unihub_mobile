@@ -11,7 +11,6 @@ abstract class MarketplaceRepository {
     double? minPrice,
     double? maxPrice,
     bool? isFeatured,
-    String? university,
     String? searchQuery,
     ListingSortType? sortBy,
     ListingStatus? status,
@@ -24,7 +23,7 @@ abstract class MarketplaceRepository {
   // Discovery & Sections
   Stream<List<Listing>> watchRecentlyViewed(String userId);
   Future<void> clearRecentlyViewed(String userId);
-  Stream<List<Listing>> watchTrendingListings({String? university, int limit = 10});
+  Stream<List<Listing>> watchTrendingListings({int limit = 10});
   Stream<List<Listing>> watchRecommendedListings(String userId, {int limit = 10});
   Stream<List<Listing>> watchSimilarListings(Listing listing, {int limit = 6});
   

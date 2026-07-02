@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/marketplace/domain/models/listing.dart';
@@ -60,7 +59,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
           children: [
             Text(
               widget.listing == null ? 'Post Listing' : 'Edit Listing',
-              style: GoogleFonts.plusJakartaSans(
+              style: theme.textTheme.titleMedium?.copyWith(
                 color: theme.colorScheme.onSurface, 
                 fontWeight: FontWeight.bold, 
                 fontSize: 16,
@@ -131,7 +130,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
           const SizedBox(height: 32),
           Text(
             'What are you selling?', 
-            style: GoogleFonts.plusJakartaSans(
+            style: theme.textTheme.displaySmall?.copyWith(
               fontSize: 22, 
               fontWeight: FontWeight.w800,
               color: theme.colorScheme.onSurface,
@@ -160,7 +159,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
         children: [
           Text(
             'Item Details', 
-            style: GoogleFonts.plusJakartaSans(
+            style: theme.textTheme.displaySmall?.copyWith(
               fontSize: 22, 
               fontWeight: FontWeight.w800,
               color: theme.colorScheme.onSurface,
@@ -183,7 +182,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
           const SizedBox(height: 32),
           Text(
             'Specifications', 
-            style: GoogleFonts.plusJakartaSans(
+            style: theme.textTheme.titleLarge?.copyWith(
               fontSize: 18, 
               fontWeight: FontWeight.bold,
               color: theme.colorScheme.onSurface,
@@ -206,7 +205,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
         children: [
           Text(
             'Final Details', 
-            style: GoogleFonts.plusJakartaSans(
+            style: theme.textTheme.displaySmall?.copyWith(
               fontSize: 22, 
               fontWeight: FontWeight.w800,
               color: theme.colorScheme.onSurface,
@@ -334,7 +333,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
           children: [
             Text(
               'Photos', 
-              style: GoogleFonts.plusJakartaSans(
+              style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.bold, 
                 fontSize: 16,
                 color: theme.colorScheme.onSurface,
@@ -666,7 +665,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Listing Quality: ${state.qualityLabel}', 
-                    style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 14, color: qualityColor)),
+                    style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800, fontSize: 14, color: qualityColor)),
                 ],
               ),
               Text('${(qualityScore * 100).toInt()}%', 
@@ -756,6 +755,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   }
 
   Widget _buildPreviewOverlay(AddListingState state) {
+    final theme = Theme.of(context);
     final int quantity = (state.quantity as dynamic) ?? 1;
     return Positioned.fill(
       child: Container(
@@ -763,7 +763,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
         child: Column(
           children: [
             const Spacer(),
-            Text('Listing Preview', style: GoogleFonts.plusJakartaSans(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
+            Text('Listing Preview', style: theme.textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
             const SizedBox(height: 32),
             SizedBox(
               width: 280,
@@ -854,7 +854,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
               const SizedBox(height: 24),
               Text(
                 'Live on UniHub!', 
-                style: GoogleFonts.plusJakartaSans(
+                style: theme.textTheme.titleLarge?.copyWith(
                   fontSize: 22, 
                   fontWeight: FontWeight.bold,
                   color: theme.colorScheme.onSurface,

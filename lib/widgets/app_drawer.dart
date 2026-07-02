@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import '../features/auth/presentation/controllers/auth_controller.dart';
 import '../features/auth/shared/providers.dart';
@@ -52,7 +51,7 @@ class AppDrawer extends ConsumerWidget {
                       const SizedBox(height: 16),
                       Text(
                         user?.fullName ?? 'User',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: theme.textTheme.titleLarge?.copyWith(
                           color: Colors.white,
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
@@ -61,7 +60,7 @@ class AppDrawer extends ConsumerWidget {
                       const SizedBox(height: 4),
                       Text(
                         user?.email ?? '',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: theme.textTheme.bodyMedium?.copyWith(
                           color: Colors.white70,
                           fontSize: 14,
                         ),
@@ -168,18 +167,18 @@ class AppDrawer extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Log Out?',
-          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
         ),
         content: Text(
           'Are you sure you want to log out of UniHub?',
-          style: GoogleFonts.plusJakartaSans(color: theme.colorScheme.onSurfaceVariant),
+          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Cancel',
-              style: GoogleFonts.plusJakartaSans(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), fontWeight: FontWeight.w600),
+              style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), fontWeight: FontWeight.w600),
             ),
           ),
           TextButton(
@@ -189,7 +188,7 @@ class AppDrawer extends ConsumerWidget {
             },
             child: Text(
               'Log Out',
-              style: GoogleFonts.plusJakartaSans(color: AppColors.error, fontWeight: FontWeight.bold),
+              style: theme.textTheme.labelLarge?.copyWith(color: AppColors.error, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -203,7 +202,7 @@ class AppDrawer extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
       child: Text(
         title.toUpperCase(),
-        style: GoogleFonts.plusJakartaSans(
+        style: theme.textTheme.labelSmall?.copyWith(
           fontSize: 11,
           fontWeight: FontWeight.bold,
           color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
@@ -225,7 +224,7 @@ class AppDrawer extends ConsumerWidget {
       leading: Icon(icon, color: color ?? theme.colorScheme.onSurfaceVariant, size: 22),
       title: Text(
         title,
-        style: GoogleFonts.plusJakartaSans(
+        style: theme.textTheme.titleMedium?.copyWith(
           color: color ?? theme.colorScheme.onSurface,
           fontSize: 15,
           fontWeight: FontWeight.w600,

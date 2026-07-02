@@ -7,8 +7,13 @@ import 'package:unihub_mobile/features/trust/domain/models/professional_role.dar
 import 'package:unihub_mobile/features/trust/domain/repositories/trust_repository.dart';
 import 'package:unihub_mobile/features/trust/data/repositories/trust_repository_impl.dart';
 
+import 'package:unihub_mobile/services/notification_service.dart';
+
 final trustRepositoryProvider = Provider<TrustRepository>((ref) {
-  return TrustRepositoryImpl(ref.watch(firestoreProvider));
+  return TrustRepositoryImpl(
+    ref.watch(firestoreProvider),
+    ref.watch(notificationServiceProvider),
+  );
 });
 
 final userApplicationsProvider = StreamProvider<List<VerificationApplication>>((ref) {

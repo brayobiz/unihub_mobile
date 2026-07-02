@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../layout/admin_layout.dart';
+import '../../../auth/shared/providers.dart';
 import '../../domain/models/verification_request.dart';
 import '../../shared/providers.dart';
 
@@ -47,9 +48,14 @@ class _VerificationDetailScreenState extends ConsumerState<VerificationDetailScr
 
     setState(() => _isProcessing = true);
     try {
+      final admin = ref.read(appUserProvider).valueOrNull;
+      if (admin == null) throw Exception('Admin session not found');
+
       await ref.read(adminRepositoryProvider).processVerification(
         request: widget.request,
         newStatus: status,
+        adminId: admin.uid,
+        adminName: admin.fullName,
         reason: _reasonController.text.trim(),
         adminNotes: _adminNotesController.text.trim(),
       );
@@ -121,7 +127,11 @@ class _VerificationDetailScreenState extends ConsumerState<VerificationDetailScr
             children: [
               Text(
                 '${widget.request.type.name.toUpperCase()} Verification',
-                style: const TextStyle(fontSize: 14, color: AppColors.grey600, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 14, 
+                  color: Theme.of(context).colorScheme.onSurfaceVariant, 
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               Text(
                 'Request ID: ${widget.request.id}',
@@ -277,7 +287,10 @@ class _VerificationDetailScreenState extends ConsumerState<VerificationDetailScr
               else
                 Container(
                   padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: AppColors.grey100, borderRadius: BorderRadius.circular(8)),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest, 
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   child: const Text('This request has already been processed.', textAlign: TextAlign.center),
                 ),
             ],
@@ -290,7 +303,10 @@ class _VerificationDetailScreenState extends ConsumerState<VerificationDetailScr
   Widget _buildSectionCard({required String title, required Widget child}) {
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: AppColors.grey200)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12), 
+        side: BorderSide(color: Theme.of(context).dividerColor),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -311,7 +327,16 @@ class _VerificationDetailScreenState extends ConsumerState<VerificationDetailScr
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 120, child: Text(label, style: const TextStyle(color: AppColors.grey600, fontWeight: FontWeight.w500))),
+          SizedBox(
+            width: 120, 
+            child: Text(
+              label, 
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant, 
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
           Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.bold))),
         ],
       ),
@@ -333,8 +358,14 @@ class _VerificationDetailScreenState extends ConsumerState<VerificationDetailScr
               height: 200,
               width: double.infinity,
               fit: BoxFit.cover,
-              placeholder: (context, url) => Container(color: AppColors.grey100, child: const Center(child: CircularProgressIndicator())),
-              errorWidget: (context, url, error) => Container(color: AppColors.grey100, child: const Icon(Icons.error)),
+              placeholder: (context, url) => Container(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest, 
+                child: const Center(child: CircularProgressIndicator()),
+              ),
+              errorWidget: (context, url, error) => Container(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest, 
+                child: const Icon(Icons.error),
+              ),
             ),
           ),
         ),

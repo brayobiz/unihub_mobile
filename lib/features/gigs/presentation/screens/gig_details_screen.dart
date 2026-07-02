@@ -35,16 +35,21 @@ class _GigDetailsScreenState extends ConsumerState<GigDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final gig = widget.gig;
     final user = ref.watch(appUserProvider).valueOrNull;
     final isOwner = user != null && gig.authorId == user.uid;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Gig details', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        title: Text('Gig details', 
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+          )),
+        backgroundColor: theme.colorScheme.surface,
+        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -58,13 +63,13 @@ class _GigDetailsScreenState extends ConsumerState<GigDetailsScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.indigo.shade50,
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     gig.price ?? 'Negotiable',
                     style: TextStyle(
-                      color: Colors.indigo.shade700,
+                      color: theme.colorScheme.primary,
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
@@ -73,61 +78,62 @@ class _GigDetailsScreenState extends ConsumerState<GigDetailsScreen> {
                 const Spacer(),
                 Text(
                   DateFormat.yMMMd().format(gig.createdAt),
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13),
                 ),
               ],
             ),
             const SizedBox(height: 20),
             Text(
               gig.title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.bold,
                 letterSpacing: -0.5,
+                color: theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
             Row(
               children: [
-                const Icon(Icons.business_center_outlined, size: 16, color: Colors.grey),
+                Icon(Icons.business_center_outlined, size: 16, color: theme.colorScheme.onSurfaceVariant),
                 const SizedBox(width: 6),
                 Text(
                   'Employer: ${gig.authorName}',
-                  style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
-            const Divider(height: 40),
+            Divider(height: 40, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
 
-            const Text(
+            Text(
               'Job Description',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
             ),
             const SizedBox(height: 12),
             Text(
               gig.subtitle,
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.grey.shade800,
+                color: theme.colorScheme.onSurfaceVariant,
                 height: 1.6,
               ),
             ),
             const SizedBox(height: 32),
 
             if (gig.deadline != null) ...[
-              _buildInfoRow(Icons.calendar_month_outlined, 'Application Deadline', 
+              _buildInfoRow(context, Icons.calendar_month_outlined, 'Application Deadline', 
                   DateFormat.yMMMd().format(gig.deadline!)),
               const SizedBox(height: 16),
             ],
             
-            _buildInfoRow(Icons.location_on_outlined, 'Campus', gig.university ?? 'Global'),
+            _buildInfoRow(context, Icons.location_on_outlined, 'Campus', gig.university ?? 'Global'),
             
             const SizedBox(height: 40),
 
             if (gig.images.isNotEmpty) ...[
-              const Text(
+              Text(
                 'Attachments',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
               ),
               const SizedBox(height: 12),
               SizedBox(
@@ -140,6 +146,7 @@ class _GigDetailsScreenState extends ConsumerState<GigDetailsScreen> {
                       width: 200,
                       margin: const EdgeInsets.only(right: 12),
                       decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(16),
                         image: DecorationImage(
                           image: NetworkImage(gig.images[index]),
@@ -157,18 +164,18 @@ class _GigDetailsScreenState extends ConsumerState<GigDetailsScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.amber.shade50,
+                color: Colors.amber.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.amber.shade200),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.2)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.shield_outlined, color: Colors.amber.shade800),
+                  const Icon(Icons.shield_outlined, color: Colors.amber),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'Safety Tip: Never pay any upfront fees to secure a gig. Always meet in public campus locations.',
-                      style: TextStyle(color: Colors.amber.shade900, fontSize: 13),
+                      style: TextStyle(color: Colors.amber, fontSize: 13),
                     ),
                   ),
                 ],
@@ -181,10 +188,10 @@ class _GigDetailsScreenState extends ConsumerState<GigDetailsScreen> {
       bottomSheet: Container(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.colorScheme.surface,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, -5),
             ),
@@ -199,6 +206,8 @@ class _GigDetailsScreenState extends ConsumerState<GigDetailsScreen> {
                   icon: const Icon(Icons.dashboard_outlined),
                   label: const Text('View Applications'),
                   style: OutlinedButton.styleFrom(
+                    foregroundColor: theme.colorScheme.primary,
+                    side: BorderSide(color: theme.colorScheme.primary),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
@@ -211,7 +220,7 @@ class _GigDetailsScreenState extends ConsumerState<GigDetailsScreen> {
                     ? null 
                     : () => context.push('/apply-gig', extra: gig),
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.indigo,
+                    backgroundColor: theme.colorScheme.primary,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: Text(
@@ -224,20 +233,21 @@ class _GigDetailsScreenState extends ConsumerState<GigDetailsScreen> {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value) {
+  Widget _buildInfoRow(BuildContext context, IconData icon, String label, String value) {
+    final theme = Theme.of(context);
     return Row(
       children: [
         CircleAvatar(
           radius: 18,
-          backgroundColor: Colors.grey.shade100,
-          child: Icon(icon, size: 18, color: Colors.grey.shade700),
+          backgroundColor: theme.colorScheme.surfaceContainerHighest,
+          child: Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
         ),
         const SizedBox(width: 12),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
-            Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            Text(label, style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 12)),
+            Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface)),
           ],
         ),
       ],

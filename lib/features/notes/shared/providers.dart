@@ -5,9 +5,13 @@ import '../domain/models/note.dart';
 import '../domain/models/study_progress.dart';
 import '../domain/repositories/notes_repository.dart';
 
+import '../../campus_filter/shared/providers.dart';
+
 final notesRepositoryProvider = Provider<NotesRepository>((ref) {
+  final campus = ref.watch(effectiveCampusFilterProvider);
   return NotesRepositoryImpl(
     ref.watch(firestoreProvider),
+    campus,
   );
 });
 
@@ -16,7 +20,6 @@ final notesSearchQueryProvider = StateProvider<String>((ref) => '');
 final notesCategoryFilterProvider = StateProvider<String>((ref) => 'All');
 final notesTypeFilterProvider = StateProvider<String>((ref) => 'All');
 final notesYearFilterProvider = StateProvider<String>((ref) => 'All');
-final notesUniversityFilterProvider = StateProvider<String?>((ref) => null);
 final notesCourseFilterProvider = StateProvider<String>((ref) => 'All');
 
 final notesListingsProvider = StreamProvider.family<List<NoteListing>, int>((ref, limit) {
@@ -25,16 +28,17 @@ final notesListingsProvider = StreamProvider.family<List<NoteListing>, int>((ref
   final category = ref.watch(notesCategoryFilterProvider);
   final type = ref.watch(notesTypeFilterProvider);
   final year = ref.watch(notesYearFilterProvider);
-  final selectedUni = ref.watch(notesUniversityFilterProvider);
 
   return ref.watch(notesRepositoryProvider).watchNotes(
-    university: selectedUni ?? user?.university,
     subjectCategory: category,
     noteType: type,
     yearOfStudy: year,
     query: query,
     limit: limit,
-  );
+  ).map((notes) {
+    if (user == null || user.blockedUids.isEmpty) return notes;
+    return notes.where((n) => !user.blockedUids.contains(n.authorId)).toList();
+  });
 });
 
 final userNotesProvider = StreamProvider<List<NoteListing>>((ref) {

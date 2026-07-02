@@ -12,7 +12,6 @@ class ListingFilter {
   final int itemsLimit;
   final ListingSortType sortBy;
   final ListingStatus status;
-  final String? university;
   final Map<String, dynamic> categoryAttributes;
 
   ListingFilter({
@@ -24,7 +23,6 @@ class ListingFilter {
     this.itemsLimit = 50,
     ListingSortType? sortBy,
     ListingStatus? status,
-    this.university,
     this.categoryAttributes = const {},
   })  : sortBy = sortBy ?? ListingSortType.newest,
         status = status ?? ListingStatus.active;
@@ -38,7 +36,6 @@ class ListingFilter {
     int? itemsLimit,
     ListingSortType? sortBy,
     ListingStatus? status,
-    ValueGetter<String?>? university,
     Map<String, dynamic>? categoryAttributes,
   }) {
     return ListingFilter(
@@ -50,7 +47,6 @@ class ListingFilter {
       itemsLimit: itemsLimit ?? this.itemsLimit,
       sortBy: sortBy ?? this.sortBy,
       status: status ?? this.status,
-      university: university != null ? university() : this.university,
       categoryAttributes: categoryAttributes ?? this.categoryAttributes,
     );
   }
@@ -68,7 +64,6 @@ class ListingFilter {
           itemsLimit == other.itemsLimit &&
           sortBy == other.sortBy &&
           status == other.status &&
-          university == other.university &&
           mapEquals(categoryAttributes, other.categoryAttributes);
 
   @override
@@ -81,7 +76,6 @@ class ListingFilter {
         itemsLimit,
         sortBy,
         status,
-        university,
         categoryAttributes,
       );
 }

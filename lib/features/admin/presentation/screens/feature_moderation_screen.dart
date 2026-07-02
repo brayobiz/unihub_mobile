@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../layout/admin_layout.dart';
+import '../../../auth/shared/providers.dart';
 import '../../domain/models/moderation_content.dart';
+import '../../domain/models/audit_log.dart';
 import '../../shared/providers.dart';
 
 class FeatureModerationScreen extends ConsumerStatefulWidget {
   final ContentType contentType;
+  final String? initialUserId;
 
-  const FeatureModerationScreen({super.key, required this.contentType});
+  const FeatureModerationScreen({super.key, required this.contentType, this.initialUserId});
 
   @override
   ConsumerState<FeatureModerationScreen> createState() => _FeatureModerationScreenState();
@@ -19,6 +23,72 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
   String? _selectedStatus;
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  final Set<String> _selectedIds = {};
+  bool _isBulkProcessing = false;
+
+  void _toggleSelection(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+      } else {
+        _selectedIds.add(id);
+      }
+    });
+  }
+
+  Future<void> _handleBulkStatusUpdate(String newStatus, List<ModeratedContent> items) async {
+    final selectedItems = items.where((i) => _selectedIds.contains(i.id)).toList();
+    if (selectedItems.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Bulk Status Update'),
+        content: Text('Are you sure you want to update ${selectedItems.length} items to "$newStatus"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm')),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isBulkProcessing = true);
+    try {
+      final admin = ref.read(appUserProvider).valueOrNull;
+      if (admin == null) throw Exception('Admin session not found');
+
+      await ref.read(adminRepositoryProvider).bulkUpdateContentStatus(
+        contentIds: selectedItems.map((i) => i.id).toList(),
+        type: widget.contentType,
+        newStatus: newStatus,
+        adminId: admin.uid,
+        adminName: admin.fullName,
+      );
+      
+      setState(() {
+        _selectedIds.clear();
+        _isBulkProcessing = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bulk update completed successfully')));
+      }
+    } catch (e) {
+      setState(() => _isBulkProcessing = false);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialUserId != null) {
+      _searchQuery = widget.initialUserId!.toLowerCase();
+      _searchController.text = widget.initialUserId!;
+    }
+  }
 
   @override
   void dispose() {
@@ -34,7 +104,7 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
       title: '${widget.contentType.name[0].toUpperCase()}${widget.contentType.name.substring(1)} Moderation',
       child: Column(
         children: [
-          _buildFilters(contentAsync.valueOrNull?.length ?? 0),
+          _buildFilters(contentAsync.valueOrNull?.length ?? 0, contentAsync.valueOrNull ?? []),
           _buildSearchBar(),
           Expanded(
             child: contentAsync.when(
@@ -51,7 +121,7 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
     );
   }
 
-  Widget _buildFilters(int count) {
+  Widget _buildFilters(int count, List<ModeratedContent> items) {
     List<String> statuses = ['active', 'removed'];
     if (widget.contentType == ContentType.marketplace) {
       statuses = ['active', 'sold', 'paused', 'expired', 'archived', 'removed'];
@@ -61,28 +131,63 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
 
     return Container(
       padding: const EdgeInsets.all(16),
-      color: Colors.white,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            const Text('Status: ', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(width: 8),
-            DropdownButton<String?>(
-              value: _selectedStatus,
-              items: [
-                const DropdownMenuItem(value: null, child: Text('All')),
-                ...statuses.map((s) => DropdownMenuItem(
-                  value: s,
-                  child: Text(s[0].toUpperCase() + s.substring(1)),
-                )),
+      color: Theme.of(context).cardColor,
+      child: Column(
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                const Text('Status: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(width: 8),
+                DropdownButton<String?>(
+                  value: _selectedStatus,
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('All')),
+                    ...statuses.map((s) => DropdownMenuItem(
+                      value: s,
+                      child: Text(s[0].toUpperCase() + s.substring(1)),
+                    )),
+                  ],
+                  onChanged: (val) => setState(() => _selectedStatus = val),
+                ),
+                const SizedBox(width: 24),
+                Text('$count Items Found', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
               ],
-              onChanged: (val) => setState(() => _selectedStatus = val),
             ),
-            const SizedBox(width: 24),
-            Text('$count Items Found', style: const TextStyle(color: AppColors.grey600)),
+          ),
+          if (_selectedIds.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  Text('${_selectedIds.length} Selected', 
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                  const SizedBox(width: 16),
+                  if (_isBulkProcessing) 
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                    )
+                  else ...[
+                    TextButton.icon(
+                      onPressed: () => _handleBulkStatusUpdate('removed', items),
+                      icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                      label: const Text('Remove Selected', style: TextStyle(color: AppColors.error)),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: () => setState(() => _selectedIds.clear()),
+                      icon: const Icon(Icons.close),
+                      tooltip: 'Clear Selection',
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -90,7 +195,7 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
   Widget _buildSearchBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
@@ -98,6 +203,7 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
           prefixIcon: const Icon(Icons.search),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           contentPadding: const EdgeInsets.symmetric(vertical: 0),
+          fillColor: Theme.of(context).colorScheme.surface,
         ),
         onChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
       ),
@@ -124,26 +230,43 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
       separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final item = items[index];
-        return Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: AppColors.grey200),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(12),
-            leading: _buildThumbnail(item),
-            title: Text(item.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('By ${item.authorName} • ${item.university ?? "Unknown"}'),
-                Text(DateFormat('MMM dd, yyyy').format(item.createdAt), style: const TextStyle(fontSize: 12, color: AppColors.grey600)),
-              ],
+        final isSelected = _selectedIds.contains(item.id);
+
+        return Row(
+          children: [
+            Checkbox(
+              value: isSelected,
+              onChanged: (_) => _toggleSelection(item.id),
             ),
-            trailing: _buildStatusChip(item.status),
-            onTap: () => _showModerationOptions(item),
-          ),
+            Expanded(
+              child: Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Theme.of(context).dividerColor),
+                ),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.all(12),
+                  leading: _buildThumbnail(item),
+                  title: Text(item.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('By ${item.authorName} • ${item.university ?? "Unknown"}'),
+                      Text(DateFormat('MMM dd, yyyy').format(item.createdAt), 
+                        style: TextStyle(
+                          fontSize: 12, 
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                  trailing: _buildStatusChip(item.status),
+                  onTap: () => _showModerationOptions(item),
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -254,10 +377,15 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
 
     if (confirmed == true) {
       try {
+        final admin = ref.read(appUserProvider).valueOrNull;
+        if (admin == null) throw Exception('Admin session not found');
+
         await ref.read(adminRepositoryProvider).updateContentStatus(
           widget.contentType,
           item.id,
           newStatus == 'remove' ? 'removed' : (widget.contentType == ContentType.housing ? 'available' : 'active'),
+          adminId: admin.uid,
+          adminName: admin.fullName,
         );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Status updated successfully')));

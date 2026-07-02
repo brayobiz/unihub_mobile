@@ -5,7 +5,6 @@ import '../models/vacancy_request.dart';
 
 abstract class HousingRepository {
   Stream<List<HousingListing>> watchListings({
-    String? campus,
     String? location,
     HousingType? type,
     double? minRent,
@@ -20,7 +19,7 @@ abstract class HousingRepository {
 
   Stream<List<HousingReview>> watchPlugReviews(String plugId);
 
-  Stream<List<RoommateProfile>> watchRoommates({String? campus, int limit = 30});
+  Stream<List<RoommateProfile>> watchRoommates({int limit = 30});
 
   Future<HousingListing?> getListingById(String id);
 
@@ -68,7 +67,7 @@ abstract class HousingRepository {
   // Vacancy Requests
   Future<void> submitVacancyRequest(VacancyRequest request);
   
-  Stream<List<VacancyRequest>> watchVacancyOpportunities({String? campus});
+  Stream<List<VacancyRequest>> watchVacancyOpportunities();
   
   Future<void> claimVacancyRequest(String requestId, String plugId, String plugName);
 }

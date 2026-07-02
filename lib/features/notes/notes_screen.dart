@@ -8,6 +8,8 @@ import 'presentation/widgets/discover_tab.dart';
 import 'presentation/widgets/library_tab.dart';
 import '../../widgets/app_drawer.dart';
 import '../../widgets/notification_badge.dart';
+import 'package:unihub_mobile/features/announcements/presentation/widgets/announcement_display.dart';
+import 'package:unihub_mobile/features/campus_filter/presentation/widgets/campus_filter_selector.dart';
 
 class NotesScreen extends ConsumerStatefulWidget {
   const NotesScreen({super.key});
@@ -73,16 +75,28 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'notes_fab',
         onPressed: () => context.push('/add-note'),
         backgroundColor: theme.colorScheme.primary,
         label: const Text('Share Notes', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
         icon: const Icon(Icons.add, color: Colors.white),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: const [
-          DiscoverTab(),
-          LibraryTab(),
+      body: Column(
+        children: [
+          const RelevantAnnouncementsWidget(feature: 'notes'),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: CampusFilterSelector(),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: const [
+                DiscoverTab(),
+                LibraryTab(),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -106,7 +120,6 @@ class NoteFilterSheet extends ConsumerWidget {
     final theme = Theme.of(context);
     final selectedType = ref.watch(notesTypeFilterProvider);
     final selectedYear = ref.watch(notesYearFilterProvider);
-    final selectedUni = ref.watch(notesUniversityFilterProvider);
     final user = ref.watch(appUserProvider).valueOrNull;
 
     final noteTypes = ['All', 'Lecture Note', 'Revision Kit', 'Assignment', 'Past Paper', 'Summary'];
@@ -139,7 +152,6 @@ class NoteFilterSheet extends ConsumerWidget {
                   onPressed: () {
                     ref.read(notesTypeFilterProvider.notifier).state = 'All';
                     ref.read(notesYearFilterProvider.notifier).state = 'All';
-                    ref.read(notesUniversityFilterProvider.notifier).state = null;
                   },
                   child: const Text('Reset All'),
                 ),
@@ -150,11 +162,6 @@ class NoteFilterSheet extends ConsumerWidget {
                 controller: scrollController,
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 children: [
-                  Text('Institution', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
-                  const SizedBox(height: 12),
-                  _buildUniFilter(context, ref, selectedUni, user?.university),
-                  
-                  const SizedBox(height: 32),
                   Text('Note Type', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
                   const SizedBox(height: 12),
                   Wrap(
@@ -206,33 +213,6 @@ class NoteFilterSheet extends ConsumerWidget {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildUniFilter(BuildContext context, WidgetRef ref, String? selected, String? userUni) {
-    final theme = Theme.of(context);
-    return Column(
-      children: [
-        RadioListTile<String?>(
-          title: Text('All Institutions', style: TextStyle(color: theme.colorScheme.onSurface)),
-          value: null,
-          groupValue: selected,
-          activeColor: theme.colorScheme.primary,
-          onChanged: (val) => ref.read(notesUniversityFilterProvider.notifier).state = val,
-          contentPadding: EdgeInsets.zero,
-          dense: true,
-        ),
-        if (userUni != null)
-          RadioListTile<String?>(
-            title: Text('My University ($userUni)', style: TextStyle(color: theme.colorScheme.onSurface)),
-            value: userUni,
-            groupValue: selected,
-            activeColor: theme.colorScheme.primary,
-            onChanged: (val) => ref.read(notesUniversityFilterProvider.notifier).state = val,
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-          ),
-      ],
     );
   }
 }

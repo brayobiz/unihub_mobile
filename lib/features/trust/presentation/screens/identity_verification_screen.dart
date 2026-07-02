@@ -103,29 +103,45 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
+        backgroundColor: theme.colorScheme.surface,
+        elevation: 0,
         title: Text('Platform Identity', 
-          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+          )),
+        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Identity Verification',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
+              style: TextStyle(
+                fontSize: 24, 
+                fontWeight: FontWeight.w900, 
+                color: theme.colorScheme.onSurface
+              ),
             ),
             const SizedBox(height: 12),
             Text(
               'Verify your legal identity once to unlock professional roles across the entire UniHub platform.',
-              style: TextStyle(fontSize: 15, color: Colors.blueGrey.shade600, height: 1.5),
+              style: TextStyle(
+                fontSize: 15, 
+                color: theme.colorScheme.onSurfaceVariant, 
+                height: 1.5
+              ),
             ),
             const SizedBox(height: 32),
             
             _buildUploadCard(
+              context,
               title: 'National ID / Driver\'s License',
               subtitle: 'Clear photo of your official identification',
               file: _idFile,
@@ -134,6 +150,7 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
             ),
             const SizedBox(height: 20),
             _buildUploadCard(
+              context,
               title: 'Live Selfie',
               subtitle: 'Face confirmation to match your ID',
               file: _selfieFile,
@@ -143,21 +160,21 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
             ),
             
             const SizedBox(height: 48),
-            _buildRequirements(),
+            _buildRequirements(context),
             const SizedBox(height: 48),
             
             if (_isSubmitting) ...[
               LinearProgressIndicator(
                 value: _uploadProgress,
-                backgroundColor: const Color(0xFFF1F5F9),
-                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1677F2)),
+                backgroundColor: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
+                valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
                 borderRadius: BorderRadius.circular(10),
               ),
               const SizedBox(height: 12),
               Center(
                 child: Text(
                   'Uploading Documents: ${(_uploadProgress * 100).toInt()}%',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.blueGrey.shade700),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant),
                 ),
               ),
               const SizedBox(height: 24),
@@ -169,12 +186,14 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
               child: ElevatedButton(
                 onPressed: (_idFile == null || _selfieFile == null || _isSubmitting) ? null : _submit,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1677F2),
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 0,
                 ),
                 child: _isSubmitting
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Submit Verification', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                    : const Text('Submit Verification', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -183,7 +202,8 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
     );
   }
 
-  Widget _buildUploadCard({
+  Widget _buildUploadCard(
+    BuildContext context, {
     required String title,
     required String subtitle,
     File? file,
@@ -191,16 +211,17 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
     required IconData icon,
     bool isCamera = false,
   }) {
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: _isSubmitting ? null : onTap,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
+          color: theme.colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: file != null ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
+            color: file != null ? const Color(0xFF10B981) : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
             width: 2,
           ),
         ),
@@ -210,7 +231,7 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
               width: 60,
               height: 60,
               decoration: BoxDecoration(
-                color: (file != null ? const Color(0xFF10B981) : const Color(0xFF1677F2)).withOpacity(0.1),
+                color: (file != null ? const Color(0xFF10B981) : theme.colorScheme.primary).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: file != null
@@ -218,48 +239,49 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
                       borderRadius: BorderRadius.circular(16),
                       child: Image.file(file, fit: BoxFit.cover),
                     )
-                  : Icon(icon, color: const Color(0xFF1677F2), size: 30),
+                  : Icon(icon, color: theme.colorScheme.primary, size: 30),
             ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                  Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: theme.colorScheme.onSurface)),
                   const SizedBox(height: 4),
                   Text(file != null ? 'Document ready' : subtitle, 
-                    style: TextStyle(color: file != null ? const Color(0xFF059669) : Colors.blueGrey.shade400, fontSize: 12)),
+                    style: TextStyle(color: file != null ? const Color(0xFF059669) : theme.colorScheme.onSurfaceVariant, fontSize: 12)),
                 ],
               ),
             ),
             if (file != null)
               const Icon(Icons.check_circle, color: Color(0xFF10B981))
             else
-              const Icon(Icons.add_a_photo_outlined, color: Color(0xFF1677F2), size: 20),
+              Icon(Icons.add_a_photo_outlined, color: theme.colorScheme.primary, size: 20),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildRequirements() {
+  Widget _buildRequirements(BuildContext context) {
     return Column(
       children: [
-        _requirementItem(Icons.lightbulb_outline, 'Use a well-lit environment'),
-        _requirementItem(Icons.document_scanner_outlined, 'Ensure text on ID is legible'),
-        _requirementItem(Icons.no_photography_outlined, 'No glare or blur on documents'),
+        _requirementItem(context, Icons.lightbulb_outline, 'Use a well-lit environment'),
+        _requirementItem(context, Icons.document_scanner_outlined, 'Ensure text on ID is legible'),
+        _requirementItem(context, Icons.no_photography_outlined, 'No glare or blur on documents'),
       ],
     );
   }
 
-  Widget _requirementItem(IconData icon, String text) {
+  Widget _requirementItem(BuildContext context, IconData icon, String text) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Colors.blueGrey.shade400),
+          Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6)),
           const SizedBox(width: 12),
-          Text(text, style: TextStyle(color: Colors.blueGrey.shade600, fontSize: 13, fontWeight: FontWeight.w500)),
+          Text(text, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.w500)),
         ],
       ),
     );

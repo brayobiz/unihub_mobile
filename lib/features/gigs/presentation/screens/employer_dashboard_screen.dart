@@ -5,11 +5,15 @@ import '../../../auth/shared/providers.dart';
 import '../../domain/models/gig_application.dart';
 import '../../shared/providers.dart';
 import '../../../../widgets/notification_badge.dart';
+import 'package:unihub_mobile/features/ads/ads_module.dart';
 
 final employerApplicationsProvider = StreamProvider<List<GigApplication>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
   if (user == null) return Stream.value([]);
-  return ref.watch(gigsRepositoryProvider).watchApplicationsForEmployer(user.uid);
+  return ref.watch(gigsRepositoryProvider).watchApplicationsForEmployer(user.uid).map((apps) {
+    if (user.blockedUids.isEmpty) return apps;
+    return apps.where((a) => !user.blockedUids.contains(a.freelancerId)).toList();
+  });
 });
 
 class EmployerDashboardScreen extends ConsumerStatefulWidget {
@@ -24,14 +28,23 @@ class _EmployerDashboardScreenState extends ConsumerState<EmployerDashboardScree
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final appsAsync = ref.watch(employerApplicationsProvider);
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: theme.scaffoldBackgroundColor,
+      bottomNavigationBar: const SafeArea(
+        top: false,
+        child: BannerAdWidget(),
+      ),
       appBar: AppBar(
-        title: const Text('Employer Dashboard', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        title: Text('Employer Dashboard', 
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+          )),
+        backgroundColor: theme.colorScheme.surface,
+        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
         elevation: 0,
         actions: const [
           NotificationBadge(module: 'gig'),
@@ -42,17 +55,17 @@ class _EmployerDashboardScreenState extends ConsumerState<EmployerDashboardScree
         children: [
           // Filter Chips Row
           Container(
-            color: Colors.white,
+            color: theme.colorScheme.surface,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
-                _filterChip(null, 'All'),
+                _filterChip(context, null, 'All'),
                 const SizedBox(width: 8),
-                _filterChip(ApplicationStatus.pending, 'Pending'),
+                _filterChip(context, ApplicationStatus.pending, 'Pending'),
                 const SizedBox(width: 8),
-                _filterChip(ApplicationStatus.accepted, 'Accepted'),
+                _filterChip(context, ApplicationStatus.accepted, 'Accepted'),
                 const SizedBox(width: 8),
-                _filterChip(ApplicationStatus.rejected, 'Rejected'),
+                _filterChip(context, ApplicationStatus.rejected, 'Rejected'),
               ],
             ),
           ),
@@ -70,9 +83,9 @@ class _EmployerDashboardScreenState extends ConsumerState<EmployerDashboardScree
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.folder_open_outlined, size: 64, color: Colors.grey.shade300),
+                        Icon(Icons.folder_open_outlined, size: 64, color: theme.colorScheme.outlineVariant),
                         const SizedBox(height: 16),
-                        Text('No applications found.', style: TextStyle(color: Colors.grey.shade600)),
+                        Text('No applications found.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
                       ],
                     ),
                   );
@@ -83,12 +96,12 @@ class _EmployerDashboardScreenState extends ConsumerState<EmployerDashboardScree
                   itemCount: filteredApps.length,
                   itemBuilder: (context, index) {
                     final app = filteredApps[index];
-                    return _applicationCard(app);
+                    return _applicationCard(context, app);
                   },
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(child: Text('Error: $err')),
+              loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
+              error: (err, _) => Center(child: Text('Error: $err', style: TextStyle(color: theme.colorScheme.error))),
             ),
           ),
         ],
@@ -96,18 +109,20 @@ class _EmployerDashboardScreenState extends ConsumerState<EmployerDashboardScree
     );
   }
 
-  Widget _filterChip(ApplicationStatus? status, String label) {
+  Widget _filterChip(BuildContext context, ApplicationStatus? status, String label) {
+    final theme = Theme.of(context);
     final isSelected = _selectedFilter == status;
     return ChoiceChip(
       label: Text(
         label,
         style: TextStyle(
-          color: isSelected ? Colors.white : Colors.black,
+          color: isSelected ? Colors.white : theme.colorScheme.onSurface,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         ),
       ),
       selected: isSelected,
-      selectedColor: Colors.indigo,
+      selectedColor: theme.colorScheme.primary,
+      backgroundColor: theme.colorScheme.surfaceContainerHighest,
       onSelected: (val) {
         if (val) {
           setState(() => _selectedFilter = status);
@@ -116,16 +131,18 @@ class _EmployerDashboardScreenState extends ConsumerState<EmployerDashboardScree
     );
   }
 
-  Widget _applicationCard(GigApplication app) {
+  Widget _applicationCard(BuildContext context, GigApplication app) {
+    final theme = Theme.of(context);
     Color statusColor = Colors.amber;
     if (app.status == ApplicationStatus.accepted) statusColor = Colors.green;
-    if (app.status == ApplicationStatus.rejected) statusColor = Colors.red;
+    if (app.status == ApplicationStatus.rejected) statusColor = theme.colorScheme.error;
 
     return Card(
       elevation: 0,
+      color: theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -136,16 +153,16 @@ class _EmployerDashboardScreenState extends ConsumerState<EmployerDashboardScree
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: Colors.indigo.shade50,
-                  child: Text(app.fullName[0].toUpperCase(), style: const TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold)),
+                  backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+                  child: Text(app.fullName[0].toUpperCase(), style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(app.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      Text('Gig: ${app.gigTitle}', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                      Text(app.fullName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: theme.colorScheme.onSurface)),
+                      Text('Gig: ${app.gigTitle}', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
                     ],
                   ),
                 ),
@@ -166,12 +183,12 @@ class _EmployerDashboardScreenState extends ConsumerState<EmployerDashboardScree
             
             Text(
               'Cover Letter:',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade700, fontSize: 13),
+              style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface, fontSize: 13),
             ),
             const SizedBox(height: 4),
             Text(
               app.coverLetter,
-              style: TextStyle(color: Colors.grey.shade800, height: 1.4),
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, height: 1.4),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
             ),
@@ -180,12 +197,12 @@ class _EmployerDashboardScreenState extends ConsumerState<EmployerDashboardScree
               const SizedBox(height: 12),
               Row(
                 children: [
-                  const Icon(Icons.link, size: 16, color: Colors.grey),
+                  Icon(Icons.link, size: 16, color: theme.colorScheme.onSurfaceVariant),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
                       app.portfolioLink!,
-                      style: const TextStyle(color: Colors.indigo, fontSize: 13),
+                      style: TextStyle(color: theme.colorScheme.primary, fontSize: 13),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -194,7 +211,7 @@ class _EmployerDashboardScreenState extends ConsumerState<EmployerDashboardScree
               ),
             ],
             
-            const Divider(height: 32),
+            Divider(height: 32, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
             
             // Action Buttons
             Row(
@@ -215,6 +232,8 @@ class _EmployerDashboardScreenState extends ConsumerState<EmployerDashboardScree
                   icon: const Icon(Icons.chat_bubble_outline),
                   label: const Text('Reply & Chat'),
                   style: OutlinedButton.styleFrom(
+                    foregroundColor: theme.colorScheme.primary,
+                    side: BorderSide(color: theme.colorScheme.primary),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
@@ -224,7 +243,7 @@ class _EmployerDashboardScreenState extends ConsumerState<EmployerDashboardScree
                     onPressed: () {
                       ref.read(gigsRepositoryProvider).updateApplicationStatus(app.id, ApplicationStatus.rejected);
                     },
-                    icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                    icon: Icon(Icons.cancel_outlined, color: theme.colorScheme.error),
                   ),
                   const SizedBox(width: 8),
                   FilledButton.icon(

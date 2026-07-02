@@ -48,13 +48,14 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
 
     setState(() => _isProcessing = true);
     try {
-      final currentAdmin = ref.read(authStateProvider).valueOrNull;
+      final currentAdmin = ref.read(appUserProvider).valueOrNull;
       if (currentAdmin == null) throw Exception('Admin not logged in');
 
       await ref.read(adminRepositoryProvider).resolveReport(
         report: widget.report,
         action: action,
         adminId: currentAdmin.uid,
+        adminName: currentAdmin.fullName,
         notes: _notesController.text.trim(),
         suspensionDays: suspensionDays,
       );
@@ -123,7 +124,12 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('REPORT #${widget.report.id.toUpperCase()}', 
-                style: const TextStyle(fontSize: 12, color: AppColors.grey600, fontWeight: FontWeight.bold)),
+                style: TextStyle(
+                  fontSize: 12, 
+                  color: Theme.of(context).colorScheme.onSurfaceVariant, 
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               Text(widget.report.reason, 
                 style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 overflow: TextOverflow.ellipsis,
@@ -201,7 +207,9 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
                   const Text('Direct Content Moderation', style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Text('Quickly jump to the moderation panel for this ${widget.report.type.name}.', 
-                    textAlign: TextAlign.center, style: const TextStyle(color: AppColors.grey600)),
+                    textAlign: TextAlign.center, 
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
                   const SizedBox(height: 16),
                   if (widget.report.type == ReportType.marketplace || widget.report.type == ReportType.housing || widget.report.type == ReportType.feedItem)
                     ElevatedButton(
@@ -242,14 +250,22 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
           else if (widget.report.status == ReportStatus.resolved || widget.report.status == ReportStatus.dismissed)
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: AppColors.grey100, borderRadius: BorderRadius.circular(8)),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest, 
+                borderRadius: BorderRadius.circular(8),
+              ),
               child: const Text('This report has already been resolved.', textAlign: TextAlign.center),
             )
           else
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _ActionButton(label: 'Dismiss Report', icon: Icons.close, color: AppColors.grey600, onPressed: () => _handleAction('dismiss')),
+                _ActionButton(
+                  label: 'Dismiss Report', 
+                  icon: Icons.close, 
+                  color: Theme.of(context).colorScheme.onSurfaceVariant, 
+                  onPressed: () => _handleAction('dismiss'),
+                ),
                 const SizedBox(height: 12),
                 _ActionButton(label: 'Issue Warning', icon: Icons.warning_amber, color: AppColors.warning, onPressed: () => _handleAction('warn')),
                 const SizedBox(height: 12),
@@ -257,7 +273,7 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
                 const SizedBox(height: 12),
                 _ActionButton(label: 'Suspend User (7 Days)', icon: Icons.timer_outlined, color: AppColors.error, onPressed: () => _handleAction('suspend', suspensionDays: 7)),
                 const SizedBox(height: 12),
-                _ActionButton(label: 'Permanent Ban', icon: Icons.block, color: AppColors.black, onPressed: () => _handleAction('ban')),
+                _ActionButton(label: 'Permanent Ban', icon: Icons.block, color: AppColors.error, onPressed: () => _handleAction('ban')),
               ],
             ),
         ],
@@ -268,7 +284,10 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
   Widget _buildSectionCard({required String title, required Widget child}) {
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: AppColors.grey200)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12), 
+        side: BorderSide(color: Theme.of(context).dividerColor),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -289,7 +308,16 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 140, child: Text(label, style: const TextStyle(color: AppColors.grey600, fontWeight: FontWeight.w500))),
+          SizedBox(
+            width: 140, 
+            child: Text(
+              label, 
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant, 
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
           Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.bold))),
         ],
       ),

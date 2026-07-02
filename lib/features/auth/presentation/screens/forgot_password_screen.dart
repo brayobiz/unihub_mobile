@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../controllers/auth_controller.dart';
 import '../widgets/auth_text_field.dart';
 import '../widgets/auth_button.dart';
@@ -64,7 +63,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -74,11 +72,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             const SizedBox(height: 20),
             Text(
               'Forgot Password',
-              style: GoogleFonts.plusJakartaSans(
+              style: theme.textTheme.displayLarge?.copyWith(
                 fontSize: 32,
-                fontWeight: FontWeight.bold,
                 letterSpacing: -1,
-                color: theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 10),

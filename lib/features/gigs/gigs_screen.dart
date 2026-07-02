@@ -10,11 +10,12 @@ import '../../widgets/feed/feed_card.dart';
 import '../auth/shared/providers.dart';
 import '../shared/add_feed_item_screen.dart';
 import '../../widgets/notification_badge.dart';
-
-final gigsFeedProvider = StreamProvider<List<FeedItem>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
-  return ref.watch(feedRepositoryProvider).watchFeed(FeedType.gig, university: user?.university);
-});
+import '../campus_filter/presentation/widgets/campus_filter_selector.dart';
+import '../campus_filter/shared/providers.dart';
+import '../campus_filter/domain/models/browsing_scope.dart';
+import 'package:unihub_mobile/features/announcements/presentation/widgets/announcement_display.dart';
+import 'package:unihub_mobile/features/ads/ads_module.dart';
+import 'shared/providers.dart';
 
 class GigsScreen extends ConsumerStatefulWidget {
   const GigsScreen({super.key});
@@ -35,13 +36,21 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final feedAsync = ref.watch(gigsFeedProvider);
     final user = ref.watch(appUserProvider).valueOrNull;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Student Gigs', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: theme.colorScheme.surface,
+        elevation: 0,
+        title: Text('Student Gigs', 
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+          )),
+        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
         actions: const [
           NotificationBadge(module: 'gig'),
           SizedBox(width: 8),
@@ -51,12 +60,14 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: TextField(
+              style: TextStyle(color: theme.colorScheme.onSurface),
               decoration: InputDecoration(
                 hintText: 'Search for gigs...',
-                prefixIcon: const Icon(Icons.search),
+                hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+                prefixIcon: Icon(Icons.search, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                 filled: true,
-                fillColor: Colors.grey.shade100,
+                fillColor: theme.colorScheme.surfaceContainerHighest,
                 contentPadding: EdgeInsets.zero,
               ),
               onChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
@@ -66,6 +77,11 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
       ),
       body: Column(
         children: [
+          const RelevantAnnouncementsWidget(feature: 'gigs'),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: CampusFilterSelector(),
+          ),
           _buildRoleApplicationBanner(context, ref),
           Expanded(
             child: feedAsync.when(
@@ -76,23 +92,53 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
                 ).toList();
 
                 if (filteredItems.isEmpty) {
+                  final isFiltered = _searchQuery.isNotEmpty || ref.read(browsingScopeProvider).type != BrowsingScopeType.all;
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.work_off_outlined, size: 64, color: Colors.grey.shade300),
+                        Icon(Icons.work_off_outlined, size: 64, color: theme.colorScheme.outlineVariant),
                         const SizedBox(height: 16),
-                        Text('No gigs found matching your search.', style: TextStyle(color: Colors.grey.shade600)),
+                        Text('No gigs found.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                        if (isFiltered) ...[
+                          const SizedBox(height: 24),
+                          FilledButton.icon(
+                            onPressed: () {
+                              setState(() => _searchQuery = '');
+                              ref.read(browsingScopeProvider.notifier).reset();
+                            },
+                            icon: const Icon(Icons.refresh_rounded, size: 18),
+                            label: const Text('Explore All Gigs'),
+                            style: FilledButton.styleFrom(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   );
                 }
 
+                const int adInterval = AdConfig.gigsAdInterval;
+
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: filteredItems.length,
+                  itemCount: filteredItems.length + (filteredItems.length > 0 ? (filteredItems.length ~/ adInterval) : 0),
                   itemBuilder: (context, index) {
-                    final item = filteredItems[index];
+                    // If it's an ad position
+                    if ((index + 1) % (adInterval + 1) == 0) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: BannerAdWidget(),
+                      );
+                    }
+
+                    // Calculate the actual item index
+                    final int itemIndex = index - (index ~/ (adInterval + 1));
+                    
+                    if (itemIndex >= filteredItems.length) return null;
+
+                    final item = filteredItems[itemIndex];
                     final isLiked = user != null && item.likedBy.contains(user.uid);
                     final isOwner = user != null && item.authorId == user.uid;
 
@@ -118,13 +164,14 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
                   },
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(child: Text('Error: $err')),
+              loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
+              error: (err, _) => Center(child: Text('Error: $err', style: TextStyle(color: theme.colorScheme.error))),
             ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'gigs_fab',
         onPressed: () {
           Navigator.push(
             context,
@@ -133,13 +180,14 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
         },
         label: const Text('Post a Gig', style: TextStyle(fontWeight: FontWeight.bold)),
         icon: const Icon(Icons.add_task_rounded),
-        backgroundColor: Colors.indigo,
+        backgroundColor: theme.colorScheme.primary,
         foregroundColor: Colors.white,
       ),
     );
   }
 
   Widget _buildRoleApplicationBanner(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final user = ref.watch(appUserProvider).valueOrNull;
     if (user == null) return const SizedBox.shrink();
 
@@ -161,7 +209,9 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      color: (isIdentityRejected) ? Colors.red.shade50 : Colors.indigo.shade50,
+      color: (isIdentityRejected) 
+          ? theme.colorScheme.errorContainer.withValues(alpha: 0.1) 
+          : theme.colorScheme.primaryContainer.withValues(alpha: 0.1),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -170,12 +220,16 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
               Icon(
                 isIdentityRejected ? Icons.error_outline_rounded : (!isVerified ? Icons.lock_outline_rounded : Icons.verified_user_outlined), 
                 size: 20, 
-                color: isIdentityRejected ? Colors.red.shade700 : Colors.indigo.shade700
+                color: isIdentityRejected ? theme.colorScheme.error : theme.colorScheme.primary
               ),
               const SizedBox(width: 8),
               Text(
                 isIdentityRejected ? 'Identity Rejected' : (!isVerified ? 'Verification Required' : 'Professional Profiles'),
-                style: TextStyle(fontWeight: FontWeight.w800, color: isIdentityRejected ? Colors.red.shade900 : Colors.indigo.shade900, fontSize: 13),
+                style: TextStyle(
+                  fontWeight: FontWeight.w800, 
+                  color: isIdentityRejected ? theme.colorScheme.error : theme.colorScheme.primary, 
+                  fontSize: 13
+                ),
               ),
             ],
           ),
@@ -187,7 +241,10 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
                 : (isIdentityPending 
                     ? 'Your identity is under review. You can apply for these roles once approved.'
                     : 'Verify your platform identity to apply for professional badges.'),
-              style: TextStyle(fontSize: 12, color: isIdentityRejected ? Colors.red.shade700 : Colors.indigo.shade700),
+              style: TextStyle(
+                fontSize: 12, 
+                color: isIdentityRejected ? theme.colorScheme.error : theme.colorScheme.onSurfaceVariant
+              ),
             ),
             if (!isIdentityPending) ...[
               const SizedBox(height: 12),
@@ -196,7 +253,7 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
                 child: FilledButton(
                   onPressed: () => context.push(isIdentityRejected ? '/trust-center' : '/verify-identity'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: isIdentityRejected ? Colors.red : Colors.indigo,
+                    backgroundColor: isIdentityRejected ? theme.colorScheme.error : theme.colorScheme.primary,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   child: Text(isIdentityRejected ? 'Fix Identity Issues' : 'Verify Identity'),
@@ -220,20 +277,30 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
                         padding: const EdgeInsets.only(right: 10),
                         child: ActionChip(
                           onPressed: isPending ? null : () => context.push('/verify-professional/${role.name}'),
-                          backgroundColor: isRejected ? Colors.red.shade100 : (isPending ? Colors.grey.shade200 : Colors.white),
-                          side: BorderSide(color: isRejected ? Colors.red.shade200 : Colors.indigo.shade100),
+                          backgroundColor: isRejected 
+                              ? theme.colorScheme.errorContainer.withValues(alpha: 0.2) 
+                              : (isPending ? theme.colorScheme.surfaceContainerHighest : theme.colorScheme.surface),
+                          side: BorderSide(
+                            color: isRejected 
+                                ? theme.colorScheme.error.withValues(alpha: 0.2) 
+                                : theme.colorScheme.outlineVariant
+                          ),
                           label: Text(
                             isRejected ? 'Apply ${role.label} (Rejected)' : (isPending ? '${role.label} (Pending)' : 'Apply as ${role.label}'),
                             style: TextStyle(
                               fontSize: 12, 
                               fontWeight: FontWeight.bold,
-                              color: isRejected ? Colors.red.shade900 : (isPending ? Colors.grey.shade600 : Colors.indigo.shade700),
+                              color: isRejected 
+                                  ? theme.colorScheme.error 
+                                  : (isPending ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.primary),
                             ),
                           ),
                           avatar: Icon(
                             isRejected ? Icons.error_outline : (isPending ? Icons.access_time : Icons.add_circle_outline),
                             size: 14,
-                            color: isRejected ? Colors.red.shade700 : (isPending ? Colors.grey.shade600 : Colors.indigo.shade700),
+                            color: isRejected 
+                                ? theme.colorScheme.error 
+                                : (isPending ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.primary),
                           ),
                         ),
                       );

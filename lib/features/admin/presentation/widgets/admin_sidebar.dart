@@ -83,14 +83,24 @@ class AdminSidebar extends StatelessWidget {
                   title: 'Users',
                   path: '/admin/users',
                   currentPath: currentPath,
-                  isPlaceholder: true,
+                ),
+                _SidebarItem(
+                  icon: Icons.support_agent,
+                  title: 'Support Center',
+                  path: '/admin/support',
+                  currentPath: currentPath,
+                ),
+                _SidebarItem(
+                  icon: Icons.campaign,
+                  title: 'Announcements',
+                  path: '/admin/announcements',
+                  currentPath: currentPath,
                 ),
                 _SidebarItem(
                   icon: Icons.settings,
                   title: 'Settings',
                   path: '/admin/settings',
                   currentPath: currentPath,
-                  isPlaceholder: true,
                 ),
               ],
             ),
@@ -135,7 +145,9 @@ class _SidebarItem extends StatelessWidget {
       title: Text(
         title,
         style: TextStyle(
-          color: isSelected ? AppColors.primary : AppColors.black,
+          color: isSelected 
+              ? AppColors.primary 
+              : Theme.of(context).textTheme.bodyLarge?.color,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         ),
       ),
@@ -143,12 +155,15 @@ class _SidebarItem extends StatelessWidget {
         ? Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: AppColors.grey200,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(4),
             ),
-            child: const Text(
+            child: Text(
               'Soon',
-              style: TextStyle(fontSize: 10, color: AppColors.grey600),
+              style: TextStyle(
+                fontSize: 10, 
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           )
         : null,

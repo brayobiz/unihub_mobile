@@ -8,9 +8,12 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
+import 'package:unihub_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:unihub_mobile/features/marketplace/domain/models/review.dart';
 import 'package:unihub_mobile/features/marketplace/shared/providers.dart';
 import 'package:unihub_mobile/features/marketplace/domain/models/listing.dart';
+import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
+import 'package:unihub_mobile/features/chat/shared/providers.dart';
 
 class SellerProfileScreen extends ConsumerStatefulWidget {
   final String userId;
@@ -55,12 +58,12 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                             clipper: _HeaderClipper(),
                             child: Container(
                               height: 220,
-                              decoration: const BoxDecoration(
+                              decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
-                                    Color(0xFF0F172A),
-                                    Color(0xFF1677F2),
-                                    Color(0xFF19D3C5),
+                                    theme.brightness == Brightness.dark ? const Color(0xFF0F172A) : const Color(0xFF1e293b),
+                                    theme.colorScheme.primary,
+                                    const Color(0xFF19D3C5),
                                   ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
@@ -73,11 +76,21 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                             left: 16,
                             right: 16,
                             child: Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.share_outlined, color: Colors.white),
-                                  onPressed: () {},
+                                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+                                  onPressed: () => context.pop(),
+                                ),
+                                Row(
+                                  children: [
+                                    _buildBlockButton(seller),
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      icon: const Icon(Icons.share_outlined, color: Colors.white),
+                                      onPressed: () {},
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -148,10 +161,10 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 4),
+        border: Border.all(color: theme.brightness == Brightness.dark ? theme.colorScheme.outlineVariant : Colors.white, width: 4),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -162,7 +175,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
         children: [
           CircleAvatar(
             radius: avatarRadius,
-            backgroundColor: colorScheme.surfaceVariant,
+            backgroundColor: colorScheme.surfaceContainerHighest,
             backgroundImage: seller.photoUrl != null ? CachedNetworkImageProvider(seller.photoUrl!) : null,
             child: seller.photoUrl == null
                 ? Text(
@@ -177,10 +190,63 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
               bottom: 2,
               child: Container(
                 padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface, 
+                  shape: BoxShape.circle
+                ),
                 child: const Icon(Icons.verified, color: AppColors.success, size: 24),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBlockButton(AppUser seller) {
+    final currentUser = ref.watch(appUserProvider).valueOrNull;
+    if (currentUser == null || currentUser.uid == seller.uid) return const SizedBox.shrink();
+    
+    final isBlocked = currentUser.blockedUids.contains(seller.uid);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+      ),
+      child: IconButton(
+        icon: Icon(
+          isBlocked ? Icons.check_circle_outline_rounded : Icons.block_flipped, 
+          color: isBlocked ? Colors.greenAccent : Colors.white, 
+          size: 20
+        ),
+        onPressed: () {
+          if (isBlocked) {
+            ref.read(authControllerProvider.notifier).unblockUser(seller.uid);
+          } else {
+            _showBlockConfirmation(seller);
+          }
+        },
+        visualDensity: VisualDensity.compact,
+      ),
+    );
+  }
+
+  void _showBlockConfirmation(AppUser seller) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Block User?'),
+        content: Text('You will no longer receive messages or see listings from ${seller.fullName}.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              ref.read(authControllerProvider.notifier).blockUser(seller.uid);
+              Navigator.pop(context);
+            }, 
+            child: const Text('Block', style: TextStyle(color: AppColors.error))
+          ),
         ],
       ),
     );
@@ -296,7 +362,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(100),
       ),
       child: Row(
@@ -306,7 +372,11 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
           const SizedBox(width: 6),
           Text(
             label,
-            style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              fontSize: 12, 
+              color: theme.colorScheme.onSurface, 
+              fontWeight: FontWeight.w700
+            ),
           ),
         ],
       ),
@@ -317,9 +387,9 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.success.withOpacity(0.08),
+        color: AppColors.success.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: AppColors.success.withOpacity(0.1)),
+        border: Border.all(color: AppColors.success.withValues(alpha: 0.1)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -339,9 +409,9 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.warning.withOpacity(0.08),
+        color: AppColors.warning.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: AppColors.warning.withOpacity(0.1)),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.1)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -364,10 +434,10 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 20,
             offset: const Offset(0, 10),
           )
@@ -422,10 +492,10 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 20,
             offset: const Offset(0, 10),
           )
@@ -445,7 +515,12 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                   ],
                   Text(
                     title,
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface, letterSpacing: -0.5),
+                    style: TextStyle(
+                      fontSize: 18, 
+                      fontWeight: FontWeight.w900, 
+                      color: theme.colorScheme.onSurface, 
+                      letterSpacing: -0.5
+                    ),
                   ),
                 ],
               ),
@@ -490,7 +565,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: (isVerified ? AppColors.success : theme.colorScheme.outlineVariant).withOpacity(0.1),
+            color: (isVerified ? AppColors.success : theme.colorScheme.outlineVariant).withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: isVerified ? AppColors.success : theme.colorScheme.onSurfaceVariant, size: 18),
@@ -500,7 +575,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+              Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: theme.colorScheme.onSurface)),
               Text(status, style: TextStyle(color: isVerified ? AppColors.success : theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w500)),
             ],
           ),
@@ -550,11 +625,12 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
   }
 
   Widget _buildActiveListingsSection(BuildContext context, AppUser seller, AsyncValue<List<Listing>> listingsAsync) {
+    final theme = Theme.of(context);
     return listingsAsync.when(
       data: (listings) => _buildSectionCard(
         'Active Listings',
         listings.isEmpty
-            ? const Text('No active listings.')
+            ? Text('No active listings.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant))
             : GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -571,11 +647,11 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
         trailing: listings.isNotEmpty
             ? TextButton(
                 onPressed: () => _showAllListings(context, seller.fullName, listings),
-                child: const Text('View All', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6366F1))),
+                child: Text('View All', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
               )
             : null,
       ),
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
       error: (_, __) => const SizedBox.shrink(),
     );
   }
@@ -586,7 +662,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
       onTap: () => context.push('/listing-detail', extra: listing),
       child: Container(
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -607,8 +683,24 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(listing.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                  Text('KES ${NumberFormat('#,###').format(listing.price)}', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w900, fontSize: 13)),
+                  Text(
+                    listing.title, 
+                    maxLines: 1, 
+                    overflow: TextOverflow.ellipsis, 
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold, 
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurface,
+                    )
+                  ),
+                  Text(
+                    'KES ${NumberFormat('#,###').format(listing.price)}', 
+                    style: TextStyle(
+                      color: theme.colorScheme.primary, 
+                      fontWeight: FontWeight.w900, 
+                      fontSize: 13
+                    )
+                  ),
                 ],
               ),
             ),
@@ -619,17 +711,18 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
   }
 
   Widget _buildReviewsSection(AsyncValue<List<Map<String, dynamic>>> reviewsAsync) {
+    final theme = Theme.of(context);
     return reviewsAsync.when(
       data: (reviews) => _buildSectionCard(
         'Buyer Reviews',
         reviews.isEmpty
-            ? const Text('No reviews yet.')
+            ? Text('No reviews yet.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant))
             : Column(
                 children: reviews.take(3).map((r) => _buildReviewItem(Review.fromJson(r))).toList(),
               ),
         icon: Icons.star_outline_rounded,
       ),
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
       error: (_, __) => const SizedBox.shrink(),
     );
   }
@@ -643,7 +736,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
             child: Text(review.reviewerName[0].toUpperCase(), style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 12)),
           ),
           const SizedBox(width: 12),
@@ -654,14 +747,14 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(review.reviewerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    Text(review.reviewerName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface)),
                     Row(children: List.generate(5, (index) => Icon(Icons.star_rounded, size: 12, color: index < review.rating ? AppColors.warning : theme.colorScheme.outlineVariant))),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(review.comment, style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant)),
                 const SizedBox(height: 4),
-                Text(DateFormat('MMM dd, yyyy').format(review.createdAt), style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7))),
+                Text(DateFormat('MMM dd, yyyy').format(review.createdAt), style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7))),
               ],
             ),
           ),
@@ -678,7 +771,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
         color: theme.colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 20,
             offset: const Offset(0, -5),
           )
@@ -689,20 +782,32 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
           Expanded(
             flex: 2,
             child: OutlinedButton(
-              onPressed: () {
+              onPressed: () async {
                 final currentUser = ref.read(authStateProvider).valueOrNull;
                 if (currentUser == null) {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please login to chat')));
                   return;
                 }
-                final conversationId = currentUser.uid.compareTo(seller.uid) < 0 
-                    ? '${currentUser.uid}_${seller.uid}' 
-                    : '${seller.uid}_${currentUser.uid}';
-                context.push('/chat', extra: {
-                  'conversationId': conversationId,
-                  'otherUserName': seller.fullName,
-                  'listing': null,
-                });
+                
+                final chatContext = ChatContext(
+                  type: 'profile',
+                  id: seller.uid,
+                  title: '${seller.fullName}\'s Profile',
+                  thumbnail: seller.photoUrl,
+                );
+
+                final conversationId = await ref.read(chatRepositoryProvider).getOrCreateConversation(
+                  participantIds: [currentUser.uid, seller.uid],
+                  context: chatContext,
+                );
+
+                if (context.mounted) {
+                  context.push('/chat', extra: {
+                    'conversationId': conversationId,
+                    'otherUserName': seller.fullName,
+                    'context': chatContext,
+                  });
+                }
               },
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),

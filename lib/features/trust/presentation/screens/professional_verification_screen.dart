@@ -149,20 +149,27 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Theme.of(context).primaryColor;
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
     final user = ref.watch(appUserProvider).valueOrNull;
     final bool isVerified = user?.isVerified ?? false;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
+        backgroundColor: theme.colorScheme.surface,
+        elevation: 0,
         title: Text('Role Application', 
-          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+          )),
+        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
       ),
       body: SingleChildScrollView(
         child: Column(
           children: [
-            _buildExplanationHeader(primaryColor),
+            _buildExplanationHeader(context),
             Padding(
               padding: const EdgeInsets.all(24.0),
               child: Form(
@@ -170,58 +177,66 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Personal Details',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
+                      style: TextStyle(
+                        fontSize: 18, 
+                        fontWeight: FontWeight.w900, 
+                        color: theme.colorScheme.onSurface
+                      ),
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(
+                      context,
                       controller: _nameController,
                       label: 'Full Name (as on ID)',
                       hint: 'Enter your legal name',
                       icon: Icons.person_outline_rounded,
                       validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                      primaryColor: primaryColor,
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(
+                      context,
                       controller: _phoneController,
                       label: 'Phone Number',
                       hint: 'Enter your WhatsApp/Phone number',
                       icon: Icons.phone_android_rounded,
                       keyboardType: TextInputType.phone,
                       validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                      primaryColor: primaryColor,
                     ),
                     
                     if (!isVerified) ...[
                       const SizedBox(height: 32),
-                      const Text(
+                      Text(
                         'Identity Verification',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
+                        style: TextStyle(
+                          fontSize: 18, 
+                          fontWeight: FontWeight.w900, 
+                          color: theme.colorScheme.onSurface
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'We need to verify your identity to grant you the ${widget.role.label} badge.',
-                        style: TextStyle(color: Colors.blueGrey.shade600, fontSize: 14),
+                        style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14),
                       ),
                       const SizedBox(height: 20),
                       
                       _buildUploadTile(
+                        context,
                         title: 'National ID / Driver\'s License',
                         subtitle: 'Upload a clear photo of your official ID',
                         file: _idDocumentFile,
                         onTap: () => _pickImage(false),
-                        primaryColor: primaryColor,
                       ),
                       const SizedBox(height: 16),
                       _buildUploadTile(
+                        context,
                         title: 'Live Selfie',
                         subtitle: 'Take a clear photo of your face',
                         file: _selfieFile,
                         onTap: () => _pickImage(true),
                         isCamera: true,
-                        primaryColor: primaryColor,
                       ),
                     ],
                     
@@ -261,16 +276,18 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
     );
   }
 
-  Widget _buildExplanationHeader(Color primaryColor) {
+  Widget _buildExplanationHeader(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
     final roleName = widget.role.name == 'housePlug' ? 'House Plug' : 
                      widget.role.name[0].toUpperCase() + widget.role.name.substring(1);
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(32),
           bottomRight: Radius.circular(32),
         ),
@@ -280,7 +297,7 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: primaryColor.withOpacity(0.1),
+              color: primaryColor.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(_getRoleIcon(widget.role), color: primaryColor, size: 32),
@@ -289,10 +306,10 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
           Text(
             'Apply for $roleName Role',
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w900,
-              color: Color(0xFF1E293B),
+              color: theme.colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
@@ -301,7 +318,7 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
-              color: Colors.blueGrey.shade600,
+              color: theme.colorScheme.onSurfaceVariant,
               height: 1.5,
             ),
           ),
@@ -310,40 +327,45 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
     );
   }
 
-  Widget _buildTextField({
+  Widget _buildTextField(
+    BuildContext context, {
     required TextEditingController controller,
     required String label,
     required String hint,
     required IconData icon,
-    required Color primaryColor,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: theme.colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
           validator: validator,
+          style: TextStyle(color: theme.colorScheme.onSurface),
           decoration: InputDecoration(
             hintText: hint,
-            prefixIcon: Icon(icon, size: 20, color: const Color(0xFF94A3B8)),
+            hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+            prefixIcon: Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: theme.colorScheme.surfaceContainerHighest,
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -355,24 +377,27 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
     );
   }
 
-  Widget _buildUploadTile({
+  Widget _buildUploadTile(
+    BuildContext context, {
     required String title,
     required String subtitle,
-    required Color primaryColor,
     File? file,
     required VoidCallback onTap,
     bool isCamera = false,
   }) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: file != null ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
+            color: file != null ? const Color(0xFF10B981) : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
             width: 1,
           ),
         ),
@@ -382,7 +407,7 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
               width: 50,
               height: 50,
               decoration: BoxDecoration(
-                color: (file != null ? const Color(0xFF10B981) : const Color(0xFFF1F5F9)).withOpacity(0.1),
+                color: (file != null ? const Color(0xFF10B981) : theme.colorScheme.outlineVariant).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: file != null
@@ -391,7 +416,7 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
                     child: Image.file(file, fit: BoxFit.cover),
                   )
                 : Icon(isCamera ? Icons.camera_alt_rounded : Icons.file_upload_outlined, 
-                    color: const Color(0xFF94A3B8)),
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -400,13 +425,13 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: theme.colorScheme.onSurface),
                   ),
                   Text(
                     file != null ? 'File uploaded' : subtitle,
                     style: TextStyle(
                       fontSize: 12, 
-                      color: file != null ? const Color(0xFF10B981) : Colors.blueGrey.shade400,
+                      color: file != null ? const Color(0xFF10B981) : theme.colorScheme.onSurfaceVariant,
                       fontWeight: file != null ? FontWeight.w700 : FontWeight.normal,
                     ),
                   ),

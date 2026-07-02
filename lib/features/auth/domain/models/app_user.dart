@@ -1,4 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import '../../../trust/domain/models/badge.dart';
+import '../../../trust/domain/models/professional_role.dart';
+import '../../../../core/constants/campus_constants.dart';
 
 class AppUser {
   final String uid;
@@ -15,7 +19,8 @@ class AppUser {
   final String? housingStatus;
   
   // Trust & Reputation
-  final double trustScore; // 0 - 100
+  final double _reputationPoints; // Maps to 'trustScore' in Firestore
+  double get reputationPoints => _reputationPoints;
   final int ratingsCount;
   final double averageRating;
   final double sellerRating;
@@ -48,6 +53,7 @@ class AppUser {
   
   final Map<String, String> privacySettings;
   final Map<String, bool> notificationSettings;
+  final List<String> blockedUids;
   final String? fcmToken;
 
   final bool isOnboardingCompleted;
@@ -73,7 +79,7 @@ class AppUser {
     this.course,
     this.yearOfStudy,
     this.housingStatus,
-    this.trustScore = 70.0,
+    double? reputationPoints,
     this.ratingsCount = 0,
     this.averageRating = 0.0,
     this.sellerRating = 0.0,
@@ -116,6 +122,7 @@ class AppUser {
       'system': true,
       'community_activity': true,
     },
+    this.blockedUids = const [],
     this.fcmToken,
     this.isOnboardingCompleted = false,
     this.isOnline = false,
@@ -124,7 +131,7 @@ class AppUser {
     this.isBanned = false,
     this.banReason,
     this.suspendedUntil,
-  });
+  }) : _reputationPoints = reputationPoints ?? 0.0;
 
   bool get isHousingPlug => roles.contains('housing_plug');
   bool get isVerifiedPlug => verifiedRoles.contains('housePlug');
@@ -174,11 +181,63 @@ class AppUser {
         score += 3.0;
       }
     }
+    
+    // 5. Bonus Reputation (Optional Activity Boosts from legacy system)
+    // This allows repositories to still provide manual boosts if needed.
+    // We cap the influence of legacy points to 20% to avoid score inflation.
+    score += (reputationPoints.clamp(0, 20));
 
     return score.clamp(0.0, 100.0);
   }
 
   double get displayTrustScore => calculatedTrustScore;
+  
+  /// Compatibility getter for legacy field access.
+  /// Points to displayTrustScore to ensure all UI components see the unified score.
+  double get trustScore => displayTrustScore;
+
+  List<AppBadge> get activeBadges {
+    final List<AppBadge> badges = [];
+    
+    // 1. Verification Badges
+    if (isIdentityVerified) {
+      badges.add(AppBadge.identityVerified());
+    }
+    if (isStudentVerified) {
+      badges.add(AppBadge.studentVerified());
+    }
+
+    // 2. Professional Role Badges
+    for (final roleName in verifiedRoles) {
+      try {
+        final role = ProfessionalRole.values.firstWhere((e) => e.name == roleName);
+        badges.add(AppBadge(
+          id: 'role_${role.name}',
+          label: role.label,
+          description: 'Verified professional status on UniHub',
+          icon: Icons.verified_user_rounded,
+          color: const Color(0xFF1677F2),
+          type: BadgeType.professional,
+        ));
+      } catch (_) {
+        // Skip unknown roles
+      }
+    }
+
+    // 3. Activity Badges (Simple logic for now)
+    if (completedSalesCount >= 10) {
+      badges.add(const AppBadge(
+        id: 'top_seller',
+        label: 'Top Seller',
+        description: 'Completed 10+ successful sales',
+        icon: Icons.auto_awesome_rounded,
+        color: Colors.orange,
+        type: BadgeType.achievement,
+      ));
+    }
+
+    return badges;
+  }
 
   double get profileCompletion {
     int score = 0;
@@ -209,7 +268,7 @@ class AppUser {
     String? course,
     String? yearOfStudy,
     String? housingStatus,
-    double? trustScore,
+    double? reputationPoints,
     int? ratingsCount,
     double? averageRating,
     double? sellerRating,
@@ -238,6 +297,7 @@ class AppUser {
     List<String>? roles,
     Map<String, String>? privacySettings,
     Map<String, bool>? notificationSettings,
+    List<String>? blockedUids,
     String? fcmToken,
     bool? isOnboardingCompleted,
     bool? isOnline,
@@ -260,7 +320,7 @@ class AppUser {
       course: course ?? this.course,
       yearOfStudy: yearOfStudy ?? this.yearOfStudy,
       housingStatus: housingStatus ?? this.housingStatus,
-      trustScore: trustScore ?? this.trustScore,
+      reputationPoints: reputationPoints ?? this.reputationPoints,
       ratingsCount: ratingsCount ?? this.ratingsCount,
       averageRating: averageRating ?? this.averageRating,
       sellerRating: sellerRating ?? this.sellerRating,
@@ -289,6 +349,7 @@ class AppUser {
       roles: roles ?? this.roles,
       privacySettings: privacySettings ?? this.privacySettings,
       notificationSettings: notificationSettings ?? this.notificationSettings,
+      blockedUids: blockedUids ?? this.blockedUids,
       fcmToken: fcmToken ?? this.fcmToken,
       isOnboardingCompleted: isOnboardingCompleted ?? this.isOnboardingCompleted,
       isOnline: isOnline ?? this.isOnline,
@@ -314,7 +375,7 @@ class AppUser {
       'course': course,
       'yearOfStudy': yearOfStudy,
       'housingStatus': housingStatus,
-      'trustScore': trustScore,
+      'trustScore': reputationPoints,
       'ratingsCount': ratingsCount,
       'averageRating': averageRating,
       'sellerRating': sellerRating,
@@ -343,6 +404,7 @@ class AppUser {
       'roles': roles,
       'privacySettings': privacySettings,
       'notificationSettings': notificationSettings,
+      'blockedUids': blockedUids,
       'fcmToken': fcmToken,
       'isOnboardingCompleted': isOnboardingCompleted,
       'isOnline': isOnline,
@@ -391,12 +453,12 @@ class AppUser {
       bio: json['bio']?.toString(),
       photoUrl: json['photoUrl']?.toString(),
       coverPhotoUrl: json['coverPhotoUrl']?.toString(),
-      university: json['university']?.toString(),
-      campus: json['campus']?.toString(),
+      university: CampusConstants.resolveToId(json['university']?.toString()) ?? json['university']?.toString(),
+      campus: CampusConstants.resolveToId(json['campus']?.toString()) ?? json['campus']?.toString(),
       course: json['course']?.toString(),
       yearOfStudy: json['yearOfStudy']?.toString(),
       housingStatus: json['housingStatus']?.toString(),
-      trustScore: safeDouble(json['trustScore'], 70.0),
+      reputationPoints: safeDouble(json['trustScore'], 0.0),
       ratingsCount: safeInt(json['ratingsCount'], 0),
       averageRating: safeDouble(json['averageRating'], 0.0),
       sellerRating: safeDouble(json['sellerRating'], 0.0),
@@ -447,6 +509,7 @@ class AppUser {
           'community_activity': true,
         }
       ),
+      blockedUids: (json['blockedUids'] as List?)?.map((e) => e.toString()).toList() ?? <String>[],
       fcmToken: json['fcmToken']?.toString(),
       isOnboardingCompleted: safeBool(json['isOnboardingCompleted'], false),
       isOnline: safeBool(json['isOnline'], false),

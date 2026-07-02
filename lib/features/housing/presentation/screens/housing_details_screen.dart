@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
@@ -103,6 +102,53 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
         'context': chatContext,
       });
     }
+  }
+
+  void _shareListing(HousingListing listing) {
+    final text = 'Check out this ${listing.title} at ${listing.location} for KES ${NumberFormat('#,###').format(listing.rent)} on UniHub Housing! \n\nDownload UniHub to view more: https://unihub.app/housing/${listing.id}';
+    Share.share(text);
+  }
+
+  void _showReportDialog(HousingListing listing) {
+    final reasons = [
+      'Fake property',
+      'Incorrect location',
+      'Scam or suspicious',
+      'Already taken/Sold',
+      'Incorrect price',
+      'Inappropriate photos',
+      'Other'
+    ];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Report Property'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: reasons.map((reason) => ListTile(
+            title: Text(reason),
+            onTap: () async {
+              final user = ref.read(appUserProvider).valueOrNull;
+              if (user != null) {
+                await ref.read(housingRepositoryProvider).reportListing(
+                  listingId: listing.id,
+                  reporterId: user.uid,
+                  reason: reason,
+                  category: listing.title,
+                );
+                if (mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Report submitted. Our team will review this listing shortly.')),
+                  );
+                }
+              }
+            },
+          )).toList(),
+        ),
+      ),
+    );
   }
 
   @override
@@ -321,13 +367,15 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
               right: 16,
               child: Row(
                 children: [
-                  _buildCircleButton(Icons.ios_share, () => Share.share('Check out this ${listing.type.name} at ${listing.location} on UniHub!')),
+                  _buildCircleButton(Icons.ios_share, () => _shareListing(listing)),
                   const SizedBox(width: 12),
                   _buildCircleButton(
                     isSaved ? Icons.favorite : Icons.favorite_border, 
                     _toggleSave,
                     iconColor: isSaved ? AppColors.error : theme.colorScheme.onSurface,
                   ),
+                  const SizedBox(width: 12),
+                  _buildCircleButton(Icons.report_gmailerrorred_rounded, () => _showReportDialog(listing)),
                 ],
               ),
             ),
@@ -418,14 +466,14 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: AppColors.verifiedSellerBg,
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.verified, color: AppColors.verifiedSellerIcon, size: 14),
-                  SizedBox(width: 4),
-                  Text('Verified Plug', style: TextStyle(color: AppColors.verifiedSellerIcon, fontSize: 11, fontWeight: FontWeight.bold)),
+                  Icon(Icons.verified, color: theme.colorScheme.primary, size: 14),
+                  const SizedBox(width: 4),
+                  Text('Verified Plug', style: TextStyle(color: theme.colorScheme.primary, fontSize: 11, fontWeight: FontWeight.bold)),
                 ],
               ),
             )
@@ -433,7 +481,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -453,7 +501,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
               ),
               Text(
                 '${listing.views} views',
-                style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), fontSize: 10),
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10),
               ),
             ],
           ),
@@ -528,15 +576,16 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(height: 8),
-            Text(label, style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), fontSize: 10)),
+            Text(label, style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10)),
             Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: theme.colorScheme.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
           ],
         ),
@@ -569,9 +618,9 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -612,8 +661,16 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+            border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Column(
             children: [
@@ -622,7 +679,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                   CircleAvatar(
                     radius: 30,
                     backgroundImage: plug.photoUrl != null ? NetworkImage(plug.photoUrl!) : null,
-                    backgroundColor: theme.colorScheme.surfaceVariant,
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
                     child: plug.photoUrl == null ? Text(plug.fullName[0], style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant)) : null,
                   ),
                   const SizedBox(width: 16),
@@ -653,7 +710,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                                   borderRadius: BorderRadius.circular(6),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.orange.withOpacity(0.3),
+                                      color: Colors.orange.withValues(alpha: 0.3),
                                       blurRadius: 4,
                                       offset: const Offset(0, 2),
                                     ),
@@ -683,7 +740,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                             Text('${plug.averageRating} (${plug.ratingsCount} reviews)', 
                               style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
                             const SizedBox(width: 8),
-                            Text('•', style: TextStyle(color: theme.colorScheme.outlineVariant)),
+                            Text('•', style: TextStyle(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
                             const SizedBox(width: 8),
                             Text('${plug.displayTrustScore.toInt()}% Trust', 
                               style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
@@ -697,14 +754,14 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                     onPressed: () => context.push('/plug-profile/${plug.uid}'),
                     style: OutlinedButton.styleFrom(
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      side: BorderSide(color: theme.colorScheme.outlineVariant),
+                      side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.8)),
                     ),
                     child: Text('View', style: TextStyle(fontSize: 12, color: theme.colorScheme.primary)),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-              Divider(height: 1, color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+              Divider(height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
               const SizedBox(height: 16),
               _buildPlugDetailRow(Icons.bolt_rounded, 'Response rate', plug.responseRate),
               const SizedBox(height: 12),
@@ -727,7 +784,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
     final theme = Theme.of(context);
     return Row(
       children: [
-        Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7)),
+        Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
         const SizedBox(width: 8),
         Text(label, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
         const Spacer(),
@@ -742,12 +799,13 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.safetyBannerBg,
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.shield_outlined, color: AppColors.verifiedSellerIcon),
+          const Icon(Icons.shield_outlined, color: AppColors.success),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -758,7 +816,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
               ],
             ),
           ),
-          Icon(Icons.chevron_right, color: theme.colorScheme.outlineVariant),
+          Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
         ],
       ),
     );
@@ -771,14 +829,21 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Similar Properties', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+        Text('Similar Properties', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
         const SizedBox(height: 16),
         SizedBox(
           height: 240,
           child: similarAsync.when(
             data: (listings) {
               final filtered = listings.where((l) => l.id != listing.id).toList();
-              if (filtered.isEmpty) return const Center(child: Text('No similar properties found'));
+              if (filtered.isEmpty) {
+                return Center(
+                  child: Text(
+                    'No similar properties found', 
+                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant)
+                  )
+                );
+              }
               
               return ListView.builder(
                 scrollDirection: Axis.horizontal,
@@ -794,7 +859,7 @@ class _HousingDetailsScreenState extends ConsumerState<HousingDetailsScreen> {
                 ),
               );
             },
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
             error: (_, __) => const SizedBox.shrink(),
           ),
         ),

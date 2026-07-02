@@ -10,6 +10,8 @@ import '../../../auth/shared/providers.dart';
 import '../../../../services/history_service.dart';
 import '../../../../services/download_service.dart';
 import 'package:path/path.dart' as p;
+import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
+import 'package:unihub_mobile/features/chat/shared/providers.dart';
 import 'package:open_filex/open_filex.dart';
 
 class NoteDetailScreen extends ConsumerStatefulWidget {
@@ -64,7 +66,7 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
                   const SizedBox(height: 32),
                   _buildSectionTitle(context, 'Contributor Info'),
                   const SizedBox(height: 16),
-                  _buildInfoRow(context, 'Shared by', note.authorName, Icons.person_outline),
+                  _buildContributorInfo(context, theme, note),
                   _buildInfoRow(context, 'Date', DateFormat('MMM dd, yyyy').format(note.createdAt), Icons.event_available_outlined),
                   _buildInfoRow(context, 'Price', note.price == 0 ? 'FREE' : 'KES ${note.price}', Icons.payments_outlined),
                   
@@ -273,6 +275,69 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
     return Text(
       title, 
       style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.5, color: theme.colorScheme.onSurface)
+    );
+  }
+
+  Widget _buildContributorInfo(BuildContext context, ThemeData theme, NoteListing note) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Icons.person_outline, size: 18, color: theme.colorScheme.primary),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Shared by', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w500)),
+                Text(note.authorName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface)),
+              ],
+            ),
+          ),
+          if (ref.watch(authStateProvider).valueOrNull?.uid != note.authorId)
+            TextButton.icon(
+              onPressed: () async {
+                final currentUser = ref.read(authStateProvider).valueOrNull;
+                if (currentUser == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please login to chat')));
+                  return;
+                }
+
+                final chatContext = ChatContext(
+                  type: 'notes',
+                  id: note.id,
+                  title: note.title,
+                );
+
+                final conversationId = await ref.read(chatRepositoryProvider).getOrCreateConversation(
+                  participantIds: [currentUser.uid, note.authorId],
+                  context: chatContext,
+                );
+
+                if (context.mounted) {
+                  context.push('/chat', extra: {
+                    'conversationId': conversationId,
+                    'otherUserName': note.authorName,
+                    'context': chatContext,
+                  });
+                }
+              },
+              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16),
+              label: const Text('Chat'),
+              style: TextButton.styleFrom(
+                foregroundColor: theme.colorScheme.primary,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+        ],
+      ),
     );
   }
 

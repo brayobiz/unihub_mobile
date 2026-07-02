@@ -9,9 +9,10 @@ import '../../../shared/domain/models/uni_notification.dart';
 
 class MarketplaceRepositoryImpl implements MarketplaceRepository {
   final FirebaseFirestore _firestore;
+  final String? _browsingCampus;
   final NotificationService? _notificationService;
 
-  MarketplaceRepositoryImpl(this._firestore, [this._notificationService]);
+  MarketplaceRepositoryImpl(this._firestore, this._browsingCampus, [this._notificationService]);
 
   @override
   Stream<List<Listing>> watchListings({
@@ -21,7 +22,6 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     double? minPrice,
     double? maxPrice,
     bool? isFeatured,
-    String? university,
     String? searchQuery,
     ListingSortType? sortBy,
     ListingStatus? status,
@@ -60,8 +60,15 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     final fetchLimit = (limit ?? 50) * 4;
     query = query.limit(fetchLimit);
 
-    return query.snapshots().map((snapshot) {
+    return query.snapshots().asyncMap((snapshot) async {
       debugPrint('📖 Firestore: watchListings emitting ${snapshot.docs.length} raw docs');
+      
+      // Fetch current user blocked list if available
+      List<String> blockedUids = [];
+      final currentUser = _firestore.app.options.projectId; // Just a placeholder check
+      // In a real repo, we'd want the current user ID passed in or accessible.
+      // Since watchListings doesn't have it, we'll assume the caller (Controller/Provider) handles it 
+      // OR we can try to fetch it if we had access to auth.
       
       var items = snapshot.docs
           .map((doc) => Listing.fromJson(doc.data() as Map<String, dynamic>))
@@ -73,6 +80,9 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       final targetStatus = status ?? ListingStatus.active;
       items = items.where((l) => l.status == targetStatus).toList();
 
+      // 1b. Blocked Filter (Optional - usually done at the logic layer, but good to have here)
+      // items = items.where((l) => !blockedUids.contains(l.sellerId)).toList();
+
       // 2. Category Filter
       if (category != null && category != 'All' && category.isNotEmpty) {
         items = items.where((l) => l.category == category).toList();
@@ -83,9 +93,9 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
         items = items.where((l) => l.isFeatured == true).toList();
       }
 
-      // 4. University Filter
-      if (university != null && university.isNotEmpty) {
-        items = items.where((l) => l.sellerUniversity == university).toList();
+      // 4. Global Campus Filter
+      if (_browsingCampus != null && _browsingCampus!.isNotEmpty) {
+        items = items.where((l) => l.sellerUniversity == _browsingCampus).toList();
       }
 
       // 5. Price Filters
@@ -219,9 +229,9 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
   }
 
   @override
-  Stream<List<Listing>> watchTrendingListings({String? university, int limit = 10}) {
+  Stream<List<Listing>> watchTrendingListings({int limit = 10}) {
     // Trending = high engagement (views + saves * 2) and recently added
-    // We fetch a larger pool to allow for client-side scoring and university filtering
+    // We fetch a larger pool to allow for client-side scoring and campus filtering
     return _firestore.collection('listings')
         .where('status', isEqualTo: ListingStatus.active.name)
         .orderBy('viewsCount', descending: true)
@@ -231,6 +241,11 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
           var items = snapshot.docs
               .map((doc) => Listing.fromJson(doc.data() as Map<String, dynamic>))
               .toList();
+
+          // Apply hard campus filter if scope is set
+          if (_browsingCampus != null && _browsingCampus!.isNotEmpty) {
+            items = items.where((l) => l.sellerUniversity == _browsingCampus).toList();
+          }
 
           // Apply scoring algorithm
           items.sort((a, b) {
@@ -248,12 +263,6 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
             
             final bAgeDays = DateTime.now().difference(b.createdAt).inDays;
             if (bAgeDays <= 3) bScore += (3 - bAgeDays) * 10.0;
-
-            // University match boost if university is provided
-            if (university != null && university.isNotEmpty) {
-              if (a.sellerUniversity == university) aScore *= 1.5;
-              if (b.sellerUniversity == university) bScore *= 1.5;
-            }
 
             return bScore.compareTo(aScore);
           });
@@ -291,12 +300,16 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
         }
       }
 
-      // Fetch active listings, prioritizing newer ones
-      final snapshot = await _firestore.collection('listings')
+      // Fetch active listings
+      Query query = _firestore.collection('listings')
           .where('status', isEqualTo: ListingStatus.active.name)
-          .orderBy('createdAt', descending: true)
-          .limit(100)
-          .get();
+          .orderBy('createdAt', descending: true);
+
+      if (_browsingCampus != null && _browsingCampus!.isNotEmpty) {
+        query = query.where('sellerUniversity', isEqualTo: _browsingCampus);
+      }
+
+      final snapshot = await query.limit(limit * 4).get();
 
       var listings = snapshot.docs
           .map((doc) => Listing.fromJson(doc.data() as Map<String, dynamic>))
@@ -316,6 +329,8 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
         if (recentCategories.contains(b.category)) bScore += 15;
 
         // 3. Same University (Medium weight)
+        // If browsing campus is set, this is already partially filtered but still useful for 'My Campus' within 'Specific Campus' if we ever support mixed.
+        // Actually, let's use the verified university for recommendation boost.
         if (university != null && a.sellerUniversity == university) aScore += 12;
         if (university != null && b.sellerUniversity == university) bScore += 12;
 
@@ -702,8 +717,12 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
   @override
   Future<List<Listing>> getListings({int limit = 20, Listing? startAfter}) async {
     Query query = _firestore.collection('listings')
-        .orderBy('createdAt', descending: true)
-        .limit(limit * 2);
+        .where('status', isEqualTo: ListingStatus.active.name)
+        .orderBy('createdAt', descending: true);
+
+    if (_browsingCampus != null && _browsingCampus!.isNotEmpty) {
+      query = query.where('sellerUniversity', isEqualTo: _browsingCampus);
+    }
 
     if (startAfter != null) {
       final doc = await _firestore.collection('listings').doc(startAfter.id).get();
@@ -712,11 +731,9 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       }
     }
 
-    final snapshot = await query.get(const GetOptions(source: Source.serverAndCache));
+    final snapshot = await query.limit(limit).get(const GetOptions(source: Source.serverAndCache));
     return snapshot.docs
         .map((doc) => Listing.fromJson(doc.data() as Map<String, dynamic>))
-        .where((l) => l.status == ListingStatus.active)
-        .take(limit)
         .toList();
   }
 
@@ -1014,7 +1031,16 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       'reporterId': reporterId,
       'reason': reason,
       'timestamp': FieldValue.serverTimestamp(),
+      'status': 'pending',
     });
+
+    if (_notificationService != null) {
+      await _notificationService.notifyAdmins(
+        title: 'Marketplace Report 📦',
+        body: 'A listing has been reported for: $reason',
+        route: '/admin/reports',
+      );
+    }
   }
 
   @override

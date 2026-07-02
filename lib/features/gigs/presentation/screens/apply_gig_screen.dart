@@ -130,16 +130,21 @@ class _ApplyGigScreenState extends ConsumerState<ApplyGigScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Apply for Gig'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        title: Text('Apply for Gig', 
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+          )),
+        backgroundColor: theme.colorScheme.surface,
+        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
         elevation: 0,
       ),
       body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
+        ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
         : SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Form(
@@ -149,14 +154,15 @@ class _ApplyGigScreenState extends ConsumerState<ApplyGigScreen> {
                 children: [
                   Text(
                     'Applying for: ${widget.gig.title}',
-                    style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 32),
                   
-                  _buildLabel('Full Name'),
+                  _buildLabel(context, 'Full Name'),
                   TextFormField(
                     controller: _nameController,
-                    decoration: _inputDecoration('e.g., John Doe'),
+                    style: TextStyle(color: theme.colorScheme.onSurface),
+                    decoration: _inputDecoration(context, 'e.g., John Doe'),
                     validator: (v) => v!.isEmpty ? 'Enter your full name' : null,
                   ),
                   const SizedBox(height: 20),
@@ -167,10 +173,11 @@ class _ApplyGigScreenState extends ConsumerState<ApplyGigScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildLabel('Email Address'),
+                            _buildLabel(context, 'Email Address'),
                             TextFormField(
                               controller: _emailController,
-                              decoration: _inputDecoration('email@example.com'),
+                              style: TextStyle(color: theme.colorScheme.onSurface),
+                              decoration: _inputDecoration(context, 'email@example.com'),
                               keyboardType: TextInputType.emailAddress,
                               validator: (v) => v!.isEmpty ? 'Enter email' : null,
                             ),
@@ -182,10 +189,11 @@ class _ApplyGigScreenState extends ConsumerState<ApplyGigScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildLabel('Phone Number'),
+                            _buildLabel(context, 'Phone Number'),
                             TextFormField(
                               controller: _phoneController,
-                              decoration: _inputDecoration('07...'),
+                              style: TextStyle(color: theme.colorScheme.onSurface),
+                              decoration: _inputDecoration(context, '07...'),
                               keyboardType: TextInputType.phone,
                               validator: (v) => v!.isEmpty ? 'Enter phone' : null,
                             ),
@@ -196,19 +204,21 @@ class _ApplyGigScreenState extends ConsumerState<ApplyGigScreen> {
                   ),
                   const SizedBox(height: 20),
                   
-                  _buildLabel('Cover Letter'),
+                  _buildLabel(context, 'Cover Letter'),
                   TextFormField(
                     controller: _coverLetterController,
-                    decoration: _inputDecoration('Explain why you are the best fit for this gig...'),
+                    style: TextStyle(color: theme.colorScheme.onSurface),
+                    decoration: _inputDecoration(context, 'Explain why you are the best fit for this gig...'),
                     maxLines: 6,
                     validator: (v) => v!.isEmpty ? 'Please provide a cover letter' : null,
                   ),
                   const SizedBox(height: 20),
                   
-                  _buildLabel('Portfolio Link (Optional)'),
+                  _buildLabel(context, 'Portfolio Link (Optional)'),
                   TextFormField(
                     controller: _portfolioController,
-                    decoration: _inputDecoration('e.g., GitHub, Behance, or Website link'),
+                    style: TextStyle(color: theme.colorScheme.onSurface),
+                    decoration: _inputDecoration(context, 'e.g., GitHub, Behance, or Website link'),
                   ),
                   const SizedBox(height: 40),
                   
@@ -218,7 +228,7 @@ class _ApplyGigScreenState extends ConsumerState<ApplyGigScreen> {
                     child: FilledButton(
                       onPressed: _submit,
                       style: FilledButton.styleFrom(
-                        backgroundColor: Colors.indigo,
+                        backgroundColor: theme.colorScheme.primary,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: const Text('Submit Application', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
@@ -232,28 +242,35 @@ class _ApplyGigScreenState extends ConsumerState<ApplyGigScreen> {
     );
   }
 
-  Widget _buildLabel(String label) {
+  Widget _buildLabel(BuildContext context, String label) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8, left: 4),
       child: Text(
         label,
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface),
       ),
     );
   }
 
-  InputDecoration _inputDecoration(String hint) {
+  InputDecoration _inputDecoration(BuildContext context, String hint) {
+    final theme = Theme.of(context);
     return InputDecoration(
       hintText: hint,
+      hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
       filled: true,
-      fillColor: Colors.grey.shade50,
+      fillColor: theme.colorScheme.surfaceContainerHighest,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade200),
+        borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade200),
+        borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
       ),
     );
   }

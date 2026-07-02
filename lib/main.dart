@@ -7,6 +7,7 @@ import 'app/router/app_router.dart';
 import 'app/theme/app_theme.dart';
 import 'app/theme/theme_provider.dart';
 import 'features/auth/shared/providers.dart';
+import 'features/ads/providers/ad_provider.dart';
 import 'firebase_options.dart';
 
 import 'features/profile/settings_screen.dart';
@@ -45,6 +46,9 @@ Future<void> main() async {
 
   // Initialize notifications
   container.read(notificationServiceProvider).init();
+
+  // Initialize Ads (non-blocking)
+  container.read(adInitializationProvider);
 
   runApp(
     UncontrolledProviderScope(

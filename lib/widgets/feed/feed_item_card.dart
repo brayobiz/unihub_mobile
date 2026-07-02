@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-
+import '../../models/feed_type.dart';
+import '../../core/utils/category_utils.dart';
 import 'feed_item_model.dart';
-import 'feed_type.dart';
 
 class FeedItemCard extends StatelessWidget {
   final FeedItemModel item;
@@ -14,80 +13,44 @@ class FeedItemCard extends StatelessWidget {
     this.onTap,
   });
 
-  IconData get icon {
-    switch (item.type) {
-      case FeedType.marketplace:
-        return Icons.storefront_outlined;
+  IconData get icon => CategoryUtils.getIcon(item.type);
 
-      case FeedType.housing:
-        return Icons.home_work_outlined;
-
-      case FeedType.notes:
-        return Icons.menu_book_outlined;
-
-      case FeedType.community:
-        return Icons.groups_outlined;
-
-      case FeedType.confession:
-        return Icons.favorite_outline;
-
-      case FeedType.gig:
-        return Icons.work_outline;
-    }
-  }
-
-  Color get color {
-    switch (item.type) {
-      case FeedType.marketplace:
-        return Colors.green;
-
-      case FeedType.housing:
-        return Colors.blue;
-
-      case FeedType.notes:
-        return Colors.orange;
-
-      case FeedType.community:
-        return Colors.purple;
-
-      case FeedType.confession:
-        return Colors.red;
-
-      case FeedType.gig:
-        return Colors.indigo;
-    }
-  }
+  Color get color => CategoryUtils.getColor(item.type);
 
   String get label {
     switch (item.type) {
       case FeedType.marketplace:
         return "Marketplace";
-
       case FeedType.housing:
         return "Housing";
-
       case FeedType.notes:
         return "Notes";
-
       case FeedType.community:
         return "Community";
-
       case FeedType.confession:
         return "Confession";
-
       case FeedType.gig:
         return "Gigs";
+      case FeedType.event:
+        return "Events";
+      case FeedType.lostFound:
+        return "Lost & Found";
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 12),
+      color: colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200, width: 1),
+        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5), width: 1),
       ),
       child: ListTile(
         onTap: onTap,
@@ -107,19 +70,18 @@ class FeedItemCard extends StatelessWidget {
         ),
         title: Text(
           item.title,
-          style: GoogleFonts.plusJakartaSans(
+          style: textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w700,
             fontSize: 15,
-            color: const Color(0xFF1A1C1E),
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
           item.subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: textTheme.bodyMedium?.copyWith(
             fontSize: 13,
-            color: const Color(0xFF64748B),
+            color: colorScheme.onSurfaceVariant.withOpacity(0.8),
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -136,7 +98,7 @@ class FeedItemCard extends StatelessWidget {
               ),
               child: Text(
                 label.toUpperCase(),
-                style: GoogleFonts.plusJakartaSans(
+                style: textTheme.labelSmall?.copyWith(
                   color: color,
                   fontSize: 9,
                   fontWeight: FontWeight.w800,
@@ -147,9 +109,9 @@ class FeedItemCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               item.time,
-              style: GoogleFonts.plusJakartaSans(
+              style: textTheme.bodySmall?.copyWith(
                 fontSize: 11,
-                color: const Color(0xFF94A3B8),
+                color: colorScheme.onSurfaceVariant.withOpacity(0.6),
                 fontWeight: FontWeight.w500,
               ),
             ),

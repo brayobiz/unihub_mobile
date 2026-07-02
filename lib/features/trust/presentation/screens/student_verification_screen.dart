@@ -92,25 +92,32 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Theme.of(context).primaryColor;
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
+        backgroundColor: theme.colorScheme.surface,
+        elevation: 0,
         title: Text('Student Verification', 
-          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+          )),
+        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Confirm your enrollment',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.w900,
-                color: Color(0xFF1E293B),
+                color: theme.colorScheme.onSurface,
                 letterSpacing: -0.5,
               ),
             ),
@@ -119,7 +126,7 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
               'Upload a clear photo of your Student ID card. This helps us ensure that UniHub remains a safe community for verified students.',
               style: TextStyle(
                 fontSize: 15,
-                color: Colors.blueGrey.shade600,
+                color: theme.colorScheme.onSurfaceVariant,
                 height: 1.5,
               ),
             ),
@@ -132,10 +139,10 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
                 width: double.infinity,
                 height: 240,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
+                  color: theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
-                    color: const Color(0xFFE2E8F0),
+                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
                     width: 2,
                     style: _imageFile == null ? BorderStyle.solid : BorderStyle.none,
                   ),
@@ -168,12 +175,12 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
                     : Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.add_a_photo_outlined, size: 48, color: Colors.blueGrey.shade300),
+                          Icon(Icons.add_a_photo_outlined, size: 48, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
                           const SizedBox(height: 16),
                           Text(
                             'Tap to upload ID photo',
                             style: TextStyle(
-                              color: Colors.blueGrey.shade400,
+                              color: theme.colorScheme.onSurfaceVariant,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -181,7 +188,7 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
                           Text(
                             'JPG or PNG, max 5MB',
                             style: TextStyle(
-                              color: Colors.blueGrey.shade300,
+                              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                               fontSize: 12,
                             ),
                           ),
@@ -192,16 +199,16 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
             
             const SizedBox(height: 40),
             
-            _buildRequirementItem(Icons.check_circle_outline, 'Ensure your full name is visible'),
-            _buildRequirementItem(Icons.check_circle_outline, 'University name must be clearly readable'),
-            _buildRequirementItem(Icons.check_circle_outline, 'ID card should be valid/not expired'),
+            _buildRequirementItem(context, Icons.check_circle_outline, 'Ensure your full name is visible'),
+            _buildRequirementItem(context, Icons.check_circle_outline, 'University name must be clearly readable'),
+            _buildRequirementItem(context, Icons.check_circle_outline, 'ID card should be valid/not expired'),
             
             const SizedBox(height: 48),
 
             if (_isSubmitting) ...[
               LinearProgressIndicator(
                 value: _uploadProgress,
-                backgroundColor: const Color(0xFFF1F5F9),
+                backgroundColor: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
                 valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -209,7 +216,7 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
               Center(
                 child: Text(
                   'Uploading Document: ${(_uploadProgress * 100).toInt()}%',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.blueGrey.shade700),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant),
                 ),
               ),
               const SizedBox(height: 24),
@@ -244,7 +251,8 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
     );
   }
 
-  Widget _buildRequirementItem(IconData icon, String text) {
+  Widget _buildRequirementItem(BuildContext context, IconData icon, String text) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -255,7 +263,7 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
             text,
             style: TextStyle(
               fontSize: 14,
-              color: Colors.blueGrey.shade700,
+              color: theme.colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w500,
             ),
           ),

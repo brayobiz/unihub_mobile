@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../../core/constants/campus_constants.dart';
 
 enum HousingType { 
   hostel, 
@@ -105,8 +106,8 @@ class HousingListing {
         (e) => e.name == data['type'],
         orElse: () => HousingType.hostel,
       ),
-      university: (data['university'] ?? '').toString(),
-      campus: (data['campus'] ?? '').toString(),
+      university: CampusConstants.resolveToId(data['university']?.toString()) ?? (data['university'] ?? '').toString(),
+      campus: CampusConstants.resolveToId(data['campus']?.toString()) ?? (data['campus'] ?? '').toString(),
       location: (data['location'] ?? '').toString(),
       distance: (data['distance'] ?? '').toString(),
       images: List<String>.from(data['images'] ?? <String>[]),

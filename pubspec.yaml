@@ -59,6 +59,7 @@ dependencies:
   rxdart: ^0.27.7
   shimmer: ^3.0.0
   webview_flutter: ^4.8.0
+  google_mobile_ads: ^5.1.0
 
 dev_dependencies:
   flutter_test:

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import '../../../auth/shared/providers.dart';
@@ -301,7 +300,7 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
             children: [
               _buildMediaSelector(),
               const SizedBox(height: 32),
-              _buildSectionLabel('Basic Details'),
+              _buildSectionLabel(context, 'Basic Details'),
               _buildTextField(
                 controller: _titleController,
                 label: 'Property Title',
@@ -374,10 +373,10 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
                 ],
               ),
               const SizedBox(height: 32),
-              _buildSectionLabel('Amenities'),
+              _buildSectionLabel(context, 'Amenities'),
               _buildAmenitiesWrap(),
               const SizedBox(height: 32),
-              _buildSectionLabel('Description'),
+              _buildSectionLabel(context, 'Description'),
               _buildTextField(
                 controller: _descriptionController,
                 label: 'About the property',
@@ -406,7 +405,7 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionLabel('Photos & Video Walkthrough'),
+        _buildSectionLabel(context, 'Photos & Video Walkthrough'),
         const SizedBox(height: 8),
         SizedBox(
           height: 140,
@@ -639,15 +638,16 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
     );
   }
 
-  Widget _buildSectionLabel(String label) {
+  Widget _buildSectionLabel(BuildContext context, String label) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12, left: 4),
       child: Text(
         label,
-        style: GoogleFonts.plusJakartaSans(
+        style: theme.textTheme.titleMedium?.copyWith(
           fontSize: 15,
           fontWeight: FontWeight.w900,
-          color: const Color(0xFF1A1C1E),
+          color: theme.colorScheme.onSurface,
         ),
       ),
     );

@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/dashboard/controllers/smart_feed_controller.dart';
-import 'package:unihub_mobile/widgets/feed/feed_type.dart';
+import 'package:unihub_mobile/models/feed_type.dart';
 import 'package:go_router/go_router.dart';
+import 'package:unihub_mobile/features/campus_filter/presentation/widgets/campus_filter_selector.dart';
+import 'package:unihub_mobile/features/campus_filter/shared/providers.dart';
+import 'package:unihub_mobile/features/campus_filter/domain/models/browsing_scope.dart';
 
 class GlobalSearchScreen extends ConsumerStatefulWidget {
   const GlobalSearchScreen({super.key});
@@ -73,34 +76,44 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
             ),
         ],
       ),
-      body: _query.isEmpty 
-          ? _buildSearchSuggestions(context)
-          : allFeedAsync.when(
-              data: (items) {
-                final filtered = items.where((item) {
-                  return item.model.title.toLowerCase().contains(_query) ||
-                         item.model.subtitle.toLowerCase().contains(_query);
-                }).toList();
+      body: Column(
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
+            child: CampusFilterSelector(),
+          ),
+          Expanded(
+            child: _query.isEmpty 
+                ? _buildSearchSuggestions(context)
+                : allFeedAsync.when(
+                    data: (items) {
+                      final filtered = items.where((item) {
+                        return item.model.title.toLowerCase().contains(_query) ||
+                               item.model.subtitle.toLowerCase().contains(_query);
+                      }).toList();
 
-                if (filtered.isEmpty) {
-                  return _buildNoResults(context);
-                }
+                      if (filtered.isEmpty) {
+                        return _buildNoResults(context);
+                      }
 
-                return ListView.builder(
-                  padding: const EdgeInsets.all(20),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, index) {
-                    final item = filtered[index];
-                    return _SearchItemCard(
-                      item: item,
-                      onTap: () => _handleItemTap(context, item),
-                    );
-                  },
-                );
-              },
-              loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
-              error: (err, _) => Center(child: Text('Error: $err')),
-            ),
+                      return ListView.builder(
+                        padding: const EdgeInsets.all(20),
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final item = filtered[index];
+                          return _SearchItemCard(
+                            item: item,
+                            onTap: () => _handleItemTap(context, item),
+                          );
+                        },
+                      );
+                    },
+                    loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
+                    error: (err, _) => Center(child: Text('Error: $err')),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -156,6 +169,8 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
 
   Widget _buildNoResults(BuildContext context) {
     final theme = Theme.of(context);
+    final isCampusFiltered = ref.read(browsingScopeProvider).type != BrowsingScopeType.all;
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -186,6 +201,19 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
               fontSize: 14,
             ),
           ),
+          if (isCampusFiltered) ...[
+            const SizedBox(height: 32),
+            FilledButton.icon(
+              onPressed: () {
+                ref.read(browsingScopeProvider.notifier).reset();
+              },
+              icon: const Icon(Icons.public, size: 18),
+              label: const Text('Search All Campuses'),
+              style: FilledButton.styleFrom(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -202,7 +230,7 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
     } else if (item.model.type == FeedType.notes) {
       context.push('/note-detail', extra: item.originalData);
     } else if (item.model.type == FeedType.marketplace) {
-      context.push('/marketplace-detail', extra: item.originalData);
+      context.push('/listing-detail', extra: item.originalData);
     } else if (item.model.type == FeedType.gig) {
       context.push('/gig-detail', extra: item.originalData);
     }

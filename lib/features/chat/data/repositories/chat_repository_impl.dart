@@ -6,6 +6,7 @@ import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
 import 'package:unihub_mobile/features/chat/domain/repositories/chat_repository.dart';
 import 'package:unihub_mobile/services/notification_service.dart';
 import 'package:unihub_mobile/features/shared/notification_repository.dart';
+import 'package:unihub_mobile/core/utils/app_logger.dart';
 
 class ChatRepositoryImpl implements ChatRepository {
   final FirebaseFirestore _firestore;
@@ -19,14 +20,26 @@ class ChatRepositoryImpl implements ChatRepository {
         .collection('conversations')
         .where('participants', arrayContains: userId)
         .snapshots()
-        .map((snapshot) {
+        .asyncMap((snapshot) async {
       final now = DateTime.now();
+      
+      // Fetch user's blocked list for filtering
+      final userDoc = await _firestore.collection('users').doc(userId).get(const GetOptions(source: Source.serverAndCache));
+      final blockedUids = List<String>.from(userDoc.data()?['blockedUids'] ?? []);
+
       final items = snapshot.docs
           .map((doc) => Conversation.fromJson(doc.data()))
-          .where((c) => c.expiresAt == null || c.expiresAt!.isAfter(now))
+          .where((c) {
+            // Filter 1: Not expired
+            final isNotExpired = c.expiresAt == null || c.expiresAt!.isAfter(now);
+            // Filter 2: No participants are in our blocked list
+            final otherParticipant = c.participants.firstWhere((id) => id != userId, orElse: () => '');
+            final isNotBlocked = !blockedUids.contains(otherParticipant);
+            
+            return isNotExpired && isNotBlocked;
+          })
           .toList();
-      // Sort in-memory to avoid requiring a composite index in Firestore
-      // while maintaining the real-time order.
+      // Sort in-memory
       items.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
       return items;
     });
@@ -64,79 +77,150 @@ class ChatRepositoryImpl implements ChatRepository {
 
   @override
   Future<void> sendMessage(String conversationId, Message message) async {
-    // 1. Prepare message with 'sent' status for Firestore
+    final convRef = _firestore.collection('conversations').doc(conversationId);
+    final convDoc = await convRef.get();
+    
+    if (!convDoc.exists) throw Exception('Conversation not found');
+    
+    final Map<String, dynamic> data = convDoc.data()!;
+    final participants = List<String>.from(data['participants'] ?? []);
+    
+    if (participants.isEmpty) {
+      AppLogger.warning('Conversation $conversationId has no participants', 'CHAT_REPO');
+    }
+
+    final recipientId = participants.firstWhere((id) => id != message.senderId, orElse: () => '');
+    
+    if (recipientId.isNotEmpty) {
+      // 1. Check if recipient has blocked sender (Only for P2P chats)
+      if (!(data['isSupport'] ?? false)) {
+        final recipientDoc = await _firestore.collection('users').doc(recipientId).get();
+        if (recipientDoc.exists) {
+          final blockedUids = List<String>.from(recipientDoc.data()?['blockedUids'] ?? []);
+          if (blockedUids.contains(message.senderId)) {
+            throw Exception('You cannot message this user.');
+          }
+        }
+      }
+    }
+
+    // 2. Prepare message
     final sentMessage = message.copyWith(status: MessageStatus.sent);
     final batch = _firestore.batch();
     
-    final messageRef = _firestore
-        .collection('conversations')
-        .doc(conversationId)
-        .collection('messages')
-        .doc(message.id);
-    
+    final messageRef = convRef.collection('messages').doc(message.id);
     batch.set(messageRef, sentMessage.toJson());
     
-    final convRef = _firestore.collection('conversations').doc(conversationId);
-    
-    // 2. Update conversation metadata using server timestamp for consistency
+    // 3. Update conversation metadata
     final now = DateTime.now();
     final expiresAt = now.add(const Duration(hours: 48));
     
-    batch.update(convRef, {
+    final Map<String, dynamic> updateData = {
       'lastMessage': message.type == MessageType.text ? message.content : '[${message.type.name}]',
       'lastMessageSenderId': message.senderId,
       'lastMessageStatus': MessageStatus.sent.name,
       'lastMessageTime': FieldValue.serverTimestamp(),
-      'expiresAt': Timestamp.fromDate(expiresAt), // Reset expiration timer
-    });
+      'expiresAt': Timestamp.fromDate(expiresAt),
+    };
 
-    // 3. Increment unread counts for other participants (Optimistic + Fallback)
-    try {
-      final cacheDoc = await convRef.get(const GetOptions(source: Source.cache));
-      List<String> participants = [];
-      if (cacheDoc.exists) {
-        participants = List<String>.from(cacheDoc.data()?['participants'] ?? []);
-      } else {
-        final serverDoc = await convRef.get();
-        if (serverDoc.exists) {
-          participants = List<String>.from(serverDoc.data()?['participants'] ?? []);
-        }
-      }
+    if (message.context != null) {
+      updateData['context'] = message.context!.toJson();
+    }
+
+    // Support Chat specific logic:
+    if (conversationId.contains('unihub_admin') || (data['isSupport'] ?? false)) {
+      final realAdminId = message.metadata?['adminId'] as String?;
       
-      for (final participantId in participants) {
-        if (participantId != message.senderId) {
-          batch.update(convRef, {
-            'unreadCounts.$participantId': FieldValue.increment(1),
-          });
-        }
+      // Auto-assign admin to participants if they are sending a message but aren't in the list
+      if (realAdminId != null && realAdminId.isNotEmpty && !participants.contains(realAdminId)) {
+        participants.add(realAdminId);
+        batch.update(convRef, {
+          'participants': FieldValue.arrayUnion([realAdminId]),
+          'unreadCounts.$realAdminId': 0, // Initialize unread count for the newly joined admin
+        });
       }
-    } catch (e) {
-      debugPrint('Error updating unread counts: $e');
+
+      // If the sender is the student (usually index 0), it's waiting for admin
+      if (participants.isNotEmpty && message.senderId == participants[0]) {
+        updateData['supportStatus'] = 'waiting_admin';
+      } else {
+        updateData['supportStatus'] = 'waiting_user';
+      }
+    }
+    
+    batch.update(convRef, updateData);
+
+    // 4. Increment unread counts for other participants
+    // We use a Set to avoid duplicates if participants list is messy
+    final Map<String, dynamic> unreadUpdates = {};
+    for (final participantId in participants.toSet()) {
+      if (participantId.isNotEmpty && participantId != message.senderId) {
+        unreadUpdates['unreadCounts.$participantId'] = FieldValue.increment(1);
+      }
+    }
+
+    if (unreadUpdates.isNotEmpty) {
+      batch.update(convRef, unreadUpdates);
     }
 
     await batch.commit();
 
-    // 4. Send Notification (non-blocking)
-    convRef.get().then((doc) {
-      if (doc.exists) {
-        _sendNotificationForMessage(conversationId, sentMessage, doc.data()!);
-      }
-    });
+    // 5. Send Notification (non-blocking)
+    _sendNotificationForMessage(conversationId, sentMessage, data);
   }
 
   Future<void> _sendNotificationForMessage(String conversationId, Message message, Map<String, dynamic> data) async {
     try {
       final participants = List<String>.from(data['participants'] ?? []);
-      final recipientId = participants.firstWhere((id) => id != message.senderId, orElse: () => '');
+      final isSupport = data['isSupport'] ?? false;
+      final assignedAdminId = data['assignedAdminId'] as String?;
       
-      if (recipientId.isNotEmpty) {
+      final List<String> recipients = [];
+      String? actorName = message.metadata?['adminName'] as String?;
+      
+      if (isSupport) {
+        // Support Logic
+        if (message.senderId == 'unihub_admin' || (participants.contains(message.senderId) && message.senderId != participants[0])) {
+          // Message from admin, notify student (always at index 0 for support)
+          if (participants.isNotEmpty) recipients.add(participants[0]);
+        } else {
+          // Message from student, notify assigned admin
+          if (assignedAdminId != null) {
+            recipients.add(assignedAdminId);
+          } else {
+            // NEW: Unassigned ticket: Notify the generic support identity or use a broadcast
+            // Since 'unihub_admin' might not have a token, we broadcast to 'admins' topic
+            await _notificationService.triggerPushNotification(
+              recipientId: '',
+              isBroadcast: true,
+              title: 'New Support Message',
+              body: message.type == MessageType.text ? message.content : 'Sent an attachment',
+              data: {
+                'type': NotificationType.support.name,
+                'targetId': conversationId,
+                'route': '/admin/support/$conversationId',
+                'topic': 'admins', // Hint for backend to only send to admin tokens
+              },
+            );
+          }
+        }
+      } else {
+        // Standard Chat Logic
+        final recipientId = participants.firstWhere((id) => id != message.senderId, orElse: () => '');
+        if (recipientId.isNotEmpty) recipients.add(recipientId);
+        
+        // Use sender's name if we have it in metadata (optional enhancement)
+        actorName = message.metadata?['senderName'] as String?;
+      }
+      
+      for (final recipientId in recipients) {
         final contextData = data['context'] as Map<String, dynamic>?;
         final module = contextData?['type'] as String?;
-        final isSupport = data['isSupport'] ?? false;
         
         await _notificationService.sendNotification(
           recipientId: recipientId,
-          title: isSupport ? 'UniHub Support' : 'New Message',
+          actorName: actorName,
+          title: isSupport ? (actorName != null ? 'UniHub Support ($actorName)' : 'UniHub Support') : 'New Message',
           body: message.type == MessageType.text ? message.content : 'Sent an attachment',
           type: isSupport ? NotificationType.support : NotificationType.chat,
           targetId: conversationId,
@@ -148,32 +232,29 @@ class ChatRepositoryImpl implements ChatRepository {
     }
   }
 
+  String _getDeterministicConversationId(List<String> ids) {
+    final sortedIds = List<String>.from(ids)..sort();
+    return 'chat_${sortedIds.join('_')}';
+  }
+
   @override
   Future<String> getOrCreateConversation({
     required List<String> participantIds,
     required ChatContext context,
   }) async {
-    // Filter by context.id and then check type/participants in memory to avoid index requirement
-    final existing = await _firestore
-        .collection('conversations')
-        .where('context.id', isEqualTo: context.id)
-        .get();
-
-    for (var doc in existing.docs) {
-      final data = doc.data();
-      if (data['context']['type'] != context.type) continue;
-      
-      final participants = List<String>.from(data['participants']);
-      if (participants.length == participantIds.length && 
-          participants.every((p) => participantIds.contains(p))) {
-        return doc.id;
-      }
+    final conversationId = _getDeterministicConversationId(participantIds);
+    final convRef = _firestore.collection('conversations').doc(conversationId);
+    
+    final doc = await convRef.get();
+    if (doc.exists) {
+      // If it exists, we update the context to the latest one being accessed
+      await convRef.update({'context': context.toJson()});
+      return conversationId;
     }
 
-    final newConvRef = _firestore.collection('conversations').doc();
     final now = DateTime.now();
     final conversation = Conversation(
-      id: newConvRef.id,
+      id: conversationId,
       participants: participantIds,
       context: context,
       lastMessageTime: now,
@@ -181,20 +262,29 @@ class ChatRepositoryImpl implements ChatRepository {
       expiresAt: now.add(const Duration(hours: 48)),
     );
 
-    await newConvRef.set(conversation.toJson());
-    return newConvRef.id;
+    await convRef.set(conversation.toJson());
+    return conversationId;
   }
 
   @override
   Future<void> markAsRead(String conversationId, String userId) async {
+    if (userId.isEmpty) return;
+    
     final convRef = _firestore.collection('conversations').doc(conversationId);
     
     // 1. Reset unread count
-    await convRef.update({
-      'unreadCounts.$userId': 0,
-    });
+    try {
+      await convRef.update({
+        'unreadCounts.$userId': 0,
+      });
+    } catch (e) {
+      AppLogger.warning('Failed to reset unread count for $userId in $conversationId: $e', 'CHAT_REPO');
+    }
 
-    // 2. Mark messages from others as read
+    // 2. Clear associated notifications
+    await _notificationService.markAsReadByTarget(userId, conversationId);
+
+    // 3. Mark messages from others as read
     // Use a single property filter to avoid composite index requirement
     final unreadMessages = await convRef
         .collection('messages')
@@ -260,28 +350,23 @@ class ChatRepositoryImpl implements ChatRepository {
 
   @override
   Future<String> getSupportConversation(String userId) async {
+    if (userId.isEmpty) throw Exception('User ID cannot be empty');
+
     const adminId = 'unihub_admin';
+    final participantIds = [userId, adminId];
+    final conversationId = _getDeterministicConversationId(participantIds);
     
-    // Fetch user's conversations and filter in-memory to avoid index requirement
-    final existing = await _firestore
-        .collection('conversations')
-        .where('participants', arrayContains: userId)
-        .get();
+    final convRef = _firestore.collection('conversations').doc(conversationId);
+    final doc = await convRef.get();
 
-    final supportConv = existing.docs.where((doc) {
-      final data = doc.data();
-      return data['isSupport'] == true;
-    });
-
-    if (supportConv.isNotEmpty) {
-      return supportConv.first.id;
+    if (doc.exists) {
+      return conversationId;
     }
 
-    final newConvRef = _firestore.collection('conversations').doc();
     final now = DateTime.now();
     final conversation = Conversation(
-      id: newConvRef.id,
-      participants: [userId, adminId],
+      id: conversationId,
+      participants: participantIds,
       context: ChatContext(
         type: 'support',
         id: 'support_$userId',
@@ -290,11 +375,13 @@ class ChatRepositoryImpl implements ChatRepository {
       lastMessageTime: now,
       unreadCounts: {userId: 0, adminId: 0},
       isSupport: true,
+      supportStatus: 'waiting_admin',
+      supportPriority: 'normal',
       expiresAt: now.add(const Duration(hours: 48)),
     );
 
-    await newConvRef.set(conversation.toJson());
-    return newConvRef.id;
+    await convRef.set(conversation.toJson());
+    return conversationId;
   }
 
   @override

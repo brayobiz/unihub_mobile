@@ -2,10 +2,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/feed_type.dart';
 import '../../features/auth/shared/providers.dart';
+import '../../services/notification_service.dart';
+import '../campus_filter/shared/providers.dart';
+import '../../core/constants/campus_constants.dart';
 
-final feedRepositoryProvider = Provider((ref) => FeedRepository(
-  ref.watch(firestoreProvider),
-));
+final feedRepositoryProvider = Provider((ref) {
+  final campus = ref.watch(effectiveCampusFilterProvider);
+  return FeedRepository(
+    ref.watch(firestoreProvider),
+    campus,
+    ref.watch(notificationServiceProvider),
+  );
+});
 
 class FeedItem {
   final String id;
@@ -58,7 +66,7 @@ class FeedItem {
       subtitle: json['subtitle'] ?? '',
       price: json['price'],
       type: FeedType.values.firstWhere((e) => e.name == json['type'], orElse: () => FeedType.community),
-      university: json['university'],
+      university: CampusConstants.resolveToId(json['university']?.toString()) ?? json['university'],
       createdAt: parseDate(json['createdAt']),
       deadline: json['deadline'] != null ? parseDate(json['deadline']) : null,
       images: List<String>.from(json['images'] ?? <String>[]),
@@ -89,10 +97,12 @@ class FeedItem {
 
 class FeedRepository {
   final FirebaseFirestore _firestore;
+  final String? _browsingCampus;
+  final NotificationService? _notificationService;
 
-  FeedRepository(this._firestore);
+  FeedRepository(this._firestore, this._browsingCampus, [this._notificationService]);
 
-  Stream<List<FeedItem>> watchFeed(FeedType type, {String? university, int limit = 20}) {
+  Stream<List<FeedItem>> watchFeed(FeedType type, {int limit = 20}) {
     // Basic query to avoid complex index requirements
     Query query = _firestore.collection('feed')
         .where('type', isEqualTo: type.name);
@@ -107,16 +117,11 @@ class FeedRepository {
       
       var filteredItems = items;
       
-      // Filter logic
-      final bool shouldFilterByUniversity = 
-          type != FeedType.community && 
-          type != FeedType.gig && 
-          type != FeedType.confession;
-
-      if (shouldFilterByUniversity && university != null && university.isNotEmpty) {
+      // Filter logic: All feed types now respect the global campus filter
+      if (_browsingCampus != null && _browsingCampus!.isNotEmpty) {
         filteredItems = items.where((i) {
           if (i.university == null || i.university!.isEmpty) return true;
-          return i.university == university;
+          return i.university == _browsingCampus;
         }).toList();
       }
 
@@ -174,6 +179,12 @@ class FeedRepository {
     await batch.commit();
   }
 
+  Future<FeedItem?> getFeedItemById(String id) async {
+    final doc = await _firestore.collection('feed').doc(id).get();
+    if (!doc.exists) return null;
+    return FeedItem.fromJson(doc.data() as Map<String, dynamic>);
+  }
+
   Future<void> deleteFeedItem(String id) async {
     await _firestore.collection('feed').doc(id).delete();
   }
@@ -228,6 +239,15 @@ class FeedRepository {
       'reason': reason,
       'type': 'feed_item',
       'createdAt': FieldValue.serverTimestamp(),
+      'status': 'pending',
     });
+
+    if (_notificationService != null) {
+      await _notificationService!.notifyAdmins(
+        title: 'New Community Report ⚠️',
+        body: 'A feed item has been reported for: $reason',
+        route: '/admin/reports',
+      );
+    }
   }
 }

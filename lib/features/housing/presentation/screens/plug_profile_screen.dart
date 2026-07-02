@@ -11,6 +11,8 @@ import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import 'package:unihub_mobile/features/housing/domain/models/housing_listing.dart';
 import 'package:unihub_mobile/features/housing/domain/models/housing_review.dart';
 import 'package:unihub_mobile/features/housing/shared/providers.dart';
+import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
+import 'package:unihub_mobile/features/chat/shared/providers.dart';
 
 class PlugProfileScreen extends ConsumerStatefulWidget {
   final String plugId;
@@ -686,20 +688,32 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
           Expanded(
             flex: 2,
             child: OutlinedButton(
-              onPressed: () {
+              onPressed: () async {
                 final currentUser = ref.read(authStateProvider).valueOrNull;
                 if (currentUser == null) {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please login to chat')));
                   return;
                 }
-                final conversationId = currentUser.uid.compareTo(plug.uid) < 0 
-                    ? '${currentUser.uid}_${plug.uid}' 
-                    : '${plug.uid}_${currentUser.uid}';
-                context.push('/chat', extra: {
-                  'conversationId': conversationId,
-                  'otherUserName': plug.fullName,
-                  'listing': null,
-                });
+                
+                final chatContext = ChatContext(
+                  type: 'plug',
+                  id: plug.uid,
+                  title: '${plug.fullName}\'s Plug Profile',
+                  thumbnail: plug.photoUrl,
+                );
+
+                final conversationId = await ref.read(chatRepositoryProvider).getOrCreateConversation(
+                  participantIds: [currentUser.uid, plug.uid],
+                  context: chatContext,
+                );
+
+                if (context.mounted) {
+                  context.push('/chat', extra: {
+                    'conversationId': conversationId,
+                    'otherUserName': plug.fullName,
+                    'context': chatContext,
+                  });
+                }
               },
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),

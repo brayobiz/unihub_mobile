@@ -85,5 +85,12 @@ final marketplaceControllerProvider =
 
 final scoredListingsProvider = Provider<AsyncValue<List<Listing>>>((ref) {
   final filter = ref.watch(marketplaceControllerProvider);
-  return ref.watch(listingsProvider(filter));
+  final listingsAsync = ref.watch(listingsProvider(filter));
+  final user = ref.watch(appUserProvider).valueOrNull;
+
+  if (user == null || user.blockedUids.isEmpty) return listingsAsync;
+
+  return listingsAsync.whenData((listings) {
+    return listings.where((l) => !user.blockedUids.contains(l.sellerId)).toList();
+  });
 });

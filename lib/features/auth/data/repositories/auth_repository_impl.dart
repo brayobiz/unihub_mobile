@@ -260,12 +260,81 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> deleteAccount() async {
     final user = _firebaseAuth.currentUser;
     if (user != null) {
-      // 1. Delete user data from Firestore
-      await _firestore.collection('users').doc(user.uid).delete();
+      final uid = user.uid;
+      final batch = _firestore.batch();
+
+      // 1. Delete marketplace listings
+      final listings = await _firestore.collection('listings')
+          .where('sellerId', isEqualTo: uid).get();
+      for (var doc in listings.docs) {
+        batch.delete(doc.reference);
+      }
+
+      // 2. Delete housing listings
+      final housing = await _firestore.collection('housing_listings')
+          .where('plugId', isEqualTo: uid).get();
+      for (var doc in housing.docs) {
+        batch.delete(doc.reference);
+      }
+
+      // 3. Delete academic notes
+      final notes = await _firestore.collection('notes')
+          .where('authorId', isEqualTo: uid).get();
+      for (var doc in notes.docs) {
+        batch.delete(doc.reference);
+      }
+
+      // 4. Delete feed items (Community, Gigs, Confessions)
+      final feedItems = await _firestore.collection('feed')
+          .where('authorId', isEqualTo: uid).get();
+      for (var doc in feedItems.docs) {
+        batch.delete(doc.reference);
+      }
+
+      // 5. Delete gig applications
+      final applications = await _firestore.collection('gig_applications')
+          .where('freelancerId', isEqualTo: uid).get();
+      for (var doc in applications.docs) {
+        batch.delete(doc.reference);
+      }
+      final employerApps = await _firestore.collection('gig_applications')
+          .where('employerId', isEqualTo: uid).get();
+      for (var doc in employerApps.docs) {
+        batch.delete(doc.reference);
+      }
+
+      // 6. Delete verification records (Sensitive IDs)
+      batch.delete(_firestore.collection('student_verifications').doc(uid));
+      batch.delete(_firestore.collection('identity_verifications').doc(uid));
       
-      // 2. Delete the user from Firebase Auth
+      final verApps = await _firestore.collection('verification_applications')
+          .where('userId', isEqualTo: uid).get();
+      for (var doc in verApps.docs) {
+        batch.delete(doc.reference);
+      }
+
+      // 7. Delete user profile
+      batch.delete(_firestore.collection('users').doc(uid));
+      
+      await batch.commit();
+      
+      // 8. Delete the user from Firebase Auth
       await user.delete();
     }
+  }
+
+  @override
+  Future<void> blockUser(String uid, String blockedUid) async {
+    await _firestore.collection('users').doc(uid).update({
+      'blockedUids': FieldValue.arrayUnion([blockedUid]),
+    });
+  }
+
+  @override
+  Future<void> unblockUser(String uid, String blockedUid) async {
+    await _firestore.collection('users').doc(uid).update({
+      'blockedUids': FieldValue.arrayRemove([blockedUid]),
+    });
   }
 
   @override

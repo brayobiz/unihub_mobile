@@ -57,7 +57,8 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     
     if (widget.note != null) {
       _tags.addAll(widget.note!.tags);
-      _fileName = 'Existing Document (.docx)';
+      final ext = p.extension(widget.note!.fileUrl).toUpperCase();
+      _fileName = 'Existing Document ${ext.isNotEmpty ? '($ext)' : ''}';
     }
   }
 
@@ -106,7 +107,7 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
         if (mounted) {
            ScaffoldMessenger.of(context).showSnackBar(
              const SnackBar(
-               content: Text('Only Microsoft Word (.docx) documents are supported at the moment. PDF support will be available in a future update.'),
+               content: Text('Only Microsoft Word (.docx) documents are supported.'),
                backgroundColor: Colors.orange,
              )
            );
@@ -134,7 +135,7 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedFile == null && widget.note == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a .docx file')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a document file (.docx)')));
       return;
     }
     if (_tags.isEmpty) {
@@ -348,7 +349,7 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Help your fellow students by sharing high-quality .docx notes.',
+              'Help your fellow students by sharing high-quality study notes (.docx).',
               style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface, fontWeight: FontWeight.w500),
             ),
           ),
@@ -375,6 +376,16 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     final theme = Theme.of(context);
     final bool hasFile = _selectedFile != null || widget.note != null;
     
+    String fileExt = '';
+    if (_selectedFile != null) {
+      fileExt = p.extension(_selectedFile!.path).toUpperCase().replaceAll('.', '');
+    } else if (widget.note != null) {
+      final url = widget.note!.fileUrl.toLowerCase();
+      if (url.contains('.docx')) fileExt = 'DOCX';
+      else if (url.contains('.doc')) fileExt = 'DOC';
+      else fileExt = 'PDF';
+    }
+
     return InkWell(
       onTap: _isLoading ? null : _pickFile,
       borderRadius: BorderRadius.circular(24),
@@ -402,9 +413,9 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                 child: Icon(Icons.upload_file_rounded, size: 32, color: theme.colorScheme.primary),
               ),
               const SizedBox(height: 16),
-              Text('Select Microsoft Word Document', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: theme.colorScheme.onSurface)),
+              Text('Select Study Document', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: theme.colorScheme.onSurface)),
               const SizedBox(height: 4),
-              Text('Only .docx files are supported', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
+              Text('.docx files are supported', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
             ] else ...[
               Row(
                 children: [
@@ -423,7 +434,7 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface)),
                         Row(
                           children: [
-                            Text('.DOCX', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold)),
+                            Text(fileExt, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold)),
                             if (_fileSize != null) ...[
                               const SizedBox(width: 8),
                               CircleAvatar(radius: 2, backgroundColor: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),

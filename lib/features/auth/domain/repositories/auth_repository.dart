@@ -37,6 +37,10 @@ abstract class AuthRepository {
   });
   Future<void> updateOnboardingStatus(String uid, bool completed);
   Future<void> deleteAccount();
+
+  // Blocking
+  Future<void> blockUser(String uid, String blockedUid);
+  Future<void> unblockUser(String uid, String blockedUid);
   
   // Reputation & Trust
   Future<void> updateTrustScore(String uid, double delta);

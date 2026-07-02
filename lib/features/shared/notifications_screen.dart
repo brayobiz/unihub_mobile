@@ -42,12 +42,19 @@ class NotificationsScreen extends ConsumerWidget {
         ),
         actions: [
           if (user != null)
-            TextButton(
-              onPressed: () => ref.read(notificationRepositoryProvider).markFeatureNotificationsAsRead(user.uid, module: module),
-              child: Text(
-                'Mark all read',
-                style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w600),
-              ),
+            Consumer(
+              builder: (context, ref, _) {
+                final unreadCount = ref.watch(unreadNotificationsCountProvider(module)).valueOrNull ?? 0;
+                if (unreadCount == 0) return const SizedBox.shrink();
+                
+                return TextButton(
+                  onPressed: () => _showMarkAllReadConfirmation(context, ref, user.uid),
+                  child: Text(
+                    'Mark all read',
+                    style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w600),
+                  ),
+                );
+              },
             ),
           const SizedBox(width: 8),
         ],
@@ -94,6 +101,33 @@ class NotificationsScreen extends ConsumerWidget {
     );
   }
 
+  void _showMarkAllReadConfirmation(BuildContext context, WidgetRef ref, String userId) {
+    final theme = Theme.of(context);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: theme.colorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Mark all as read?'),
+        content: Text(
+          module != null 
+            ? 'This will mark all ${module!.toLowerCase()} notifications as read.'
+            : 'This will mark all notifications as read.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              ref.read(notificationRepositoryProvider).markFeatureNotificationsAsRead(userId, module: module);
+              Navigator.pop(context);
+            },
+            child: Text('Mark Read', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   List<dynamic> _groupNotifications(List<UniNotification> notifications) {
     if (notifications.isEmpty) return [];
 
@@ -122,6 +156,7 @@ class _NotificationTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final aggregationCount = notification.metadata['aggregationCount'] as int? ?? 1;
     IconData iconData;
     Color iconColor;
     
@@ -212,6 +247,29 @@ class _NotificationTile extends ConsumerWidget {
                       color: AppColors.error,
                       shape: BoxShape.circle,
                       border: Border.all(color: theme.colorScheme.surface, width: 2),
+                    ),
+                  ),
+                ),
+              if (aggregationCount > 1 && !notification.isRead)
+                Positioned(
+                  right: -2,
+                  bottom: -2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: theme.colorScheme.surface, width: 2),
+                    ),
+                    constraints: const BoxConstraints(minWidth: 16),
+                    child: Text(
+                      aggregationCount > 9 ? '9+' : '$aggregationCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w900,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ),
                 ),
@@ -428,10 +486,15 @@ class _NotificationTile extends ConsumerWidget {
       switch (n.type) {
         case NotificationType.chat:
         case NotificationType.support:
-          context.push('/chat', extra: {
-            'conversationId': n.targetId,
-            'otherUserName': n.actorName ?? (n.type == NotificationType.support ? 'UniHub Support' : 'Message'),
-          });
+          final isAdmin = ref.read(appUserProvider).valueOrNull?.isAdmin ?? false;
+          if (isAdmin && n.type == NotificationType.support) {
+            context.push('/admin/support/${n.targetId}');
+          } else {
+            context.push('/chat', extra: {
+              'conversationId': n.targetId,
+              'otherUserName': n.actorName ?? (n.type == NotificationType.support ? 'UniHub Support' : 'Message'),
+            });
+          }
           break;
 
         case NotificationType.marketplace:

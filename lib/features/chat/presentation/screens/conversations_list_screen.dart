@@ -65,9 +65,10 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
             child: conversationsAsync.when(
               data: (conversations) {
                 final filtered = conversations.where((c) {
-                  final titleMatch = c.context.title.toLowerCase().contains(_searchQuery.toLowerCase());
-                  // In a real app, we'd also search participant names, but that requires more data loading here
-                  return titleMatch;
+                  final titleMatch = c.context?.title.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false;
+                  final typeMatch = c.context?.type.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false;
+                  final lastMessageMatch = c.lastMessage?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false;
+                  return titleMatch || typeMatch || lastMessageMatch;
                 }).toList();
 
                 if (filtered.isEmpty) {
@@ -230,38 +231,39 @@ class _ConversationTile extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 2),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: _getContextColor(conversation.context.type).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      conversation.context.type.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                        color: _getContextColor(conversation.context.type),
+              if (conversation.context != null)
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _getContextColor(conversation.context!.type).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        conversation.context!.type.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: _getContextColor(conversation.context!.type),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      conversation.context.title,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w500,
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        conversation.context!.title,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
               const SizedBox(height: 4),
               Row(
                 children: [

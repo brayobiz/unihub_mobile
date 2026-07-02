@@ -3,25 +3,22 @@ import 'app_colors.dart';
 import 'app_typography.dart';
 
 /// The entry point for the UniHub Theming System.
-/// 
-/// This class provides the light and dark [ThemeData] and acts as the
-/// single source of truth for the application's appearance.
 class AppTheme {
   AppTheme._();
 
-  // Legacy constants kept for internal backward compatibility within this file
   static const Color primaryColor = AppColors.primary;
   static const Color secondaryColor = AppColors.secondary;
   static const Color backgroundColor = AppColors.scaffoldLight;
   static const Color cardColor = AppColors.white;
 
-  /// Returns the Light Theme for UniHub.
-  static ThemeData get lightTheme {
+  // Cache theme instances to prevent expensive recalculations during rebuilds
+  static final ThemeData lightTheme = _buildLightTheme();
+  static final ThemeData darkTheme = _buildDarkTheme();
+
+  static ThemeData _buildLightTheme() {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-
-      // Colors
       primaryColor: primaryColor,
       scaffoldBackgroundColor: backgroundColor,
       colorScheme: ColorScheme.fromSeed(
@@ -35,11 +32,7 @@ class AppTheme {
         onSurfaceVariant: AppColors.grey600,
         error: AppColors.error,
       ),
-
-      // Typography
       textTheme: AppTypography.lightTextTheme,
-
-      // Component Themes
       appBarTheme: _appBarThemeLight,
       cardTheme: _cardThemeLight,
       elevatedButtonTheme: _elevatedButtonTheme,
@@ -49,42 +42,36 @@ class AppTheme {
     );
   }
 
-  /// Returns the Dark Theme for UniHub.
-  static ThemeData get darkTheme {
+  static ThemeData _buildDarkTheme() {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-
-      // Colors
       colorScheme: ColorScheme.dark(
         primary: primaryColor,
         secondary: secondaryColor,
         surface: AppColors.backgroundDark,
         surfaceContainerHighest: AppColors.cardDark,
-        outlineVariant: AppColors.grey.withValues(alpha: 0.2),
+        outlineVariant: AppColors.grey.withOpacity(0.2),
         onSurface: Colors.white,
         onSurfaceVariant: Colors.white70,
         error: AppColors.error,
       ),
       scaffoldBackgroundColor: AppColors.backgroundDark,
-
-      // Typography
       textTheme: AppTypography.darkTextTheme,
-
-      // Component Themes
       appBarTheme: _appBarThemeDark,
       cardTheme: _cardThemeDark,
-      dividerTheme: DividerThemeData(color: AppColors.grey.withValues(alpha: 0.2)),
+      elevatedButtonTheme: _elevatedButtonTheme,
+      inputDecorationTheme: _inputDecorationThemeDark,
+      dividerTheme: DividerThemeData(color: AppColors.grey.withOpacity(0.2)),
     );
   }
-
-  // --- COMPONENT THEME DEFINITIONS ---
 
   static AppBarTheme get _appBarThemeLight => AppBarTheme(
     backgroundColor: AppColors.white,
     elevation: 0,
     centerTitle: true,
     iconTheme: const IconThemeData(color: AppColors.black),
+    actionsIconTheme: const IconThemeData(color: AppColors.black),
     titleTextStyle: TextStyle(
       color: AppColors.black,
       fontSize: 18,
@@ -93,10 +80,18 @@ class AppTheme {
     ),
   );
 
-  static AppBarTheme get _appBarThemeDark => const AppBarTheme(
+  static AppBarTheme get _appBarThemeDark => AppBarTheme(
     backgroundColor: AppColors.backgroundDark,
     elevation: 0,
     centerTitle: true,
+    iconTheme: const IconThemeData(color: Colors.white),
+    actionsIconTheme: const IconThemeData(color: Colors.white),
+    titleTextStyle: TextStyle(
+      color: Colors.white,
+      fontSize: 18,
+      fontWeight: FontWeight.bold,
+      fontFamily: AppTypography.fontFamily,
+    ),
   );
 
   static CardThemeData get _cardThemeLight => CardThemeData(
@@ -151,6 +146,29 @@ class AppTheme {
       borderSide: const BorderSide(color: AppColors.error),
     ),
     hintStyle: const TextStyle(color: AppColors.grey400, fontSize: 14),
+  );
+
+  static InputDecorationTheme get _inputDecorationThemeDark => InputDecorationTheme(
+    filled: true,
+    fillColor: AppColors.cardDark,
+    contentPadding: const EdgeInsets.all(16),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide.none,
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: AppColors.grey.withOpacity(0.2)),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: primaryColor, width: 2),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.error),
+    ),
+    hintStyle: const TextStyle(color: AppColors.grey600, fontSize: 14),
   );
 
   static IconThemeData get _iconThemeLight => const IconThemeData(

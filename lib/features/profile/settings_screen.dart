@@ -7,7 +7,10 @@ import '../../../services/notification_service.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import 'package:unihub_mobile/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:unihub_mobile/features/marketplace/shared/providers.dart';
 import 'package:unihub_mobile/app/theme/theme_provider.dart';
+import '../admin/shared/providers.dart';
+import '../admin/domain/models/system_settings.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -18,6 +21,7 @@ class SettingsScreen extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
     final userAsync = ref.watch(appUserProvider);
     final authState = ref.watch(authControllerProvider);
+    final settingsAsync = ref.watch(systemSettingsProvider);
 
     ref.listen<AsyncValue<void>>(authControllerProvider, (previous, next) {
       next.whenOrNull(
@@ -53,7 +57,7 @@ class SettingsScreen extends ConsumerWidget {
             centerTitle: true,
           ),
           body: userAsync.when(
-            data: (user) => _buildBody(context, ref, user, themeMode),
+            data: (user) => _buildBody(context, ref, user, themeMode, settingsAsync),
             loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
             error: (err, _) => Center(child: Text('Error: $err')),
           ),
@@ -67,7 +71,7 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildBody(BuildContext context, WidgetRef ref, AppUser? user, ThemeMode themeMode) {
+  Widget _buildBody(BuildContext context, WidgetRef ref, AppUser? user, ThemeMode themeMode, AsyncValue<SystemSettings> settingsAsync) {
     final theme = Theme.of(context);
     return ListView(
       physics: const BouncingScrollPhysics(),
@@ -130,18 +134,10 @@ class SettingsScreen extends ConsumerWidget {
           const Divider(height: 1, indent: 50),
           _buildSettingTile(
             context,
-            icon: Icons.contact_mail_outlined,
-            title: 'Show Social Links',
-            subtitle: 'Visible on your seller profile',
-            trailing: Switch.adaptive(
-              value: user?.privacySettings['show_socials'] != 'private',
-              activeTrackColor: theme.colorScheme.primary,
-              onChanged: (val) {
-                if (user != null) {
-                  _updatePrivacySetting(ref, user.uid, 'show_socials', val ? 'university' : 'private');
-                }
-              },
-            ),
+            icon: Icons.block_flipped,
+            title: 'Blocked Users',
+            subtitle: 'Manage people you\'ve blocked',
+            onTap: () => _showBlockedUsersDialog(context, ref, user!),
           ),
         ]),
 
@@ -156,6 +152,8 @@ class SettingsScreen extends ConsumerWidget {
           _buildSwitchTile(context, icon: Icons.menu_book_outlined, title: 'Study Notes', value: user?.notificationSettings['notes'] ?? true, onChanged: (val) => user != null ? _updateNotificationSetting(ref, user.uid, 'notes', val) : null),
           const Divider(height: 1, indent: 50),
           _buildSwitchTile(context, icon: Icons.electrical_services_outlined, title: 'Plug Requests', value: user?.notificationSettings['plug'] ?? true, onChanged: (val) => user != null ? _updateNotificationSetting(ref, user.uid, 'plug', val) : null),
+          const Divider(height: 1, indent: 50),
+          _buildSwitchTile(context, icon: Icons.work_outline_rounded, title: 'Gigs & Opportunities', value: user?.notificationSettings['gigs'] ?? true, onChanged: (val) => user != null ? _updateNotificationSetting(ref, user.uid, 'gigs', val) : null),
           const Divider(height: 1, indent: 50),
           _buildSwitchTile(context, icon: Icons.star_outline_rounded, title: 'Reviews & Feedback', value: user?.notificationSettings['reviews'] ?? true, onChanged: (val) => user != null ? _updateNotificationSetting(ref, user.uid, 'reviews', val) : null),
           const Divider(height: 1, indent: 50),
@@ -192,13 +190,35 @@ class SettingsScreen extends ConsumerWidget {
         _buildSettingsCard(context, [
           _buildSettingTile(context, icon: Icons.help_outline_rounded, title: 'Help Centre', onTap: () => context.push('/help')),
           const Divider(height: 1, indent: 50),
-          _buildSettingTile(context, icon: Icons.policy_outlined, title: 'Privacy Policy', onTap: () => _launchPrivacyPolicy()),
+          _buildSettingTile(
+            context, 
+            icon: Icons.policy_outlined, 
+            title: 'Privacy Policy', 
+            onTap: () {
+              final url = settingsAsync.valueOrNull?.privacyPolicyUrl ?? 'https://unihub-3663e.web.app/privacy';
+              _launchUrl(url);
+            },
+          ),
+          const Divider(height: 1, indent: 50),
+          _buildSettingTile(
+            context, 
+            icon: Icons.gavel_outlined, 
+            title: 'Terms of Service', 
+            onTap: () {
+              final url = settingsAsync.valueOrNull?.termsOfServiceUrl ?? 'https://unihub-3663e.web.app/terms';
+              _launchUrl(url);
+            },
+          ),
         ]),
 
         const SizedBox(height: 32),
         Center(child: Column(children: [
           TextButton(onPressed: () => _showSignOutDialog(context, ref), child: const Text('Sign Out', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold))),
-          Text('UniHub v1.2.5 (Stable)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: 12)),
+          settingsAsync.when(
+            data: (settings) => Text('UniHub v${settings.appVersion} (Stable)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: 12)),
+            loading: () => Text('UniHub v1.2.5 (Stable)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: 12)),
+            error: (_, __) => Text('UniHub v1.2.5 (Stable)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: 12)),
+          ),
         ])),
         const SizedBox(height: 60),
       ],
@@ -207,32 +227,52 @@ class SettingsScreen extends ConsumerWidget {
 
   Widget _buildSectionHeader(BuildContext context, String title) {
     final theme = Theme.of(context);
-    return Padding(padding: const EdgeInsets.fromLTRB(10, 24, 20, 12), child: Text(title.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7), letterSpacing: 1.2)));
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 24, 20, 12), 
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          fontSize: 11, 
+          fontWeight: FontWeight.w800, 
+          color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), 
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
   }
 
   Widget _buildSettingsCard(BuildContext context, List<Widget> children) {
     final theme = Theme.of(context);
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))
-        ],
+        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.3)),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(children: children),
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(children: children),
+      ),
     );
   }
 
   Widget _buildSettingTile(BuildContext context, {required IconData icon, required String title, String? subtitle, Widget? trailing, VoidCallback? onTap, Color? titleColor}) {
     final theme = Theme.of(context);
     return ListTile(
-      leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: (titleColor ?? theme.colorScheme.primary).withValues(alpha: 0.05), borderRadius: BorderRadius.circular(10)), child: Icon(icon, size: 20, color: titleColor ?? theme.colorScheme.primary)),
+      leading: Container(
+        padding: const EdgeInsets.all(8), 
+        decoration: BoxDecoration(
+          color: (titleColor ?? theme.colorScheme.primary).withOpacity(0.08), 
+          borderRadius: BorderRadius.circular(10)
+        ), 
+        child: Icon(icon, size: 20, color: titleColor ?? theme.colorScheme.primary)
+      ),
       title: Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: titleColor ?? theme.colorScheme.onSurface)),
-      subtitle: subtitle != null ? Text(subtitle, style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7))) : null,
-      trailing: trailing ?? Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+      subtitle: subtitle != null ? Text(subtitle, style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7))) : null,
+      trailing: trailing ?? Icon(Icons.chevron_right_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.4)),
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     );
@@ -271,6 +311,71 @@ class SettingsScreen extends ConsumerWidget {
       _visibilityOption(context, ref, user, 'private', 'Private', 'Hidden from all users', Icons.lock_outline),
       const SizedBox(height: 20),
     ])));
+  }
+
+  void _showBlockedUsersDialog(BuildContext context, WidgetRef ref, AppUser user) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.9,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (context, scrollController) => Container(
+          padding: const EdgeInsets.all(30),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Blocked Users', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+              const SizedBox(height: 12),
+              Text('You will not see messages or listings from these people.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+              const SizedBox(height: 24),
+              Expanded(
+                child: user.blockedUids.isEmpty 
+                  ? Center(child: Text('No blocked users.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)))
+                  : ListView.builder(
+                      controller: scrollController,
+                      itemCount: user.blockedUids.length,
+                      itemBuilder: (context, index) {
+                        final blockedUid = user.blockedUids[index];
+                        return Consumer(
+                          builder: (context, ref, child) {
+                            final userAsync = ref.watch(otherUserProvider(blockedUid));
+                            return userAsync.when(
+                              data: (u) => ListTile(
+                                leading: CircleAvatar(
+                                  backgroundImage: u.photoUrl != null ? NetworkImage(u.photoUrl!) : null,
+                                  child: u.photoUrl == null ? Text(u.fullName[0].toUpperCase()) : null,
+                                ),
+                                title: Text(u.fullName),
+                                trailing: TextButton(
+                                  onPressed: () => ref.read(authControllerProvider.notifier).unblockUser(blockedUid),
+                                  child: const Text('Unblock', style: TextStyle(color: AppColors.success)),
+                                ),
+                              ),
+                              loading: () => const ListTile(title: Text('Loading...')),
+                              error: (_, __) => ListTile(
+                                title: Text('Unknown User ($blockedUid)'),
+                                trailing: TextButton(
+                                  onPressed: () => ref.read(authControllerProvider.notifier).unblockUser(blockedUid),
+                                  child: const Text('Unblock', style: TextStyle(color: AppColors.success)),
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _visibilityOption(BuildContext context, WidgetRef ref, AppUser user, String value, String title, String subtitle, IconData icon) {
@@ -315,9 +420,15 @@ class SettingsScreen extends ConsumerWidget {
     ]));
   }
 
-  Future<void> _launchPrivacyPolicy() async {
-    final Uri url = Uri.parse('https://unihub-mobile.web.app/privacy');
-    if (!await launchUrl(url)) { debugPrint('Could not launch $url'); }
+  Future<void> _launchUrl(String urlString) async {
+    final Uri url = Uri.parse(urlString);
+    try {
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) { 
+        debugPrint('Could not launch $url'); 
+      }
+    } catch (e) {
+      debugPrint('Error launching URL: $e');
+    }
   }
 }
 

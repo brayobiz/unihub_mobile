@@ -7,6 +7,9 @@ import '../../shared/providers.dart';
 import 'note_card.dart';
 import '../../../../core/utils/debouncer.dart';
 import '../../domain/models/note.dart';
+import '../../../campus_filter/shared/providers.dart';
+import '../../../campus_filter/domain/models/browsing_scope.dart';
+import 'package:unihub_mobile/features/ads/ads_module.dart';
 
 class DiscoverTab extends ConsumerStatefulWidget {
   const DiscoverTab({super.key});
@@ -40,6 +43,7 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
     final searchQuery = ref.watch(notesSearchQueryProvider);
 
     final isSearching = searchQuery.isNotEmpty || selectedCategory != 'All';
+    const int adInterval = AdConfig.notesAdInterval;
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -56,67 +60,95 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
             ),
           ),
           
-          if (!isSearching) ...[
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-              sliver: SliverToBoxAdapter(
-                child: Row(
-                  children: [
-                    Text(
-                      'All Resources',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontSize: 18, 
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: -0.5,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                    const Spacer(),
-                    if (user?.university != null)
-                      Text(
-                        'at ${user?.university}',
-                        style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w600),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-
-          if (isSearching)
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-              sliver: SliverToBoxAdapter(
-                child: Text(
-                  'Search Results',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontSize: 18, 
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: -0.5,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-              ),
-            ),
-
           // Main List
           notesAsync.when(
-            data: (notes) => notes.isEmpty 
-              ? SliverToBoxAdapter(child: _buildEmptyState(context))
-              : SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) => NoteCard(
-                        index: index,
-                        note: notes[index],
-                        userUniversity: user?.university,
-                        onTap: () => _handleNoteTap(notes[index]),
+            data: (notes) {
+              if (notes.isEmpty) return SliverToBoxAdapter(child: _buildEmptyState(context));
+              
+              return SliverMainAxisGroup(
+                slivers: [
+                  if (!isSearching)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+                      sliver: SliverToBoxAdapter(
+                        child: Row(
+                          children: [
+                            Text(
+                              'All Resources',
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontSize: 18, 
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: -0.5,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                            const Spacer(),
+                            if (user?.university != null)
+                              Text(
+                                'at ${user?.university}',
+                                style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w600),
+                              ),
+                          ],
+                        ),
                       ),
-                      childCount: notes.length,
+                    ),
+                  if (isSearching)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                      sliver: SliverToBoxAdapter(
+                        child: Text(
+                          'Search Results',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontSize: 18, 
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.5,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                    ),
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          // Check if we should show a banner at the very end
+                          final bool isLast = index == (notes.length + (notes.length ~/ adInterval));
+                          if (isLast && notes.length >= 3) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 24),
+                              child: BannerAdWidget(),
+                            );
+                          }
+
+                          // If it's an ad position within the list
+                          if ((index + 1) % (adInterval + 1) == 0) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 20),
+                              child: const BannerAdWidget(),
+                            );
+                          }
+
+                          // Calculate the actual note index by subtracting the number of ads before it
+                          final int itemIndex = index - (index ~/ (adInterval + 1));
+                          
+                          if (itemIndex >= notes.length) return null;
+
+                          return NoteCard(
+                            index: itemIndex,
+                            note: notes[itemIndex],
+                            userUniversity: user?.university,
+                            onTap: () => _handleNoteTap(notes[itemIndex]),
+                          );
+                        },
+                        // Increase child count to include injected ads + potential bottom ad
+                        childCount: notes.length + (notes.length ~/ adInterval) + (notes.length >= 3 ? 1 : 0),
+                      ),
                     ),
                   ),
-                ),
+                ],
+              );
+            },
             loading: () => SliverFillRemaining(
               child: Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
             ),
@@ -253,11 +285,28 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
             style: TextStyle(color: theme.colorScheme.onSurfaceVariant, height: 1.6),
           ),
           const SizedBox(height: 32),
-          if (query.isNotEmpty || category != 'All')
-            TextButton.icon(
-              onPressed: _resetFilters,
-              icon: Icon(Icons.refresh, color: theme.colorScheme.primary),
-              label: Text('Clear all filters', style: TextStyle(color: theme.colorScheme.primary)),
+          if (query.isNotEmpty || category != 'All' || ref.read(browsingScopeProvider).type != BrowsingScopeType.all)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton.icon(
+                  onPressed: _resetFilters,
+                  icon: Icon(Icons.refresh, color: theme.colorScheme.primary),
+                  label: Text('Clear Filters', style: TextStyle(color: theme.colorScheme.primary)),
+                ),
+                const SizedBox(width: 12),
+                FilledButton.icon(
+                  onPressed: () {
+                    _resetFilters();
+                    ref.read(browsingScopeProvider.notifier).reset();
+                  },
+                  icon: const Icon(Icons.public, size: 18),
+                  label: const Text('Explore All'),
+                  style: FilledButton.styleFrom(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
             ),
         ],
       ),

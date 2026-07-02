@@ -10,6 +10,7 @@ import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../auth/shared/providers.dart';
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
+import 'package:unihub_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import '../../domain/models/listing.dart';
 import '../../domain/models/offer.dart';
 import '../../shared/providers.dart';
@@ -394,9 +395,9 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.5)),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -413,17 +414,20 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
   }
 
   Widget _buildPriceBadge(Listing listing) {
+    final theme = Theme.of(context);
     final isNegotiable = listing.isNegotiable;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: isNegotiable ? AppColors.negotiableBg : Colors.grey.withOpacity(0.1),
+        color: isNegotiable 
+            ? AppColors.marketplaceBlue.withValues(alpha: 0.1) 
+            : theme.colorScheme.onSurface.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         isNegotiable ? 'Negotiable' : 'Fixed Price',
         style: TextStyle(
-          color: isNegotiable ? AppColors.marketplaceBlue : AppColors.grey, 
+          color: isNegotiable ? AppColors.marketplaceBlue : theme.colorScheme.onSurfaceVariant, 
           fontSize: 12, 
           fontWeight: FontWeight.bold
         ),
@@ -432,6 +436,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
   }
 
   Widget _buildConditionSection(Listing listing) {
+    final theme = Theme.of(context);
     final cond = listing.condition;
     String label;
     String explanation;
@@ -463,7 +468,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -471,7 +476,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(Icons.check_circle_outline_rounded, color: color, size: 20),
@@ -483,12 +488,12 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
               children: [
                 Text(
                   label,
-                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 15),
+                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   explanation,
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
                 ),
               ],
             ),
@@ -610,6 +615,8 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                   ),
                   const SizedBox(width: 12),
                   _buildCircleButton(Icons.report_gmailerrorred_rounded, () => _showReportDialog(listing)),
+                  const SizedBox(width: 12),
+                  _buildBlockActionButton(listing.sellerId),
                 ],
               ),
             ),
@@ -650,7 +657,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -660,6 +667,46 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
         icon: Icon(icon, color: iconColor ?? theme.colorScheme.onSurface, size: 20),
         onPressed: onTap,
         padding: EdgeInsets.zero,
+      ),
+    );
+  }
+
+  Widget _buildBlockActionButton(String sellerId) {
+    final user = ref.watch(appUserProvider).valueOrNull;
+    if (user == null || user.uid == sellerId) return const SizedBox.shrink();
+    
+    final isBlocked = user.blockedUids.contains(sellerId);
+    
+    return _buildCircleButton(
+      isBlocked ? Icons.block_flipped : Icons.block_outlined, 
+      () {
+        if (isBlocked) {
+          ref.read(authControllerProvider.notifier).unblockUser(sellerId);
+        } else {
+          _showBlockConfirmation(sellerId);
+        }
+      },
+      iconColor: isBlocked ? AppColors.success : AppColors.error,
+    );
+  }
+
+  void _showBlockConfirmation(String sellerId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Block Seller?'),
+        content: const Text('You will no longer see listings or receive messages from this student.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              ref.read(authControllerProvider.notifier).blockUser(sellerId);
+              Navigator.pop(context);
+              context.pop(); // Go back to marketplace
+            }, 
+            child: const Text('Block', style: TextStyle(color: AppColors.error))
+          ),
+        ],
       ),
     );
   }
@@ -674,14 +721,14 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: AppColors.verifiedSellerBg,
+                color: AppColors.success.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.verified, color: AppColors.verifiedSellerIcon, size: 14),
+                  Icon(Icons.verified, color: AppColors.success, size: 14),
                   SizedBox(width: 4),
-                  Text('Verified Seller', style: TextStyle(color: AppColors.verifiedSellerIcon, fontSize: 11, fontWeight: FontWeight.bold)),
+                  Text('Verified Seller', style: TextStyle(color: AppColors.success, fontSize: 11, fontWeight: FontWeight.bold)),
                 ],
               ),
             )
@@ -689,7 +736,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -710,11 +757,11 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
               if (listing.updatedAt != null)
                 Text(
                   'Updated ${DateFormatter.formatRelative(listing.updatedAt!)}',
-                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), fontSize: 10),
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10),
                 ),
               Text(
                 '${listing.viewsCount} views',
-                style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), fontSize: 10),
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10),
               ),
             ],
           ),
@@ -856,8 +903,16 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
       data: (seller) => Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: theme.colorScheme.outlineVariant),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           children: [
@@ -867,7 +922,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                 CircleAvatar(
                   radius: 30,
                   backgroundImage: seller.photoUrl != null ? NetworkImage(seller.photoUrl!) : null,
-                  backgroundColor: theme.colorScheme.surfaceVariant,
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -879,7 +934,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                           Flexible(
                             child: Text(
                               seller.fullName, 
-                              style: GoogleFonts.plusJakartaSans(
+                              style: theme.textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.bold, 
                                 fontSize: 16,
                                 color: theme.colorScheme.onSurface,
@@ -901,7 +956,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                                 borderRadius: BorderRadius.circular(6),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.orange.withOpacity(0.3),
+                                    color: Colors.orange.withValues(alpha: 0.3),
                                     blurRadius: 4,
                                     offset: const Offset(0, 2),
                                   ),
@@ -947,7 +1002,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                     onPressed: () => context.push('/seller-profile', extra: listing.sellerId),
                     style: OutlinedButton.styleFrom(
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      side: BorderSide(color: theme.colorScheme.outlineVariant),
+                      side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.8)),
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       minimumSize: const Size(0, 36),
                     ),
@@ -999,12 +1054,13 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppColors.safetyBannerBg,
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
         ),
         child: Row(
           children: [
-            const Icon(Icons.shield_outlined, color: AppColors.verifiedSellerIcon),
+            const Icon(Icons.shield_outlined, color: AppColors.success),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -1025,7 +1081,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: theme.colorScheme.outlineVariant),
+            Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
           ],
         ),
       ),

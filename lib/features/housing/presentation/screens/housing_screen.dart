@@ -14,6 +14,11 @@ import 'package:unihub_mobile/features/trust/domain/models/verification_applicat
 import 'package:unihub_mobile/features/trust/presentation/providers/trust_providers.dart';
 import 'package:unihub_mobile/features/housing/presentation/widgets/housing_card.dart';
 import 'package:unihub_mobile/features/housing/domain/models/housing_listing.dart';
+import 'package:unihub_mobile/features/announcements/presentation/widgets/announcement_display.dart';
+import 'package:unihub_mobile/features/campus_filter/presentation/widgets/campus_filter_selector.dart';
+import 'package:unihub_mobile/features/campus_filter/shared/providers.dart';
+import 'package:unihub_mobile/features/campus_filter/domain/models/browsing_scope.dart';
+import 'package:unihub_mobile/features/ads/ads_module.dart';
 
 class HousingScreen extends ConsumerStatefulWidget {
   const HousingScreen({super.key});
@@ -91,6 +96,9 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
           controller: _scrollController,
           slivers: [
           _buildSliverAppBar(isVerifiedPlug),
+          const SliverToBoxAdapter(
+            child: RelevantAnnouncementsWidget(feature: 'housing'),
+          ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
@@ -98,6 +106,8 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildSearchBar(),
+                  const SizedBox(height: 16),
+                  const CampusFilterSelector(),
                   if (_searchController.text.isEmpty && _recentSearches.isNotEmpty) ...[
                     const SizedBox(height: 16),
                     _buildRecentSearches(),
@@ -121,12 +131,11 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
                   const SizedBox(height: 24),
                   if (locationFilter == null || locationFilter.isEmpty) ...[
                     _buildFeaturedSection(),
-                    const SizedBox(height: 32),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: BannerAdWidget(),
+                    ),
                   ],
-                  _buildSectionTitle(locationFilter != null && locationFilter.isNotEmpty 
-                      ? 'Search Results' 
-                      : 'Recently Added'),
-                  const SizedBox(height: 16),
                   _buildListingsList(),
                 ],
               ),
@@ -136,6 +145,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
       ),
     ),
       floatingActionButton: isVerifiedPlug ? FloatingActionButton.extended(
+        heroTag: 'housing_fab',
         onPressed: () => context.push('/add-housing'),
         backgroundColor: theme.colorScheme.primary,
         elevation: 4,
@@ -654,23 +664,62 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
 
   Widget _buildListingsList() {
     final listingsAsync = ref.watch(topHousingProvider);
+    final locationFilter = ref.watch(housingLocationFilterProvider);
     
     return listingsAsync.when(
-      data: (listings) => listings.isEmpty
-          ? _buildEmptyState()
-          : ListView.builder(
-              shrinkWrap: true,
-              padding: EdgeInsets.zero,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: listings.length,
-              itemBuilder: (context, index) => HousingCard(
-                listing: listings[index],
-                onTap: () => context.push('/housing-detail', extra: listings[index]),
-              ),
-            ),
+      data: (listings) {
+        if (listings.isEmpty) return _buildEmptyState();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 32),
+            _buildSectionTitle(locationFilter != null && locationFilter.isNotEmpty 
+                ? 'Search Results' 
+                : 'Recently Added'),
+            const SizedBox(height: 16),
+            ..._buildListingsWithAds(listings),
+          ],
+        );
+      },
       loading: () => _buildListingsSkeleton(),
       error: (e, _) => Center(child: Text('Error loading listings: $e')),
     );
+  }
+
+  List<Widget> _buildListingsWithAds(List<HousingListing> listings) {
+    final List<Widget> children = [];
+    const int adInterval = AdConfig.housingAdInterval;
+
+    for (int i = 0; i < listings.length; i++) {
+      children.add(
+        HousingCard(
+          listing: listings[i],
+          onTap: () => context.push('/housing-detail', extra: listings[i]),
+        ),
+      );
+
+      if ((i + 1) % adInterval == 0 && (i + 1) < listings.length) {
+        children.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: const BannerAdWidget(),
+          ),
+        );
+      }
+    }
+
+    // Always add a banner at the bottom of a substantial list
+    if (listings.length >= 5) {
+      children.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 12, bottom: 32),
+          child: const BannerAdWidget(),
+        ),
+      );
+    }
+
+    return children;
   }
 
   Widget _buildEmptyState() {
@@ -692,18 +741,38 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
           const SizedBox(height: 8),
           Text('Try adjusting your search or filters', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500)),
           const SizedBox(height: 24),
-          OutlinedButton(
-            onPressed: () {
-              _searchController.clear();
-              ref.read(housingLocationFilterProvider.notifier).state = null;
-              ref.read(housingTypeFilterProvider.notifier).state = null;
-              ref.read(housingGenderFilterProvider.notifier).state = null;
-              setState(() {});
-            },
-            style: OutlinedButton.styleFrom(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Clear all filters'),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              OutlinedButton(
+                onPressed: () {
+                  _searchController.clear();
+                  ref.read(housingLocationFilterProvider.notifier).state = null;
+                  ref.read(housingTypeFilterProvider.notifier).state = null;
+                  ref.read(housingGenderFilterProvider.notifier).state = null;
+                  setState(() {});
+                },
+                style: OutlinedButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Clear Filters'),
+              ),
+              const SizedBox(width: 12),
+              FilledButton(
+                onPressed: () {
+                  _searchController.clear();
+                  ref.read(housingLocationFilterProvider.notifier).state = null;
+                  ref.read(housingTypeFilterProvider.notifier).state = null;
+                  ref.read(housingGenderFilterProvider.notifier).state = null;
+                  ref.read(browsingScopeProvider.notifier).reset();
+                  setState(() {});
+                },
+                style: FilledButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Explore All'),
+              ),
+            ],
           ),
         ],
       ),

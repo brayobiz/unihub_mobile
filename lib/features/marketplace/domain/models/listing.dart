@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../../core/constants/campus_constants.dart';
 import 'price_history.dart';
 
 enum ListingCondition { newCondition, likeNew, good, fair }
@@ -149,7 +150,7 @@ class Listing {
       id: safeString(json['id'], ''),
       sellerId: safeString(json['sellerId'] ?? json['seller_id'], ''),
       sellerName: safeString(json['sellerName'] ?? json['seller_name'], 'Student'),
-      sellerUniversity: safeString(json['sellerUniversity'] ?? json['seller_university'], ''),
+      sellerUniversity: CampusConstants.resolveToId(safeString(json['sellerUniversity'] ?? json['seller_university'], '')) ?? safeString(json['sellerUniversity'] ?? json['seller_university'], ''),
       sellerTrustScore: safeDouble(json['sellerTrustScore'] ?? json['trust_score'], 100.0),
       title: safeString(json['title'], ''),
       description: safeString(json['description'], ''),

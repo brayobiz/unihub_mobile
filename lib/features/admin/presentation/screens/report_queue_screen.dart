@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../layout/admin_layout.dart';
+import '../../../auth/shared/providers.dart';
 import '../../domain/models/report.dart';
 import '../../shared/providers.dart';
 
@@ -19,6 +20,66 @@ class _ReportQueueScreenState extends ConsumerState<ReportQueueScreen> {
   ReportType? _selectedType;
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  final Set<String> _selectedIds = {};
+  bool _isBulkProcessing = false;
+
+  void _toggleSelection(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+      } else {
+        _selectedIds.add(id);
+      }
+    });
+  }
+
+  Future<void> _handleBulkAction(String action, List<AdminReport> reports) async {
+    final selectedReports = reports.where((r) => _selectedIds.contains(r.id)).toList();
+    if (selectedReports.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Bulk $action'),
+        content: Text('Are you sure you want to $action ${selectedReports.length} reports?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm')),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isBulkProcessing = true);
+    try {
+      final admin = ref.read(appUserProvider).valueOrNull;
+      if (admin == null) throw Exception('Admin session not found');
+
+      await ref.read(adminRepositoryProvider).bulkResolveReports(
+        reports: selectedReports,
+        action: action,
+        adminId: admin.uid,
+        adminName: admin.fullName,
+      );
+      
+      setState(() {
+        _selectedIds.clear();
+        _isBulkProcessing = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Bulk $action completed successfully')),
+        );
+      }
+    } catch (e) {
+      setState(() => _isBulkProcessing = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -34,7 +95,7 @@ class _ReportQueueScreenState extends ConsumerState<ReportQueueScreen> {
       title: 'Moderation Queue',
       child: Column(
         children: [
-          _buildFilters(reportsAsync.valueOrNull?.length ?? 0),
+          _buildFilters(reportsAsync.valueOrNull?.length ?? 0, reportsAsync.valueOrNull ?? []),
           _buildSearchBar(),
           Expanded(
             child: reportsAsync.when(
@@ -54,7 +115,7 @@ class _ReportQueueScreenState extends ConsumerState<ReportQueueScreen> {
   Widget _buildSearchBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
@@ -68,6 +129,7 @@ class _ReportQueueScreenState extends ConsumerState<ReportQueueScreen> {
             : null,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           contentPadding: const EdgeInsets.symmetric(vertical: 0),
+          fillColor: Theme.of(context).colorScheme.surface,
         ),
         onChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
       ),
@@ -84,45 +146,86 @@ class _ReportQueueScreenState extends ConsumerState<ReportQueueScreen> {
     ).toList();
   }
 
-  Widget _buildFilters(int count) {
+  Widget _buildFilters(int count, List<AdminReport> reports) {
     return Container(
       padding: const EdgeInsets.all(16),
-      color: Colors.white,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            const Text('Status: ', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(width: 8),
-            DropdownButton<ReportStatus?>(
-              value: _selectedStatus,
-              items: [
-                const DropdownMenuItem(value: null, child: Text('All')),
-                ...ReportStatus.values.map((s) => DropdownMenuItem(
-                  value: s,
-                  child: Text(s.name[0].toUpperCase() + s.name.substring(1)),
-                )),
+      color: Theme.of(context).cardColor,
+      child: Column(
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                const Text('Status: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(width: 8),
+                DropdownButton<ReportStatus?>(
+                  value: _selectedStatus,
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('All')),
+                    ...ReportStatus.values.map((s) => DropdownMenuItem(
+                      value: s,
+                      child: Text(s.name[0].toUpperCase() + s.name.substring(1)),
+                    )),
+                  ],
+                  onChanged: (val) => setState(() => _selectedStatus = val),
+                ),
+                const SizedBox(width: 24),
+                const Text('Feature: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(width: 8),
+                DropdownButton<ReportType?>(
+                  value: _selectedType,
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('All')),
+                    ...ReportType.values.map((t) => DropdownMenuItem(
+                      value: t,
+                      child: Text(t.name[0].toUpperCase() + t.name.substring(1)),
+                    )),
+                  ],
+                  onChanged: (val) => setState(() => _selectedType = val),
+                ),
+                const SizedBox(width: 24),
+                Text('$count Reports Found', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
               ],
-              onChanged: (val) => setState(() => _selectedStatus = val),
             ),
-            const SizedBox(width: 24),
-            const Text('Feature: ', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(width: 8),
-            DropdownButton<ReportType?>(
-              value: _selectedType,
-              items: [
-                const DropdownMenuItem(value: null, child: Text('All')),
-                ...ReportType.values.map((t) => DropdownMenuItem(
-                  value: t,
-                  child: Text(t.name[0].toUpperCase() + t.name.substring(1)),
-                )),
-              ],
-              onChanged: (val) => setState(() => _selectedType = val),
+          ),
+          if (_selectedIds.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  Text('${_selectedIds.length} Selected', 
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                  const SizedBox(width: 16),
+                  if (_isBulkProcessing) 
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                    )
+                  else ...[
+                    TextButton.icon(
+                      onPressed: () => _handleBulkAction('resolve', reports),
+                      icon: const Icon(Icons.check_circle_outline, color: AppColors.success),
+                      label: const Text('Resolve Selected', style: TextStyle(color: AppColors.success)),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      onPressed: () => _handleBulkAction('dismiss', reports),
+                      icon: const Icon(Icons.close, color: AppColors.grey600),
+                      label: const Text('Dismiss Selected', style: TextStyle(color: AppColors.grey600)),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: () => setState(() => _selectedIds.clear()),
+                      icon: const Icon(Icons.close),
+                      tooltip: 'Clear Selection',
+                    ),
+                  ],
+                ],
+              ),
             ),
-            const SizedBox(width: 24),
-            Text('$count Reports Found', style: const TextStyle(color: AppColors.grey600)),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -147,7 +250,17 @@ class _ReportQueueScreenState extends ConsumerState<ReportQueueScreen> {
       separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final report = reports[index];
-        return _ReportListItem(report: report);
+        final isSelected = _selectedIds.contains(report.id);
+
+        return Row(
+          children: [
+            Checkbox(
+              value: isSelected,
+              onChanged: (_) => _toggleSelection(report.id),
+            ),
+            Expanded(child: _ReportListItem(report: report)),
+          ],
+        );
       },
     );
   }
@@ -164,7 +277,7 @@ class _ReportListItem extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.grey200),
+        side: BorderSide(color: Theme.of(context).dividerColor),
       ),
       child: InkWell(
         onTap: () => context.push('/admin/reports/${report.id}', extra: report),
@@ -196,7 +309,10 @@ class _ReportListItem extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       'Target ID: ${report.targetId ?? "User Report"}',
-                      style: const TextStyle(color: AppColors.grey600, fontSize: 12),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant, 
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
@@ -210,7 +326,10 @@ class _ReportListItem extends StatelessWidget {
                   ),
                   Text(
                     DateFormat('HH:mm').format(report.createdAt),
-                    style: const TextStyle(color: AppColors.grey600, fontSize: 12),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant, 
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),

@@ -3,7 +3,6 @@ import '../models/study_progress.dart';
 
 abstract class NotesRepository {
   Stream<List<NoteListing>> watchNotes({
-    String? university,
     String? subjectCategory,
     String? noteType,
     String? yearOfStudy,

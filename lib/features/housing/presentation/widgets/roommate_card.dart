@@ -11,6 +11,7 @@ class RoommateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final currencyFormat = NumberFormat.currency(symbol: 'KES ', decimalDigits: 0);
 
     return GestureDetector(
@@ -54,7 +55,7 @@ class RoommateCard extends StatelessWidget {
                         children: [
                           Text(
                             profile.name,
-                            style: GoogleFonts.plusJakartaSans(
+                            style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
@@ -62,12 +63,12 @@ class RoommateCard extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: Colors.indigo.shade50,
+                              color: theme.colorScheme.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
                               profile.gender,
-                              style: const TextStyle(color: Colors.indigo, fontSize: 10, fontWeight: FontWeight.bold),
+                              style: TextStyle(color: theme.colorScheme.primary, fontSize: 10, fontWeight: FontWeight.bold),
                             ),
                           ),
                         ],

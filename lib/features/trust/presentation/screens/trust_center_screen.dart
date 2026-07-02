@@ -12,15 +12,22 @@ class TrustCenterScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final appUserAsync = ref.watch(appUserProvider);
     final studentVerificationAsync = ref.watch(studentVerificationProvider);
     final identityVerificationAsync = ref.watch(identityVerificationProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
+        backgroundColor: theme.colorScheme.surface,
+        elevation: 0,
         title: Text('Trust & Verification', 
-          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+          )),
+        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
       ),
       body: appUserAsync.when(
         data: (user) {
@@ -31,7 +38,7 @@ class TrustCenterScreen extends ConsumerWidget {
             slivers: [
               // 1. Header & Explanation
               SliverToBoxAdapter(
-                child: _buildHeader(),
+                child: _buildHeader(context),
               ),
 
               // 2. Trust Score & Status
@@ -53,12 +60,12 @@ class TrustCenterScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Platform Verification',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
-                          color: Color(0xFF1E293B),
+                          color: theme.colorScheme.onSurface,
                           letterSpacing: -0.5,
                         ),
                       ),
@@ -67,7 +74,7 @@ class TrustCenterScreen extends ConsumerWidget {
                         'These verifications establish your identity across all of UniHub.',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.blueGrey.shade600,
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -86,7 +93,7 @@ class TrustCenterScreen extends ConsumerWidget {
                           padding: EdgeInsets.symmetric(vertical: 20),
                           child: Center(child: CircularProgressIndicator()),
                         ),
-                        error: (e, _) => _buildErrorCard('Student Status Error: $e'),
+                        error: (e, _) => _buildErrorCard(context, 'Student Status Error: $e'),
                       ),
                       const SizedBox(height: 12),
                       identityVerificationAsync.when(
@@ -95,7 +102,7 @@ class TrustCenterScreen extends ConsumerWidget {
                           padding: EdgeInsets.symmetric(vertical: 20),
                           child: Center(child: CircularProgressIndicator()),
                         ),
-                        error: (e, _) => _buildErrorCard('Identity Verification Error: $e'),
+                        error: (e, _) => _buildErrorCard(context, 'Identity Verification Error: $e'),
                       ),
                     ],
                   ),
@@ -106,7 +113,7 @@ class TrustCenterScreen extends ConsumerWidget {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: _buildEducationSection(),
+                  child: _buildEducationSection(context),
                 ),
               ),
 
@@ -120,23 +127,26 @@ class TrustCenterScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildErrorCard(String message) {
+  Widget _buildErrorCard(BuildContext context, String message) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
+        color: theme.colorScheme.errorContainer.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.error.withValues(alpha: 0.2)),
       ),
-      child: Text(message, style: const TextStyle(color: Colors.red)),
+      child: Text(message, style: TextStyle(color: theme.colorScheme.error)),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(32),
           bottomRight: Radius.circular(32),
         ),
@@ -146,19 +156,19 @@ class TrustCenterScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF1677F2).withOpacity(0.1),
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.verified_user_rounded, color: Color(0xFF1677F2), size: 40),
+            child: Icon(Icons.verified_user_rounded, color: theme.colorScheme.primary, size: 40),
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Single Identity, Total Trust',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w900,
-              color: Color(0xFF1E293B),
+              color: theme.colorScheme.onSurface,
               letterSpacing: -0.5,
             ),
           ),
@@ -168,7 +178,7 @@ class TrustCenterScreen extends ConsumerWidget {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 15,
-              color: Colors.blueGrey.shade600,
+              color: theme.colorScheme.onSurfaceVariant,
               height: 1.5,
             ),
           ),
@@ -254,6 +264,7 @@ class TrustCenterScreen extends ConsumerWidget {
   }
 
   Widget _buildIdentityVerificationCard(BuildContext context, user, IdentityVerification? v) {
+    final theme = Theme.of(context);
     final bool isVerified = user.isIdentityVerified;
     final bool isPending = v?.status == IdentityVerificationStatus.pending;
     final bool isRejected = v?.status == IdentityVerificationStatus.rejected;
@@ -263,15 +274,15 @@ class TrustCenterScreen extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red.shade200 : (isResubmit ? Colors.orange.shade200 : Colors.transparent)),
+          color: isVerified ? const Color(0xFF10B981) : (isRejected ? theme.colorScheme.error : (isResubmit ? Colors.orange : theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -285,12 +296,12 @@ class TrustCenterScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: (isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red : (isResubmit ? Colors.orange : const Color(0xFF1677F2)))).withOpacity(0.1),
+                  color: (isVerified ? const Color(0xFF10B981) : (isRejected ? theme.colorScheme.error : (isResubmit ? Colors.orange : theme.colorScheme.primary))).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   isVerified ? Icons.badge_rounded : (isRejected ? Icons.error_outline_rounded : (isResubmit ? Icons.refresh_rounded : Icons.badge_outlined)),
-                  color: isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red : (isResubmit ? Colors.orange : const Color(0xFF1677F2))),
+                  color: isVerified ? const Color(0xFF10B981) : (isRejected ? theme.colorScheme.error : (isResubmit ? Colors.orange : theme.colorScheme.primary)),
                   size: 24,
                 ),
               ),
@@ -299,12 +310,12 @@ class TrustCenterScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Identity Verification',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF1E293B),
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                     Text(
@@ -321,7 +332,7 @@ class TrustCenterScreen extends ConsumerWidget {
                                 : 'Verify your ID and face to build trust',
                       style: TextStyle(
                         fontSize: 13,
-                        color: isRejected ? Colors.red.shade700 : (isResubmit ? Colors.orange.shade700 : Colors.blueGrey.shade500),
+                        color: isRejected ? theme.colorScheme.error : (isResubmit ? Colors.orange : theme.colorScheme.onSurfaceVariant),
                       ),
                     ),
                   ],
@@ -330,26 +341,26 @@ class TrustCenterScreen extends ConsumerWidget {
               if (isVerified)
                 const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981))
               else if (isPending || isUnderReview)
-                _buildStatusBadge(isUnderReview ? 'Reviewing' : 'Pending', Colors.orange)
+                _buildStatusBadge(context, isUnderReview ? 'Reviewing' : 'Pending', Colors.orange)
               else if (isResubmit)
-                _buildStatusBadge('Resubmit', Colors.orange)
+                _buildStatusBadge(context, 'Resubmit', Colors.orange)
               else if (isRejected)
-                _buildStatusBadge('Rejected', Colors.red)
+                _buildStatusBadge(context, 'Rejected', theme.colorScheme.error)
             ],
           ),
           if (isPending || isUnderReview) ...[
             const SizedBox(height: 16),
-            _buildInfoBox(isUnderReview 
+            _buildInfoBox(context, isUnderReview 
               ? 'An administrator is currently reviewing your documents.'
               : 'Our team is verifying your government ID. This usually takes 12-24 hours.'),
           ],
           if (isResubmit && v?.rejectionReason != null) ...[
             const SizedBox(height: 12),
-            _buildWarningBox('Resubmission Needed: ${v!.rejectionReason}'),
+            _buildWarningBox(context, 'Resubmission Needed: ${v!.rejectionReason}'),
           ],
           if (isRejected && v?.rejectionReason != null) ...[
             const SizedBox(height: 12),
-            _buildErrorBox('Reason: ${v!.rejectionReason}'),
+            _buildErrorBox(context, 'Reason: ${v!.rejectionReason}'),
           ],
           if (!isVerified && !isPending && !isUnderReview) ...[
             const SizedBox(height: 20),
@@ -358,7 +369,7 @@ class TrustCenterScreen extends ConsumerWidget {
               child: ElevatedButton(
                 onPressed: () => context.push('/verify-identity'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isRejected ? Colors.red : (isResubmit ? Colors.orange : const Color(0xFF1677F2)),
+                  backgroundColor: isRejected ? theme.colorScheme.error : (isResubmit ? Colors.orange : theme.colorScheme.primary),
                   foregroundColor: Colors.white,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 12),
@@ -373,24 +384,25 @@ class TrustCenterScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildWarningBox(String message) {
+  Widget _buildWarningBox(BuildContext context, String message) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.orange.shade50,
+        color: Colors.orange.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.orange.shade100),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
-          Icon(Icons.warning_amber_rounded, size: 18, color: Colors.orange.shade700),
+          const Icon(Icons.warning_amber_rounded, size: 18, color: Colors.orange),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               message,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 12, 
-                color: Colors.orange.shade800, 
+                color: Colors.orange, 
                 fontWeight: FontWeight.w600,
                 height: 1.4,
               ),
@@ -401,13 +413,13 @@ class TrustCenterScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatusBadge(String text, Color color) {
+  Widget _buildStatusBadge(BuildContext context, String text, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -427,24 +439,25 @@ class TrustCenterScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildInfoBox(String message) {
+  Widget _buildInfoBox(BuildContext context, String message) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1677F2).withOpacity(0.05),
+        color: theme.colorScheme.primary.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1677F2).withOpacity(0.1)),
+        border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF1677F2)),
+          Icon(Icons.info_outline_rounded, size: 18, color: theme.colorScheme.primary),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               message,
               style: TextStyle(
                 fontSize: 12, 
-                color: Colors.blueGrey.shade700, 
+                color: theme.colorScheme.onSurfaceVariant, 
                 fontWeight: FontWeight.w500,
                 height: 1.4,
               ),
@@ -456,6 +469,7 @@ class TrustCenterScreen extends ConsumerWidget {
   }
 
   Widget _buildStudentVerificationCard(BuildContext context, user, StudentVerification? v) {
+    final theme = Theme.of(context);
     final bool isVerified = user.isStudentVerified;
     final bool isPending = v?.status == StudentVerificationStatus.pending;
     final bool isRejected = v?.status == StudentVerificationStatus.rejected;
@@ -465,15 +479,15 @@ class TrustCenterScreen extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red.shade200 : (isResubmit ? Colors.orange.shade200 : Colors.transparent)),
+          color: isVerified ? const Color(0xFF10B981) : (isRejected ? theme.colorScheme.error : (isResubmit ? Colors.orange : theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -487,12 +501,12 @@ class TrustCenterScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: (isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red : (isResubmit ? Colors.orange : const Color(0xFF1677F2)))).withOpacity(0.1),
+                  color: (isVerified ? const Color(0xFF10B981) : (isRejected ? theme.colorScheme.error : (isResubmit ? Colors.orange : theme.colorScheme.primary))).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   isVerified ? Icons.school_rounded : (isRejected ? Icons.error_outline_rounded : (isResubmit ? Icons.refresh_rounded : Icons.school_outlined)),
-                  color: isVerified ? const Color(0xFF10B981) : (isRejected ? Colors.red : (isResubmit ? Colors.orange : const Color(0xFF1677F2))),
+                  color: isVerified ? const Color(0xFF10B981) : (isRejected ? theme.colorScheme.error : (isResubmit ? Colors.orange : theme.colorScheme.primary)),
                   size: 24,
                 ),
               ),
@@ -501,12 +515,12 @@ class TrustCenterScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Student Status',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF1E293B),
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                     Text(
@@ -523,7 +537,7 @@ class TrustCenterScreen extends ConsumerWidget {
                                 : 'Verify your campus enrollment',
                       style: TextStyle(
                         fontSize: 13,
-                        color: isRejected ? Colors.red.shade700 : (isResubmit ? Colors.orange.shade700 : Colors.blueGrey.shade500),
+                        color: isRejected ? theme.colorScheme.error : (isResubmit ? Colors.orange : theme.colorScheme.onSurfaceVariant),
                       ),
                     ),
                   ],
@@ -532,26 +546,26 @@ class TrustCenterScreen extends ConsumerWidget {
               if (isVerified)
                 const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981))
               else if (isPending || isUnderReview)
-                _buildStatusBadge(isUnderReview ? 'Reviewing' : 'Pending', Colors.orange)
+                _buildStatusBadge(context, isUnderReview ? 'Reviewing' : 'Pending', Colors.orange)
               else if (isResubmit)
-                _buildStatusBadge('Resubmit', Colors.orange)
+                _buildStatusBadge(context, 'Resubmit', Colors.orange)
               else if (isRejected)
-                _buildStatusBadge('Rejected', Colors.red)
+                _buildStatusBadge(context, 'Rejected', theme.colorScheme.error)
             ],
           ),
           if (isPending || isUnderReview) ...[
             const SizedBox(height: 16),
-            _buildInfoBox(isUnderReview
+            _buildInfoBox(context, isUnderReview
               ? 'An administrator is currently reviewing your student ID.'
               : 'Our team is verifying your student ID. This usually takes 12-24 hours.'),
           ],
           if (isResubmit && v?.rejectionReason != null) ...[
             const SizedBox(height: 12),
-            _buildWarningBox('Resubmission Needed: ${v!.rejectionReason}'),
+            _buildWarningBox(context, 'Resubmission Needed: ${v!.rejectionReason}'),
           ],
           if (isRejected && v?.rejectionReason != null) ...[
             const SizedBox(height: 12),
-            _buildErrorBox('Reason: ${v!.rejectionReason}'),
+            _buildErrorBox(context, 'Reason: ${v!.rejectionReason}'),
           ],
           if (!isVerified && !isPending && !isUnderReview) ...[
             const SizedBox(height: 20),
@@ -560,7 +574,7 @@ class TrustCenterScreen extends ConsumerWidget {
               child: ElevatedButton(
                 onPressed: () => context.push('/verify-student'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isRejected ? Colors.red : (isResubmit ? Colors.orange : const Color(0xFF1677F2)),
+                  backgroundColor: isRejected ? theme.colorScheme.error : (isResubmit ? Colors.orange : theme.colorScheme.primary),
                   foregroundColor: Colors.white,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 12),
@@ -575,24 +589,25 @@ class TrustCenterScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildErrorBox(String message) {
+  Widget _buildErrorBox(BuildContext context, String message) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
+        color: theme.colorScheme.error.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.red.shade100),
+        border: Border.all(color: theme.colorScheme.error.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline_rounded, size: 18, color: Colors.red.shade700),
+          Icon(Icons.error_outline_rounded, size: 18, color: theme.colorScheme.error),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               message,
               style: TextStyle(
                 fontSize: 12, 
-                color: Colors.red.shade800, 
+                color: theme.colorScheme.error, 
                 fontWeight: FontWeight.w600,
                 height: 1.4,
               ),
@@ -603,39 +618,43 @@ class TrustCenterScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildEducationSection() {
+  Widget _buildEducationSection(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'How Trust Works',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w900,
-              color: Color(0xFF1E293B),
+              color: theme.colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 16),
           _buildEduItem(
+            context,
             Icons.verified_user_outlined,
             'Universal Identity',
             'Your identity is verified once. This confirmation carries across all roles on UniHub, from Selling to Professional Gigs.',
           ),
           const SizedBox(height: 20),
           _buildEduItem(
+            context,
             Icons.insights_rounded,
             'Dynamic Trust Score',
             'Your score grows as you complete successful transactions, receive positive ratings, and maintain professional behavior.',
           ),
           const SizedBox(height: 20),
           _buildEduItem(
+            context,
             Icons.security_rounded,
             'Safe Community',
             'Verified badges help students identify legitimate providers and build a safer campus marketplace for everyone.',
@@ -645,11 +664,12 @@ class TrustCenterScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildEduItem(IconData icon, String title, String description) {
+  Widget _buildEduItem(BuildContext context, IconData icon, String title, String description) {
+    final theme = Theme.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: const Color(0xFF1677F2), size: 20),
+        Icon(icon, color: theme.colorScheme.primary, size: 20),
         const SizedBox(width: 16),
         Expanded(
           child: Column(
@@ -657,10 +677,10 @@ class TrustCenterScreen extends ConsumerWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 15,
-                  color: Color(0xFF1E293B),
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 4),
@@ -668,7 +688,7 @@ class TrustCenterScreen extends ConsumerWidget {
                 description,
                 style: TextStyle(
                   fontSize: 13,
-                  color: Colors.blueGrey.shade500,
+                  color: theme.colorScheme.onSurfaceVariant,
                   height: 1.4,
                 ),
               ),
@@ -680,9 +700,10 @@ class TrustCenterScreen extends ConsumerWidget {
   }
 
   void _showTrustBreakdown(BuildContext context, dynamic user) {
+    final theme = Theme.of(context);
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
       builder: (context) => Container(
         padding: const EdgeInsets.all(32),
@@ -691,18 +712,18 @@ class TrustCenterScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Trust Score Breakdown', 
-              style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w900)),
+              style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface)),
             const SizedBox(height: 8),
             Text('Your score is a deterministic reflection of your verified milestones and platform activity.', 
-              style: TextStyle(color: Colors.blueGrey.shade600, fontSize: 14)),
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14)),
             const SizedBox(height: 32),
-            _buildBreakdownItem(Icons.badge_rounded, 'Identity Verification', user.isIdentityVerified ? 'Confirmed (+30%)' : 'Not Verified', user.isIdentityVerified),
-            const Divider(height: 32),
-            _buildBreakdownItem(Icons.school_rounded, 'Student Verification', user.isStudentVerified ? 'Verified (+20%)' : 'Not Verified', user.isStudentVerified),
-            const Divider(height: 32),
-            _buildBreakdownItem(Icons.verified_user_rounded, 'Professional Roles', user.verifiedRoles.isNotEmpty ? '${user.verifiedRoles.length} Roles (+${(user.verifiedRoles.length.clamp(0, 3) * 5).toInt()}%)' : 'No verified roles', user.verifiedRoles.isNotEmpty),
-            const Divider(height: 32),
-            _buildBreakdownItem(Icons.person_outline_rounded, 'Profile Completion', '${(user.profileCompletion * 100).toInt()}% (+${(user.profileCompletion * 10).toInt()}%)', user.profileCompletion > 0),
+            _buildBreakdownItem(context, Icons.badge_rounded, 'Identity Verification', user.isIdentityVerified ? 'Confirmed (+30%)' : 'Not Verified', user.isIdentityVerified),
+            Divider(height: 32, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+            _buildBreakdownItem(context, Icons.school_rounded, 'Student Verification', user.isStudentVerified ? 'Verified (+20%)' : 'Not Verified', user.isStudentVerified),
+            Divider(height: 32, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+            _buildBreakdownItem(context, Icons.verified_user_rounded, 'Professional Roles', user.verifiedRoles.isNotEmpty ? '${user.verifiedRoles.length} Roles (+${(user.verifiedRoles.length.clamp(0, 3) * 5).toInt()}%)' : 'No verified roles', user.verifiedRoles.isNotEmpty),
+            Divider(height: 32, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+            _buildBreakdownItem(context, Icons.person_outline_rounded, 'Profile Completion', '${(user.profileCompletion * 100).toInt()}% (+${(user.profileCompletion * 10).toInt()}%)', user.profileCompletion > 0),
             const SizedBox(height: 40),
           ],
         ),
@@ -710,24 +731,25 @@ class TrustCenterScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildBreakdownItem(IconData icon, String title, String subtitle, bool isPositive) {
+  Widget _buildBreakdownItem(BuildContext context, IconData icon, String title, String subtitle, bool isPositive) {
+    final theme = Theme.of(context);
     return Row(
       children: [
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: (isPositive ? const Color(0xFF10B981) : Colors.blueGrey).withOpacity(0.1),
+            color: (isPositive ? const Color(0xFF10B981) : theme.colorScheme.outlineVariant).withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
-          child: Icon(icon, color: isPositive ? const Color(0xFF10B981) : Colors.blueGrey, size: 20),
+          child: Icon(icon, color: isPositive ? const Color(0xFF10B981) : theme.colorScheme.onSurfaceVariant, size: 20),
         ),
         const SizedBox(width: 16),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-              Text(subtitle, style: TextStyle(color: isPositive ? const Color(0xFF059669) : Colors.blueGrey.shade500, fontSize: 13, fontWeight: FontWeight.w500)),
+              Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: theme.colorScheme.onSurface)),
+              Text(subtitle, style: TextStyle(color: isPositive ? const Color(0xFF059669) : theme.colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.w500)),
             ],
           ),
         ),

@@ -38,7 +38,7 @@ class PresenceService with WidgetsBindingObserver {
     if (user == null) return;
 
     try {
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+      await _ref.read(firestoreProvider).collection('users').doc(user.uid).update({
         'isOnline': isOnline,
         'lastSeen': FieldValue.serverTimestamp(),
       });

@@ -3,9 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/dashboard/controllers/smart_feed_controller.dart';
-import 'package:unihub_mobile/widgets/feed/feed_type.dart';
+import 'package:unihub_mobile/models/feed_type.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:unihub_mobile/features/campus_filter/presentation/widgets/campus_filter_selector.dart';
 
 class CampusPulseScreen extends ConsumerWidget {
   const CampusPulseScreen({super.key});
@@ -41,6 +42,8 @@ class CampusPulseScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const CampusFilterSelector(),
+              const SizedBox(height: 24),
               _buildStatsGrid(context, pulseAsync),
               const SizedBox(height: 32),
               _sectionHeader(context, 'Trending on Campus'),
@@ -124,7 +127,7 @@ class CampusPulseScreen extends ConsumerWidget {
     } else if (item.model.type == FeedType.notes) {
       context.push('/note-detail', extra: item.originalData);
     } else if (item.model.type == FeedType.marketplace) {
-      context.push('/marketplace-detail', extra: item.originalData);
+      context.push('/listing-detail', extra: item.originalData);
     } else if (item.model.type == FeedType.gig) {
       context.push('/gig-detail', extra: item.originalData);
     }

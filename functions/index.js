@@ -59,19 +59,36 @@ exports.processNotificationQueue = onDocumentCreated("notifications_queue/{queue
     }
 
     const tokens = tokensSnapshot.docs.map((doc) => doc.data().token);
+    console.log(`Sending to ${tokens.length} tokens for user ${recipientId}`);
 
-    // 2. Build FCM message
+    // 2. Build FCM message with High Priority for Android
     const message = {
       notification: {
         title: title,
         body: body,
       },
       data: payload || {},
+      android: {
+        priority: "high",
+        notification: {
+          channelId: "unihub_main_channel",
+          priority: "high",
+          clickAction: "FLUTTER_NOTIFICATION_CLICK",
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            contentAvailable: true,
+            sound: "default",
+          },
+        },
+      },
       tokens: tokens,
     };
 
     // 3. Send multicast message
-    const response = await getMessaging().sendEachForMulticast(message);
+    const response = await messaging.sendEachForMulticast(message);
 
     console.log(`${response.successCount} messages were sent successfully`);
 
@@ -159,5 +176,81 @@ exports.scheduledMarketplaceReminder = onSchedule("0 10 * * *", async (event) =>
     console.log("Scheduled marketplace reminder sent successfully");
   } catch (error) {
     console.error("Error sending scheduled marketplace reminder:", error);
+  }
+});
+
+/**
+ * Scheduled function to prune notifications older than 20 days.
+ * Runs every day at midnight.
+ */
+exports.pruneOldNotifications = onSchedule("0 0 * * *", async (event) => {
+  const db = getFirestore();
+  const twentyDaysAgo = new Date();
+  twentyDaysAgo.setDate(twentyDaysAgo.getDate() - 20);
+
+  console.log(`Pruning notifications created before: ${twentyDaysAgo.toISOString()}`);
+
+  try {
+    // Use collectionGroup to query all 'notifications' subcollections across all users
+    const oldNotificationsSnapshot = await db
+        .collectionGroup("notifications")
+        .where("createdAt", "<", twentyDaysAgo)
+        .limit(500) // Process in chunks to avoid timeout/memory issues
+        .get();
+
+    if (oldNotificationsSnapshot.empty) {
+      console.log("No old notifications to prune.");
+      return null;
+    }
+
+    const batch = db.batch();
+    oldNotificationsSnapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+    console.log(`Successfully pruned ${oldNotificationsSnapshot.size} old notifications.`);
+    return null;
+  } catch (error) {
+    console.error("Error pruning old notifications:", error);
+    return null;
+  }
+});
+
+/**
+ * Scheduled function to cleanup expired conversations.
+ * Runs every hour to check for conversations where expiresAt < now.
+ */
+exports.cleanupExpiredConversations = onSchedule("0 * * * *", async (event) => {
+  const db = getFirestore();
+  const now = FieldValue.serverTimestamp();
+
+  console.log("Checking for expired conversations...");
+
+  try {
+    const expiredSnap = await db.collection("conversations")
+        .where("expiresAt", "<", new Date())
+        .limit(100)
+        .get();
+
+    if (expiredSnap.empty) {
+      console.log("No expired conversations found.");
+      return null;
+    }
+
+    const batch = db.batch();
+    for (const doc of expiredSnap.docs) {
+      // Note: In production, you'd recursively delete messages subcollection
+      // For now, we delete the conversation doc.
+      // Firestore batch limit is 500, so 100 docs is safe.
+      batch.delete(doc.ref);
+    }
+
+    await batch.commit();
+    console.log(`Successfully cleaned up ${expiredSnap.size} expired conversations.`);
+    return null;
+  } catch (error) {
+    console.error("Error cleaning up expired conversations:", error);
+    return null;
   }
 });

@@ -6,6 +6,8 @@ import '../controllers/auth_controller.dart';
 import '../widgets/auth_text_field.dart';
 import '../../shared/providers.dart';
 import '../../../shared/storage_repository.dart';
+import '../../../../core/constants/campus_constants.dart';
+import '../../../campus_filter/domain/models/campus.dart';
 
 class CompleteProfileScreen extends ConsumerStatefulWidget {
   const CompleteProfileScreen({super.key});
@@ -18,6 +20,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
   final universityController = TextEditingController();
   final courseController = TextEditingController();
   final yearController = TextEditingController();
+  Campus? _selectedCampus;
   File? _selectedImage;
   String? _uploadedImageUrl;
   bool _localLoading = false;
@@ -76,8 +79,82 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
     }
   }
 
+  void _showCampusPicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          final theme = Theme.of(context);
+          final query = TextEditingController();
+          List<Campus> filtered = CampusConstants.campuses;
+
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.8,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: theme.colorScheme.outlineVariant, borderRadius: BorderRadius.circular(2))),
+                const SizedBox(height: 24),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: TextField(
+                    controller: query,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: 'Search University...',
+                      prefixIcon: const Icon(Icons.search),
+                      filled: true,
+                      fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    ),
+                    onChanged: (val) {
+                      setModalState(() {
+                        filtered = CampusConstants.campuses.where((c) => 
+                          c.officialName.toLowerCase().contains(val.toLowerCase()) ||
+                          c.shortName.toLowerCase().contains(val.toLowerCase()) ||
+                          c.aliases.any((a) => a.toLowerCase().contains(val.toLowerCase()))
+                        ).toList();
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      final campus = filtered[index];
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+                        title: Text(campus.officialName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(campus.shortName),
+                        onTap: () {
+                          setState(() {
+                            _selectedCampus = campus;
+                            universityController.text = campus.officialName;
+                          });
+                          Navigator.pop(context);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _onContinue() async {
-    final university = universityController.text.trim();
+    final university = _selectedCampus?.campusId ?? universityController.text.trim();
     final course = courseController.text.trim();
     final year = yearController.text.trim();
 
@@ -207,11 +284,16 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
               ),
             const SizedBox(height: 50),
             
-            AuthTextField(
-              controller: universityController,
-              hintText: 'University / Campus',
-              icon: Icons.school_outlined,
-              enabled: !isProcessing,
+            GestureDetector(
+              onTap: isProcessing ? null : _showCampusPicker,
+              child: AbsorbPointer(
+                child: AuthTextField(
+                  controller: universityController,
+                  hintText: 'University / Campus',
+                  icon: Icons.school_outlined,
+                  enabled: !isProcessing,
+                ),
+              ),
             ),
             const SizedBox(height: 18),
             AuthTextField(

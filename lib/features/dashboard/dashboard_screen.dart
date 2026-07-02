@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../app/theme/app_colors.dart';
+import '../../core/utils/category_utils.dart';
 import '../auth/shared/providers.dart';
 import '../marketplace/domain/models/listing.dart';
 import '../marketplace/shared/providers.dart';
@@ -11,7 +11,7 @@ import '../housing/presentation/widgets/housing_card.dart';
 import '../notes/shared/providers.dart';
 import '../../widgets/app_drawer.dart';
 import '../../widgets/feed/feed_item_card.dart';
-import '../../widgets/feed/feed_type.dart';
+import '../../models/feed_type.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/notification_badge.dart';
 import '../../widgets/universal_search_bar.dart';
@@ -22,7 +22,9 @@ import '../../services/history_service.dart';
 import '../shared/add_feed_item_screen.dart';
 import '../shared/global_search_screen.dart';
 import '../shared/campus_pulse_screen.dart';
-import '../../models/feed_type.dart' as models;
+import '../announcements/presentation/widgets/announcement_display.dart';
+import '../campus_filter/presentation/widgets/campus_filter_selector.dart';
+import '../ads/ads_module.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -35,10 +37,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // Request notification permission if not already granted
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(notificationServiceProvider).requestPermission();
-      // Record visit for next time
       ref.read(historyServiceProvider).updateLastVisit();
     });
   }
@@ -61,9 +61,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           slivers: [
             const _DashboardAppBar(),
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(20, 16, 20, 0),
+                child: CampusFilterSelector(),
+              ),
+            ),
+            const SliverToBoxAdapter(
+              child: RelevantAnnouncementsWidget(),
+            ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.only(top: 12),
                 child: UniversalSearchBar(
                   onTap: () {
                     Navigator.push(
@@ -76,30 +85,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
             const SliverToBoxAdapter(child: _WhatsNewSection()),
             const SliverToBoxAdapter(child: _QuickActions()),
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.only(top: 20),
+                child: BannerAdWidget(),
+              ),
+            ),
             const SliverToBoxAdapter(child: _ContinueReadingSection()),
             const SliverToBoxAdapter(child: _RecentlyViewedSection()),
             const SliverToBoxAdapter(child: _CampusPulseSection()),
             const SliverToBoxAdapter(child: _TrendingSection()),
             const SliverToBoxAdapter(child: _HousingPreviewSection()),
             const SliverToBoxAdapter(child: _SavedItemsSection()),
-            
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-              sliver: SliverToBoxAdapter(
-                child: Text(
-                  'Fresh Activity Feed',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: Theme.of(context).colorScheme.onSurface,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ),
-            ),
-            
             const _ActivityFeedSection(),
-            
             const SliverToBoxAdapter(child: SizedBox(height: 40)),
           ],
         ),
@@ -124,7 +122,7 @@ class _DashboardAppBar extends ConsumerWidget {
 
     final theme = Theme.of(context);
     return SliverAppBar(
-      expandedHeight: 150,
+      expandedHeight: 110,
       pinned: true,
       backgroundColor: theme.colorScheme.surface,
       elevation: 0,
@@ -149,25 +147,25 @@ class _DashboardAppBar extends ConsumerWidget {
             ),
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Text(
                   '${getGreeting()}, ${user?.fullName.split(' ').first ?? 'Student'}! 🎓',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: theme.textTheme.headlineSmall?.copyWith(
                     color: Colors.white,
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'Explore your campus ecosystem',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: theme.textTheme.bodyMedium?.copyWith(
                     color: Colors.white.withOpacity(0.8),
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -185,50 +183,50 @@ class _QuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Action Shortcuts',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 18,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontSize: 17,
               fontWeight: FontWeight.w800,
-              color: Theme.of(context).colorScheme.onSurface,
               letterSpacing: -0.5,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _ActionItem(
-                icon: Icons.note_add_outlined,
+                icon: CategoryUtils.getIcon(FeedType.notes),
                 label: 'Upload Notes',
-                color: AppColors.notes,
+                color: CategoryUtils.getColor(FeedType.notes),
                 onTap: () => context.push('/add-note'),
               ),
               _ActionItem(
-                icon: Icons.add_shopping_cart_outlined,
+                icon: CategoryUtils.getIcon(FeedType.marketplace),
                 label: 'Sell Item',
-                color: AppColors.marketplace,
+                color: CategoryUtils.getColor(FeedType.marketplace),
                 onTap: () => context.push('/add-listing'),
               ),
               _ActionItem(
-                icon: Icons.campaign_outlined,
+                icon: CategoryUtils.getIcon(FeedType.housing),
                 label: 'Report Vacancy',
-                color: AppColors.housing,
+                color: CategoryUtils.getColor(FeedType.housing),
                 onTap: () => context.push('/submit-vacancy'),
               ),
               _ActionItem(
-                icon: Icons.add_task_rounded,
+                icon: CategoryUtils.getIcon(FeedType.gig),
                 label: 'Post Gig',
-                color: AppColors.gigs,
+                color: CategoryUtils.getColor(FeedType.gig),
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const AddFeedItemScreen(type: models.FeedType.gig)),
+                    MaterialPageRoute(builder: (context) => const AddFeedItemScreen(type: FeedType.gig)),
                   );
                 },
               ),
@@ -255,6 +253,7 @@ class _ActionItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Expanded(
       child: InkWell(
         onTap: onTap,
@@ -264,20 +263,20 @@ class _ActionItem extends StatelessWidget {
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(icon, color: color, size: 26),
+                child: Icon(icon, color: color, size: 24),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
                 label,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontSize: 10.5,
                   fontWeight: FontWeight.w700,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 1,
@@ -296,6 +295,7 @@ class _WhatsNewSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final summaryAsync = ref.watch(newItemsSummaryProvider);
 
     return summaryAsync.when(
@@ -303,7 +303,7 @@ class _WhatsNewSection extends ConsumerWidget {
         if (summary.isEmpty) return const SizedBox.shrink();
 
         return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -315,11 +315,8 @@ class _WhatsNewSection extends ConsumerWidget {
               children: [
                 Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(
-                    color: Colors.orange,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.star_rounded, color: Colors.white, size: 16),
+                  decoration: const BoxDecoration(color: Colors.orange, shape: BoxShape.circle),
+                  child: const Icon(Icons.star_rounded, color: Colors.white, size: 14),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -328,15 +325,15 @@ class _WhatsNewSection extends ConsumerWidget {
                     children: [
                       Text(
                         'New since your last visit',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontSize: 12.5,
                           fontWeight: FontWeight.w800,
                           color: Colors.orange.shade900,
                         ),
                       ),
                       Text(
                         summary.entries.map((e) => '${e.value} ${e.key}').join(', '),
-                        style: GoogleFonts.plusJakartaSans(
+                        style: theme.textTheme.bodySmall?.copyWith(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: Colors.orange.shade800,
@@ -347,7 +344,7 @@ class _WhatsNewSection extends ConsumerWidget {
                     ],
                   ),
                 ),
-                Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.orange.shade700),
+                Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Colors.orange.shade700),
               ],
             ),
           ),
@@ -364,157 +361,162 @@ class _TrendingSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final trendingAsync = ref.watch(trendingFeedProvider);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-          child: Row(
+    return trendingAsync.when(
+      data: (items) {
+        if (items.isEmpty) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Trending Now',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: Theme.of(context).colorScheme.onSurface,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                 child: Row(
                   children: [
-                    Icon(Icons.local_fire_department_rounded, size: 12, color: Colors.red.shade700),
-                    const SizedBox(width: 4),
                     Text(
-                      'HOT',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.red.shade700,
+                      'Trending Now',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.local_fire_department_rounded, size: 11, color: Colors.red.shade700),
+                          const SizedBox(width: 4),
+                          Text(
+                            'HOT',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.red.shade700,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
+              SizedBox(
+                height: 190,
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: items.take(5).length,
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    final imageUrl = _getImageUrl(item);
+
+                    return GestureDetector(
+                      onTap: () => _handleItemTap(context, item),
+                      child: Container(
+                        width: 155,
+                        margin: const EdgeInsets.only(right: 14),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surface,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: theme.colorScheme.outlineVariant),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.03),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ClipRRect(
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                              child: Stack(
+                                children: [
+                                  OptimizedImage(
+                                    imageUrl: imageUrl ?? CategoryUtils.getPlaceholder(item.model.type),
+                                    height: 95,
+                                    width: 155,
+                                  ),
+                                  Positioned(
+                                    top: 8,
+                                    left: 8,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.9),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Icon(
+                                        CategoryUtils.getIcon(item.model.type),
+                                        size: 11,
+                                        color: CategoryUtils.getColor(item.model.type),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(10),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    item.model.title,
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    item.model.subtitle,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      fontSize: 10,
+                                      color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ],
           ),
-        ),
-        SizedBox(
-          height: 200,
-          child: trendingAsync.when(
-            data: (items) => ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              itemCount: items.take(5).length,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                final imageUrl = _getImageUrl(item);
-
-                return GestureDetector(
-                  onTap: () => _handleItemTap(context, item),
-                  child: Container(
-                    width: 160,
-                    margin: const EdgeInsets.only(right: 16),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ClipRRect(
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                          child: Stack(
-                            children: [
-                              OptimizedImage(
-                                imageUrl: imageUrl ?? _getPlaceholder(item.model.type),
-                                height: 100,
-                                width: 160, // Fixed width instead of infinity
-                              ),
-                              Positioned(
-                                top: 8,
-                                left: 8,
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.9),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Icon(
-                                    _getCategoryIcon(item.model.type),
-                                    size: 12,
-                                    color: _getCategoryColor(item.model.type),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                item.model.title,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                item.model.subtitle,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.grey.shade500,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => const SizedBox.shrink(),
-          ),
-        ),
-      ],
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 
   String? _getImageUrl(SmartFeedItem item) {
     final data = item.originalData;
     if (data == null) return null;
-
     try {
       if (item.model.type == FeedType.marketplace) {
         return (data.imageUrls as List?)?.firstOrNull;
@@ -526,51 +528,6 @@ class _TrendingSection extends ConsumerWidget {
     } catch (_) {}
     return null;
   }
-
-  String _getPlaceholder(FeedType type) {
-    switch (type) {
-      case FeedType.marketplace:
-        return 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1999&auto=format&fit=crop';
-      case FeedType.housing:
-        return 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=2070&auto=format&fit=crop';
-      case FeedType.notes:
-        return 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=1973&auto=format&fit=crop';
-      case FeedType.gig:
-        return 'https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?q=80&w=2070&auto=format&fit=crop';
-      default:
-        return 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=2070&auto=format&fit=crop';
-    }
-  }
-
-  IconData _getCategoryIcon(FeedType type) {
-    switch (type) {
-      case FeedType.marketplace:
-        return Icons.shopping_bag_outlined;
-      case FeedType.housing:
-        return Icons.home_work_outlined;
-      case FeedType.notes:
-        return Icons.description_outlined;
-      case FeedType.gig:
-        return Icons.work_outline;
-      default:
-        return Icons.star_outline;
-    }
-  }
-
-  Color _getCategoryColor(FeedType type) {
-    switch (type) {
-      case FeedType.marketplace:
-        return AppColors.marketplace;
-      case FeedType.housing:
-        return AppColors.housing;
-      case FeedType.notes:
-        return AppColors.notes;
-      case FeedType.gig:
-        return AppColors.gigs;
-      default:
-        return AppColors.grey;
-    }
-  }
 }
 
 class _ActivityFeedSection extends ConsumerWidget {
@@ -578,30 +535,55 @@ class _ActivityFeedSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final activityAsync = ref.watch(recentActivityProvider);
 
     return activityAsync.when(
-      data: (items) => SliverPadding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        sliver: SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, index) {
-              final item = items[index];
-              final createdAt = item.originalData?.createdAt as DateTime?;
-              final timeAgo = createdAt != null ? _formatTimeAgo(createdAt) : '';
-              
-              return _ActivityItem(
-                item: item,
-                timeAgo: timeAgo,
-                onTap: () => _handleItemTap(context, item),
-              );
-            },
-            childCount: items.length,
-          ),
-        ),
-      ),
+      data: (items) {
+        if (items.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+
+        return SliverMainAxisGroup(
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+              sliver: SliverToBoxAdapter(
+                child: Text(
+                  'Fresh Activity Feed',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final item = items[index];
+                    final createdAt = item.originalData?.createdAt as DateTime?;
+                    final timeAgo = createdAt != null ? _formatTimeAgo(createdAt) : '';
+                    
+                    return _ActivityItem(
+                      item: item,
+                      timeAgo: timeAgo,
+                      onTap: () => _handleItemTap(context, item),
+                    );
+                  },
+                  childCount: items.length,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
       loading: () => const SliverToBoxAdapter(
-        child: Center(child: CircularProgressIndicator()),
+        child: Padding(
+          padding: EdgeInsets.all(40),
+          child: Center(child: CircularProgressIndicator()),
+        ),
       ),
       error: (_, __) => const SliverToBoxAdapter(child: SizedBox.shrink()),
     );
@@ -629,6 +611,7 @@ class _ActivityItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final isVeryRecent = DateTime.now().difference(item.originalData?.createdAt as DateTime? ?? DateTime(2000)).inHours < 24;
 
     return Padding(
@@ -639,9 +622,9 @@ class _ActivityItem extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
+            color: theme.colorScheme.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
           ),
           child: Row(
             children: [
@@ -649,13 +632,13 @@ class _ActivityItem extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: _getCategoryColor(item.model.type).withOpacity(0.1),
+                  color: CategoryUtils.getColor(item.model.type).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
-                  _getCategoryIcon(item.model.type),
+                  CategoryUtils.getIcon(item.model.type),
                   size: 20,
-                  color: _getCategoryColor(item.model.type),
+                  color: CategoryUtils.getColor(item.model.type),
                 ),
               ),
               const SizedBox(width: 12),
@@ -668,7 +651,7 @@ class _ActivityItem extends StatelessWidget {
                         Expanded(
                           child: Text(
                             item.model.title,
-                            style: GoogleFonts.plusJakartaSans(
+                            style: theme.textTheme.titleSmall?.copyWith(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                             ),
@@ -698,9 +681,9 @@ class _ActivityItem extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       '${item.model.subtitle} • $timeAgo',
-                      style: TextStyle(
+                      style: theme.textTheme.bodySmall?.copyWith(
                         fontSize: 12,
-                        color: Colors.grey.shade500,
+                        color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
                         fontWeight: FontWeight.w500,
                       ),
                       maxLines: 1,
@@ -715,26 +698,6 @@ class _ActivityItem extends StatelessWidget {
       ),
     );
   }
-
-  IconData _getCategoryIcon(FeedType type) {
-    switch (type) {
-      case FeedType.marketplace: return Icons.shopping_bag_outlined;
-      case FeedType.housing: return Icons.home_work_outlined;
-      case FeedType.notes: return Icons.description_outlined;
-      case FeedType.gig: return Icons.work_outline;
-      default: return Icons.notifications_none_rounded;
-    }
-  }
-
-  Color _getCategoryColor(FeedType type) {
-    switch (type) {
-      case FeedType.marketplace: return AppColors.marketplace;
-      case FeedType.housing: return AppColors.housing;
-      case FeedType.notes: return AppColors.notes;
-      case FeedType.gig: return AppColors.gigs;
-      default: return AppColors.grey;
-    }
-  }
 }
 
 class _CampusPulseSection extends ConsumerWidget {
@@ -747,98 +710,97 @@ class _CampusPulseSection extends ConsumerWidget {
     final trendingAsync = ref.watch(trendingFeedProvider);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [AppColors.highlightIndigoBg, Theme.of(context).colorScheme.surface],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.highlightIndigoBorder.withOpacity(0.5)),
-        ),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: const BoxDecoration(
-                    color: AppColors.highlightIndigoBorder,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.bolt_rounded, color: AppColors.secondaryDark, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Campus Pulse',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.secondaryDark,
-                        ),
-                      ),
-                      pulseAsync.when(
-                        data: (stats) {
-                          final trendingItem = trendingAsync.valueOrNull?.firstOrNull;
-                          if (trendingItem != null) {
-                            return Text(
-                              '🔥 Trending: ${trendingItem.model.title}',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12,
-                                color: AppColors.secondary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            );
-                          }
-                          return Text(
-                            'Active: ${stats['listings']} items, ${stats['notes']} notes',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12,
-                              color: AppColors.secondary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          );
-                        },
-                        loading: () => const SizedBox.shrink(),
-                        error: (_, __) => const SizedBox.shrink(),
-                      ),
-                    ],
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const CampusPulseScreen()),
-                    );
-                  },
-                  style: TextButton.styleFrom(
-                    backgroundColor: theme.colorScheme.surface,
-                    foregroundColor: AppColors.secondary,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: AppColors.highlightIndigoBorder),
-                    ),
-                    textStyle: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  child: const Text('View All'),
-                ),
-              ],
+      padding: const EdgeInsets.only(top: 20),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppColors.highlightIndigoBg, Theme.of(context).colorScheme.surface],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          ],
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.highlightIndigoBorder.withOpacity(0.5)),
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(color: AppColors.highlightIndigoBorder, shape: BoxShape.circle),
+                    child: const Icon(Icons.bolt_rounded, color: AppColors.secondaryDark, size: 18),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Campus Pulse',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.secondaryDark,
+                          ),
+                        ),
+                        pulseAsync.when(
+                          data: (stats) {
+                            final trendingItem = trendingAsync.valueOrNull?.firstOrNull;
+                            if (trendingItem != null) {
+                              return Text(
+                                '🔥 Trending: ${trendingItem.model.title}',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontSize: 11.5,
+                                  color: AppColors.secondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              );
+                            }
+                            return Text(
+                              'Active: ${stats['listings']} items, ${stats['notes']} notes',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 11.5,
+                                color: AppColors.secondary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            );
+                          },
+                          loading: () => const SizedBox.shrink(),
+                          error: (_, __) => const SizedBox.shrink(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const CampusPulseScreen()),
+                      );
+                    },
+                    style: TextButton.styleFrom(
+                      backgroundColor: theme.colorScheme.surface,
+                      foregroundColor: AppColors.secondary,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: const BorderSide(color: AppColors.highlightIndigoBorder),
+                      ),
+                      textStyle: theme.textTheme.labelLarge?.copyWith(fontSize: 11.5, fontWeight: FontWeight.w700),
+                    ),
+                    child: const Text('View All'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -850,71 +812,72 @@ class _HousingPreviewSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final listingsAsync = ref.watch(topHousingProvider);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Nearby Housing',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: Theme.of(context).colorScheme.onSurface,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => context.push('/housing'),
-                  child: Text(
-                    'View All',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.indigo.shade600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          listingsAsync.when(
-            data: (listings) => SizedBox(
-              height: 230,
-              child: ListView.builder(
+    return listingsAsync.when(
+      data: (listings) {
+        if (listings.isEmpty) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: listings.length > 5 ? 5 : listings.length,
-                itemBuilder: (context, index) => SizedBox(
-                  width: 200,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 16),
-                    child: HousingCard(
-                      listing: listings[index],
-                      isCompact: true,
-                      onTap: () => context.push('/housing-detail', extra: listings[index]),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Nearby Housing',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => context.push('/housing'),
+                      child: Text(
+                        'View All',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.indigo.shade600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 220,
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: listings.length > 5 ? 5 : listings.length,
+                  itemBuilder: (context, index) => SizedBox(
+                    width: 190,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 14),
+                      child: HousingCard(
+                        listing: listings[index],
+                        isCompact: true,
+                        onTap: () => context.push('/housing-detail', extra: listings[index]),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            loading: () => const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: SkeletonLoader(width: double.infinity, height: 200),
-            ),
-            error: (e, _) => const SizedBox.shrink(),
+            ],
           ),
-        ],
-      ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (e, _) => const SizedBox.shrink(),
     );
   }
 }
@@ -985,6 +948,7 @@ class _ContinueReadingSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final historyAsync = ref.watch(studyHistoryProvider);
 
     return historyAsync.when(
@@ -998,82 +962,87 @@ class _ContinueReadingSection extends ConsumerWidget {
           data: (note) {
             if (note == null) return const SizedBox.shrink();
             return Padding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Continue Reading',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: Theme.of(context).colorScheme.onSurface,
-                      letterSpacing: -0.5,
+              padding: const EdgeInsets.only(top: 20),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Continue Reading',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: AppColors.highlightIndigoBg,
-                            borderRadius: BorderRadius.circular(12),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: theme.colorScheme.outlineVariant),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
                           ),
-                          child: const Icon(Icons.description_rounded, color: AppColors.secondary),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                note.title,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 15,
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: AppColors.highlightIndigoBg,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.description_rounded, color: AppColors.secondary, size: 22),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  note.title,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14.5,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                '${note.unitCode} • Page ${recent.lastPage + 1}',
-                                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                              ),
-                            ],
+                                Text(
+                                  '${note.unitCode} • Page ${recent.lastPage + 1}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
+                                    fontSize: 12.5
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        FilledButton(
-                          onPressed: () => context.push('/note-detail', extra: note),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.indigo,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          const SizedBox(width: 12),
+                          FilledButton(
+                            onPressed: () => context.push('/note-detail', extra: note),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.indigo,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text('Resume', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
                           ),
-                          child: const Text('Resume', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             );
           },
@@ -1092,78 +1061,82 @@ class _RecentlyViewedSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final history = ref.watch(recentHistoryProvider);
 
     if (history.isEmpty) return const SizedBox.shrink();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Recently Viewed',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: Theme.of(context).colorScheme.onSurface,
-                  letterSpacing: -0.5,
+    return Padding(
+      padding: const EdgeInsets.only(top: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Recently Viewed',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  ),
                 ),
-              ),
-              TextButton(
-                onPressed: () => ref.read(recentHistoryProvider.notifier).clear(),
-                child: const Text('Clear', style: TextStyle(color: Colors.red, fontSize: 13)),
-              ),
-            ],
+                TextButton(
+                  onPressed: () => ref.read(recentHistoryProvider.notifier).clear(),
+                  style: TextButton.styleFrom(minimumSize: Size.zero, padding: EdgeInsets.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                  child: const Text('Clear', style: TextStyle(color: Colors.red, fontSize: 12.5)),
+                ),
+              ],
+            ),
           ),
-        ),
-        SizedBox(
-          height: 120,
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            itemCount: history.take(10).length,
-            itemBuilder: (context, index) {
-              final item = history[index];
-              return Container(
-                width: 100,
-                margin: const EdgeInsets.only(right: 12),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 70,
-                      height: 70,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-                        image: item.imageUrl != null 
-                          ? DecorationImage(image: NetworkImage(item.imageUrl!), fit: BoxFit.cover)
+          SizedBox(
+            height: 110,
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: history.take(10).length,
+              itemBuilder: (context, index) {
+                final item = history[index];
+                return Container(
+                  width: 90,
+                  margin: const EdgeInsets.only(right: 12),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 65,
+                        height: 65,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surface,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: theme.colorScheme.outlineVariant),
+                          image: item.imageUrl != null 
+                            ? DecorationImage(image: NetworkImage(item.imageUrl!), fit: BoxFit.cover)
+                            : null,
+                        ),
+                        child: item.imageUrl == null 
+                          ? Icon(_getIcon(item.type), color: Colors.indigo.shade200, size: 20)
                           : null,
                       ),
-                      child: item.imageUrl == null 
-                        ? Icon(_getIcon(item.type), color: Colors.indigo.shade200)
-                        : null,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      item.title,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              );
-            },
+                      const SizedBox(height: 6),
+                      Text(
+                        item.title,
+                        style: theme.textTheme.bodySmall?.copyWith(fontSize: 10.5, fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1183,51 +1156,53 @@ class _SavedItemsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final allSavedListings = ref.watch(savedListingsProvider).valueOrNull ?? [];
-    // Only show active listings in the homepage favorites preview
     final savedListings = allSavedListings.where((l) => l.status == ListingStatus.active).toList();
     final savedHousing = ref.watch(savedHousingProvider).valueOrNull ?? [];
 
     if (savedListings.isEmpty && savedHousing.isEmpty) return const SizedBox.shrink();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-          child: Text(
-            'Your Favorites',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: Theme.of(context).colorScheme.onSurface,
-              letterSpacing: -0.5,
+    return Padding(
+      padding: const EdgeInsets.only(top: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+            child: Text(
+              'Your Favorites',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+              ),
             ),
           ),
-        ),
-        SizedBox(
-          height: 180,
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            children: [
-              ...savedHousing.take(3).map((h) => _SavedItemCard(
-                title: h.title,
-                subtitle: 'KES ${h.rent.toInt()}',
-                imageUrl: h.images.isNotEmpty ? h.images.first : null,
-                onTap: () => context.push('/housing-detail', extra: h),
-              )),
-              ...savedListings.take(3).map((l) => _SavedItemCard(
-                title: l.title,
-                subtitle: 'KES ${l.price.toInt()}',
-                imageUrl: l.imageUrls.isNotEmpty ? l.imageUrls.first : null,
-                onTap: () => context.push('/listing-detail', extra: l),
-              )),
-            ],
+          SizedBox(
+            height: 170,
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              children: [
+                ...savedHousing.take(3).map((h) => _SavedItemCard(
+                  title: h.title,
+                  subtitle: 'KES ${h.rent.toInt()}',
+                  imageUrl: h.images.isNotEmpty ? h.images.first : null,
+                  onTap: () => context.push('/housing-detail', extra: h),
+                )),
+                ...savedListings.take(3).map((l) => _SavedItemCard(
+                  title: l.title,
+                  subtitle: 'KES ${l.price.toInt()}',
+                  imageUrl: l.imageUrls.isNotEmpty ? l.imageUrls.first : null,
+                  onTap: () => context.push('/listing-detail', extra: l),
+                )),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -1247,15 +1222,16 @@ class _SavedItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 140,
-        margin: const EdgeInsets.only(right: 16),
+        width: 135,
+        margin: const EdgeInsets.only(right: 14),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.02),
@@ -1270,17 +1246,34 @@ class _SavedItemCard extends StatelessWidget {
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
               child: imageUrl != null 
-                ? Image.network(imageUrl!, height: 100, width: 140, fit: BoxFit.cover)
-                : Container(height: 100, width: 140, color: Colors.grey.shade100, child: const Icon(Icons.image_outlined, color: Colors.grey)),
+                ? Image.network(imageUrl!, height: 95, width: 135, fit: BoxFit.cover)
+                : Container(
+                    height: 95, 
+                    width: 135, 
+                    color: theme.colorScheme.surfaceContainerHighest, 
+                    child: Icon(Icons.image_outlined, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5), size: 20)
+                  ),
             ),
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 4),
-                  Text(subtitle, style: const TextStyle(fontSize: 11, color: AppColors.secondary, fontWeight: FontWeight.w700)),
+                  Text(
+                    title, 
+                    style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: 11.5), 
+                    maxLines: 1, 
+                    overflow: TextOverflow.ellipsis
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle, 
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: theme.colorScheme.primary, 
+                      fontWeight: FontWeight.w700
+                    )
+                  ),
                 ],
               ),
             ),

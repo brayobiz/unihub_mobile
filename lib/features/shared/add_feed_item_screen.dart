@@ -102,6 +102,7 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final isGig = widget.type == FeedType.gig;
     final isConfession = widget.type == FeedType.confession;
     
@@ -110,13 +111,17 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
     if (isConfession) title = 'Anonymous Confession';
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
-        title: Text(title, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: Text(title, 
+          style: TextStyle(
+            color: theme.colorScheme.onSurface, 
+            fontWeight: FontWeight.bold
+          )),
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.black),
+          icon: Icon(Icons.close, color: theme.colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
@@ -125,7 +130,7 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
             child: FilledButton(
               onPressed: _isLoading ? null : _submit,
               style: FilledButton.styleFrom(
-                backgroundColor: isGig ? Colors.indigo : (isConfession ? Colors.red : Colors.blue),
+                backgroundColor: isGig ? theme.colorScheme.primary : (isConfession ? Colors.red : Colors.blue),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: _isLoading 
@@ -143,18 +148,20 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (isGig) ...[
-                _buildSectionLabel('What service do you need?'),
+                _buildSectionLabel(context, 'What service do you need?'),
                 _buildModernField(
+                  context,
                   controller: _titleController,
                   hint: 'e.g., Graphic Designer for Logo',
                   icon: Icons.work_outline,
                   validator: (v) => v!.isEmpty ? 'Please enter a title' : null,
                 ),
                 const SizedBox(height: 24),
-                _buildGigCategoryPicker(),
+                _buildGigCategoryPicker(context),
                 const SizedBox(height: 24),
-                _buildSectionLabel('Budget / Pay'),
+                _buildSectionLabel(context, 'Budget / Pay'),
                 _buildModernField(
+                  context,
                   controller: _priceController,
                   hint: 'e.g., 1000',
                   icon: Icons.payments_outlined,
@@ -162,7 +169,7 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
                   prefixText: 'KES ',
                 ),
                 const SizedBox(height: 24),
-                _buildSectionLabel('Application Deadline (Optional)'),
+                _buildSectionLabel(context, 'Application Deadline (Optional)'),
                 InkWell(
                   onTap: () async {
                     final date = await showDatePicker(
@@ -176,20 +183,22 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
+                      color: theme.colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey.shade200),
+                      border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.calendar_today, color: Colors.grey),
+                        Icon(Icons.calendar_today, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
                         const SizedBox(width: 12),
                         Text(
                           _selectedDeadline == null 
                               ? 'Select a deadline' 
                               : 'Deadline: ${DateFormat.yMMMd().format(_selectedDeadline!)}',
                           style: TextStyle(
-                            color: _selectedDeadline == null ? Colors.grey : Colors.black,
+                            color: _selectedDeadline == null 
+                                ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5) 
+                                : theme.colorScheme.onSurface,
                           ),
                         ),
                       ],
@@ -197,7 +206,7 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                _buildSectionLabel('Attachments / Images'),
+                _buildSectionLabel(context, 'Attachments / Images'),
                 SizedBox(
                   height: 100,
                   child: ListView(
@@ -214,11 +223,11 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
                         child: Container(
                           width: 100,
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
+                            color: theme.colorScheme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey.shade300, style: BorderStyle.solid),
+                            border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), style: BorderStyle.solid),
                           ),
-                          child: const Icon(Icons.add_a_photo_outlined, color: Colors.grey),
+                          child: Icon(Icons.add_a_photo_outlined, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
                         ),
                       ),
                       ..._selectedImages.map((img) => Container(
@@ -243,9 +252,10 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                _buildSectionLabel('Describe the work'),
+                _buildSectionLabel(context, 'Describe the work'),
               ] else if (!isConfession) ...[
                 _buildModernField(
+                  context,
                   controller: _titleController,
                   hint: 'Title (optional)',
                   icon: Icons.title,
@@ -254,6 +264,7 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
               ],
               
               _buildModernField(
+                context,
                 controller: _contentController,
                 hint: isGig 
                     ? 'Provide details about the gig, requirements, and deadline...' 
@@ -267,18 +278,18 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.indigo.shade50,
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.indigo.shade100),
+                    border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.lightbulb_outline, color: Colors.indigo.shade700),
+                      Icon(Icons.lightbulb_outline, color: theme.colorScheme.primary),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'Keep it campus-focused for better responses from fellow students.',
-                          style: TextStyle(color: Colors.indigo.shade900, fontSize: 13),
+                          style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13),
                         ),
                       ),
                     ],
@@ -292,18 +303,19 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
     );
   }
 
-  Widget _buildGigCategoryPicker() {
+  Widget _buildGigCategoryPicker(BuildContext context) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _buildSectionLabel('Gig Category'),
+            _buildSectionLabel(context, 'Gig Category'),
             GestureDetector(
               onTap: () => _showMarketplaceDifferentiator(),
               child: Text('Selling an item?', 
-                style: TextStyle(fontSize: 11, color: Colors.indigo.shade400, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
+                style: TextStyle(fontSize: 11, color: theme.colorScheme.primary, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
             ),
           ],
         ),
@@ -312,22 +324,24 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.grey.shade50,
+              color: theme.colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade200),
+              border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
             ),
             child: Row(
               children: [
-                const Icon(Icons.category_outlined, color: Colors.grey),
+                Icon(Icons.category_outlined, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
                 const SizedBox(width: 12),
                 Text(
                   _selectedCategory ?? 'Select a category',
                   style: TextStyle(
-                    color: _selectedCategory == null ? Colors.grey : Colors.black,
+                    color: _selectedCategory == null 
+                        ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5) 
+                        : theme.colorScheme.onSurface,
                   ),
                 ),
                 const Spacer(),
-                const Icon(Icons.expand_more_rounded, color: Colors.grey),
+                Icon(Icons.expand_more_rounded, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
               ],
             ),
           ),
@@ -337,11 +351,12 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
   }
 
   void _showGigCategorySheet() {
+    final theme = Theme.of(context);
     final categories = GigCategories.all;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
       builder: (context) => Container(
         constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
@@ -349,9 +364,9 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Select Gig Category', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text('Select Gig Category', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
             const SizedBox(height: 10),
-            Text('Services and tasks only. Selling items? Go to Marketplace.', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+            Text('Services and tasks only. Selling items? Go to Marketplace.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
             const SizedBox(height: 20),
             Expanded(
               child: ListView.builder(
@@ -360,8 +375,8 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
                   final cat = categories[index];
                   return ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 30, vertical: 4),
-                    title: Text(cat, style: const TextStyle(fontWeight: FontWeight.w600)),
-                    trailing: _selectedCategory == cat ? const Icon(Icons.check_circle, color: Colors.indigo) : null,
+                    title: Text(cat, style: TextStyle(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
+                    trailing: _selectedCategory == cat ? Icon(Icons.check_circle, color: theme.colorScheme.primary) : null,
                     onTap: () {
                       setState(() => _selectedCategory = cat);
                       Navigator.pop(context);
@@ -377,28 +392,32 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
   }
 
   void _showMarketplaceDifferentiator() {
+    final theme = Theme.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: theme.colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.lightbulb_outline, color: Colors.amber),
-            SizedBox(width: 10),
-            Text('Gigs vs Marketplace'),
+            const Icon(Icons.lightbulb_outline, color: Colors.amber),
+            const SizedBox(width: 10),
+            Text('Gigs vs Marketplace', style: TextStyle(color: theme.colorScheme.onSurface)),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildDiffItem(
+              context,
               icon: Icons.work_rounded,
               title: 'Student Gigs',
               desc: 'Offering or hiring for services like tutoring, errands, or design.',
-              color: Colors.indigo,
+              color: theme.colorScheme.primary,
             ),
             const SizedBox(height: 16),
             _buildDiffItem(
+              context,
               icon: Icons.shopping_bag_rounded,
               title: 'Marketplace',
               desc: 'Selling physical items like textbooks, laptops, or clothes.',
@@ -422,7 +441,8 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
     );
   }
 
-  Widget _buildDiffItem({required IconData icon, required String title, required String desc, required Color color}) {
+  Widget _buildDiffItem(BuildContext context, {required IconData icon, required String title, required String desc, required Color color}) {
+    final theme = Theme.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -436,9 +456,9 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface)),
               const SizedBox(height: 2),
-              Text(desc, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+              Text(desc, style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
             ],
           ),
         ),
@@ -446,17 +466,19 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
     );
   }
 
-  Widget _buildSectionLabel(String label) {
+  Widget _buildSectionLabel(BuildContext context, String label) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8, left: 4),
       child: Text(
         label,
-        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+        style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
       ),
     );
   }
 
-  Widget _buildModernField({
+  Widget _buildModernField(
+    BuildContext context, {
     required TextEditingController controller,
     required String hint,
     IconData? icon,
@@ -465,30 +487,33 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
     String? prefixText,
     String? Function(String?)? validator,
   }) {
+    final theme = Theme.of(context);
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboardType,
       validator: validator,
+      style: TextStyle(color: theme.colorScheme.onSurface),
       decoration: InputDecoration(
         hintText: hint,
-        prefixIcon: icon != null ? Icon(icon, color: Colors.grey) : null,
+        hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+        prefixIcon: icon != null ? Icon(icon, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7)) : null,
         prefixText: prefixText,
-        prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+        prefixStyle: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
         filled: true,
-        fillColor: Colors.grey.shade50,
+        fillColor: theme.colorScheme.surfaceContainerHighest,
         contentPadding: const EdgeInsets.all(16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.grey.shade200),
+          borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.grey.shade200),
+          borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Colors.indigo, width: 2),
+          borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
         ),
       ),
     );

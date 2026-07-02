@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:unihub_mobile/services/notification_service.dart';
 import '../../domain/models/verification_application.dart';
 import '../../domain/models/professional_role.dart';
 import '../../domain/models/student_verification.dart';
@@ -7,14 +8,23 @@ import '../../domain/repositories/trust_repository.dart';
 
 class TrustRepositoryImpl implements TrustRepository {
   final FirebaseFirestore _firestore;
+  final NotificationService? _notificationService;
 
-  TrustRepositoryImpl(this._firestore);
+  TrustRepositoryImpl(this._firestore, [this._notificationService]);
 
   @override
   Future<void> submitProfessionalApplication(VerificationApplication application) async {
     await _firestore.collection('verification_applications').doc(application.id).set(
       application.toFirestore(),
     );
+
+    if (_notificationService != null) {
+      await _notificationService!.notifyAdmins(
+        title: 'New Professional Application 💼',
+        body: 'A user has applied for the ${application.role.label} role.',
+        route: '/admin/verifications',
+      );
+    }
   }
 
   @override
@@ -59,6 +69,14 @@ class TrustRepositoryImpl implements TrustRepository {
       'status': StudentVerificationStatus.pending.name,
       'submittedAt': FieldValue.serverTimestamp(),
     });
+
+    if (_notificationService != null) {
+      await _notificationService!.notifyAdmins(
+        title: 'New Student Verification 🎓',
+        body: 'A user has submitted their student ID for verification.',
+        route: '/admin/verifications',
+      );
+    }
   }
 
   @override
@@ -90,6 +108,14 @@ class TrustRepositoryImpl implements TrustRepository {
     await _firestore.collection('users').doc(userId).update({
       'identityStatus': 'pending',
     });
+
+    if (_notificationService != null) {
+      await _notificationService!.notifyAdmins(
+        title: 'New Identity Verification 🛡️',
+        body: 'A user has submitted identity documents and a selfie for review.',
+        route: '/admin/verifications',
+      );
+    }
   }
 
   @override

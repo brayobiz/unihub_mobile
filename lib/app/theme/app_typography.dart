@@ -7,37 +7,30 @@ class AppTypography {
 
   static String get fontFamily => GoogleFonts.plusJakartaSans().fontFamily!;
 
-  static TextTheme get lightTextTheme => GoogleFonts.plusJakartaSansTextTheme(
-    const TextTheme(
-      displayLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-      displayMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-      displaySmall: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-      titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-      titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-      titleSmall: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-      bodyLarge: TextStyle(fontSize: 16),
-      bodyMedium: TextStyle(fontSize: 14),
-      bodySmall: TextStyle(fontSize: 12),
-      labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-      labelMedium: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-      labelSmall: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2),
-    ),
-  );
+  // Cache TextTheme instances to avoid expensive font resolution on every rebuild
+  static final TextTheme lightTextTheme = _buildTextTheme(Brightness.light);
+  static final TextTheme darkTextTheme = _buildTextTheme(Brightness.dark);
 
-  static TextTheme get darkTextTheme => GoogleFonts.plusJakartaSansTextTheme(
-    const TextTheme(
-      displayLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
-      displayMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
-      displaySmall: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
-      titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-      titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
-      titleSmall: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
-      bodyLarge: TextStyle(fontSize: 16, color: Colors.white),
-      bodyMedium: TextStyle(fontSize: 14, color: Colors.white),
-      bodySmall: TextStyle(fontSize: 12, color: Colors.white70),
-      labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
-      labelMedium: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-      labelSmall: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: Colors.white60),
-    ),
-  );
+  static TextTheme _buildTextTheme(Brightness brightness) {
+    final bool isDark = brightness == Brightness.dark;
+    final Color primaryColor = isDark ? Colors.white : Colors.black;
+    final Color secondaryColor = isDark ? Colors.white70 : Colors.black87;
+
+    return GoogleFonts.plusJakartaSansTextTheme(
+      TextTheme(
+        displayLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: primaryColor),
+        displayMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: primaryColor),
+        displaySmall: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: primaryColor),
+        titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: primaryColor),
+        titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: primaryColor),
+        titleSmall: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: primaryColor),
+        bodyLarge: TextStyle(fontSize: 16, color: primaryColor),
+        bodyMedium: TextStyle(fontSize: 14, color: secondaryColor),
+        bodySmall: TextStyle(fontSize: 12, color: secondaryColor),
+        labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: primaryColor),
+        labelMedium: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primaryColor),
+        labelSmall: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: secondaryColor),
+      ),
+    );
+  }
 }
