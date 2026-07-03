@@ -21,7 +21,10 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> signInWithEmailAndPassword(String email, String password) async {
     try {
-      debugPrint('🔑 Auth: Attempting sign in for $email');
+      // SECURITY FIX: Do not log full email in production
+      if (kDebugMode) {
+        debugPrint('🔑 Auth: Attempting sign in for ${email.split('@').first}@...');
+      }
       await _firebaseAuth.signInWithEmailAndPassword(
         email: email,
         password: password,
@@ -137,6 +140,15 @@ class AuthRepositoryImpl implements AuthRepository {
       await _firebaseAuth.sendPasswordResetEmail(email: email);
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
+    }
+  }
+
+  @override
+  Future<void> reauthenticate(String email, String password) async {
+    final user = _firebaseAuth.currentUser;
+    if (user != null) {
+      final credential = EmailAuthProvider.credential(email: email, password: password);
+      await user.reauthenticateWithCredential(credential);
     }
   }
 
@@ -313,12 +325,18 @@ class AuthRepositoryImpl implements AuthRepository {
         batch.delete(doc.reference);
       }
 
-      // 7. Delete user profile
+      // 7. Delete notifications
+      final notifications = await _firestore.collection('users').doc(uid).collection('notifications').get();
+      for (var doc in notifications.docs) {
+        batch.delete(doc.reference);
+      }
+
+      // 8. Delete user profile
       batch.delete(_firestore.collection('users').doc(uid));
       
       await batch.commit();
       
-      // 8. Delete the user from Firebase Auth
+      // 9. Delete the user from Firebase Auth
       await user.delete();
     }
   }

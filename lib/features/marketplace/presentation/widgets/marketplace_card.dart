@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
+import '../../../../core/utils/date_formatter.dart';
 import '../../domain/models/listing.dart';
 import '../../shared/providers.dart';
 
@@ -194,6 +196,34 @@ class MarketplaceCard extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          DateFormatter.formatRelative(listing.createdAt),
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        if (listing.viewsCount > 10)
+                          Row(
+                            children: [
+                              Icon(Icons.visibility_outlined, size: 10, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${NumberFormat.compact().format(listing.viewsCount)} views',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
                     Consumer(
                       builder: (context, ref, child) {
                         final sellerAsync = ref.watch(otherUserProvider(listing.sellerId));
@@ -206,7 +236,9 @@ class MarketplaceCard extends ConsumerWidget {
                                   CircleAvatar(
                                     radius: 8,
                                     backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                                    backgroundImage: seller.photoUrl != null ? NetworkImage(seller.photoUrl!) : null,
+                                    backgroundImage: seller.photoUrl != null 
+                                        ? CachedNetworkImageProvider(seller.photoUrl!)
+                                        : null,
                                     child: seller.photoUrl == null
                                       ? Text(
                                           seller.fullName[0].toUpperCase(),
@@ -358,7 +390,9 @@ class MarketplaceCard extends ConsumerWidget {
             onPressed: () async {
               Navigator.pop(context);
               try {
-                await ref.read(marketplaceRepositoryProvider).deleteListing(listing.id);
+                final user = ref.read(appUserProvider).valueOrNull;
+                if (user == null) return;
+                await ref.read(marketplaceRepositoryProvider).deleteListing(listing.id, user.uid);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Listing deleted successfully')),

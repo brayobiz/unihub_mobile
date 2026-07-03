@@ -38,7 +38,12 @@ class PresenceService with WidgetsBindingObserver {
     if (user == null) return;
 
     try {
-      await _ref.read(firestoreProvider).collection('users').doc(user.uid).update({
+      final firestore = _ref.read(firestoreProvider);
+      final docRef = firestore.collection('users').doc(user.uid);
+      
+      // OPTIMIZATION: Only update if status actually changes or enough time passed
+      // For simplicity here, we just use a basic update.
+      await docRef.update({
         'isOnline': isOnline,
         'lastSeen': FieldValue.serverTimestamp(),
       });

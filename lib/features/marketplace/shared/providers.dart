@@ -105,11 +105,17 @@ class MarketplaceDiscoveryData {
   final List<Listing> recentlyViewed;
   final List<Listing> recommended;
   final List<Listing> trending;
+  final List<Listing> recentlyPosted;
+  final List<Listing> mostSaved;
+  final List<Listing> popular;
 
   MarketplaceDiscoveryData({
     required this.recentlyViewed,
     required this.recommended,
     required this.trending,
+    required this.recentlyPosted,
+    required this.mostSaved,
+    required this.popular,
   });
 }
 
@@ -117,32 +123,39 @@ final marketplaceDiscoveryProvider = Provider<AsyncValue<MarketplaceDiscoveryDat
   final recentlyViewedAsync = ref.watch(recentlyViewedProvider);
   final recommendedAsync = ref.watch(recommendedListingsProvider);
   final trendingAsync = ref.watch(trendingListingsProvider);
+  
+  final recentlyPostedAsync = ref.watch(listingsProvider(ListingFilter(sortBy: ListingSortType.newest, itemsLimit: 10)));
+  final mostSavedAsync = ref.watch(listingsProvider(ListingFilter(sortBy: ListingSortType.mostSaved, itemsLimit: 10)));
+  final popularAsync = ref.watch(listingsProvider(ListingFilter(sortBy: ListingSortType.mostViewed, itemsLimit: 10)));
 
-  if (recentlyViewedAsync.isLoading || recommendedAsync.isLoading || trendingAsync.isLoading) {
+  if (recentlyViewedAsync.isLoading || recommendedAsync.isLoading || trendingAsync.isLoading || 
+      recentlyPostedAsync.isLoading || mostSavedAsync.isLoading || popularAsync.isLoading) {
     return const AsyncValue.loading();
   }
 
   if (recentlyViewedAsync.hasError) return AsyncValue.error(recentlyViewedAsync.error!, recentlyViewedAsync.stackTrace!);
   if (recommendedAsync.hasError) return AsyncValue.error(recommendedAsync.error!, recommendedAsync.stackTrace!);
   if (trendingAsync.hasError) return AsyncValue.error(trendingAsync.error!, trendingAsync.stackTrace!);
+  if (recentlyPostedAsync.hasError) return AsyncValue.error(recentlyPostedAsync.error!, recentlyPostedAsync.stackTrace!);
+  if (mostSavedAsync.hasError) return AsyncValue.error(mostSavedAsync.error!, mostSavedAsync.stackTrace!);
+  if (popularAsync.hasError) return AsyncValue.error(popularAsync.error!, popularAsync.stackTrace!);
 
   final seenIds = <String>{};
-  final recentlyViewed = recentlyViewedAsync.value ?? [];
-  final uniqueRecentlyViewed = recentlyViewed.where((l) => seenIds.add(l.id)).toList();
   
-  final recommended = recommendedAsync.value ?? [];
-  final uniqueRecommended = recommended.where((l) => !seenIds.contains(l.id)).toList();
-  for (var l in uniqueRecommended) {
-    seenIds.add(l.id);
-  }
-  
-  final trending = trendingAsync.value ?? [];
-  final uniqueTrending = trending.where((l) => !seenIds.contains(l.id)).toList();
+  final recentlyViewed = (recentlyViewedAsync.value ?? []).where((l) => seenIds.add(l.id)).toList();
+  final recommended = (recommendedAsync.value ?? []).where((l) => seenIds.add(l.id)).toList();
+  final recentlyPosted = (recentlyPostedAsync.value ?? []).where((l) => seenIds.add(l.id)).toList();
+  final mostSaved = (mostSavedAsync.value ?? []).where((l) => seenIds.add(l.id)).toList();
+  final popular = (popularAsync.value ?? []).where((l) => seenIds.add(l.id)).toList();
+  final trending = (trendingAsync.value ?? []).where((l) => seenIds.add(l.id)).toList();
 
   return AsyncValue.data(MarketplaceDiscoveryData(
-    recentlyViewed: uniqueRecentlyViewed,
-    recommended: uniqueRecommended,
-    trending: uniqueTrending,
+    recentlyViewed: recentlyViewed,
+    recommended: recommended,
+    trending: trending,
+    recentlyPosted: recentlyPosted,
+    mostSaved: mostSaved,
+    popular: popular,
   ));
 });
 
@@ -204,37 +217,30 @@ final otherUserProvider = StreamProvider.family<AppUser, String>((ref, userId) {
         bool canViewDetails = visibility == 'public' || (visibility == 'university' && isSameUni) || isOwner;
         
         if (visibility == 'private' && !isOwner) {
-          return AppUser(
-            uid: targetUser.uid,
-            email: 'hidden@unihub.student',
-            fullName: targetUser.fullName,
-            photoUrl: targetUser.photoUrl,
-            reputationPoints: targetUser.reputationPoints,
-            averageRating: targetUser.averageRating,
-            ratingsCount: targetUser.ratingsCount,
+          return targetUser.stripSensitiveInfo().copyWith(
             university: 'Private Profile',
             course: 'Student',
-            isOnboardingCompleted: true,
           );
         }
 
         if (!canViewDetails) {
-           return targetUser.copyWith(
-             email: 'hidden@unihub.student',
+           return targetUser.stripSensitiveInfo().copyWith(
              bio: 'This profile is set to University-only visibility.',
              course: 'Student',
-             phoneNumber: null,
-             whatsappNumber: null,
-             socialLinks: const <String, String>{},
              university: showUni ? targetUni : 'Hidden Campus',
            );
         }
 
-        return targetUser.copyWith(
+        // Apply secondary flags
+        return targetUser.stripSensitiveInfo().copyWith(
           university: (showUni || isSameUni || isOwner) ? targetUni : 'Hidden Campus',
           socialLinks: (showSocials || isSameUni || isOwner)
               ? targetUser.socialLinks
               : const <String, String>{},
+          // Keep some public fields if it's the owner
+          email: isOwner ? targetUser.email : 'hidden@unihub.student',
+          phoneNumber: isOwner ? targetUser.phoneNumber : null,
+          whatsappNumber: isOwner ? targetUser.whatsappNumber : null,
         );
       });
 });

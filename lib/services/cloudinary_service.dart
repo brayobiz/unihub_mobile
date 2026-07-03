@@ -42,10 +42,17 @@ class CloudinaryService {
     required String folder,
     String? publicId,
     bool compress = true,
+    bool isPrivate = false,
     Function(int, int)? onProgress,
   }) async {
     final fileName = p.basename(file.path);
-    debugPrint('☁️ Cloudinary: Starting upload for $fileName to folder unihub/$folder');
+    
+    // SECURITY NOTE: In production, highly sensitive documents should use SIGNED uploads
+    // and be stored in a Private/Authenticated Cloudinary folder.
+    // This implementation uses a 'protected_' prefix as a hint for Cloudinary rules.
+    final effectiveFolder = isPrivate ? 'unihub/protected_$folder' : 'unihub/$folder';
+
+    debugPrint('☁️ Cloudinary: Starting upload for $fileName to folder $effectiveFolder');
     
     try {
       if (!await file.exists()) {
@@ -55,15 +62,12 @@ class CloudinaryService {
       File fileToUpload = file;
       final isImg = _isImage(file.path);
       
-      if (compress && isImg) {
+      if (compress && isImg && !isPrivate) {
         debugPrint('☁️ Cloudinary: Compressing image before upload...');
         fileToUpload = await compressImage(file);
         debugPrint('☁️ Cloudinary: Compression complete.');
       }
 
-      // Proactive Fix: PDFs should be handled as RAW for guaranteed bit-for-bit retrieval
-      // unless we specifically need image-like transformations. For the study reader,
-      // we need the original bytes. 
       final isPdf = p.extension(file.path).toLowerCase() == '.pdf';
       final resourceType = isImg 
           ? CloudinaryResourceType.Image 
@@ -71,7 +75,7 @@ class CloudinaryService {
 
       final cloudinaryFile = CloudinaryFile.fromFile(
         fileToUpload.path,
-        folder: 'unihub/$folder',
+        folder: effectiveFolder,
         publicId: publicId,
         resourceType: resourceType,
       );

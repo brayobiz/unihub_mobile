@@ -13,8 +13,8 @@ abstract class ChatRepository {
   });
   Future<void> markAsRead(String conversationId, String userId);
   Future<String> getSupportConversation(String userId);
-  Future<void> deleteMessage(String conversationId, String messageId);
-  Future<void> deleteConversation(String conversationId);
+  Future<void> deleteMessage(String conversationId, String messageId, String userId);
+  Future<void> deleteConversation(String conversationId, String userId);
   Future<void> updateTypingStatus(String conversationId, String userId, bool isTyping);
   Future<void> markAsDelivered(String conversationId, String userId);
 }

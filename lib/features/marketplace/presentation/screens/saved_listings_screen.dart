@@ -166,15 +166,40 @@ class _SavedListingsScreenState extends ConsumerState<SavedListingsScreen> with 
   }
 
   Widget _buildListingsGrid(List<dynamic> listings, {String prefix = 'saved'}) {
+    final theme = Theme.of(context);
     if (listings.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.favorite_border, size: 80, color: Colors.grey.shade300),
-            const SizedBox(height: 16),
-            const Text('No items yet.'),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.favorite_border_rounded, size: 48, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Nothing saved yet', 
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: theme.colorScheme.onSurface),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Items you save will appear here for quick access later.', 
+                textAlign: TextAlign.center,
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: () => context.go('/main'),
+                child: const Text('Explore Marketplace'),
+              ),
+            ],
+          ),
         ),
       );
     }

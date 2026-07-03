@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
@@ -199,7 +200,10 @@ class HousingCard extends ConsumerWidget {
                           shape: BoxShape.circle,
                           color: theme.colorScheme.surfaceContainerHighest,
                           image: listing.plugPhotoUrl != null 
-                              ? DecorationImage(image: NetworkImage(listing.plugPhotoUrl!), fit: BoxFit.cover)
+                              ? DecorationImage(
+                                  image: CachedNetworkImageProvider(listing.plugPhotoUrl!), 
+                                  fit: BoxFit.cover
+                                )
                               : null,
                         ),
                         child: listing.plugPhotoUrl == null 

@@ -401,7 +401,10 @@ class AddListingController extends StateNotifier<AddListingState> {
         quantity: state.quantity,
         tags: state.tags,
         attributes: state.attributes,
-        createdAt: DateTime.now(),
+        createdAt: state.isEditing 
+            ? (_ref.read(listingProvider(state.id)).value?.createdAt ?? DateTime.now())
+            : DateTime.now(),
+        updatedAt: state.isEditing ? DateTime.now() : null,
         expiresAt: DateTime.now().add(const Duration(days: 30)),
       );
 

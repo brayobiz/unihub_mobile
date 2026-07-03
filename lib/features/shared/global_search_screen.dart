@@ -5,6 +5,7 @@ import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/dashboard/controllers/smart_feed_controller.dart';
 import 'package:unihub_mobile/models/feed_type.dart';
 import 'package:go_router/go_router.dart';
+import 'package:unihub_mobile/core/utils/category_utils.dart';
 import 'package:unihub_mobile/features/campus_filter/presentation/widgets/campus_filter_selector.dart';
 import 'package:unihub_mobile/features/campus_filter/shared/providers.dart';
 import 'package:unihub_mobile/features/campus_filter/domain/models/browsing_scope.dart';
@@ -371,12 +372,12 @@ class _SearchItemCard extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: _getCategoryColor(item.model.type).withValues(alpha: 0.1),
+              color: CategoryUtils.getColor(item.model.type).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
-              _getCategoryIcon(item.model.type),
-              color: _getCategoryColor(item.model.type),
+              CategoryUtils.getIcon(item.model.type),
+              color: CategoryUtils.getColor(item.model.type),
             ),
           ),
           title: Text(
@@ -402,25 +403,5 @@ class _SearchItemCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  IconData _getCategoryIcon(FeedType type) {
-    switch (type) {
-      case FeedType.marketplace: return Icons.shopping_bag_outlined;
-      case FeedType.housing: return Icons.home_work_outlined;
-      case FeedType.notes: return Icons.description_outlined;
-      case FeedType.gig: return Icons.work_outline;
-      default: return Icons.star_outline;
-    }
-  }
-
-  Color _getCategoryColor(FeedType type) {
-    switch (type) {
-      case FeedType.marketplace: return AppColors.marketplace;
-      case FeedType.housing: return AppColors.housing;
-      case FeedType.notes: return AppColors.notes;
-      case FeedType.gig: return AppColors.gigs;
-      default: return AppColors.grey;
-    }
   }
 }

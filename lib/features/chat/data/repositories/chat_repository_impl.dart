@@ -16,6 +16,9 @@ class ChatRepositoryImpl implements ChatRepository {
 
   @override
   Stream<List<Conversation>> watchConversations(String userId) {
+    // Cache for blocked users to avoid frequent Firestore reads during stream updates
+    final Map<String, List<String>> _blockedCache = {};
+    
     return _firestore
         .collection('conversations')
         .where('participants', arrayContains: userId)
@@ -23,9 +26,13 @@ class ChatRepositoryImpl implements ChatRepository {
         .asyncMap((snapshot) async {
       final now = DateTime.now();
       
-      // Fetch user's blocked list for filtering
-      final userDoc = await _firestore.collection('users').doc(userId).get(const GetOptions(source: Source.serverAndCache));
-      final blockedUids = List<String>.from(userDoc.data()?['blockedUids'] ?? []);
+      // Fetch user's blocked list (using local cache or serverAndCache to save reads)
+      List<String> blockedUids = _blockedCache[userId] ?? [];
+      if (blockedUids.isEmpty) {
+        final userDoc = await _firestore.collection('users').doc(userId).get(const GetOptions(source: Source.serverAndCache));
+        blockedUids = List<String>.from(userDoc.data()?['blockedUids'] ?? []);
+        _blockedCache[userId] = blockedUids;
+      }
 
       final items = snapshot.docs
           .map((doc) => Conversation.fromJson(doc.data()))
@@ -385,17 +392,31 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
-  Future<void> deleteMessage(String conversationId, String messageId) async {
-    await _firestore
+  Future<void> deleteMessage(String conversationId, String messageId, String userId) async {
+    final msgDoc = await _firestore
         .collection('conversations')
         .doc(conversationId)
         .collection('messages')
         .doc(messageId)
-        .delete();
+        .get();
+    
+    if (msgDoc.exists && msgDoc.data()?['senderId'] == userId) {
+      await msgDoc.reference.delete();
+    } else {
+      throw Exception('Unauthorized: You can only delete your own messages');
+    }
   }
 
   @override
-  Future<void> deleteConversation(String conversationId) async {
+  Future<void> deleteConversation(String conversationId, String userId) async {
+    final convDoc = await _firestore.collection('conversations').doc(conversationId).get();
+    if (!convDoc.exists) return;
+    
+    final participants = List<String>.from(convDoc.data()?['participants'] ?? []);
+    if (!participants.contains(userId)) {
+      throw Exception('Unauthorized: You are not a participant in this conversation');
+    }
+
     final messages = await _firestore
         .collection('conversations')
         .doc(conversationId)

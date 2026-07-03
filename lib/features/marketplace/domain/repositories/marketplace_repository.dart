@@ -1,5 +1,7 @@
 import '../models/listing.dart';
 import '../models/offer.dart';
+import '../models/seller_stats.dart';
+import '../models/saved_search.dart';
 
 enum ListingSortType { newest, oldest, lowestPrice, highestPrice, mostViewed, mostSaved }
 
@@ -48,8 +50,14 @@ abstract class MarketplaceRepository {
   Future<void> clearRecentSearches(String userId);
   Future<List<String>> getPopularSearches();
 
+  // Saved Searches & Alerts
+  Future<void> saveSearch(SavedSearch search);
+  Future<void> deleteSavedSearch(String userId, String searchId);
+  Stream<List<SavedSearch>> watchSavedSearches(String userId);
+  Future<void> updateSavedSearchNotification(String userId, String searchId, bool enabled);
+
   // Seller Dashboard & Performance
-  Future<Map<String, dynamic>> getSellerStats(String userId);
+  Future<SellerStats> getSellerStats(String userId);
   Stream<List<Listing>> watchSellerListingsByStatus(String sellerId, ListingStatus status);
 
   Future<List<Listing>> getListings({int limit = 20, Listing? startAfter});
@@ -58,15 +66,15 @@ abstract class MarketplaceRepository {
 
   Future<void> createListing(Listing listing);
   Future<void> updateListing(Listing listing);
-  Future<void> deleteListing(String id);
+  Future<void> deleteListing(String id, String userId);
   Future<void> toggleSaveListing(String userId, String listingId);
   Future<void> boostListing(String listingId);
   Future<void> recordView(String listingId, {String? userId});
   Future<void> recordSave(String listingId, bool isSaved);
   Future<void> recordChatStarted(String listingId);
   Future<void> recordShare(String listingId);
-  Future<void> updateListingStatus(String listingId, ListingStatus status);
-  Future<void> updateListingPrice(String listingId, double newPrice);
+  Future<void> updateListingStatus(String listingId, ListingStatus status, String userId);
+  Future<void> updateListingPrice(String listingId, double newPrice, String userId);
   
   Future<void> reportListing({
     required String listingId,

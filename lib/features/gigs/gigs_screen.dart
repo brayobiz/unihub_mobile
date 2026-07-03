@@ -13,6 +13,7 @@ import '../../widgets/notification_badge.dart';
 import '../campus_filter/presentation/widgets/campus_filter_selector.dart';
 import '../campus_filter/shared/providers.dart';
 import '../campus_filter/domain/models/browsing_scope.dart';
+import 'package:unihub_mobile/core/utils/category_utils.dart';
 import 'package:unihub_mobile/features/announcements/presentation/widgets/announcement_display.dart';
 import 'package:unihub_mobile/features/ads/ads_module.dart';
 import 'shared/providers.dart';
@@ -94,27 +95,60 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
                 if (filteredItems.isEmpty) {
                   final isFiltered = _searchQuery.isNotEmpty || ref.read(browsingScopeProvider).type != BrowsingScopeType.all;
                   return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.work_off_outlined, size: 64, color: theme.colorScheme.outlineVariant),
-                        const SizedBox(height: 16),
-                        Text('No gigs found.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
-                        if (isFiltered) ...[
-                          const SizedBox(height: 24),
-                          FilledButton.icon(
-                            onPressed: () {
-                              setState(() => _searchQuery = '');
-                              ref.read(browsingScopeProvider.notifier).reset();
-                            },
-                            icon: const Icon(Icons.refresh_rounded, size: 18),
-                            label: const Text('Explore All Gigs'),
-                            style: FilledButton.styleFrom(
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(40),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              CategoryUtils.getIcon(FeedType.gig),
+                              size: 56,
+                              color: theme.colorScheme.primary.withValues(alpha: 0.5),
                             ),
                           ),
+                          const SizedBox(height: 24),
+                          Text(
+                            isFiltered ? 'No matching gigs' : 'No gigs available',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            isFiltered 
+                                ? 'Try adjusting your search or switching to "All Campuses".' 
+                                : 'Be the first to post a student gig and help your fellow students!',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                              height: 1.5,
+                            ),
+                          ),
+                          if (isFiltered) ...[
+                            const SizedBox(height: 32),
+                            FilledButton.icon(
+                              onPressed: () {
+                                setState(() => _searchQuery = '');
+                                ref.read(browsingScopeProvider.notifier).reset();
+                              },
+                              icon: const Icon(Icons.refresh_rounded, size: 18),
+                              label: const Text('Explore All Gigs'),
+                              style: FilledButton.styleFrom(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   );
                 }

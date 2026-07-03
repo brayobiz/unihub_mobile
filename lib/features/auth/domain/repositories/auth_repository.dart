@@ -13,6 +13,7 @@ abstract class AuthRepository {
   });
   Future<void> signOut();
   Future<void> resetPassword(String email);
+  Future<void> reauthenticate(String email, String password);
   Stream<AppUser?> watchUser(String uid);
   Future<AppUser?> getUser(String uid);
   Future<void> updateProfile({

@@ -146,6 +146,9 @@ class _MyListingCard extends ConsumerWidget {
                   iconColor: theme.colorScheme.onSurface,
                   onSelected: (val) async {
                     final messenger = ScaffoldMessenger.of(context);
+                    final user = ref.read(appUserProvider).valueOrNull;
+                    if (user == null) return;
+                    
                     try {
                       if (val == 'delete') {
                         final confirmed = await showDialog<bool>(
@@ -161,17 +164,17 @@ class _MyListingCard extends ConsumerWidget {
                           ),
                         );
                         if (confirmed == true) {
-                          await ref.read(marketplaceRepositoryProvider).deleteListing(listing.id);
+                          await ref.read(marketplaceRepositoryProvider).deleteListing(listing.id, user.uid);
                           messenger.showSnackBar(const SnackBar(content: Text('Listing deleted')));
                         }
                       } else if (val == 'sold') {
-                        await ref.read(marketplaceRepositoryProvider).updateListingStatus(listing.id, ListingStatus.sold);
+                        await ref.read(marketplaceRepositoryProvider).updateListingStatus(listing.id, ListingStatus.sold, user.uid);
                         messenger.showSnackBar(const SnackBar(content: Text('Item marked as sold! 🎉')));
                       } else if (val == 'pause') {
-                        await ref.read(marketplaceRepositoryProvider).updateListingStatus(listing.id, ListingStatus.paused);
+                        await ref.read(marketplaceRepositoryProvider).updateListingStatus(listing.id, ListingStatus.paused, user.uid);
                         messenger.showSnackBar(const SnackBar(content: Text('Listing paused')));
                       } else if (val == 'activate') {
-                        await ref.read(marketplaceRepositoryProvider).updateListingStatus(listing.id, ListingStatus.active);
+                        await ref.read(marketplaceRepositoryProvider).updateListingStatus(listing.id, ListingStatus.active, user.uid);
                         messenger.showSnackBar(const SnackBar(content: Text('Listing is now active')));
                       } else if (val == 'edit') {
                         context.push('/add-listing', extra: listing);

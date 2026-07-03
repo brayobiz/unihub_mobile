@@ -54,6 +54,7 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
         path: 'verifications/identity/ids',
         id: 'id_${user.uid}_${DateTime.now().millisecondsSinceEpoch}',
         file: _idFile!,
+        isPrivate: true,
         onProgress: (sent, total) {
           setState(() => _uploadProgress = (sent / total) * 0.5);
         },
@@ -64,6 +65,7 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
         path: 'verifications/identity/selfies',
         id: 'selfie_${user.uid}_${DateTime.now().millisecondsSinceEpoch}',
         file: _selfieFile!,
+        isPrivate: true,
         onProgress: (sent, total) {
           setState(() => _uploadProgress = 0.5 + (sent / total) * 0.5);
         },

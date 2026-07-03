@@ -473,10 +473,13 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
         ],
         _buildActionButton(Icons.verified_user_outlined, 'Trust & Verification', () => context.push('/trust-center')),
         const SizedBox(height: 8),
-        _buildActionButton(Icons.favorite_outline_rounded, 'Saved Items', () => context.push('/saved')),
+        _buildActionButton(Icons.favorite_outline_rounded, 'Saved Items', () => context.push('/saved-housing')),
         const SizedBox(height: 8),
-        _buildActionButton(Icons.emoji_events_outlined, 'Achievements (Coming Soon)', () {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Achievements are coming soon! Stay tuned.')));
+        _buildActionButton(Icons.emoji_events_outlined, 'Achievements & Milestones', () {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Achievements are coming in the next update! Keep using UniHub to rack up points.'),
+            behavior: SnackBarBehavior.floating,
+          ));
         }),
       ],
     );

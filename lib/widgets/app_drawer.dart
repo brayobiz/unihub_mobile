@@ -125,7 +125,7 @@ class AppDrawer extends ConsumerWidget {
           _drawerItem(context, Icons.work_outline, 'Student Gigs', onTap: () {
             context.push('/gigs');
           }),
-          _drawerItem(context, Icons.favorite_border, 'Confessions', onTap: () {
+          _drawerItem(context, Icons.favorite_border_rounded, 'Confessions', onTap: () {
             context.push('/confessions');
           }),
 

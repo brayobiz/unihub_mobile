@@ -112,8 +112,12 @@ final smartFeedProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
     ));
   }
 
-  // Simple shuffle for variety
-  allItems.shuffle();
+  // Stable sorting by timestamp instead of shuffle for better UI reliability
+  allItems.sort((a, b) {
+    final dateA = a.originalData?.createdAt as DateTime? ?? DateTime(2000);
+    final dateB = b.originalData?.createdAt as DateTime? ?? DateTime(2000);
+    return dateB.compareTo(dateA);
+  });
 
   return AsyncValue.data(allItems);
 });

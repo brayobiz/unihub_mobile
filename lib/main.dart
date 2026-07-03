@@ -13,6 +13,7 @@ import 'firebase_options.dart';
 import 'features/profile/settings_screen.dart';
 import 'services/notification_service.dart';
 import 'services/presence_service.dart';
+import 'services/connectivity_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -72,6 +73,7 @@ class UniHubApp extends ConsumerWidget {
 
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final connectivity = ref.watch(connectivityServiceProvider);
     
     return MaterialApp.router(
       title: 'UniHubLife',
@@ -84,6 +86,40 @@ class UniHubApp extends ConsumerWidget {
 
       // Navigation
       routerConfig: router,
+
+      builder: (context, child) {
+        return Column(
+          children: [
+            if (connectivity == ConnectivityStatus.isDisconnected)
+              _buildOfflineBanner(context),
+            Expanded(child: child ?? const SizedBox.shrink()),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildOfflineBanner(BuildContext context) {
+    return Material(
+      child: Container(
+        width: double.infinity,
+        color: Colors.red.shade800,
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+        child: SafeArea(
+          bottom: false,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 16),
+              const SizedBox(width: 8),
+              Text(
+                'You are currently offline. Some features may be limited.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

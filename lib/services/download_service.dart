@@ -12,7 +12,11 @@ final downloadServiceProvider = Provider((ref) => DownloadService(ref));
 
 class DownloadService {
   final Ref _ref;
-  final Dio _dio = Dio();
+  final Dio _dio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 15),
+    receiveTimeout: const Duration(seconds: 60),
+    sendTimeout: const Duration(seconds: 30),
+  ));
 
   DownloadService(this._ref);
 

@@ -6,6 +6,7 @@ import 'package:unihub_mobile/features/dashboard/controllers/smart_feed_controll
 import 'package:unihub_mobile/models/feed_type.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:unihub_mobile/core/utils/category_utils.dart';
 import 'package:unihub_mobile/features/campus_filter/presentation/widgets/campus_filter_selector.dart';
 
 class CampusPulseScreen extends ConsumerWidget {
@@ -84,10 +85,10 @@ class CampusPulseScreen extends ConsumerWidget {
         crossAxisSpacing: 16,
         childAspectRatio: 1.5,
         children: [
-          _StatCard(label: 'Marketplace', value: stats['listings'] ?? 0, icon: Icons.shopping_bag_outlined, color: AppColors.marketplace),
-          _StatCard(label: 'Study Notes', value: stats['notes'] ?? 0, icon: Icons.description_outlined, color: AppColors.notes),
-          _StatCard(label: 'Campus Gigs', value: stats['gigs'] ?? 0, icon: Icons.work_outline, color: AppColors.gigs),
-          _StatCard(label: 'Housing', value: stats['housing'] ?? 0, icon: Icons.home_work_outlined, color: AppColors.housing),
+          _StatCard(label: 'Marketplace', value: stats['listings'] ?? 0, icon: CategoryUtils.getIcon(FeedType.marketplace), color: CategoryUtils.getColor(FeedType.marketplace)),
+          _StatCard(label: 'Study Notes', value: stats['notes'] ?? 0, icon: CategoryUtils.getIcon(FeedType.notes), color: CategoryUtils.getColor(FeedType.notes)),
+          _StatCard(label: 'Campus Gigs', value: stats['gigs'] ?? 0, icon: CategoryUtils.getIcon(FeedType.gig), color: CategoryUtils.getColor(FeedType.gig)),
+          _StatCard(label: 'Housing', value: stats['housing'] ?? 0, icon: CategoryUtils.getIcon(FeedType.housing), color: CategoryUtils.getColor(FeedType.housing)),
         ],
       ),
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -96,26 +97,54 @@ class CampusPulseScreen extends ConsumerWidget {
   }
 
   Widget _buildTrendingList(BuildContext context, AsyncValue<List<SmartFeedItem>> trendingAsync) {
+    final theme = Theme.of(context);
     return trendingAsync.when(
-      data: (items) => Column(
-        children: items.map((item) => _TrendingPulseItem(
-          item: item,
-          onTap: () => _handleItemTap(context, item),
-        )).toList(),
-      ),
+      data: (items) {
+        if (items.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Text(
+                'No trending items on campus yet.',
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13),
+              ),
+            ),
+          );
+        }
+        return Column(
+          children: items.map((item) => _TrendingPulseItem(
+            item: item,
+            onTap: () => _handleItemTap(context, item),
+          )).toList(),
+        );
+      },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (_, __) => const SizedBox.shrink(),
     );
   }
 
   Widget _buildRecentActivity(BuildContext context, AsyncValue<List<SmartFeedItem>> recentAsync) {
+    final theme = Theme.of(context);
     return recentAsync.when(
-      data: (items) => Column(
-        children: items.map((item) => _ActivityPulseItem(
-          item: item,
-          onTap: () => _handleItemTap(context, item),
-        )).toList(),
-      ),
+      data: (items) {
+        if (items.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Text(
+                'No recent activity to show.',
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13),
+              ),
+            ),
+          );
+        }
+        return Column(
+          children: items.map((item) => _ActivityPulseItem(
+            item: item,
+            onTap: () => _handleItemTap(context, item),
+          )).toList(),
+        );
+      },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (_, __) => const SizedBox.shrink(),
     );
@@ -290,7 +319,11 @@ class _ActivityPulseItem extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       'Posted in ${item.model.type.name.capitalize()}',
-                      style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+                      style: TextStyle(
+                        fontSize: 11, 
+                        color: CategoryUtils.getColor(item.model.type).withValues(alpha: 0.8),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),

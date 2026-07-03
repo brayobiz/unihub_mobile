@@ -721,7 +721,7 @@ class _CampusPulseSection extends ConsumerWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(color: AppColors.highlightIndigoBorder.withOpacity(0.5)),
           ),
           child: Column(
@@ -1142,10 +1142,10 @@ class _RecentlyViewedSection extends ConsumerWidget {
 
   IconData _getIcon(String type) {
     switch (type) {
-      case 'listing': return Icons.shopping_bag_outlined;
-      case 'housing': return Icons.home_work_outlined;
-      case 'note': return Icons.description_outlined;
-      case 'gig': return Icons.work_outline;
+      case 'listing': return CategoryUtils.getIcon(FeedType.marketplace);
+      case 'housing': return CategoryUtils.getIcon(FeedType.housing);
+      case 'note': return CategoryUtils.getIcon(FeedType.notes);
+      case 'gig': return CategoryUtils.getIcon(FeedType.gig);
       default: return Icons.remove_red_eye_outlined;
     }
   }

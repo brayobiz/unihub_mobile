@@ -195,7 +195,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 leading: const Icon(Icons.delete_outline_rounded, color: Colors.red),
                 title: const Text('Delete Message', style: TextStyle(color: Colors.red)),
                 onTap: () {
-                  ref.read(chatRepositoryProvider).deleteMessage(widget.conversationId, message.id);
+                  final user = ref.read(authStateProvider).valueOrNull;
+                  if (user != null) {
+                    ref.read(chatRepositoryProvider).deleteMessage(widget.conversationId, message.id, user.uid);
+                  }
                   Navigator.pop(context);
                 },
               ),
@@ -768,7 +771,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               leading: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
               title: const Text('Delete Conversation', style: TextStyle(color: AppColors.error)),
               onTap: () {
-                ref.read(chatRepositoryProvider).deleteConversation(widget.conversationId);
+                if (user != null) {
+                  ref.read(chatRepositoryProvider).deleteConversation(widget.conversationId, user.uid);
+                }
                 context.pop(); // pop sheet
                 context.pop(); // pop screen
               },

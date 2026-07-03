@@ -13,6 +13,7 @@ class StorageRepository {
     required String path,
     required String id,
     required File file,
+    bool isPrivate = false,
     Function(int, int)? onProgress,
   }) async {
     // We map Firebase style path/id to Cloudinary folder structure
@@ -24,6 +25,7 @@ class StorageRepository {
       file: file,
       folder: folder,
       publicId: id,
+      isPrivate: isPrivate,
       onProgress: onProgress,
     );
   }

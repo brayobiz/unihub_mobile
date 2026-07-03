@@ -16,6 +16,7 @@ import '../../features/navigation/main_navigation_screen.dart';
 import '../../features/marketplace/presentation/screens/add_listing_screen.dart';
 import '../../features/marketplace/presentation/screens/listing_detail_screen.dart';
 import '../../features/marketplace/presentation/screens/my_listings_screen.dart';
+import '../../features/marketplace/presentation/screens/seller_dashboard_screen.dart';
 import '../../features/marketplace/presentation/screens/seller_profile_screen.dart';
 import '../../features/marketplace/domain/models/listing.dart';
 import '../../features/chat/presentation/screens/chat_screen.dart';
@@ -43,6 +44,7 @@ import '../../features/profile/settings_screen.dart';
 import '../../features/profile/activity_history_screen.dart';
 import '../../features/profile/achievements_screen.dart';
 import '../../features/marketplace/presentation/screens/saved_listings_screen.dart';
+import '../../features/marketplace/presentation/screens/saved_searches_screen.dart';
 import '../../features/marketplace/presentation/screens/category_discovery_screen.dart';
 import '../../features/shared/help_centre_screen.dart';
 import '../../features/shared/notifications_screen.dart';
@@ -268,6 +270,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const MyListingsScreen(),
       ),
       GoRoute(
+        path: '/seller-dashboard',
+        builder: (context, state) => const SellerDashboardScreen(),
+      ),
+      GoRoute(
         path: '/listing-detail',
         builder: (context, state) {
           final extra = state.extra;
@@ -483,6 +489,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/saved',
         builder: (context, state) => const SavedListingsScreen(),
+      ),
+      GoRoute(
+        path: '/saved-searches',
+        builder: (context, state) => const SavedSearchesScreen(),
       ),
       GoRoute(
         path: '/category-discovery/:category',

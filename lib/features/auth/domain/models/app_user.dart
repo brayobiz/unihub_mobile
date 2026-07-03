@@ -255,6 +255,16 @@ class AppUser {
     return (score / total);
   }
 
+  AppUser stripSensitiveInfo() {
+    return copyWith(
+      email: 'hidden@unihub.student',
+      fcmToken: '',
+      blockedUids: [],
+      phoneNumber: null,
+      whatsappNumber: null,
+    );
+  }
+
   AppUser copyWith({
     String? uid,
     String? email,

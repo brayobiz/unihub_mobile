@@ -81,9 +81,9 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
             selectedIcon: unreadCount > 0
               ? Badge(
                   label: Text(unreadCount > 9 ? '9+' : '$unreadCount'),
-                  child: const Icon(Icons.home),
+                  child: const Icon(Icons.home_rounded),
                 )
-              : const Icon(Icons.home),
+              : const Icon(Icons.home_rounded),
             label: 'Home',
           ),
           NavigationDestination(
@@ -96,9 +96,9 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
             selectedIcon: marketplaceUnreadCount > 0
               ? Badge(
                   label: Text(marketplaceUnreadCount > 9 ? '9+' : '$marketplaceUnreadCount'),
-                  child: const Icon(Icons.storefront),
+                  child: const Icon(Icons.storefront_rounded),
                 )
-              : const Icon(Icons.storefront),
+              : const Icon(Icons.storefront_rounded),
             label: 'Marketplace',
           ),
           NavigationDestination(
@@ -111,24 +111,24 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
             selectedIcon: housingUnreadCount > 0
               ? Badge(
                   label: Text(housingUnreadCount > 9 ? '9+' : '$housingUnreadCount'),
-                  child: const Icon(Icons.home_work),
+                  child: const Icon(Icons.home_work_rounded),
                 )
-              : const Icon(Icons.home_work),
+              : const Icon(Icons.home_work_rounded),
             label: 'Housing',
           ),
           NavigationDestination(
             icon: chatUnreadCount > 0
               ? Badge(
                   label: Text(chatUnreadCount > 9 ? '9+' : '$chatUnreadCount'),
-                  child: const Icon(Icons.chat_outlined),
+                  child: const Icon(Icons.chat_bubble_outline_rounded),
                 )
-              : const Icon(Icons.chat_outlined),
+              : const Icon(Icons.chat_bubble_outline_rounded),
             selectedIcon: chatUnreadCount > 0
               ? Badge(
                   label: Text(chatUnreadCount > 9 ? '9+' : '$chatUnreadCount'),
-                  child: const Icon(Icons.chat),
+                  child: const Icon(Icons.chat_bubble_rounded),
                 )
-              : const Icon(Icons.chat),
+              : const Icon(Icons.chat_bubble_rounded),
             label: 'Chat',
           ),
           NavigationDestination(
@@ -141,14 +141,14 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
             selectedIcon: notesUnreadCount > 0
               ? Badge(
                   label: Text(notesUnreadCount > 9 ? '9+' : '$notesUnreadCount'),
-                  child: const Icon(Icons.menu_book),
+                  child: const Icon(Icons.menu_book_rounded),
                 )
-              : const Icon(Icons.menu_book),
+              : const Icon(Icons.menu_book_rounded),
             label: 'Notes',
           ),
           const NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
+            icon: Icon(Icons.person_outline_rounded),
+            selectedIcon: Icon(Icons.person_rounded),
             label: 'Profile',
           ),
         ],

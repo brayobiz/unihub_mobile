@@ -73,6 +73,10 @@ class MarketplaceController extends StateNotifier<ListingFilter> {
     state = state.copyWith(categoryAttributes: current);
   }
 
+  void applyFilter(ListingFilter filter) {
+    state = filter;
+  }
+
   void resetFilters() {
     state = ListingFilter();
   }

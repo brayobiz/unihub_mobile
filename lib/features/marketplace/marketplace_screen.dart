@@ -10,6 +10,8 @@ import 'domain/models/listing.dart';
 import 'domain/models/marketplace_categories.dart';
 import 'domain/repositories/marketplace_repository.dart';
 import 'presentation/controllers/marketplace_controller.dart';
+import 'presentation/controllers/saved_searches_controller.dart';
+import 'domain/models/saved_search.dart';
 import 'shared/providers.dart';
 import 'domain/models/listing_filter.dart';
 import 'presentation/widgets/marketplace_card.dart';
@@ -18,6 +20,8 @@ import '../campus_filter/shared/providers.dart';
 import '../campus_filter/presentation/widgets/campus_filter_selector.dart';
 import '../../core/constants/campus_constants.dart';
 import '../../core/utils/debouncer.dart';
+import '../../core/utils/category_utils.dart';
+import '../../models/feed_type.dart';
 import '../../widgets/app_drawer.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/notification_badge.dart';
@@ -74,6 +78,11 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bookmarks_outlined),
+            tooltip: 'Saved Searches',
+            onPressed: () => context.push('/saved-searches'),
+          ),
           const NotificationBadge(module: 'marketplace'),
           const SizedBox(width: 4),
           if (ref.watch(appUserProvider).valueOrNull?.isAdmin ?? false)
@@ -331,15 +340,21 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
     final user = ref.watch(appUserProvider).valueOrNull;
 
     String trendingTitle = 'Trending';
+    String recentlyPostedTitle = 'Recently Posted';
+    
     if (scope.type == BrowsingScopeType.myCampus) {
       final uniName = CampusConstants.getDisplayName(
         CampusConstants.resolveToId(user?.university)
       );
       trendingTitle = 'Trending in $uniName';
+      recentlyPostedTitle = 'New in $uniName';
     } else if (scope.type == BrowsingScopeType.specific) {
-      trendingTitle = 'Trending in ${CampusConstants.getDisplayName(scope.campusId)}';
+      final campusName = CampusConstants.getDisplayName(scope.campusId);
+      trendingTitle = 'Trending in $campusName';
+      recentlyPostedTitle = 'New in $campusName';
     } else {
       trendingTitle = 'Trending across Campuses';
+      recentlyPostedTitle = 'New across Campuses';
     }
 
     return discoveryAsync.when(
@@ -356,9 +371,24 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
             title: 'Recommended For You',
             listings: data.recommended,
           ),
+          _buildDiscoverySection(
+            context: context,
+            title: recentlyPostedTitle,
+            listings: data.recentlyPosted,
+          ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 20),
             child: BannerAdWidget(),
+          ),
+          _buildDiscoverySection(
+            context: context,
+            title: 'Most Saved',
+            listings: data.mostSaved,
+          ),
+          _buildDiscoverySection(
+            context: context,
+            title: 'Popular This Week',
+            listings: data.popular,
           ),
           _buildDiscoverySection(
             context: context,
@@ -408,12 +438,23 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
             if (title == 'Continue Browsing')
               TextButton(
                 onPressed: () => ref.read(marketplaceControllerProvider.notifier).clearRecentlyViewed(),
-                child: Text('Clear', style: TextStyle(color: theme.colorScheme.error)),
+                child: Text('Clear', style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold)),
               )
             else
               TextButton(
-                onPressed: () {}, // Show all
-                child: const Text('See All'),
+                onPressed: () {
+                  final controller = ref.read(marketplaceControllerProvider.notifier);
+                  if (title.contains('Trending')) {
+                    controller.setSortBy(ListingSortType.mostViewed);
+                  } else if (title.contains('Recently Posted') || title.contains('New in')) {
+                    controller.setSortBy(ListingSortType.newest);
+                  } else if (title == 'Most Saved') {
+                    controller.setSortBy(ListingSortType.mostSaved);
+                  } else if (title == 'Popular This Week') {
+                    controller.setSortBy(ListingSortType.mostViewed);
+                  }
+                },
+                child: Text('See All', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
               ),
           ],
         ),
@@ -463,7 +504,11 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                         color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(Icons.search_off_rounded, size: 64, color: theme.colorScheme.primary),
+                      child: Icon(
+                        CategoryUtils.getIcon(FeedType.marketplace), 
+                        size: 56, 
+                        color: theme.colorScheme.primary.withOpacity(0.5)
+                      ),
                     ),
                     const SizedBox(height: 24),
                     Text(
@@ -477,7 +522,11 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                     const SizedBox(height: 12),
                     Text(
                       'Try switching to "All Campuses" or explore another category to find what you\'re looking for.',
-                      style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: 14),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant.withOpacity(0.8), 
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 32),
@@ -486,7 +535,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                       children: [
                         OutlinedButton.icon(
                           onPressed: () => controller.resetFilters(),
-                          icon: const Icon(Icons.refresh_rounded),
+                          icon: const Icon(Icons.refresh_rounded, size: 18),
                           label: const Text('Clear Filters'),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -499,11 +548,11 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                             controller.resetFilters();
                             ref.read(browsingScopeProvider.notifier).reset();
                           },
-                          child: const Text('Explore All'),
                           style: FilledButton.styleFrom(
                             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
+                          child: const Text('Explore All'),
                         ),
                       ],
                     ),
@@ -565,22 +614,46 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Column(
                     children: [
-                      Text(
-                        filter.searchQuery.isNotEmpty 
-                          ? 'Results for "${filter.searchQuery}"'
-                          : 'Browsing ${filter.selectedCategory ?? 'Items'}',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              filter.searchQuery.isNotEmpty 
+                                ? 'Results for "${filter.searchQuery}"'
+                                : 'Browsing ${filter.selectedCategory ?? 'Items'}',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: () => controller.resetFilters(),
+                            icon: const Icon(Icons.refresh_rounded, size: 16),
+                            label: const Text('Reset'),
+                          ),
+                        ],
                       ),
-                      TextButton.icon(
-                        onPressed: () => controller.resetFilters(),
-                        icon: const Icon(Icons.refresh_rounded, size: 16),
-                        label: const Text('Reset'),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _showSaveSearchDialog(context, filter),
+                              icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+                              label: const Text('Save Search & Alert Me'),
+                              style: OutlinedButton.styleFrom(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -622,7 +695,8 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
 
     final myListingsAsync = ref.watch(sellerListingsProvider(user.uid));
 
-    return Column(
+    return ListView(
+      physics: const BouncingScrollPhysics(),
       children: [
         if (!isVerifiedSeller)
           applicationAsync.when(
@@ -630,44 +704,138 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
             loading: () => const LinearProgressIndicator(),
             error: (_, __) => const SizedBox.shrink(),
           ),
-        Expanded(
-          child: myListingsAsync.when(
-            data: (listings) {
-              if (listings.isEmpty) {
-                return Center(
+        
+        // Dashboard Entry Point
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          child: InkWell(
+            onTap: () => context.push('/seller-dashboard'),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [theme.colorScheme.primary, theme.colorScheme.primary.withOpacity(0.8)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.colorScheme.primary.withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.analytics_outlined, color: Colors.white, size: 32),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Seller Dashboard',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                        Text(
+                          'Track your listing performance',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.9),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        myListingsAsync.when(
+          data: (listings) {
+            if (listings.isEmpty) {
+              return Padding(
+                padding: const EdgeInsets.only(top: 60),
+                child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.shopping_bag_outlined, size: 64, color: theme.colorScheme.outlineVariant),
-                      const SizedBox(height: 16),
-                      Text('You haven\'t posted any listings yet', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.shopping_bag_outlined, 
+                          size: 56, 
+                          color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)
+                        ),
+                      ),
                       const SizedBox(height: 24),
-                      ElevatedButton(
+                      Text(
+                        'No listings posted', 
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Sell your textbooks, electronics, or clothes \nto fellow students.', 
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                      const SizedBox(height: 32),
+                      FilledButton.icon(
                         onPressed: () => context.push('/add-listing'),
-                        child: const Text('Add Your First Listing'),
+                        icon: const Icon(Icons.add_rounded),
+                        label: const Text('Post Your First Listing'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
                       ),
                     ],
                   ),
-                );
-              }
-              return GridView.builder(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
-                  childAspectRatio: 0.75,
-                ),
-                itemCount: listings.length,
-                itemBuilder: (context, index) => MarketplaceCard(
-                  listing: listings[index], 
-                  index: index,
-                  heroTag: 'hero_my_${listings[index].id}',
                 ),
               );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (err, _) => Center(child: Text('Error: $err')),
+            }
+            return GridView.builder(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: 0.75,
+              ),
+              itemCount: listings.length,
+              itemBuilder: (context, index) => MarketplaceCard(
+                listing: listings[index], 
+                index: index,
+                heroTag: 'hero_my_${listings[index].id}',
+              ),
+            );
+          },
+          loading: () => const Padding(
+            padding: EdgeInsets.all(40),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (err, _) => Padding(
+            padding: const EdgeInsets.all(40),
+            child: Center(child: Text('Error: $err')),
           ),
         ),
       ],
@@ -872,6 +1040,52 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
       ),
     );
   }
+  void _showSaveSearchDialog(BuildContext context, ListingFilter filter) {
+    final theme = Theme.of(context);
+    final nameController = TextEditingController(
+      text: filter.searchQuery.isNotEmpty ? filter.searchQuery : (filter.selectedCategory ?? 'Saved Search')
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save Search'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Get notified when new items match these filters.'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: nameController,
+              decoration: InputDecoration(
+                labelText: 'Name',
+                hintText: 'e.g. MacBook Air',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () {
+              ref.read(savedSearchesControllerProvider.notifier).saveCurrentSearch(
+                name: nameController.text,
+                filter: filter,
+                campusId: ref.read(browsingScopeProvider).campusId,
+              );
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Search saved! You\'ll be alerted for new matches.')),
+              );
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showBroadcastConfirm(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
