@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 
@@ -92,7 +93,9 @@ class OptimizedImage extends StatelessWidget {
       },
       placeholder: (context, url) => _buildShimmer(),
       errorWidget: (context, url, error) {
-        debugPrint('🖼️ OptimizedImage: Failed to load image: $url');
+        if (kDebugMode) {
+          debugPrint('🖼️ OptimizedImage: Failed to load image');
+        }
         return _buildErrorWidget();
       },
       // Increase memCache for high density screens if width is provided
@@ -103,15 +106,17 @@ class OptimizedImage extends StatelessWidget {
   }
 
   Widget _buildShimmer() {
-    return Shimmer.fromColors(
-      baseColor: Colors.grey[300]!,
-      highlightColor: Colors.grey[100]!,
-      child: Container(
-        width: width ?? double.infinity,
-        height: height ?? double.infinity,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: borderRadius,
+    return RepaintBoundary(
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Container(
+          width: width ?? double.infinity,
+          height: height ?? double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: borderRadius,
+          ),
         ),
       ),
     );

@@ -6,6 +6,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../announcements/domain/models/announcement.dart';
 import '../../../announcements/shared/providers.dart';
 import '../../../auth/shared/providers.dart';
+import '../../shared/providers.dart';
 import '../layout/admin_layout.dart';
 
 class AnnouncementManagementScreen extends ConsumerStatefulWidget {
@@ -249,9 +250,10 @@ class _AnnouncementCard extends ConsumerWidget {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
-            onPressed: () {
-              ref.read(announcementRepositoryProvider).deleteAnnouncement(announcement.id);
-              Navigator.pop(context);
+            onPressed: () async {
+              final navigator = Navigator.of(context);
+              await ref.read(announcementRepositoryProvider).deleteAnnouncement(announcement.id);
+              navigator.pop();
             },
             child: const Text('Delete', style: TextStyle(color: AppColors.error)),
           ),
@@ -405,15 +407,21 @@ class _AnnouncementEditDialogState extends ConsumerState<_AnnouncementEditDialog
       updatedAt: now,
     );
 
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
     try {
-      if (widget.announcement == null) {
-        await ref.read(announcementRepositoryProvider).createAnnouncement(announcement);
-      } else {
-        await ref.read(announcementRepositoryProvider).updateAnnouncement(announcement);
-      }
-      if (mounted) Navigator.pop(context);
+      final admin = ref.read(appUserProvider).valueOrNull;
+      if (admin == null) throw Exception('Admin not logged in');
+
+      await ref.read(adminServiceProvider).publishAnnouncement(
+        announcement, 
+        adminId: admin.uid, 
+        adminName: admin.fullName,
+      );
+      if (mounted) messenger.showSnackBar(const SnackBar(content: Text('Announcement saved successfully')));
+      if (mounted) navigator.pop();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error saving: $e')));
+      if (mounted) messenger.showSnackBar(SnackBar(content: Text('Error saving: $e')));
     }
   }
 

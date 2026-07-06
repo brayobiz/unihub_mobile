@@ -93,16 +93,21 @@ class _SystemSettingsScreenState extends ConsumerState<SystemSettingsScreen> {
       updatedBy: user?.fullName ?? 'Unknown Admin',
     );
 
+    final messenger = ScaffoldMessenger.of(context);
     try {
-      await ref.read(systemSettingsRepositoryProvider).updateSettings(updatedSettings);
+      await ref.read(adminServiceProvider).updateSettings(
+        updatedSettings,
+        adminId: user?.uid ?? '',
+        adminName: user?.fullName ?? 'Unknown Admin',
+      );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(content: Text('System settings updated successfully')),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(content: Text('Error updating settings: $e')),
         );
       }

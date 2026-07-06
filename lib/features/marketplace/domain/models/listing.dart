@@ -4,6 +4,7 @@ import 'price_history.dart';
 
 enum ListingCondition { newCondition, likeNew, good, fair }
 enum ListingStatus { active, sold, paused, expired, reserved, archived }
+enum ModerationStatus { active, flagged, suspended, removed }
 
 class Listing {
   final String id;

@@ -1,8 +1,9 @@
 import '../../../marketplace/domain/models/listing.dart';
 import '../../../housing/domain/models/housing_listing.dart';
 import '../../../notes/domain/models/note.dart';
+import '../../../events/domain/models/event.dart';
 
-enum ContentType { marketplace, housing, notes }
+enum ContentType { marketplace, housing, notes, events }
 
 class ModeratedContent {
   final String id;
@@ -68,9 +69,24 @@ class ModeratedContent {
       authorName: note.authorName,
       university: note.university,
       createdAt: note.createdAt,
-      status: 'active', // NoteListing doesn't have status enum yet
+      status: note.status,
       imageUrls: [],
       originalData: note,
+    );
+  }
+
+  factory ModeratedContent.fromEvent(Event event) {
+    return ModeratedContent(
+      id: event.id,
+      type: ContentType.events,
+      title: event.title,
+      authorId: event.organizerId,
+      authorName: 'Organizer', // We'd need to fetch the organizer name if we want it here
+      university: event.campusId,
+      createdAt: event.createdAt,
+      status: event.status.name,
+      imageUrls: event.imageUrls,
+      originalData: event,
     );
   }
 }

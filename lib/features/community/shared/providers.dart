@@ -3,7 +3,7 @@ import '../../auth/shared/providers.dart';
 import '../../shared/feed_repository.dart';
 import '../../../models/feed_type.dart';
 
-final communityFeedProvider = StreamProvider<List<FeedItem>>((ref) {
+final communityFeedProvider = StreamProvider.autoDispose<List<FeedItem>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
   return ref.watch(feedRepositoryProvider).watchFeed(FeedType.community).map((items) {
     if (user == null || user.blockedUids.isEmpty) return items;

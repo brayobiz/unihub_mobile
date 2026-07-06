@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import '../../../../core/utils/date_formatter.dart';
@@ -13,6 +12,7 @@ import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import 'package:unihub_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import '../../domain/models/listing.dart';
 import '../../domain/models/offer.dart';
+import '../../domain/models/review.dart';
 import '../../shared/providers.dart';
 import '../../../chat/domain/models/chat_context.dart';
 import '../../../chat/shared/providers.dart';
@@ -20,18 +20,66 @@ import '../widgets/marketplace_card.dart';
 import '../../../../services/history_service.dart';
 import 'package:uuid/uuid.dart';
 
-class ListingDetailScreen extends ConsumerStatefulWidget {
-  final Listing listing;
+class ListingDetailScreen extends ConsumerWidget {
+  final Listing? listing;
+  final String listingId;
   final String? heroTag;
 
-  const ListingDetailScreen({super.key, required this.listing, this.heroTag});
+  const ListingDetailScreen({
+    super.key, 
+    this.listing, 
+    required this.listingId,
+    this.heroTag,
+  });
 
   @override
-  ConsumerState<ListingDetailScreen> createState() => _ListingDetailScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Watch real-time listing updates for viewsCount, price changes, etc.
+    final listingAsync = ref.watch(listingProvider(listingId));
+    
+    return listingAsync.when(
+      data: (fetchedListing) {
+        final currentListing = fetchedListing ?? listing;
+        if (currentListing == null) {
+          return const Scaffold(body: Center(child: Text('Listing no longer available.')));
+        }
+
+        return _ListingDetailContent(
+          key: ValueKey('detail_$listingId'),
+          listing: currentListing,
+          heroTag: heroTag,
+        );
+      },
+      loading: () => listing != null 
+          ? _ListingDetailContent(
+              key: ValueKey('detail_$listingId'),
+              listing: listing!, 
+              heroTag: heroTag, 
+              isLoading: true,
+            )
+          : const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
+    );
+  }
 }
 
-class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
-  bool _isSaved = false;
+class _ListingDetailContent extends ConsumerStatefulWidget {
+  final Listing listing;
+  final String? heroTag;
+  final bool isLoading;
+
+  const _ListingDetailContent({
+    super.key,
+    required this.listing,
+    this.heroTag,
+    this.isLoading = false,
+  });
+
+  @override
+  ConsumerState<_ListingDetailContent> createState() => _ListingDetailContentState();
+}
+
+class _ListingDetailContentState extends ConsumerState<_ListingDetailContent> {
   bool _isDescriptionExpanded = false;
   final PageController _pageController = PageController();
   int _currentPage = 0;
@@ -41,40 +89,29 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final listing = widget.listing;
-      
-      final userId = ref.read(firebaseAuthProvider).currentUser?.uid;
-      
-      // Only record a view if it's not the seller themselves
-      if (userId != listing.sellerId) {
-        ref.read(marketplaceRepositoryProvider).recordView(listing.id, userId: userId);
-      }
-      
-      ref.read(recentHistoryProvider.notifier).addItem(HistoryItem(
-        id: listing.id,
-        type: 'listing',
-        title: listing.title,
-        imageUrl: (listing.imageUrls.isNotEmpty) ? listing.imageUrls.first : null,
-        timestamp: DateTime.now(),
-      ));
+      _recordViewAndHistory(widget.listing);
     });
   }
 
-  void _toggleSave(Listing listing) {
-    if (listing == null) return;
+  void _recordViewAndHistory(Listing listing) {
+    final userId = ref.read(firebaseAuthProvider).currentUser?.uid;
     
-    final user = ref.read(appUserProvider).valueOrNull;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please log in to save items')));
-      return;
+    // Only record a view if it's not the seller themselves
+    if (userId != listing.sellerId) {
+      ref.read(marketplaceRepositoryProvider).recordView(listing.id, userId: userId);
     }
-    setState(() => _isSaved = !_isSaved);
-    ref.read(marketplaceRepositoryProvider).toggleSaveListing(user.uid, listing.id);
+    
+    ref.read(recentHistoryProvider.notifier).addItem(HistoryItem(
+      id: listing.id,
+      type: 'listing',
+      title: listing.title,
+      imageUrl: (listing.imageUrls.isNotEmpty) ? listing.imageUrls.first : null,
+      timestamp: DateTime.now(),
+    ));
   }
 
-  void _startChat(Listing listing) async {
-    if (listing == null) return;
-
+  void _startChat() async {
+    final listing = widget.listing;
     final buyer = ref.read(appUserProvider).valueOrNull;
     if (buyer == null) return;
     
@@ -87,7 +124,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
       type: 'marketplace',
       id: listing.id,
       title: listing.title,
-      thumbnail: (listing.imageUrls != null && listing.imageUrls.isNotEmpty) ? listing.imageUrls.first : null,
+      thumbnail: listing.imageUrls.isNotEmpty ? listing.imageUrls.first : null,
       metadata: {
         'price': listing.price,
       },
@@ -108,13 +145,15 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     }
   }
 
-  void _shareListing(Listing listing) {
-    final text = 'Check out this ${listing.title} for KES ${NumberFormat('#,###').format(listing.price)} on UniHub Marketplace! \n\nDownload UniHub to view more: https://unihub.app/marketplace/${listing.id}';
+  void _shareListing() {
+    final listing = widget.listing;
+    final text = 'Check out this ${listing.title} for KES ${NumberFormat("#,###").format(listing.price)} on UniHub Marketplace! \n\nDownload UniHub to view more: https://unihub.app/marketplace/${listing.id}';
     Share.share(text);
     ref.read(marketplaceRepositoryProvider).recordShare(listing.id);
   }
 
-  void _showReportDialog(Listing listing) {
+  void _showReportDialog() {
+    final listing = widget.listing;
     final reasons = [
       'Scam or fraud',
       'Fake product',
@@ -154,9 +193,8 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     );
   }
 
-  void _showMakeOfferSheet(Listing listing) {
-    if (listing == null) return;
-
+  void _showMakeOfferSheet() {
+    final listing = widget.listing;
     final user = ref.read(appUserProvider).valueOrNull;
     if (user == null) return;
     
@@ -186,7 +224,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Listing Price: KES ${NumberFormat('#,###').format(listing.price)}', 
+                  'Listing Price: KES ${NumberFormat("#,###").format(listing.price)}', 
                   style: TextStyle(color: mTheme.colorScheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 24),
@@ -242,285 +280,120 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final initialListing = widget.listing;
-    
-    // Watch real-time listing updates for viewsCount, price changes, etc.
-    final listingAsync = ref.watch(listingProvider(initialListing.id));
-    
-    return listingAsync.when(
-      data: (listing) {
-        if (listing == null) {
-          return const Scaffold(body: Center(child: Text('Listing no longer available.')));
-        }
+    final listing = widget.listing;
+    final currentUser = ref.watch(appUserProvider).valueOrNull;
+    final bool isOwner = currentUser != null && currentUser.uid == listing.sellerId;
 
-        final currentUser = ref.watch(appUserProvider).valueOrNull;
-        final String sellerId = listing.sellerId;
-        final bool isOwner = currentUser != null && currentUser.uid == sellerId;
-        final sellerAsync = ref.watch(otherUserProvider(sellerId));
-        final images = listing.imageUrls;
-
-        return Scaffold(
-          backgroundColor: theme.colorScheme.surface,
-          body: Stack(
-            children: [
-              CustomScrollView(
-                physics: const BouncingScrollPhysics(),
-                slivers: [
-                  _buildImageGallery(listing),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 20),
-                          _buildVerifiedBadgeRow(sellerAsync, listing),
-                          const SizedBox(height: 12),
-                          _buildAvailabilityBadge(listing),
-                          const SizedBox(height: 8),
-                          Text(
-                            listing.title,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 24, 
-                              fontWeight: FontWeight.w800,
-                              color: theme.colorScheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Text(
-                                'KES ${NumberFormat('#,###').format(listing.price)}',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 26, 
-                                  fontWeight: FontWeight.w900, 
-                                  color: AppColors.marketplaceBlue,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              _buildPriceBadge(listing),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
-                          _buildConditionSection(listing),
-                          const SizedBox(height: 24),
-                          _buildSpecsGrid(listing),
-                          const SizedBox(height: 32),
-                          Text(
-                            'Description', 
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 18, 
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            listing.description,
-                            maxLines: _isDescriptionExpanded ? null : 3,
-                            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, height: 1.6, fontSize: 15),
-                          ),
-                          GestureDetector(
-                            onTap: () => setState(() => _isDescriptionExpanded = !_isDescriptionExpanded),
-                            child: Text(
-                              _isDescriptionExpanded ? 'Read less' : '... Read more',
-                              style: const TextStyle(color: AppColors.marketplaceBlue, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          const SizedBox(height: 32),
-                          _buildSellerCard(sellerAsync, listing),
-                          _buildMoreFromSeller(sellerId, listing),
-                          _buildSafetyBanner(),
-                          _buildSimilarItems(listing),
-                          const SizedBox(height: 120),
-                        ],
+    return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
+      body: Stack(
+        children: [
+          CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              _buildImageGallery(listing),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    const SizedBox(height: 20),
+                    _VerifiedBadgeRow(listing: listing),
+                    const SizedBox(height: 12),
+                    _AvailabilityBadge(listing: listing),
+                    const SizedBox(height: 8),
+                    Text(
+                      listing.title,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 24, 
+                        fontWeight: FontWeight.w800,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Text(
+                          'KES ${NumberFormat("#,###").format(listing.price)}',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 26, 
+                            fontWeight: FontWeight.w900, 
+                            color: AppColors.marketplaceBlue,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        _PriceBadge(listing: listing),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    _ConditionSection(listing: listing),
+                    const SizedBox(height: 24),
+                    _SpecsGrid(listing: listing),
+                    const SizedBox(height: 32),
+                    Text(
+                      'Description', 
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 18, 
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      listing.description,
+                      maxLines: _isDescriptionExpanded ? null : 3,
+                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant, height: 1.6, fontSize: 15),
+                    ),
+                    GestureDetector(
+                      onTap: () => setState(() => _isDescriptionExpanded = !_isDescriptionExpanded),
+                      child: Text(
+                        _isDescriptionExpanded ? 'Read Less' : '... Read More',
+                        style: const TextStyle(color: AppColors.marketplaceBlue, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    _SellerCard(listing: listing),
+                    _ReviewsSection(listing: listing),
+                    _MoreFromSeller(listing: listing),
+                    const _SafetyBanner(),
+                    _SimilarItems(listing: listing),
+                    const SizedBox(height: 120),
+                  ]),
+                ),
               ),
-              _buildStickyActionBar(isOwner, listing),
             ],
           ),
-        );
-      },
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
-    );
-  }
-
-  void _openFullScreenGallery(int initialIndex, Listing listing) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => FullScreenGallery(
-          imageUrls: listing.imageUrls,
-          initialIndex: initialIndex,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAvailabilityBadge(Listing listing) {
-    final status = listing.status;
-    final isRecent = DateTime.now().difference(listing.createdAt).inHours < 48;
-
-    if (status == ListingStatus.active && !isRecent) return const SizedBox.shrink();
-
-    Color color;
-    String label;
-    IconData icon;
-
-    if (status == ListingStatus.active && isRecent) {
-      color = AppColors.secondary;
-      label = 'RECENTLY LISTED';
-      icon = Icons.auto_awesome_rounded;
-    } else {
-      switch (status) {
-        case ListingStatus.sold:
-          color = AppColors.error;
-          label = 'SOLD';
-          icon = Icons.shopping_bag_rounded;
-          break;
-        case ListingStatus.reserved:
-          color = Colors.orange;
-          label = 'RESERVED';
-          icon = Icons.lock_clock_rounded;
-          break;
-        default:
-          return const SizedBox.shrink();
-      }
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.5)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 14),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+          _StickyActionBar(
+            listing: listing,
+            isOwner: isOwner,
+            onStartChat: _startChat,
+            onMakeOffer: _showMakeOfferSheet,
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPriceBadge(Listing listing) {
-    final theme = Theme.of(context);
-    final isNegotiable = listing.isNegotiable;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: isNegotiable 
-            ? AppColors.marketplaceBlue.withValues(alpha: 0.1) 
-            : theme.colorScheme.onSurface.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        isNegotiable ? 'Negotiable' : 'Fixed Price',
-        style: TextStyle(
-          color: isNegotiable ? AppColors.marketplaceBlue : theme.colorScheme.onSurfaceVariant, 
-          fontSize: 12, 
-          fontWeight: FontWeight.bold
-        ),
-      ),
-    );
-  }
-
-  Widget _buildConditionSection(Listing listing) {
-    final theme = Theme.of(context);
-    final cond = listing.condition;
-    String label;
-    String explanation;
-    Color color;
-
-    switch (cond) {
-      case ListingCondition.newCondition:
-        label = 'Brand New';
-        explanation = 'Item is in its original packaging, never used.';
-        color = AppColors.success;
-        break;
-      case ListingCondition.likeNew:
-        label = 'Like New';
-        explanation = 'Item is in perfect condition, looks unused.';
-        color = Colors.blue;
-        break;
-      case ListingCondition.good:
-        label = 'Excellent';
-        explanation = 'Minor signs of use, fully functional.';
-        color = Colors.orange;
-        break;
-      case ListingCondition.fair:
-        label = 'Fair';
-        explanation = 'Significant wear, works but may have minor issues.';
-        color = Colors.red;
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.check_circle_outline_rounded, color: color, size: 20),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: 15),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  explanation,
-                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
+          if (widget.isLoading)
+             const Positioned.fill(
+               child: Center(child: CircularProgressIndicator()),
+             ),
         ],
       ),
     );
   }
 
   Widget _buildImageGallery(Listing listing) {
-    final images = listing.imageUrls ?? <String>[];
+    final images = listing.imageUrls;
     final topPadding = MediaQuery.of(context).padding.top;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     
     final theme = Theme.of(context);
     return SliverAppBar(
-      expandedHeight: 420,
+      expandedHeight: isLandscape ? 280 : 420,
       pinned: true,
       elevation: 0,
       backgroundColor: theme.colorScheme.surface,
       automaticallyImplyLeading: false,
-      leading: null,
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           children: [
             Row(
               children: [
-                // Main Image PageView
                 Expanded(
                   flex: 3,
                   child: Padding(
@@ -547,8 +420,6 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                     ),
                   ),
                 ),
-                
-                // Thumbnails Column
                 if (images.length > 1)
                   Container(
                     width: MediaQuery.of(context).size.width * 0.28,
@@ -594,35 +465,27 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                   ),
               ],
             ),
-            
-            // Top Navigation Buttons
             Positioned(
               top: topPadding + 8,
               left: 16,
-              child: _buildCircleButton(Icons.arrow_back, () => context.pop()),
+              child: _CircleButton(icon: Icons.arrow_back, onTap: () => context.pop()),
             ),
             Positioned(
               top: topPadding + 8,
               right: 16,
               child: Row(
                 children: [
-                  _buildCircleButton(Icons.ios_share, () => _shareListing(listing)),
+                  _CircleButton(icon: Icons.ios_share, onTap: _shareListing),
                   const SizedBox(width: 12),
-                  _buildCircleButton(
-                    _isSaved ? Icons.favorite : Icons.favorite_border, 
-                    () => _toggleSave(listing),
-                    iconColor: _isSaved ? AppColors.error : Theme.of(context).colorScheme.onSurface,
-                  ),
+                  _SaveButton(listing: listing),
                   const SizedBox(width: 12),
-                  _buildCircleButton(Icons.report_gmailerrorred_rounded, () => _showReportDialog(listing)),
+                  _CircleButton(icon: Icons.report_gmailerrorred_rounded, onTap: _showReportDialog),
                   const SizedBox(width: 12),
-                  _buildBlockActionButton(listing.sellerId),
+                  _BlockButton(sellerId: listing.sellerId),
                 ],
               ),
             ),
-
-            // Main Image Index Overlay
-            if (images != null && images.isNotEmpty)
+            if (images.isNotEmpty)
               Positioned(
                 bottom: 24,
                 left: 0,
@@ -647,72 +510,28 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     );
   }
 
-  Widget _buildCircleButton(IconData icon, VoidCallback onTap, {Color? iconColor}) {
+  void _openFullScreenGallery(int initialIndex, Listing listing) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FullScreenGallery(
+          imageUrls: listing.imageUrls,
+          initialIndex: initialIndex,
+        ),
+      ),
+    );
+  }
+}
+
+class _VerifiedBadgeRow extends ConsumerWidget {
+  final Listing listing;
+  const _VerifiedBadgeRow({required this.listing});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    return Container(
-      height: 40,
-      width: 40,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: IconButton(
-        icon: Icon(icon, color: iconColor ?? theme.colorScheme.onSurface, size: 20),
-        onPressed: onTap,
-        padding: EdgeInsets.zero,
-      ),
-    );
-  }
+    final sellerAsync = ref.watch(otherUserProvider(listing.sellerId));
 
-  Widget _buildBlockActionButton(String sellerId) {
-    final user = ref.watch(appUserProvider).valueOrNull;
-    if (user == null || user.uid == sellerId) return const SizedBox.shrink();
-    
-    final isBlocked = user.blockedUids.contains(sellerId);
-    
-    return _buildCircleButton(
-      isBlocked ? Icons.block_flipped : Icons.block_outlined, 
-      () {
-        if (isBlocked) {
-          ref.read(authControllerProvider.notifier).unblockUser(sellerId);
-        } else {
-          _showBlockConfirmation(sellerId);
-        }
-      },
-      iconColor: isBlocked ? AppColors.success : AppColors.error,
-    );
-  }
-
-  void _showBlockConfirmation(String sellerId) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Block Seller?'),
-        content: const Text('You will no longer see listings or receive messages from this student.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () {
-              ref.read(authControllerProvider.notifier).blockUser(sellerId);
-              Navigator.pop(context);
-              context.pop(); // Go back to marketplace
-            }, 
-            child: const Text('Block', style: TextStyle(color: AppColors.error))
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVerifiedBadgeRow(AsyncValue<AppUser> sellerAsync, Listing listing) {
-    final theme = Theme.of(context);
     return sellerAsync.when(
       data: (seller) => Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -721,7 +540,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: AppColors.success.withValues(alpha: 0.1),
+                color: AppColors.success.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Row(
@@ -736,7 +555,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -757,11 +576,11 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
               if (listing.updatedAt != null)
                 Text(
                   'Updated ${DateFormatter.formatRelative(listing.updatedAt!)}',
-                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10),
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), fontSize: 10),
                 ),
               Text(
                 '${listing.viewsCount} views',
-                style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10),
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), fontSize: 10),
               ),
             ],
           ),
@@ -771,12 +590,177 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
       error: (_, __) => const SizedBox.shrink(),
     );
   }
+}
 
-  Widget _buildSpecsGrid(Listing listing) {
+class _AvailabilityBadge extends StatelessWidget {
+  final Listing listing;
+  const _AvailabilityBadge({required this.listing});
+
+  @override
+  Widget build(BuildContext context) {
+    final status = listing.status;
+    final isRecent = DateTime.now().difference(listing.createdAt).inHours < 48;
+
+    if (status == ListingStatus.active && !isRecent) return const SizedBox.shrink();
+
+    Color color;
+    String label;
+    IconData icon;
+
+    if (status == ListingStatus.active && isRecent) {
+      color = AppColors.secondary;
+      label = 'RECENTLY LISTED';
+      icon = Icons.auto_awesome_rounded;
+    } else {
+      switch (status) {
+        case ListingStatus.sold:
+          color = AppColors.error;
+          label = 'SOLD';
+          icon = Icons.shopping_bag_rounded;
+          break;
+        case ListingStatus.reserved:
+          color = Colors.orange;
+          label = 'RESERVED';
+          icon = Icons.lock_clock_rounded;
+          break;
+        default:
+          return const SizedBox.shrink();
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 14),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PriceBadge extends StatelessWidget {
+  final Listing listing;
+  const _PriceBadge({required this.listing});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isNegotiable = listing.isNegotiable;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: isNegotiable 
+            ? AppColors.marketplaceBlue.withOpacity(0.1) 
+            : theme.colorScheme.onSurface.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        isNegotiable ? 'Negotiable' : 'Fixed Price',
+        style: TextStyle(
+          color: isNegotiable ? AppColors.marketplaceBlue : theme.colorScheme.onSurfaceVariant, 
+          fontSize: 12, 
+          fontWeight: FontWeight.bold
+        ),
+      ),
+    );
+  }
+}
+
+class _ConditionSection extends StatelessWidget {
+  final Listing listing;
+  const _ConditionSection({required this.listing});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cond = listing.condition;
+    String label;
+    String explanation;
+    Color color;
+
+    switch (cond) {
+      case ListingCondition.newCondition:
+        label = 'Brand New';
+        explanation = 'Item is in its original packaging, never used.';
+        color = AppColors.success;
+        break;
+      case ListingCondition.likeNew:
+        label = 'Like New';
+        explanation = 'Item is in perfect condition, looks unused.';
+        color = Colors.blue;
+        break;
+      case ListingCondition.good:
+        label = 'Excellent';
+        explanation = 'Minor signs of use, fully functional.';
+        color = Colors.orange;
+        break;
+      case ListingCondition.fair:
+        label = 'Fair';
+        explanation = 'Significant wear, works but may have minor issues.';
+        color = Colors.red;
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.check_circle_outline_rounded, color: color, size: 20),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  explanation,
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SpecsGrid extends StatelessWidget {
+  final Listing listing;
+  const _SpecsGrid({required this.listing});
+
+  @override
+  Widget build(BuildContext context) {
     final attributes = listing.attributes;
     final List<Map<String, dynamic>> specItems = [];
 
-    // Add Condition first
     specItems.add({
       'icon': Icons.sentiment_satisfied_alt_rounded,
       'label': 'Condition',
@@ -791,7 +775,6 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
       });
     }
 
-    // Add legacy fields if present and not in attributes
     if (listing.brand != null && !attributes.containsKey('brand')) {
       specItems.add({'icon': Icons.branding_watermark_outlined, 'label': 'Brand', 'value': listing.brand});
     }
@@ -802,11 +785,9 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
       specItems.add({'icon': Icons.palette_outlined, 'label': 'Color', 'value': listing.color});
     }
 
-    // Add dynamic attributes
     attributes.forEach((key, value) {
       if (value == null || value.toString().isEmpty) return;
       
-      // Category-specific relevant fields only
       final category = listing.category;
       bool isRelevant = false;
       
@@ -817,7 +798,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
       } else if (category == 'Shoes') {
          isRelevant = ['brand', 'size', 'material'].contains(key.toLowerCase());
       } else {
-         isRelevant = true; // Show all for other categories
+         isRelevant = true;
       }
       
       if (!isRelevant) return;
@@ -846,27 +827,29 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
 
     if (specItems.isEmpty) return const SizedBox.shrink();
 
-    return Column(
-      children: [
-        for (var i = 0; i < specItems.length; i += 2)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                _specItem(specItems[i]['icon'], specItems[i]['label'], specItems[i]['value']),
-                const SizedBox(width: 8),
-                if (i + 1 < specItems.length)
-                  _specItem(specItems[i + 1]['icon'], specItems[i + 1]['label'], specItems[i + 1]['value'])
-                else
-                  const Expanded(child: SizedBox.shrink()),
-              ],
+    return RepaintBoundary(
+      child: Column(
+        children: [
+          for (var i = 0; i < specItems.length; i += 2)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  _specItem(context, specItems[i]['icon'], specItems[i]['label'], specItems[i]['value']),
+                  const SizedBox(width: 8),
+                  if (i + 1 < specItems.length)
+                    _specItem(context, specItems[i + 1]['icon'], specItems[i + 1]['label'], specItems[i + 1]['value'])
+                  else
+                    const Expanded(child: SizedBox.shrink()),
+                ],
+              ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 
-  Widget _specItem(IconData icon, String label, String value) {
+  Widget _specItem(BuildContext context, IconData icon, String label, String value) {
     final theme = Theme.of(context);
     return Expanded(
       child: Container(
@@ -896,19 +879,27 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
       ),
     );
   }
+}
 
-  Widget _buildSellerCard(AsyncValue<AppUser> sellerAsync, Listing listing) {
+class _SellerCard extends ConsumerWidget {
+  final Listing listing;
+  const _SellerCard({required this.listing});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final sellerAsync = ref.watch(otherUserProvider(listing.sellerId));
+
     return sellerAsync.when(
       data: (seller) => Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
+              color: Colors.black.withOpacity(0.02),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -949,30 +940,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                           ],
                           if (seller.isOnline) ...[
                             const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.orange,
-                                borderRadius: BorderRadius.circular(6),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.orange.withValues(alpha: 0.3),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: const Row(
-                                children: [
-                                  Icon(Icons.bolt_rounded, color: Colors.white, size: 10),
-                                  SizedBox(width: 2),
-                                  Text(
-                                    'Available Now', 
-                                    style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
-                                  ),
-                                ],
-                              ),
-                            ),
+                            _OnlineStatusBadge(),
                           ],
                         ],
                       ),
@@ -983,12 +951,12 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                           children: [
                             const Icon(Icons.star, color: Colors.amber, size: 14),
                             const SizedBox(width: 4),
-                            Text('${seller.averageRating} (${seller.ratingsCount} reviews)', 
+                            Text("${seller.averageRating} (${seller.ratingsCount} reviews)", 
                               style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
                             const SizedBox(width: 8),
                             Text('•', style: TextStyle(color: theme.colorScheme.outlineVariant)),
                             const SizedBox(width: 8),
-                            Text('${seller.completedSalesCount} sales', 
+                            Text("${seller.completedSalesCount} sales", 
                               style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
                           ],
                         ),
@@ -999,10 +967,10 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: OutlinedButton(
-                    onPressed: () => context.push('/seller-profile', extra: listing.sellerId),
+                    onPressed: () => context.push("/seller-profile/${listing.sellerId}", extra: listing.sellerId),
                     style: OutlinedButton.styleFrom(
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.8)),
+                      side: BorderSide(color: theme.colorScheme.outlineVariant.withOpacity(0.8)),
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       minimumSize: const Size(0, 36),
                     ),
@@ -1015,7 +983,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            _buildSellerActivityInfo(seller),
+            _SellerActivityInfo(seller: seller),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -1046,17 +1014,399 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
       error: (_, __) => const SizedBox.shrink(),
     );
   }
+}
 
-  Widget _buildSafetyBanner() {
+class _OnlineStatusBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.orange,
+        borderRadius: BorderRadius.circular(6),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.orange.withOpacity(0.3),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.bolt_rounded, color: Colors.white, size: 10),
+          SizedBox(width: 2),
+          Text(
+            'Available Now', 
+            style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SellerActivityInfo extends StatelessWidget {
+  final AppUser seller;
+  const _SellerActivityInfo({required this.seller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: [
+        _activityItem(context, 'Response', seller.responseRate),
+        _activityItem(context, 'Active', seller.lastSeen != null ? DateFormatter.formatRelative(seller.lastSeen!) : 'Recently'),
+        _activityItem(context, 'Listings', seller.activeListingsCount.toString()),
+      ],
+    );
+  }
+
+  Widget _activityItem(BuildContext context, String label, String value) {
+    final theme = Theme.of(context);
+    return Column(
+      children: [
+        Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface)),
+        Text(label, style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
+      ],
+    );
+  }
+}
+
+class _ReviewsSection extends ConsumerWidget {
+  final Listing listing;
+  const _ReviewsSection({required this.listing});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final reviewsAsync = ref.watch(sellerReviewsProvider(listing.sellerId));
+    final currentUser = ref.watch(appUserProvider).valueOrNull;
+    final isOwner = currentUser?.uid == listing.sellerId;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 32),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Seller Reviews',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 18, 
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            if (!isOwner && currentUser != null)
+              reviewsAsync.when(
+                data: (reviewsData) {
+                  final reviews = reviewsData.map((json) => Review.fromJson(json)).toList();
+                  final myReview = reviews.where((r) => r.reviewerId == currentUser.uid && r.listingId == listing.id).firstOrNull;
+                  return TextButton.icon(
+                    onPressed: () => _showAddReviewDialog(context, ref, myReview),
+                    icon: Icon(myReview != null ? Icons.edit_note_rounded : Icons.add_comment_outlined, size: 18),
+                    label: Text(myReview != null ? 'Edit My Review' : 'Rate Seller', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  );
+                },
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        reviewsAsync.when(
+          data: (reviewsData) {
+            final reviews = reviewsData.map((json) => Review.fromJson(json)).toList();
+            if (reviews.isEmpty) {
+              return Container(
+                padding: const EdgeInsets.all(24),
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    Icon(Icons.rate_review_outlined, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+                    const SizedBox(height: 8),
+                    Text(
+                      'No reviews for this seller yet.',
+                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              );
+            }
+            return ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: reviews.length > 3 ? 3 : reviews.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
+              itemBuilder: (context, index) => _ReviewItem(review: reviews[index]),
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (_, __) => const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+
+  void _showAddReviewDialog(BuildContext context, WidgetRef ref, Review? existingReview) {
+    final theme = Theme.of(context);
+    double rating = existingReview?.rating ?? 5.0;
+    final commentController = TextEditingController(text: existingReview?.comment);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  existingReview != null ? 'Update Review' : 'Rate Your Experience',
+                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'How was your interaction with ${listing.sellerName}?',
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 32),
+                
+                // Star Rating
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    final isSelected = index < rating;
+                    return IconButton(
+                      onPressed: () => setModalState(() => rating = index + 1.0),
+                      icon: Icon(
+                        isSelected ? Icons.star_rounded : Icons.star_outline_rounded,
+                        color: isSelected ? Colors.amber : theme.colorScheme.outlineVariant,
+                        size: 40,
+                      ),
+                    );
+                  }),
+                ),
+                
+                const SizedBox(height: 32),
+                TextField(
+                  controller: commentController,
+                  maxLines: 4,
+                  decoration: InputDecoration(
+                    labelText: 'Tell us more (Optional)',
+                    hintText: 'Was the item as described? Was the seller responsive?',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  height: 58,
+                  child: FilledButton(
+                    onPressed: () async {
+                      final user = ref.read(appUserProvider).valueOrNull;
+                      if (user == null) return;
+
+                      await ref.read(marketplaceRepositoryProvider).submitReview(
+                        sellerId: listing.sellerId,
+                        buyerId: user.uid,
+                        listingId: listing.id,
+                        rating: rating,
+                        comment: commentController.text.trim(),
+                      );
+                      
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Thank you for your feedback!'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: const Text('Submit Review', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReviewItem extends StatelessWidget {
+  final Review review;
+  const _ReviewItem({required this.review});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 14,
+                backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                child: Text(
+                  review.reviewerName.isNotEmpty ? review.reviewerName[0].toUpperCase() : 'U',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(review.reviewerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    Text(
+                      DateFormatter.formatRelative(review.createdAt),
+                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10),
+                    ),
+                  ],
+                ),
+              ),
+              Row(
+                children: List.generate(5, (index) => Icon(
+                  index < review.rating ? Icons.star_rounded : Icons.star_outline_rounded,
+                  color: Colors.amber,
+                  size: 12,
+                )),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            review.comment,
+            style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface, height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MoreFromSeller extends ConsumerWidget {
+  final Listing listing;
+  const _MoreFromSeller({required this.listing});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sellerId = listing.sellerId;
+    if (sellerId.isEmpty) return const SizedBox.shrink();
+    
+    final moreFromSellerAsync = ref.watch(moreFromSellerProvider(sellerId));
+    
+    return moreFromSellerAsync.when(
+      data: (listings) {
+        final others = listings.where((l) => l.id != listing.id).toList();
+        if (others.isEmpty) return const SizedBox.shrink();
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'More From This Seller', 
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 18, 
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => context.push("/seller-profile/$sellerId", extra: sellerId),
+                  child: const Text('View All'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 250,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: others.length,
+                itemBuilder: (context, index) => Container(
+                  width: 170,
+                  margin: const EdgeInsets.only(right: 16),
+                  child: MarketplaceCard(
+                    listing: others[index], 
+                    index: index,
+                    heroTag: "hero_detail_seller_${others[index].id}",
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _SafetyBanner extends StatelessWidget {
+  const _SafetyBanner();
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(top: 24),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
         ),
         child: Row(
           children: [
@@ -1081,14 +1431,20 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+            Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildSimilarItems(Listing listing) {
+class _SimilarItems extends ConsumerWidget {
+  final Listing listing;
+  const _SimilarItems({required this.listing});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final similarAsync = ref.watch(similarListingsProvider(listing));
     
     return similarAsync.when(
@@ -1120,7 +1476,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                   child: MarketplaceCard(
                     listing: listings[index], 
                     index: index,
-                    heroTag: 'hero_detail_similar_${listings[index].id}',
+                    heroTag: "hero_detail_similar_${listings[index].id}",
                   ),
                 ),
               ),
@@ -1132,87 +1488,23 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
       error: (_, __) => const SizedBox.shrink(),
     );
   }
+}
 
-  Widget _buildMoreFromSeller(String sellerId, Listing listing) {
-    if (sellerId.isEmpty) return const SizedBox.shrink();
-    
-    final moreFromSellerAsync = ref.watch(moreFromSellerProvider(sellerId));
-    
-    return moreFromSellerAsync.when(
-      data: (listings) {
-        final others = listings.where((l) => l.id != listing.id).toList();
-        if (others.isEmpty) return const SizedBox.shrink();
-        
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'More From This Seller', 
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 18, 
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => context.push('/seller-profile', extra: sellerId),
-                  child: const Text('View All'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 250,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: others.length,
-                itemBuilder: (context, index) => Container(
-                  width: 170,
-                  margin: const EdgeInsets.only(right: 16),
-                  child: MarketplaceCard(
-                    listing: others[index], 
-                    index: index,
-                    heroTag: 'hero_detail_seller_${others[index].id}',
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
-    );
-  }
+class _StickyActionBar extends StatelessWidget {
+  final Listing listing;
+  final bool isOwner;
+  final VoidCallback onStartChat;
+  final VoidCallback onMakeOffer;
 
-  Widget _buildSellerActivityInfo(AppUser seller) {
-    final theme = Theme.of(context);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
-      children: [
-        _activityItem('Response', seller.responseRate),
-        _activityItem('Active', seller.lastSeen != null ? DateFormatter.formatRelative(seller.lastSeen!) : 'Recently'),
-        _activityItem('Listings', seller.activeListingsCount.toString()),
-      ],
-    );
-  }
+  const _StickyActionBar({
+    required this.listing,
+    required this.isOwner,
+    required this.onStartChat,
+    required this.onMakeOffer,
+  });
 
-  Widget _activityItem(String label, String value) {
-    final theme = Theme.of(context);
-    return Column(
-      children: [
-        Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface)),
-        Text(label, style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
-      ],
-    );
-  }
-
-  Widget _buildStickyActionBar(bool isOwner, Listing listing) {
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final status = listing.status;
     final isSold = status == ListingStatus.sold;
@@ -1221,51 +1513,158 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
       bottom: 0,
       left: 0,
       right: 0,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05), 
-              blurRadius: 20, 
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              height: 56,
-              width: 56,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: theme.colorScheme.outlineVariant),
+      child: RepaintBoundary(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05), 
+                blurRadius: 20, 
+                offset: const Offset(0, -5),
               ),
-              child: IconButton(
-                icon: Icon(Icons.chat_bubble_outline, color: isSold ? AppColors.grey : AppColors.marketplaceBlue),
-                onPressed: (isOwner || isSold) ? null : () => _startChat(listing),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: SizedBox(
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
                 height: 56,
-                child: FilledButton(
-                  onPressed: (isOwner || isSold) ? null : () => _showMakeOfferSheet(listing),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: isSold ? AppColors.grey : AppColors.marketplaceBlue,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  child: Text(
-                    isSold ? 'Item Sold' : (isOwner ? 'Your Listing' : 'Make an Offer'), 
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
+                width: 56,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: theme.colorScheme.outlineVariant),
+                ),
+                child: IconButton(
+                  icon: Icon(Icons.chat_bubble_outline, color: isSold ? AppColors.grey : AppColors.marketplaceBlue),
+                  onPressed: (isOwner || isSold) ? null : onStartChat,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 56,
+                  child: FilledButton(
+                    onPressed: (isOwner || isSold) ? null : onMakeOffer,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: isSold ? AppColors.grey : AppColors.marketplaceBlue,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: Text(
+                      isSold ? 'Item Sold' : (isOwner ? 'Your Listing' : 'Make an Offer'), 
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _CircleButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color? iconColor;
+
+  const _CircleButton({required this.icon, required this.onTap, this.iconColor});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      height: 40,
+      width: 40,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: IconButton(
+        icon: Icon(icon, color: iconColor ?? theme.colorScheme.onSurface, size: 20),
+        onPressed: onTap,
+        padding: EdgeInsets.zero,
+      ),
+    );
+  }
+}
+
+class _SaveButton extends ConsumerWidget {
+  final Listing listing;
+  const _SaveButton({required this.listing});
+
+  void _toggleSave(BuildContext context, WidgetRef ref) {
+    final user = ref.read(appUserProvider).valueOrNull;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please log in to save items')));
+      return;
+    }
+    ref.read(marketplaceRepositoryProvider).toggleSaveListing(user.uid, listing.id);
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final savedListingsAsync = ref.watch(savedListingsProvider);
+    final isSaved = savedListingsAsync.valueOrNull?.any((l) => l.id == listing.id) ?? false;
+
+    return _CircleButton(
+      icon: isSaved ? Icons.favorite : Icons.favorite_border, 
+      onTap: () => _toggleSave(context, ref),
+      iconColor: isSaved ? AppColors.error : Theme.of(context).colorScheme.onSurface,
+    );
+  }
+}
+
+class _BlockButton extends ConsumerWidget {
+  final String sellerId;
+  const _BlockButton({required this.sellerId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(appUserProvider).valueOrNull;
+    if (user == null || user.uid == sellerId) return const SizedBox.shrink();
+    
+    final isBlocked = user.blockedUids.contains(sellerId);
+    
+    return _CircleButton(
+      icon: isBlocked ? Icons.block_flipped : Icons.block_outlined, 
+      onTap: () {
+        if (isBlocked) {
+          ref.read(authControllerProvider.notifier).unblockUser(sellerId);
+        } else {
+          _showBlockConfirmation(context, ref);
+        }
+      },
+      iconColor: isBlocked ? AppColors.success : AppColors.error,
+    );
+  }
+
+  void _showBlockConfirmation(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Block Seller?'),
+        content: const Text('You will no longer see listings or receive messages from this student.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              ref.read(authControllerProvider.notifier).blockUser(sellerId);
+              Navigator.pop(context);
+              context.pop(); // Go back to marketplace
+            }, 
+            child: const Text('Block', style: TextStyle(color: AppColors.error))
+          ),
+        ],
       ),
     );
   }
@@ -1293,7 +1692,7 @@ class FullScreenGallery extends StatelessWidget {
                   minScale: 0.5,
                   maxScale: 4.0,
                   child: Hero(
-                    tag: 'listing_img_full_$index',
+                    tag: "listing_img_full_$index",
                     child: OptimizedImage(
                       imageUrl: imageUrls[index],
                       fit: BoxFit.contain,
@@ -1330,7 +1729,7 @@ class FullScreenGallery extends StatelessWidget {
                   builder: (context, child) {
                     final page = pageController.hasClients ? (pageController.page?.round() ?? initialIndex) : initialIndex;
                     return Text(
-                      '${page + 1} / ${imageUrls.length}',
+                      "${page + 1} / ${imageUrls.length}",
                       style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                     );
                   },

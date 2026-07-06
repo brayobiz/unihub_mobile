@@ -8,6 +8,10 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:unihub_mobile/core/utils/category_utils.dart';
 import 'package:unihub_mobile/features/campus_filter/presentation/widgets/campus_filter_selector.dart';
+import '../housing/domain/models/housing_listing.dart';
+import '../notes/domain/models/note.dart';
+import '../marketplace/domain/models/listing.dart';
+import 'feed_repository.dart';
 
 class CampusPulseScreen extends ConsumerWidget {
   const CampusPulseScreen({super.key});
@@ -152,13 +156,25 @@ class CampusPulseScreen extends ConsumerWidget {
 
   void _handleItemTap(BuildContext context, SmartFeedItem item) {
     if (item.model.type == FeedType.housing) {
-      context.push('/housing-detail', extra: item.originalData);
+      if (item.originalData is HousingListing) {
+        final h = item.originalData as HousingListing;
+        context.push('/housing-detail/${h.id}', extra: h);
+      }
     } else if (item.model.type == FeedType.notes) {
-      context.push('/note-detail', extra: item.originalData);
+      if (item.originalData is NoteListing) {
+        final n = item.originalData as NoteListing;
+        context.push('/note-detail/${n.id}', extra: n);
+      }
     } else if (item.model.type == FeedType.marketplace) {
-      context.push('/listing-detail', extra: item.originalData);
+      if (item.originalData is Listing) {
+        final l = item.originalData as Listing;
+        context.push('/listing-detail/${l.id}', extra: l);
+      }
     } else if (item.model.type == FeedType.gig) {
-      context.push('/gig-detail', extra: item.originalData);
+      if (item.originalData is FeedItem) {
+        final g = item.originalData as FeedItem;
+        context.push('/gig-detail/${g.id}', extra: g);
+      }
     }
   }
 }
@@ -178,7 +194,7 @@ class _StatCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Column(

@@ -315,7 +315,7 @@ class _SupportConversationTile extends ConsumerWidget {
                   children: [
                     Row(
                       children: [
-                        Flexible(
+                        Expanded(
                           child: userAsync.when(
                             data: (user) => Text(
                               user?.fullName ?? 'Unknown User',
@@ -328,7 +328,9 @@ class _SupportConversationTile extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        _buildStatusChip(conversation.supportStatus ?? 'active'),
+                        Flexible(
+                          child: _buildStatusChip(conversation.supportStatus ?? 'active'),
+                        ),
                         if (conversation.assignedAdminId != null) ...[
                           const SizedBox(width: 8),
                           Icon(

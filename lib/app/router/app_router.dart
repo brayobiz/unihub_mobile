@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,10 +8,12 @@ import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/screens/verify_email_screen.dart';
 import '../../features/auth/presentation/screens/complete_profile_screen.dart';
+import '../../features/auth/presentation/screens/account_deleted_screen.dart';
 import '../../features/auth/presentation/screens/onboarding_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/welcome_screen.dart';
 import '../../features/auth/shared/providers.dart';
+import '../../features/auth/presentation/controllers/auth_controller.dart';
 import '../../features/navigation/main_navigation_screen.dart';
 
 import '../../features/marketplace/presentation/screens/add_listing_screen.dart';
@@ -22,6 +25,8 @@ import '../../features/marketplace/domain/models/listing.dart';
 import '../../features/chat/presentation/screens/chat_screen.dart';
 import '../../features/chat/presentation/screens/conversations_list_screen.dart';
 import '../../features/chat/domain/models/chat_context.dart';
+import '../../features/housing/presentation/screens/housing_comparison_screen.dart';
+import '../../features/housing/presentation/screens/roommate_feed_screen.dart';
 import '../../features/housing/presentation/screens/add_housing_screen.dart';
 import '../../features/housing/presentation/screens/housing_details_screen.dart';
 import '../../features/housing/presentation/screens/housing_screen.dart';
@@ -32,11 +37,13 @@ import '../../features/housing/presentation/screens/saved_housing_screen.dart';
 import '../../features/housing/presentation/screens/become_plug_screen.dart';
 import '../../features/housing/presentation/screens/submit_vacancy_screen.dart';
 import '../../features/housing/presentation/screens/opportunity_feed_screen.dart';
+import '../../features/housing/presentation/screens/viewing_requests_screen.dart';
 import '../../features/housing/domain/models/housing_listing.dart';
 import '../../features/housing/domain/models/vacancy_request.dart';
 import '../../features/notes/presentation/screens/add_note_screen.dart';
 import '../../features/notes/presentation/screens/note_detail_screen.dart';
 import '../../features/notes/presentation/screens/note_reader_screen.dart';
+import '../../features/notes/notes_screen.dart';
 import '../../features/notes/domain/models/note.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/profile/edit_profile_screen.dart';
@@ -56,6 +63,7 @@ import '../../features/shared/maintenance_screen.dart';
 import '../../features/community/community_screen.dart';
 import '../../features/gigs/gigs_screen.dart';
 import '../../features/confessions/confessions_screen.dart';
+import '../../features/campus_maps/presentation/screens/campus_maps_screen.dart';
 import '../../features/shared/feed_repository.dart';
 
 import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
@@ -70,6 +78,7 @@ import '../../features/admin/presentation/screens/audit_log_screen.dart';
 import '../../features/admin/presentation/screens/support_center_screen.dart';
 import '../../features/admin/presentation/screens/support_conversation_admin_screen.dart';
 import '../../features/admin/presentation/screens/announcement_management_screen.dart';
+import '../../features/admin/presentation/screens/event_approval_screen.dart';
 import '../../features/admin/presentation/screens/system_settings_screen.dart';
 import '../../features/admin/shared/providers.dart';
 import '../../features/admin/domain/models/verification_request.dart';
@@ -89,14 +98,43 @@ import '../../features/trust/presentation/screens/identity_verification_screen.d
 import '../../features/trust/presentation/screens/professional_verification_screen.dart';
 import '../../features/trust/domain/models/professional_role.dart';
 
+import '../../features/events/presentation/screens/events_browse_screen.dart';
+import '../../features/events/presentation/screens/event_detail_screen.dart';
+import '../../features/events/presentation/screens/organizer_profile_screen.dart';
+import '../../features/events/presentation/screens/organizer_dashboard_screen.dart';
+import '../../features/events/presentation/screens/create_organizer_screen.dart';
+import '../../features/events/domain/models/organizer.dart';
+import '../../features/events/domain/models/event.dart';
+
+import '../../features/events/presentation/screens/manage_events_screen.dart';
+import '../../features/events/presentation/screens/create_event_screen.dart';
+import '../../features/events/presentation/screens/organizer_onboarding_screen.dart';
+
+import '../../features/events/presentation/screens/my_events_screen.dart';
+import '../../features/events/presentation/screens/events_list_screen.dart';
+
 class RouterNotifier extends ChangeNotifier {
   final Ref _ref;
+  bool _isDisposed = false;
 
   RouterNotifier(this._ref) {
-    _ref.listen(authStateProvider, (_, __) => notifyListeners());
-    _ref.listen(appUserProvider, (_, __) => notifyListeners());
-    _ref.listen(systemSettingsProvider, (_, __) => notifyListeners());
-    _ref.listen(deviceOnboardingCompletedProvider, (_, __) => notifyListeners());
+    // Consolidate listeners to avoid redundant rebuilds
+    _ref.listen(authStateProvider, (_, __) => _safeNotify());
+    _ref.listen(appUserProvider, (_, __) => _safeNotify());
+    _ref.listen(systemSettingsProvider, (_, __) => _safeNotify());
+    _ref.listen(deviceOnboardingCompletedProvider, (_, __) => _safeNotify());
+    _ref.listen(accountDeletedProvider, (_, __) => _safeNotify());
+    _ref.listen(authControllerProvider, (_, __) => _safeNotify());
+  }
+
+  void _safeNotify() {
+    if (!_isDisposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
   }
 
   String? redirect(BuildContext context, GoRouterState state) {
@@ -104,25 +142,37 @@ class RouterNotifier extends ChangeNotifier {
     final appUserAsync = _ref.read(appUserProvider);
     final isDeviceOnboardingDone = _ref.read(deviceOnboardingCompletedProvider);
     final settingsAsync = _ref.read(systemSettingsProvider);
+    final isAccountDeleted = _ref.read(accountDeletedProvider);
 
     final isSplash = state.matchedLocation == '/splash';
 
+    // 1. Account Deletion State (Highest Priority)
+    if (isAccountDeleted) {
+      if (state.matchedLocation != '/account-deleted' && state.matchedLocation != '/login') {
+        return '/account-deleted';
+      }
+      return null;
+    }
+
+    // 2. Auth Loading State
     if (authState.isLoading || authState.isRefreshing) {
       return isSplash ? null : '/splash';
     }
 
+    final firebaseUser = authState.valueOrNull;
     final appUser = appUserAsync.valueOrNull;
     final isAdmin = appUser?.isAdmin ?? false;
     final settings = settingsAsync.valueOrNull;
 
-    // Maintenance Mode Check
+    // 3. Maintenance Mode Check
     if (settings?.maintenanceMode == true && !isAdmin) {
       if (state.matchedLocation != '/maintenance') return '/maintenance';
       return null;
     }
 
-    final isLoggedIn = authState.valueOrNull != null;
+    final isLoggedIn = firebaseUser != null;
 
+    // 4. Unauthenticated Flow
     if (!isLoggedIn) {
       if (!isDeviceOnboardingDone) {
         if (state.matchedLocation != '/onboarding') return '/onboarding';
@@ -132,52 +182,67 @@ class RouterNotifier extends ChangeNotifier {
       final isAuthRoute = state.matchedLocation == '/login' || 
                          state.matchedLocation == '/register' || 
                          state.matchedLocation == '/welcome' ||
-                         state.matchedLocation == '/forgot-password';
+                         state.matchedLocation == '/forgot-password' ||
+                         state.matchedLocation == '/account-deleted';
 
       if (isSplash || !isAuthRoute) return '/welcome';
       return null;
     }
 
+    // 5. Authenticated - Profile Data Loading
     if (appUserAsync.isLoading || appUserAsync.isRefreshing) {
       return isSplash ? null : '/splash';
     }
 
+    // 6. Authenticated - Missing Document
     if (appUser == null) {
       if (state.matchedLocation != '/complete-profile') return '/complete-profile';
       return null;
     }
 
-    // Restriction check
+    // 7. Restriction Check (Banned/Suspended)
     if (appUser.isRestricted) {
       if (state.matchedLocation != '/banned') return '/banned';
       return null;
     }
 
+    // 8. Email Verification Guard (Hardening)
+    // Only enforce if the user signed up via email/password (Google is usually pre-verified)
+    final isEmailPasswordUser = firebaseUser.providerData.any((p) => p.providerId == 'password');
+    if (isEmailPasswordUser && !firebaseUser.emailVerified) {
+       if (state.matchedLocation != '/verify-email') return '/verify-email';
+       return null;
+    }
+
+    // 9. Profile Completion Guard
     final isProfileIncomplete = appUser.university == null || appUser.course == null;
     if (isProfileIncomplete) {
       if (state.matchedLocation != '/complete-profile') return '/complete-profile';
       return null;
     }
 
+    // 10. User Onboarding Guard
     if (!appUser.isOnboardingCompleted) {
       if (state.matchedLocation != '/onboarding') return '/onboarding';
       return null;
     }
 
+    // 11. Already Logged In - Redirect away from Auth routes
     final isAuthRoute = state.matchedLocation == '/login' || 
                        state.matchedLocation == '/register' || 
                        state.matchedLocation == '/welcome' ||
                        state.matchedLocation == '/complete-profile' ||
                        state.matchedLocation == '/onboarding' ||
+                       state.matchedLocation == '/verify-email' ||
                        isSplash;
 
     if (isAuthRoute) {
       return '/main';
     }
 
-    // Admin route protection
+    // 12. Admin route protection
     if (state.matchedLocation.startsWith('/admin')) {
-      if (appUser == null || !appUser.isAdmin) {
+      if (!appUser.isAdmin) {
         return '/main';
       }
     }
@@ -196,7 +261,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/splash',
     refreshListenable: notifier,
-    debugLogDiagnostics: true,
+    debugLogDiagnostics: kDebugMode,
     redirect: notifier.redirect,
     routes: [
       GoRoute(
@@ -232,6 +297,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const CompleteProfileScreen(),
       ),
       GoRoute(
+        path: '/account-deleted',
+        builder: (context, state) => const AccountDeletedScreen(),
+      ),
+      GoRoute(
         path: '/banned',
         builder: (context, state) => const BannedScreen(),
       ),
@@ -247,6 +316,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/campus-pulse',
         builder: (context, state) => const CampusPulseScreen(),
+      ),
+      GoRoute(
+        path: '/campus-map',
+        builder: (context, state) {
+          final eventId = state.uri.queryParameters['eventId'];
+          return CampusMapsScreen(initialEventId: eventId);
+        },
       ),
       GoRoute(
         path: '/main',
@@ -274,38 +350,36 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SellerDashboardScreen(),
       ),
       GoRoute(
-        path: '/listing-detail',
+        path: '/listing-detail/:id',
         builder: (context, state) {
+          final id = state.pathParameters['id']!;
           final extra = state.extra;
+          
           if (extra is Listing) {
-            return ListingDetailScreen(listing: extra);
+            return ListingDetailScreen(listing: extra, listingId: id);
           }
+          
           if (extra is Map<String, dynamic>) {
             if (extra.containsKey('listing') && extra['listing'] is Listing) {
               return ListingDetailScreen(
                 listing: extra['listing'] as Listing,
+                listingId: id,
                 heroTag: extra['heroTag'] as String?,
               );
             }
             try {
-              return ListingDetailScreen(listing: Listing.fromJson(extra));
+              return ListingDetailScreen(listing: Listing.fromJson(extra), listingId: id);
             } catch (_) {}
           }
-          return const Scaffold(
-            body: Center(child: Text('Invalid listing data')),
-          );
+          
+          return ListingDetailScreen(listingId: id);
         },
       ),
       GoRoute(
-        path: '/seller-profile',
+        path: '/seller-profile/:userId',
         builder: (context, state) {
-          final extra = state.extra;
-          if (extra is String) {
-            return SellerProfileScreen(userId: extra);
-          }
-          return const Scaffold(
-            body: Center(child: Text('Invalid user profile data')),
-          );
+          final id = state.pathParameters['userId']!;
+          return SellerProfileScreen(userId: id);
         },
       ),
       GoRoute(
@@ -318,7 +392,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           final Object? extra = state.extra;
           
           if (extra is! Map) {
-            debugPrint('GoRouter: /chat route extra is not a Map: $extra');
+            if (kDebugMode) {
+              debugPrint('GoRouter: /chat route extra is not a Map');
+            }
             return const Scaffold(
               body: Center(child: Text('Invalid chat navigation data')),
             );
@@ -335,7 +411,9 @@ final routerProvider = Provider<GoRouter>((ref) {
               chatContext = ChatContext.fromJson(Map<String, dynamic>.from(chatContextData));
             }
           } catch (e) {
-            debugPrint('GoRouter: Error parsing ChatContext in /chat route: $e');
+            if (kDebugMode) {
+              debugPrint('GoRouter: Error parsing ChatContext in /chat route');
+            }
           }
 
           final String convId = (extras['conversationId'] ?? '').toString();
@@ -371,16 +449,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const HousingScreen(),
       ),
       GoRoute(
-        path: '/housing-detail',
+        path: '/housing-detail/:id',
         builder: (context, state) {
+          final id = state.pathParameters['id']!;
           final extra = state.extra;
+          
           if (extra is HousingListing) {
-            return HousingDetailsScreen(listing: extra);
+            return HousingDetailsScreen(listing: extra, listingId: id);
           }
-          return const Scaffold(
-            body: Center(child: Text('Invalid housing data')),
-          );
+          
+          return HousingDetailsScreen(listingId: id);
         },
+      ),
+      GoRoute(
+        path: '/housing-comparison',
+        builder: (context, state) => const HousingComparisonScreen(),
       ),
       GoRoute(
         path: '/plug-dashboard',
@@ -402,16 +485,37 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SubmitVacancyScreen(),
       ),
       GoRoute(
+        path: '/viewing-requests',
+        builder: (context, state) => const ViewingRequestsScreen(),
+      ),
+      GoRoute(
         path: '/opportunities',
         builder: (context, state) => const OpportunityFeedScreen(),
+      ),
+      GoRoute(
+        path: '/notes',
+        builder: (context, state) {
+          final tab = int.tryParse(state.uri.queryParameters['tab'] ?? '0') ?? 0;
+          return NotesScreen(initialTabIndex: tab);
+        },
       ),
       GoRoute(
         path: '/saved-housing',
         builder: (context, state) => const SavedHousingScreen(),
       ),
       GoRoute(
+        path: '/roommates',
+        builder: (context, state) => const RoommateFeedScreen(),
+      ),
+      GoRoute(
         path: '/add-roommate',
-        builder: (context, state) => const AddRoommateScreen(),
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is HousingListing) {
+            return AddRoommateScreen(targetListing: extra);
+          }
+          return const AddRoommateScreen();
+        },
       ),
       GoRoute(
         path: '/add-note',
@@ -427,18 +531,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
-        path: '/note-detail',
+        path: '/note-detail/:id',
         builder: (context, state) {
+          final id = state.pathParameters['id']!;
           final extra = state.extra;
+          
           if (extra is NoteListing) {
-            return NoteDetailScreen(note: extra);
+            return NoteDetailScreen(note: extra, noteId: id);
           }
+          
           if (extra is Map<String, dynamic>) {
-            return NoteDetailScreen(note: NoteListing.fromJson(extra));
+            try {
+              return NoteDetailScreen(note: NoteListing.fromJson(extra), noteId: id);
+            } catch (_) {}
           }
-          return const Scaffold(
-            body: Center(child: Text('Invalid note data')),
-          );
+          
+          return NoteDetailScreen(noteId: id);
         },
       ),
       GoRoute(
@@ -513,18 +621,39 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const HelpCentreScreen(),
       ),
       GoRoute(
-        path: '/feed-detail',
+        path: '/feed-detail/:id',
         builder: (context, state) {
+          final id = state.pathParameters['id']!;
           final extra = state.extra;
+          
           if (extra is FeedItem) {
-            return FeedItemDetailScreen(item: extra);
+            return FeedItemDetailScreen(item: extra, itemId: id);
           }
           if (extra is Map<String, dynamic>) {
-            return FeedItemDetailScreen(item: FeedItem.fromJson(extra));
+            try {
+              return FeedItemDetailScreen(item: FeedItem.fromJson(extra), itemId: id);
+            } catch (_) {}
           }
-          return const Scaffold(
-            body: Center(child: Text('Invalid feed item data')),
-          );
+          
+          return FeedItemDetailScreen(itemId: id);
+        },
+      ),
+      GoRoute(
+        path: '/community-detail/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          final extra = state.extra;
+          
+          if (extra is FeedItem) {
+            return FeedItemDetailScreen(item: extra, itemId: id);
+          }
+          if (extra is Map<String, dynamic>) {
+            try {
+              return FeedItemDetailScreen(item: FeedItem.fromJson(extra), itemId: id);
+            } catch (_) {}
+          }
+          
+          return FeedItemDetailScreen(itemId: id);
         },
       ),
       GoRoute(
@@ -539,19 +668,127 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/confessions',
         builder: (context, state) => const ConfessionsScreen(),
       ),
+      // Events Routes
       GoRoute(
-        path: '/gig-detail',
+        path: '/events',
+        builder: (context, state) => const EventsBrowseScreen(),
+      ),
+      GoRoute(
+        path: '/events/list',
+        builder: (context, state) {
+          final title = state.uri.queryParameters['title'] ?? 'Events';
+          final filterStr = state.uri.queryParameters['filter'] ?? 'today';
+          final categoryId = state.uri.queryParameters['categoryId'];
+          
+          final filter = EventListFilter.values.firstWhere(
+            (e) => e.name == filterStr,
+            orElse: () => EventListFilter.today,
+          );
+
+          return EventsListScreen(
+            title: title,
+            filter: filter,
+            categoryId: categoryId,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/events/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return EventDetailScreen(eventId: id);
+        },
+      ),
+      GoRoute(
+        path: '/my-events',
+        builder: (context, state) => const MyEventsScreen(),
+      ),
+      GoRoute(
+        path: '/organizers/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return OrganizerProfileScreen(organizerId: id);
+        },
+      ),
+      GoRoute(
+        path: '/organizers/:id/dashboard',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return OrganizerDashboardScreen(organizerId: id);
+        },
+      ),
+      GoRoute(
+        path: '/organizers/:id/events',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return ManageEventsScreen(organizerId: id);
+        },
+      ),
+      GoRoute(
+        path: '/organizers/:id/events/create',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          // We need campus ID, but for MVP we can grab it from user or organizer
+          // Ideally passed or fetched. 
+          // Let's assume we can fetch it or it's provided in extra
+          final extra = state.extra as Map<String, dynamic>?;
+          return CreateEventScreen(
+            organizerId: id,
+            campusId: extra?['campusId'] ?? 'uon_main', // Fallback for routing
+          );
+        },
+      ),
+      GoRoute(
+        path: '/organizers/:id/events/edit',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          final event = state.extra as Event;
+          return CreateEventScreen(
+            organizerId: id,
+            campusId: event.campusId,
+            event: event,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/organizers/:id/edit',
         builder: (context, state) {
           final extra = state.extra;
+          if (extra is Organizer) {
+            return CreateOrganizerScreen(organizer: extra);
+          }
+          return const CreateOrganizerScreen();
+        },
+      ),
+      GoRoute(
+        path: '/organizer-onboarding',
+        name: 'organizer-onboarding',
+        builder: (context, state) => const OrganizerOnboardingScreen(),
+      ),
+      GoRoute(
+        path: '/become-organizer',
+        name: 'become-organizer',
+        builder: (context, state) {
+          final organizer = state.extra as Organizer?;
+          return CreateOrganizerScreen(organizer: organizer);
+        },
+      ),
+      GoRoute(
+        path: '/gig-detail/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          final extra = state.extra;
+          
           if (extra is FeedItem) {
-            return GigDetailsScreen(gig: extra);
+            return GigDetailsScreen(gig: extra, gigId: id);
           }
           if (extra is Map<String, dynamic>) {
-            return GigDetailsScreen(gig: FeedItem.fromJson(extra));
+            try {
+              return GigDetailsScreen(gig: FeedItem.fromJson(extra), gigId: id);
+            } catch (_) {}
           }
-          return const Scaffold(
-            body: Center(child: Text('Invalid gig data')),
-          );
+          
+          return GigDetailsScreen(gigId: id);
         },
       ),
       GoRoute(
@@ -663,6 +900,20 @@ final routerProvider = Provider<GoRouter>((ref) {
           final extra = state.extra as Map<String, dynamic>?;
           return FeatureModerationScreen(
             contentType: ContentType.notes,
+            initialUserId: extra?['userId'] as String?,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/admin/events/approvals',
+        builder: (context, state) => const EventApprovalScreen(),
+      ),
+      GoRoute(
+        path: '/admin/events',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return FeatureModerationScreen(
+            contentType: ContentType.events,
             initialUserId: extra?['userId'] as String?,
           );
         },

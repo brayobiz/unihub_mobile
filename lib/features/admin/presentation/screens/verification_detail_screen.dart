@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import 'package:intl/intl.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../layout/admin_layout.dart';
@@ -36,45 +36,81 @@ class _VerificationDetailScreenState extends ConsumerState<VerificationDetailScr
     super.dispose();
   }
 
-  Future<void> _processAction(AdminVerificationStatus status) async {
-    if (status == AdminVerificationStatus.rejected || status == AdminVerificationStatus.resubmissionRequested) {
-      if (_reasonController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Reason is required for ${status.name}')),
-        );
-        return;
-      }
-    }
+   Future<void> _processAction(AdminVerificationStatus status) async {
+     if (_isProcessing) return;
 
-    setState(() => _isProcessing = true);
-    try {
-      final admin = ref.read(appUserProvider).valueOrNull;
-      if (admin == null) throw Exception('Admin session not found');
+     if (status == AdminVerificationStatus.rejected || status == AdminVerificationStatus.resubmissionRequested) {
+       if (_reasonController.text.trim().isEmpty) {
+         if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+             SnackBar(content: Text('Reason is required for ${status.name}')),
+           );
+         }
+         return;
+       }
+     }
 
-      await ref.read(adminRepositoryProvider).processVerification(
-        request: widget.request,
-        newStatus: status,
-        adminId: admin.uid,
-        adminName: admin.fullName,
-        reason: _reasonController.text.trim(),
-        adminNotes: _adminNotesController.text.trim(),
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Action processed successfully')),
-        );
-        context.pop();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
-    }
-  }
+     setState(() => _isProcessing = true);
+     
+     // Capture dependencies before the async gap to avoid using 'ref' after dispose
+     final adminService = ref.read(adminServiceProvider);
+     final admin = ref.read(appUserProvider).valueOrNull;
+     final messenger = ScaffoldMessenger.of(context);
+     final router = GoRouter.of(context);
+     final reason = _reasonController.text.trim();
+     final adminNotes = _adminNotesController.text.trim();
+     
+     try {
+       if (admin == null) throw Exception('Admin session not found');
+
+       // DEFENSIVE VALIDATION: Ensure request has valid IDs
+       if (widget.request.id.isEmpty || widget.request.id.trim().isEmpty) {
+         throw Exception(
+           'Approval failed: Verification request ID is empty or invalid. '
+           'This may indicate corrupted data in the verification document.'
+         );
+       }
+       
+       if (widget.request.userId.isEmpty || widget.request.userId.trim().isEmpty) {
+         throw Exception(
+           'Approval failed: User ID is empty or invalid for ${widget.request.type.name} verification. '
+           'The verification document may be missing the userId field.'
+         );
+       }
+
+       await adminService.processVerification(
+         request: widget.request,
+         newStatus: status,
+         adminId: admin.uid,
+         adminName: admin.fullName,
+         reason: reason,
+         adminNotes: adminNotes,
+       );
+       
+       if (mounted) {
+         messenger.showSnackBar(
+           SnackBar(content: Text('✅ Verification ${status.name} successfully - user will be notified')),
+         );
+         // Small delay to ensure database reflects change
+         await Future.delayed(const Duration(milliseconds: 500));
+         if (router.canPop()) {
+           router.pop(true);  // Return true to indicate success
+         }
+       }
+     } catch (e) {
+       if (mounted) {
+         messenger.showSnackBar(
+           SnackBar(
+             content: Text('❌ Error: $e'),
+             backgroundColor: Colors.red,
+             duration: const Duration(seconds: 5),
+           ),
+         );
+       }
+     } finally {
+       if (mounted) setState(() => _isProcessing = false);
+     }
+   }
 
   @override
   Widget build(BuildContext context) {
@@ -158,7 +194,7 @@ class _VerificationDetailScreenState extends ConsumerState<VerificationDetailScr
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
       child: Text(widget.request.status.name.toUpperCase(), style: TextStyle(color: color, fontWeight: FontWeight.bold)),
     );
   }
@@ -195,11 +231,26 @@ class _VerificationDetailScreenState extends ConsumerState<VerificationDetailScr
         if (widget.request.metadata.isNotEmpty) ...[
           const SizedBox(height: 24),
           _buildSectionCard(
-            title: 'Metadata',
-            child: Wrap(
-              spacing: 16,
-              runSpacing: 16,
-              children: widget.request.metadata.entries.map((e) => _buildInfoRow(e.key, e.value.toString())).toList(),
+            title: 'Additional Information',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: widget.request.metadata.entries.map((e) {
+                final value = e.value.toString();
+                final isUrl = value.startsWith('http');
+                final isImage = isUrl && (
+                  value.contains('.jpg') || 
+                  value.contains('.png') || 
+                  value.contains('.jpeg') || 
+                  value.contains('firebasestorage') ||
+                  value.contains('cloudinary.com')
+                );
+                
+                if (isImage) {
+                  return _buildDocumentPreview(e.key.toUpperCase(), value);
+                }
+                
+                return _buildInfoRow(e.key, value);
+              }).toList(),
             ),
           ),
         ],
@@ -353,19 +404,11 @@ class _VerificationDetailScreenState extends ConsumerState<VerificationDetailScr
           borderRadius: BorderRadius.circular(8),
           child: InkWell(
             onTap: () => _showFullImage(url),
-            child: CachedNetworkImage(
+            child: OptimizedImage(
               imageUrl: url,
               height: 200,
               width: double.infinity,
               fit: BoxFit.cover,
-              placeholder: (context, url) => Container(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest, 
-                child: const Center(child: CircularProgressIndicator()),
-              ),
-              errorWidget: (context, url, error) => Container(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest, 
-                child: const Icon(Icons.error),
-              ),
             ),
           ),
         ),
@@ -384,7 +427,7 @@ class _VerificationDetailScreenState extends ConsumerState<VerificationDetailScr
             Stack(
               alignment: Alignment.topRight,
               children: [
-                CachedNetworkImage(imageUrl: url),
+                OptimizedImage(imageUrl: url, useCloudinaryTransform: false),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.white),
                   onPressed: () => Navigator.pop(context),

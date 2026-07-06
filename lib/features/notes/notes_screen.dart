@@ -12,7 +12,8 @@ import 'package:unihub_mobile/features/announcements/presentation/widgets/announ
 import 'package:unihub_mobile/features/campus_filter/presentation/widgets/campus_filter_selector.dart';
 
 class NotesScreen extends ConsumerStatefulWidget {
-  const NotesScreen({super.key});
+  final int initialTabIndex;
+  const NotesScreen({super.key, this.initialTabIndex = 0});
 
   @override
   ConsumerState<NotesScreen> createState() => _NotesScreenState();
@@ -24,7 +25,11 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: 2, 
+      vsync: this,
+      initialIndex: widget.initialTabIndex,
+    );
   }
 
   @override
@@ -38,7 +43,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
     final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
-      drawer: const AppDrawer(),
+      drawer: AppDrawer(),
       appBar: AppBar(
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
@@ -67,18 +72,56 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
           ],
         ),
         actions: [
-          const NotificationBadge(module: 'notes'),
+          IconButton(
+            icon: const Icon(Icons.search_rounded),
+            tooltip: 'Search Notes',
+            onPressed: () => showSearch(
+              context: context,
+              delegate: NotesSearchDelegate(ref: ref),
+            ),
+          ),
+          Semantics(
+            label: 'Notifications',
+            button: true,
+            child: const NotificationBadge(module: 'notes'),
+          ),
           IconButton(
             icon: Icon(Icons.tune, color: theme.colorScheme.onSurface),
+            tooltip: 'Filter Notes',
             onPressed: () => _showFilterSheet(),
           ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: () => context.push('/profile'),
+            child: Semantics(
+              label: 'View Profile',
+              button: true,
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final user = ref.watch(appUserProvider).valueOrNull;
+                  return CircleAvatar(
+                    radius: 16,
+                    backgroundColor: theme.colorScheme.surfaceVariant,
+                    backgroundImage: user?.photoUrl != null ? NetworkImage(user!.photoUrl!) : null,
+                    child: user?.photoUrl == null 
+                        ? Text(
+                            user?.fullName.isNotEmpty == true ? user!.fullName[0].toUpperCase() : 'U',
+                            style: TextStyle(color: theme.colorScheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                          )
+                        : null,
+                  );
+                }
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'notes_fab',
         onPressed: () => context.push('/add-note'),
         backgroundColor: theme.colorScheme.primary,
-        label: const Text('Share Notes', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        label: const Text('Upload Notes', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
         icon: const Icon(Icons.add, color: Colors.white),
       ),
       body: Column(
@@ -106,7 +149,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (context) => const NoteFilterSheet(),
     );
   }
@@ -131,7 +174,7 @@ class NoteFilterSheet extends ConsumerWidget {
       maxChildSize: 0.95,
       expand: false,
       builder: (context, scrollController) => Container(
-        decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(30))),
+        decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
         child: Column(
           children: [
@@ -204,7 +247,7 @@ class NoteFilterSheet extends ConsumerWidget {
                   onPressed: () => Navigator.pop(context),
                   style: FilledButton.styleFrom(
                     backgroundColor: theme.colorScheme.primary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: const Text('Apply Filters', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                 ),
@@ -214,5 +257,44 @@ class NoteFilterSheet extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+class NotesSearchDelegate extends SearchDelegate<String?> {
+  final WidgetRef ref;
+
+  NotesSearchDelegate({required this.ref});
+
+  @override
+  List<Widget>? buildActions(BuildContext context) {
+    return [
+      if (query.isNotEmpty)
+        IconButton(
+          onPressed: () => query = '',
+          icon: const Icon(Icons.clear_rounded, semanticLabel: 'Clear search'),
+        ),
+    ];
+  }
+
+  @override
+  Widget? buildLeading(BuildContext context) {
+    return IconButton(
+      onPressed: () => close(context, null),
+      icon: const Icon(Icons.arrow_back_rounded, semanticLabel: 'Back'),
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    // Implement results display or filtering logic here
+    // For now, let's just close and use the query if needed
+    close(context, query);
+    return const SizedBox.shrink();
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    // Add logic for note-specific suggestions if available
+    return const Center(child: Text('Search by unit code or course name'));
   }
 }

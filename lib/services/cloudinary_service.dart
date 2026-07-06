@@ -52,7 +52,9 @@ class CloudinaryService {
     // This implementation uses a 'protected_' prefix as a hint for Cloudinary rules.
     final effectiveFolder = isPrivate ? 'unihub/protected_$folder' : 'unihub/$folder';
 
-    debugPrint('☁️ Cloudinary: Starting upload for $fileName to folder $effectiveFolder');
+    if (kDebugMode) {
+      debugPrint('☁️ Cloudinary: Starting upload for (masked) to folder $effectiveFolder');
+    }
     
     try {
       if (!await file.exists()) {
@@ -63,9 +65,13 @@ class CloudinaryService {
       final isImg = _isImage(file.path);
       
       if (compress && isImg && !isPrivate) {
-        debugPrint('☁️ Cloudinary: Compressing image before upload...');
+        if (kDebugMode) {
+          debugPrint('☁️ Cloudinary: Compressing image before upload...');
+        }
         fileToUpload = await compressImage(file);
-        debugPrint('☁️ Cloudinary: Compression complete.');
+        if (kDebugMode) {
+          debugPrint('☁️ Cloudinary: Compression complete.');
+        }
       }
 
       final isPdf = p.extension(file.path).toLowerCase() == '.pdf';
@@ -80,19 +86,23 @@ class CloudinaryService {
         resourceType: resourceType,
       );
 
-      debugPrint('☁️ Cloudinary: Requesting upload with resourceType: ${cloudinaryFile.resourceType}');
+      if (kDebugMode) {
+        debugPrint('☁️ Cloudinary: Requesting upload with resourceType: ${cloudinaryFile.resourceType}');
+      }
 
       CloudinaryResponse response = await _cloudinary.uploadFile(
         cloudinaryFile,
         onProgress: onProgress,
       );
       
-      debugPrint('☁️ Cloudinary: Upload successful! URL: ${response.secureUrl}');
+      if (kDebugMode) {
+        debugPrint('☁️ Cloudinary: Upload successful!');
+      }
       return response.secureUrl;
     } catch (e, stack) {
-      debugPrint('❌ Cloudinary: Upload failed for $fileName');
-      debugPrint('Error: $e');
-      debugPrint('Stack: $stack');
+      if (kDebugMode) {
+        debugPrint('❌ Cloudinary: Upload failed');
+      }
       throw Exception('Cloudinary upload failed: $e');
     }
   }

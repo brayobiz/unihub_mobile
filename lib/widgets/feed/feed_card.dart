@@ -396,10 +396,6 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
   }
 }
 
-final commentsStreamProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, itemId) {
-  return ref.watch(feedRepositoryProvider).watchComments(itemId);
-});
-
 class _InteractionButton extends StatelessWidget {
   final BuildContext context;
   final IconData icon;

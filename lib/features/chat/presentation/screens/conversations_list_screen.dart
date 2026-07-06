@@ -9,6 +9,8 @@ import '../../domain/models/conversation.dart';
 import '../../domain/models/message.dart';
 import '../../shared/providers.dart';
 import '../../../../widgets/skeleton_loader.dart';
+import '../../../../widgets/notification_badge.dart';
+import '../../../../widgets/app_drawer.dart';
 
 class ConversationsListScreen extends ConsumerStatefulWidget {
   const ConversationsListScreen({super.key});
@@ -49,7 +51,14 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
+      drawer: AppDrawer(),
       appBar: AppBar(
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: Icon(Icons.menu_rounded, color: theme.colorScheme.onSurface),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         title: Text(
           'Messages',
           style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
@@ -57,6 +66,30 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         centerTitle: false,
+        actions: [
+          const NotificationBadge(),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => context.push('/profile'),
+            child: Consumer(
+              builder: (context, ref, _) {
+                final userProfile = ref.watch(appUserProvider).valueOrNull;
+                return CircleAvatar(
+                  radius: 16,
+                  backgroundColor: theme.colorScheme.surfaceVariant,
+                  backgroundImage: userProfile?.photoUrl != null ? NetworkImage(userProfile!.photoUrl!) : null,
+                  child: userProfile?.photoUrl == null 
+                      ? Text(
+                          userProfile?.fullName.isNotEmpty == true ? userProfile!.fullName[0].toUpperCase() : 'U',
+                          style: TextStyle(color: theme.colorScheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                        )
+                      : null,
+                );
+              }
+            ),
+          ),
+          const SizedBox(width: 16),
+        ],
       ),
       body: Column(
         children: [

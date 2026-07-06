@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +8,7 @@ import '../../../services/notification_service.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import 'package:unihub_mobile/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:unihub_mobile/features/auth/presentation/widgets/logout_dialog.dart';
 import 'package:unihub_mobile/features/marketplace/shared/providers.dart';
 import 'package:unihub_mobile/app/theme/theme_provider.dart';
 import '../admin/shared/providers.dart';
@@ -159,6 +161,8 @@ class SettingsScreen extends ConsumerWidget {
           const Divider(height: 1, indent: 50),
           _buildSwitchTile(context, icon: Icons.person_add_outlined, title: 'New Followers', value: user?.notificationSettings['followers'] ?? true, onChanged: (val) => user != null ? _updateNotificationSetting(ref, user.uid, 'followers', val) : null),
           const Divider(height: 1, indent: 50),
+          _buildSwitchTile(context, icon: Icons.event_note_outlined, title: 'Events & Campus Life', value: user?.notificationSettings['events'] ?? true, onChanged: (val) => user != null ? _updateNotificationSetting(ref, user.uid, 'events', val) : null),
+          const Divider(height: 1, indent: 50),
           _buildSwitchTile(context, icon: Icons.campaign_outlined, title: 'System Announcements', value: user?.notificationSettings['system'] ?? true, onChanged: (val) => user != null ? _updateNotificationSetting(ref, user.uid, 'system', val) : null),
           const Divider(height: 1, indent: 50),
           _buildSwitchTile(context, icon: Icons.groups_outlined, title: 'Community Activity', value: user?.notificationSettings['community_activity'] ?? true, onChanged: (val) => user != null ? _updateNotificationSetting(ref, user.uid, 'community_activity', val) : null),
@@ -183,13 +187,13 @@ class SettingsScreen extends ConsumerWidget {
           const Divider(height: 1, indent: 50),
           _buildSettingTile(context, icon: Icons.lock_outline_rounded, title: 'Change Password', onTap: () => _showChangePasswordDialog(context, ref)),
           const Divider(height: 1, indent: 50),
+          _buildSettingTile(context, icon: Icons.logout_rounded, title: 'Sign Out', onTap: () => LogoutDialog.show(context, ref)),
+          const Divider(height: 1, indent: 50),
           _buildSettingTile(context, icon: Icons.delete_outline_rounded, title: 'Delete Account', titleColor: AppColors.error, onTap: () => _showDeleteAccountDialog(context, ref)),
         ]),
 
-        _buildSectionHeader(context, 'Support'),
+        _buildSectionHeader(context, 'Support & Legal'),
         _buildSettingsCard(context, [
-          _buildSettingTile(context, icon: Icons.help_outline_rounded, title: 'Help Centre', onTap: () => context.push('/help')),
-          const Divider(height: 1, indent: 50),
           _buildSettingTile(
             context, 
             icon: Icons.policy_outlined, 
@@ -213,7 +217,6 @@ class SettingsScreen extends ConsumerWidget {
 
         const SizedBox(height: 32),
         Center(child: Column(children: [
-          TextButton(onPressed: () => _showSignOutDialog(context, ref), child: const Text('Sign Out', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold))),
           settingsAsync.when(
             data: (settings) => Text('UniHub v${settings.appVersion} (Stable)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: 12)),
             loading: () => Text('UniHub v1.2.5 (Stable)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: 12)),
@@ -404,14 +407,6 @@ class SettingsScreen extends ConsumerWidget {
     ]));
   }
 
-  void _showSignOutDialog(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    showDialog(context: context, builder: (context) => AlertDialog(backgroundColor: theme.colorScheme.surface, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), title: const Text('Sign Out'), content: const Text('Are you sure you want to sign out of UniHub?'), actions: [
-      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-      TextButton(onPressed: () { ref.read(authControllerProvider.notifier).signOut(); Navigator.pop(context); }, child: const Text('Sign Out', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold))),
-    ]));
-  }
-
   void _showDeleteAccountDialog(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     showDialog(context: context, builder: (context) => AlertDialog(backgroundColor: theme.colorScheme.surface, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), title: const Text('Delete Account?'), content: const Text('This action is permanent and will remove all your listings, messages, and profile data from UniHub.'), actions: [
@@ -424,10 +419,14 @@ class SettingsScreen extends ConsumerWidget {
     final Uri url = Uri.parse(urlString);
     try {
       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) { 
-        debugPrint('Could not launch $url'); 
+        if (kDebugMode) {
+          debugPrint('Could not launch URL'); 
+        }
       }
     } catch (e) {
-      debugPrint('Error launching URL: $e');
+      if (kDebugMode) {
+        debugPrint('Error launching URL');
+      }
     }
   }
 }

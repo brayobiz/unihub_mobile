@@ -469,7 +469,7 @@ class LibraryTab extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear History?'),
+        title: const Text('Clear History'),
         content: const Text('This will remove all recently opened documents. Your bookmarks and uploads will be kept.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),

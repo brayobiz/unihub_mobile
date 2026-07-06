@@ -59,7 +59,7 @@ class BannedScreen extends ConsumerWidget {
             const SizedBox(height: 32),
             TextButton(
               onPressed: () => ref.read(authRepositoryProvider).signOut(),
-              child: const Text('Log Out'),
+              child: const Text('Sign Out'),
             ),
           ],
         ),

@@ -80,13 +80,14 @@ class _SupportConversationAdminScreenState extends ConsumerState<SupportConversa
     );
 
     _messageController.clear();
+    final messenger = ScaffoldMessenger.of(context);
     
     try {
       await ref.read(chatRepositoryProvider).sendMessage(widget.conversationId, message);
       // Status update is handled automatically in ChatRepositoryImpl.sendMessage for support chats
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(content: Text('Failed to send message: $e')),
         );
       }
@@ -103,6 +104,7 @@ class _SupportConversationAdminScreenState extends ConsumerState<SupportConversa
 
   Future<void> _uploadAndSend(File file, MessageType type) async {
     setState(() => _isProcessing = true);
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final url = await ref.read(storageRepositoryProvider).uploadFile(
         path: 'chats/${widget.conversationId}',
@@ -111,7 +113,7 @@ class _SupportConversationAdminScreenState extends ConsumerState<SupportConversa
       );
       _sendMessage(url, type);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+      if (mounted) messenger.showSnackBar(SnackBar(content: Text('Upload failed: $e')));
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
@@ -122,6 +124,7 @@ class _SupportConversationAdminScreenState extends ConsumerState<SupportConversa
     if (admin == null) return;
 
     setState(() => _isProcessing = true);
+    final messenger = ScaffoldMessenger.of(context);
     try {
       await ref.read(adminRepositoryProvider).updateSupportConversationStatus(
         widget.conversationId, 
@@ -130,7 +133,7 @@ class _SupportConversationAdminScreenState extends ConsumerState<SupportConversa
         adminName: admin.fullName,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Status updated to ${status.replaceAll('_', ' ')}')));
+        messenger.showSnackBar(SnackBar(content: Text('Status updated to ${status.replaceAll('_', ' ')}')));
       }
     } finally {
       if (mounted) setState(() => _isProcessing = false);
@@ -168,11 +171,12 @@ class _SupportConversationAdminScreenState extends ConsumerState<SupportConversa
     final admin = ref.read(appUserProvider).valueOrNull;
     if (admin == null) return;
 
+    final messenger = ScaffoldMessenger.of(context);
     await ref.read(adminRepositoryProvider).addSupportAdminNote(widget.conversationId, note, admin.uid);
     _adminNoteController.clear();
     if (mounted) {
       Navigator.pop(context); // Close dialog
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Internal note added')));
+      messenger.showSnackBar(const SnackBar(content: Text('Internal note added')));
     }
   }
 
@@ -220,6 +224,7 @@ class _SupportConversationAdminScreenState extends ConsumerState<SupportConversa
     if (confirmed != true) return;
 
     setState(() => _isProcessing = true);
+    final navigator = Navigator.of(context);
     try {
       _sendMessage('Thank you for using UniHub Support. This ticket is now marked as Resolved.');
       await ref.read(adminRepositoryProvider).updateSupportConversationStatus(
@@ -228,7 +233,7 @@ class _SupportConversationAdminScreenState extends ConsumerState<SupportConversa
         adminId: admin.uid,
         adminName: admin.fullName,
       );
-      if (mounted) context.pop();
+      if (mounted) navigator.pop();
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }

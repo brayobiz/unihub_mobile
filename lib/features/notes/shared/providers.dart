@@ -16,13 +16,13 @@ final notesRepositoryProvider = Provider<NotesRepository>((ref) {
 });
 
 // Search and Filter States
-final notesSearchQueryProvider = StateProvider<String>((ref) => '');
-final notesCategoryFilterProvider = StateProvider<String>((ref) => 'All');
-final notesTypeFilterProvider = StateProvider<String>((ref) => 'All');
-final notesYearFilterProvider = StateProvider<String>((ref) => 'All');
-final notesCourseFilterProvider = StateProvider<String>((ref) => 'All');
+final notesSearchQueryProvider = StateProvider.autoDispose<String>((ref) => '');
+final notesCategoryFilterProvider = StateProvider.autoDispose<String>((ref) => 'All');
+final notesTypeFilterProvider = StateProvider.autoDispose<String>((ref) => 'All');
+final notesYearFilterProvider = StateProvider.autoDispose<String>((ref) => 'All');
+final notesCourseFilterProvider = StateProvider.autoDispose<String>((ref) => 'All');
 
-final notesListingsProvider = StreamProvider.family<List<NoteListing>, int>((ref, limit) {
+final notesListingsProvider = StreamProvider.autoDispose.family<List<NoteListing>, int>((ref, limit) {
   final user = ref.watch(appUserProvider).valueOrNull;
   final query = ref.watch(notesSearchQueryProvider);
   final category = ref.watch(notesCategoryFilterProvider);
@@ -41,48 +41,48 @@ final notesListingsProvider = StreamProvider.family<List<NoteListing>, int>((ref
   });
 });
 
-final userNotesProvider = StreamProvider<List<NoteListing>>((ref) {
+final userNotesProvider = StreamProvider.autoDispose<List<NoteListing>>((ref) {
   final user = ref.watch(authStateProvider).valueOrNull;
   if (user == null) return Stream.value([]);
   return ref.watch(notesRepositoryProvider).watchNotesByAuthor(user.uid);
 });
 
 // Study Specific Providers
-final studyHistoryProvider = StreamProvider<List<StudyProgress>>((ref) {
+final studyHistoryProvider = StreamProvider.autoDispose<List<StudyProgress>>((ref) {
   final user = ref.watch(authStateProvider).valueOrNull;
   if (user == null) return Stream.value([]);
   return ref.watch(notesRepositoryProvider).watchStudyHistory(user.uid);
 });
 
-final bookmarksProvider = StreamProvider<List<StudyProgress>>((ref) {
+final bookmarksProvider = StreamProvider.autoDispose<List<StudyProgress>>((ref) {
   final user = ref.watch(authStateProvider).valueOrNull;
   if (user == null) return Stream.value([]);
   return ref.watch(notesRepositoryProvider).watchBookmarks(user.uid);
 });
 
 // Derived Library Providers
-final continueReadingProvider = Provider<AsyncValue<List<StudyProgress>>>((ref) {
+final continueReadingProvider = Provider.autoDispose<AsyncValue<List<StudyProgress>>>((ref) {
   final historyAsync = ref.watch(studyHistoryProvider);
   return historyAsync.whenData((history) => 
     history.where((p) => p.progress > 0 && p.progress < 0.95).toList()
   );
 });
 
-final recentlyOpenedProvider = Provider<AsyncValue<List<StudyProgress>>>((ref) {
+final recentlyOpenedProvider = Provider.autoDispose<AsyncValue<List<StudyProgress>>>((ref) {
   final historyAsync = ref.watch(studyHistoryProvider);
   return historyAsync.whenData((history) => 
     history.take(10).toList()
   );
 });
 
-final noteProgressProvider = StreamProvider.family<StudyProgress?, String>((ref, noteId) {
+final noteProgressProvider = StreamProvider.autoDispose.family<StudyProgress?, String>((ref, noteId) {
   final user = ref.watch(authStateProvider).valueOrNull;
   if (user == null) return Stream.value(null);
   return ref.watch(notesRepositoryProvider).watchNoteProgress(user.uid, noteId);
 });
 
 // Helper provider to resolve NoteListing from StudyProgress
-final noteByIdProvider = FutureProvider.family<NoteListing?, String>((ref, noteId) {
+final noteByIdProvider = FutureProvider.autoDispose.family<NoteListing?, String>((ref, noteId) {
   return ref.watch(notesRepositoryProvider).getNoteById(noteId);
 });
 

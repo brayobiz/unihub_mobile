@@ -2,12 +2,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:unihub_mobile/app/theme/app_colors.dart';
+import '../widgets/logout_dialog.dart';
 import '../controllers/auth_controller.dart';
 import '../widgets/auth_text_field.dart';
 import '../../shared/providers.dart';
 import '../../../shared/storage_repository.dart';
 import '../../../../core/constants/campus_constants.dart';
-import '../../../campus_filter/domain/models/campus.dart';
+import '../../../../core/location/models/campus.dart';
+import '../../../../core/location/repositories/campus_repository.dart';
 
 class CompleteProfileScreen extends ConsumerStatefulWidget {
   const CompleteProfileScreen({super.key});
@@ -79,7 +82,86 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
     }
   }
 
-  void _showCampusPicker() {
+  void _showMissingCampusDialog() {
+    final nameController = TextEditingController();
+    final cityController = TextEditingController();
+    final theme = Theme.of(context);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Your Campus'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Campus Name',
+                hintText: 'e.g. Maseno University',
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: cityController,
+              decoration: const InputDecoration(
+                labelText: 'City / Town',
+                hintText: 'e.g. Kisumu',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final name = nameController.text.trim();
+              final city = cityController.text.trim();
+              if (name.isEmpty || city.isEmpty) return;
+
+              Navigator.pop(context); // Close dialog
+              Navigator.pop(context); // Close picker bottom sheet
+
+              setState(() => _localLoading = true);
+              try {
+                final newCampus = await ref.read(campusRepositoryProvider).suggestCampus(
+                  name: name,
+                  city: city,
+                );
+                setState(() {
+                  _selectedCampus = newCampus;
+                  universityController.text = newCampus.name;
+                  _localLoading = false;
+                });
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Successfully added ${newCampus.name}!')),
+                  );
+                }
+              } catch (e) {
+                setState(() => _localLoading = false);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to add campus: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Add & Select'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCampusPicker() async {
+    final campuses = await ref.read(campusRepositoryProvider).getCampuses();
+    
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -88,7 +170,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
         builder: (context, setModalState) {
           final theme = Theme.of(context);
           final query = TextEditingController();
-          List<Campus> filtered = CampusConstants.campuses;
+          List<Campus> filtered = campuses;
 
           return Container(
             height: MediaQuery.of(context).size.height * 0.8,
@@ -115,8 +197,8 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                     ),
                     onChanged: (val) {
                       setModalState(() {
-                        filtered = CampusConstants.campuses.where((c) => 
-                          c.officialName.toLowerCase().contains(val.toLowerCase()) ||
+                        filtered = campuses.where((c) => 
+                          c.name.toLowerCase().contains(val.toLowerCase()) ||
                           c.shortName.toLowerCase().contains(val.toLowerCase()) ||
                           c.aliases.any((a) => a.toLowerCase().contains(val.toLowerCase()))
                         ).toList();
@@ -127,17 +209,31 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                 const SizedBox(height: 12),
                 Expanded(
                   child: ListView.builder(
-                    itemCount: filtered.length,
+                    itemCount: filtered.length + 1,
                     itemBuilder: (context, index) {
+                      if (index == filtered.length) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                          child: OutlinedButton.icon(
+                            onPressed: _showMissingCampusDialog,
+                            icon: const Icon(Icons.add_location_alt_outlined),
+                            label: const Text('My Campus is missing'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        );
+                      }
                       final campus = filtered[index];
                       return ListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-                        title: Text(campus.officialName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(campus.shortName),
+                        title: Text(campus.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(campus.city),
                         onTap: () {
                           setState(() {
                             _selectedCampus = campus;
-                            universityController.text = campus.officialName;
+                            universityController.text = campus.name;
                           });
                           Navigator.pop(context);
                         },
@@ -154,7 +250,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
   }
 
   void _onContinue() async {
-    final university = _selectedCampus?.campusId ?? universityController.text.trim();
+    final university = _selectedCampus?.id ?? universityController.text.trim();
     final course = courseController.text.trim();
     final year = yearController.text.trim();
 
@@ -191,6 +287,19 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
     final authState = ref.watch(authControllerProvider);
     final isProcessing = authState.isLoading || _localLoading;
 
+    // Listen for auth errors
+    ref.listen<AsyncValue<void>>(authControllerProvider, (previous, next) {
+      next.whenOrNull(
+        error: (err, _) => ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(err.toString().replaceAll('Exception: ', '')),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        ),
+      );
+    });
+
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
@@ -200,7 +309,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.logout, color: theme.colorScheme.primary),
-            onPressed: isProcessing ? null : () => ref.read(authControllerProvider.notifier).signOut(),
+            onPressed: isProcessing ? null : () => LogoutDialog.show(context, ref),
           )
         ],
       ),

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:uuid/uuid.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
@@ -13,6 +14,7 @@ import 'package:unihub_mobile/features/housing/domain/models/housing_review.dart
 import 'package:unihub_mobile/features/housing/shared/providers.dart';
 import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
 import 'package:unihub_mobile/features/chat/shared/providers.dart';
+import 'package:unihub_mobile/core/constants/campus_constants.dart';
 
 class PlugProfileScreen extends ConsumerStatefulWidget {
   final String plugId;
@@ -272,9 +274,9 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              _buildSmallInfoPill(context, Icons.school_rounded, plug.university ?? 'University'),
+              _buildSmallInfoPill(context, Icons.school_rounded, CampusConstants.getDisplayName(plug.university)),
               const SizedBox(width: 8),
-              _buildSmallInfoPill(context, Icons.location_on_rounded, plug.campus ?? 'Campus'),
+              _buildSmallInfoPill(context, Icons.location_on_rounded, CampusConstants.getDisplayName(plug.campus)),
             ],
           ),
         ),
@@ -514,7 +516,7 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
       'Expertise & Areas',
       Column(
         children: [
-          _buildInfoItem(Icons.location_on_rounded, 'Areas Served', plug.campus ?? 'Main Campus'),
+          _buildInfoItem(Icons.location_on_rounded, 'Areas Served', CampusConstants.getDisplayName(plug.campus)),
           _buildInfoItem(Icons.home_rounded, 'Accommodation Specialties', plug.skills.isNotEmpty ? plug.skills.join(', ') : 'Hostels, Bedsitters'),
         ],
       ),
@@ -582,7 +584,7 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
   Widget _buildListingCard(BuildContext context, HousingListing listing) {
     final theme = Theme.of(context);
     return GestureDetector(
-      onTap: () => context.push('/housing-detail', extra: listing),
+      onTap: () => context.push('/housing-detail/${listing.id}', extra: listing),
       child: Container(
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
@@ -618,18 +620,104 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
   }
 
   Widget _buildReviewsSection(AsyncValue<List<HousingReview>> reviewsAsync) {
-    return reviewsAsync.when(
-      data: (reviews) => _buildSectionCard(
-        'Student Reviews',
-        reviews.isEmpty
-            ? const Text('No reviews yet.')
-            : Column(
-                children: reviews.take(3).map((r) => _buildReviewItem(r)).toList(),
+    final theme = Theme.of(context);
+    final user = ref.watch(appUserProvider).valueOrNull;
+    final isOwnProfile = user?.uid == widget.plugId;
+
+    return _buildSectionCard(
+      'Student Reviews',
+      Column(
+        children: [
+          if (reviewsAsync.valueOrNull?.isEmpty ?? true)
+            const Text('No reviews yet.')
+          else
+            ...reviewsAsync.valueOrNull!.take(3).map((r) => _buildReviewItem(r)),
+          if (!isOwnProfile && user != null) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _showReviewDialog(context),
+                icon: const Icon(Icons.rate_review_outlined),
+                label: const Text('Leave a Review'),
+                style: OutlinedButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
               ),
-        icon: Icons.star_outline_rounded,
+            ),
+          ],
+        ],
       ),
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, __) => const SizedBox.shrink(),
+      icon: Icons.star_outline_rounded,
+    );
+  }
+
+  void _showReviewDialog(BuildContext context) {
+    final commentController = TextEditingController();
+    double rating = 5.0;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Review Housing Plug'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('How was your experience with this plug?'),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (index) => IconButton(
+                  icon: Icon(
+                    index < rating ? Icons.star_rounded : Icons.star_outline_rounded,
+                    color: AppColors.warning,
+                    size: 32,
+                  ),
+                  onPressed: () => setDialogState(() => rating = index + 1.0),
+                )),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: commentController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Share your experience (optional)',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                final user = ref.read(appUserProvider).valueOrNull;
+                if (user == null) return;
+
+                final review = HousingReview(
+                  id: const Uuid().v4(),
+                  plugId: widget.plugId,
+                  userId: user.uid,
+                  userName: user.fullName,
+                  userPhotoUrl: user.photoUrl,
+                  rating: rating,
+                  comment: commentController.text.trim(),
+                  createdAt: DateTime.now(),
+                );
+
+                await ref.read(housingRepositoryProvider).submitReview(review);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Review submitted! Thank you.')));
+                  ref.invalidate(plugReviewsProvider(widget.plugId));
+                }
+              },
+              child: const Text('Submit'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -643,7 +731,11 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
           CircleAvatar(
             radius: 18,
             backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-            child: Text(review.userName.isNotEmpty ? review.userName[0].toUpperCase() : 'S', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 12)),
+            backgroundImage: review.userPhotoUrl != null ? CachedNetworkImageProvider(review.userPhotoUrl!) : null,
+            child: review.userPhotoUrl == null 
+                ? Text(review.userName.isNotEmpty ? review.userName[0].toUpperCase() : 'S', 
+                    style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 12))
+                : null,
           ),
           const SizedBox(width: 12),
           Expanded(

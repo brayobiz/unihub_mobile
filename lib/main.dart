@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -10,12 +11,14 @@ import 'features/auth/shared/providers.dart';
 import 'features/ads/providers/ad_provider.dart';
 import 'firebase_options.dart';
 
-import 'features/profile/settings_screen.dart';
 import 'services/notification_service.dart';
 import 'services/presence_service.dart';
 import 'services/connectivity_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:unihub_mobile/core/utils/app_logger.dart';
+import 'dart:ui';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -24,6 +27,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  _initProductionDiagnostics();
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
@@ -47,9 +51,6 @@ Future<void> main() async {
 
   // Initialize notifications
   container.read(notificationServiceProvider).init();
-
-  // Initialize Ads (non-blocking)
-  container.read(adInitializationProvider);
 
   runApp(
     UncontrolledProviderScope(
@@ -76,7 +77,7 @@ class UniHubApp extends ConsumerWidget {
     final connectivity = ref.watch(connectivityServiceProvider);
     
     return MaterialApp.router(
-      title: 'UniHubLife',
+      title: 'UniHub',
       debugShowCheckedModeBanner: false,
 
       // Theme
@@ -123,3 +124,20 @@ class UniHubApp extends ConsumerWidget {
     );
   }
 }
+
+// RC-3 Production Diagnostic Initializer
+void _initProductionDiagnostics() {
+  if (kReleaseMode) {
+    AppLogger.info('🚀 UniHub Production Build Initialized');
+    
+    // Pass all uncaught errors from the framework to Crashlytics.
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+    
+    // Pass all uncaught asynchronous errors that aren't handled by the Flutter framework to Crashlytics.
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
+  }
+}
+

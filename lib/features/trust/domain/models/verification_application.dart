@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'professional_role.dart';
 
-enum VerificationStatus { pending, approved, rejected, expired, resubmissionRequested }
+enum VerificationStatus { pending, underReview, approved, rejected, expired, resubmissionRequested }
 
 class VerificationApplication {
   final String id;

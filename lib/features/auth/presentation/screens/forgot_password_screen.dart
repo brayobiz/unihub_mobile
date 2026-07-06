@@ -98,7 +98,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
             else
               AuthButton(
-                text: 'Send Reset Link',
+                text: 'Send Link',
                 onPressed: _onResetPassword,
               ),
           ],

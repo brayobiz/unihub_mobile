@@ -10,16 +10,16 @@ final announcementRepositoryProvider = Provider<AnnouncementRepository>((ref) {
   return AnnouncementRepository(ref.watch(firestoreProvider), campus);
 });
 
-final allAnnouncementsProvider = StreamProvider<List<Announcement>>((ref) {
+final allAnnouncementsProvider = StreamProvider.autoDispose<List<Announcement>>((ref) {
   return ref.watch(announcementRepositoryProvider).watchAllAnnouncements();
 });
 
-final activeAnnouncementsProvider = StreamProvider<List<Announcement>>((ref) {
+final activeAnnouncementsProvider = StreamProvider.autoDispose<List<Announcement>>((ref) {
   return ref.watch(announcementRepositoryProvider).watchActiveAnnouncements();
 });
 
 /// Filtered announcements based on the current user's profile and the specified feature
-final relevantAnnouncementsProvider = Provider.family<List<Announcement>, String?>((ref, feature) {
+final relevantAnnouncementsProvider = Provider.autoDispose.family<List<Announcement>, String?>((ref, feature) {
   final activeAsync = ref.watch(activeAnnouncementsProvider);
   final userAsync = ref.watch(appUserProvider);
 

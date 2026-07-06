@@ -232,16 +232,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       otherUserId = conversation.participants.firstWhere((id) => id != currentUser.uid, orElse: () => '');
     }
     
-    final otherUser = (otherUserId != null && otherUserId.isNotEmpty) 
-        ? ref.watch(userByIdProvider(otherUserId)).valueOrNull 
-        : null;
-
-    final isOnline = otherUser?.isOnline == true;
-    final lastSeen = otherUser?.lastSeen;
-    
-    final bool isOtherTyping = conversation?.typing[otherUserId] != null;
     final bool isResolved = conversation?.supportStatus == 'resolved' || conversation?.supportStatus == 'closed';
-
     final effectiveContext = widget.chatContext ?? conversation?.context;
 
     return Scaffold(
@@ -254,53 +245,65 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.colorScheme.onSurface, size: 20),
           onPressed: () => context.pop(),
         ),
-        title: Row(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-              backgroundImage: otherUser?.photoUrl != null ? NetworkImage(otherUser!.photoUrl!) : null,
-              child: otherUser?.photoUrl == null
-                ? Text(
-                    widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : '?',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
-                  )
-                : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+        title: Consumer(
+          builder: (context, ref, child) {
+            final otherUser = (otherUserId != null && otherUserId!.isNotEmpty) 
+                ? ref.watch(userByIdProvider(otherUserId!)).valueOrNull 
+                : null;
+
+            final isOnline = otherUser?.isOnline == true;
+            final lastSeen = otherUser?.lastSeen;
+            final bool isOtherTyping = conversation?.typing[otherUserId] != null;
+
+            return Row(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                  backgroundImage: otherUser?.photoUrl != null ? NetworkImage(otherUser!.photoUrl!) : null,
+                  child: otherUser?.photoUrl == null
+                    ? Text(
+                        widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : '?',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+                      )
+                    : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Flexible(
-                        child: Text(
-                          widget.otherUserName,
-                          style: theme.textTheme.titleSmall?.copyWith(fontSize: 15, color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
-                          overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              widget.otherUserName,
+                              style: theme.textTheme.titleSmall?.copyWith(fontSize: 15, color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (otherUser?.isVerified == true) ...[
+                            const SizedBox(width: 4),
+                            Icon(Icons.verified, color: theme.colorScheme.primary, size: 14),
+                          ],
+                        ],
+                      ),
+                      Text(
+                        isOtherTyping 
+                            ? 'typing...' 
+                            : (isOnline ? 'Online' : (lastSeen != null ? 'Last seen ${_formatLastSeen(lastSeen)}' : 'Offline')),
+                        style: TextStyle(
+                          fontSize: 11, 
+                          color: isOtherTyping || isOnline ? AppColors.success : theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600
                         ),
                       ),
-                      if (otherUser?.isVerified == true) ...[
-                        const SizedBox(width: 4),
-                        Icon(Icons.verified, color: theme.colorScheme.primary, size: 14),
-                      ],
                     ],
                   ),
-                  Text(
-                    isOtherTyping 
-                        ? 'typing...' 
-                        : (isOnline ? 'Online' : (lastSeen != null ? 'Last seen ${_formatLastSeen(lastSeen)}' : 'Offline')),
-                    style: TextStyle(
-                      fontSize: 11, 
-                      color: isOtherTyping || isOnline ? AppColors.success : theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         ),
         actions: [
           IconButton(
@@ -590,6 +593,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       case 'support': return Icons.headset_mic_rounded;
       case 'notes': return Icons.description_rounded;
       case 'plug': return Icons.electrical_services_rounded;
+      case 'roommate': return Icons.people_outline_rounded;
       default: return Icons.info_outline;
     }
   }
@@ -599,21 +603,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (chatContext.type == 'marketplace') {
         final listing = await ref.read(marketplaceRepositoryProvider).getListingById(chatContext.id);
         if (listing != null && mounted) {
-          context.push('/listing-detail', extra: listing);
+          context.push('/listing-detail/${listing.id}', extra: listing);
         } else if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Marketplace item no longer available'))
-          );
+          context.push('/listing-detail/${chatContext.id}');
         }
       } else if (chatContext.type == 'housing') {
         final housing = await ref.read(housingRepositoryProvider).getListingById(chatContext.id);
         if (housing != null && mounted) {
-          context.push('/housing-detail', extra: housing);
+          context.push('/housing-detail/${housing.id}', extra: housing);
         } else if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Housing listing no longer available'))
-          );
+          context.push('/housing-detail/${chatContext.id}');
         }
+      } else if (chatContext.type == 'roommate') {
+        context.push('/roommates');
       }
     } catch (e) {
       if (mounted) {
@@ -675,7 +677,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               child: Container(
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
                 ),
                 child: TextField(
@@ -786,53 +788,55 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Widget _buildMessageBubble(BuildContext context, Message message, bool isMe, bool showTail) {
     final theme = Theme.of(context);
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: EdgeInsets.only(bottom: showTail ? 12 : 4),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: isMe ? theme.colorScheme.primary : theme.colorScheme.surfaceVariant.withOpacity(0.3),
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(isMe ? 16 : (showTail ? 4 : 16)),
-            bottomRight: Radius.circular(isMe ? (showTail ? 4 : 16) : 16),
-          ),
-          border: isMe ? null : Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
-          boxShadow: [
-            if (!isMe)
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              )
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            _buildMessageContent(context, message, isMe),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  DateFormat('HH:mm').format(message.timestamp), 
-                  style: TextStyle(
-                    fontSize: 9, 
-                    fontWeight: FontWeight.w500,
-                    color: isMe ? Colors.white.withOpacity(0.7) : theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
-                  ),
-                ),
-                if (isMe) ...[
-                  const SizedBox(width: 4),
-                  _buildStatusIcon(message.status),
-                ],
-              ],
+    return RepaintBoundary(
+      child: Align(
+        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          margin: EdgeInsets.only(bottom: showTail ? 12 : 4),
+          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: isMe ? theme.colorScheme.primary : theme.colorScheme.surfaceVariant.withOpacity(0.3),
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(16),
+              topRight: const Radius.circular(16),
+              bottomLeft: Radius.circular(isMe ? 16 : (showTail ? 4 : 16)),
+              bottomRight: Radius.circular(isMe ? (showTail ? 4 : 16) : 16),
             ),
-          ],
+            border: isMe ? null : Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+            boxShadow: [
+              if (!isMe)
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                )
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            children: [
+              _buildMessageContent(context, message, isMe),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    DateFormat('HH:mm').format(message.timestamp), 
+                    style: TextStyle(
+                      fontSize: 9, 
+                      fontWeight: FontWeight.w500,
+                      color: isMe ? Colors.white.withOpacity(0.7) : theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                    ),
+                  ),
+                  if (isMe) ...[
+                    const SizedBox(width: 4),
+                    _buildStatusIcon(message.status),
+                  ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -994,7 +998,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             onPressed: () => _sendMessage(replies[index]),
             backgroundColor: theme.colorScheme.surface,
             labelStyle: TextStyle(color: theme.colorScheme.onSurface),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: theme.colorScheme.outlineVariant.withOpacity(0.5))),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: theme.colorScheme.outlineVariant.withOpacity(0.5))),
           ),
         ),
       ),

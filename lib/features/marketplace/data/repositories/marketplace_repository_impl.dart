@@ -1,50 +1,55 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:unihub_mobile/core/utils/app_logger.dart';
 import '../../domain/models/listing.dart';
 import '../../domain/models/offer.dart';
 import '../../domain/models/price_history.dart';
 import '../../domain/models/seller_stats.dart';
 import '../../domain/models/saved_search.dart';
 import '../../domain/repositories/marketplace_repository.dart';
+import 'package:unihub_mobile/core/services/notification_sender.dart';
 import '../../../../services/notification_service.dart';
 import '../../../shared/domain/models/uni_notification.dart';
+import '../../../shared/domain/repositories/user_activity_repository.dart';
 
 class MarketplaceRepositoryImpl implements MarketplaceRepository {
   final FirebaseFirestore _firestore;
   final String? _browsingCampus;
-  final NotificationService? _notificationService;
+  final NotificationSender? _notificationSender;
+  final UserActivityRepository? _userActivityRepository;
 
-  MarketplaceRepositoryImpl(this._firestore, this._browsingCampus, [this._notificationService]);
+  MarketplaceRepositoryImpl(this._firestore, this._browsingCampus, [this._notificationSender, this._userActivityRepository]);
 
-  @override
-  Stream<List<Listing>> watchListings({
-    int? limit,
+  Query _buildListingsQuery({
     String? category,
-    List<String>? conditions,
+    ListingSortType? sortBy,
+    ListingStatus? status,
     double? minPrice,
     double? maxPrice,
     bool? isFeatured,
-    String? searchQuery,
-    ListingSortType? sortBy,
-    ListingStatus? status,
-    Map<String, dynamic>? categoryAttributes,
   }) {
-    // START WITH A BASE QUERY
-    // Optimized: Apply server-side status filter first as it's the most common
     Query query = _firestore.collection('listings')
         .where('status', isEqualTo: (status ?? ListingStatus.active).name);
 
-    // Apply category server-side if provided and not "All"
     if (category != null && category != 'All' && category.isNotEmpty) {
       query = query.where('category', isEqualTo: category);
     }
 
-    // Apply campus server-side if browsing context is set
-    if (_browsingCampus != null && _browsingCampus!.isNotEmpty) {
+    if (_browsingCampus != null && _browsingCampus.isNotEmpty) {
       query = query.where('sellerUniversity', isEqualTo: _browsingCampus);
     }
 
-    // Apply sorting server-side (Note: This requires composite indexes for the above filters)
+    if (isFeatured == true) {
+      query = query.where('isFeatured', isEqualTo: true);
+    }
+
+    if (minPrice != null) {
+      query = query.where('price', isGreaterThanOrEqualTo: minPrice);
+    }
+    if (maxPrice != null) {
+      query = query.where('price', isLessThanOrEqualTo: maxPrice);
+    }
+
     switch (sortBy ?? ListingSortType.newest) {
       case ListingSortType.oldest:
         query = query.orderBy('createdAt', descending: false);
@@ -62,131 +67,197 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
         query = query.orderBy('savesCount', descending: true);
         break;
       case ListingSortType.newest:
-      default:
         query = query.orderBy('createdAt', descending: true);
         break;
     }
 
-    // Reduced fetch limit: Since we apply more filters server-side, 
-    // we don't need a massive buffer.
-    final fetchLimit = (limit ?? 40) + 10;
-    query = query.limit(fetchLimit);
+    return query;
+  }
 
-    return query.snapshots().map((snapshot) {
+  List<Listing> _applyClientFilters(
+    List<Listing> items, {
+    List<String>? conditions,
+    Map<String, dynamic>? categoryAttributes,
+    String? searchQuery,
+  }) {
+    var filtered = items;
+
+    if (conditions != null && conditions.isNotEmpty) {
+      filtered = filtered.where((l) => conditions.contains(l.condition.name)).toList();
+    }
+
+    if (categoryAttributes != null && categoryAttributes.isNotEmpty) {
+      filtered = filtered.where((l) {
+        for (var entry in categoryAttributes.entries) {
+          final key = entry.key;
+          final value = entry.value;
+          if (value == null) continue;
+
+          if (key == 'brand' && l.brand != value) return false;
+          if (key == 'storage' && l.storage != value) return false;
+          if (key == 'color' && l.color != value) return false;
+
+          if (l.attributes.containsKey(key)) {
+             if (l.attributes[key] != value) return false;
+          } else {
+             if (!['brand', 'storage', 'color'].contains(key)) {
+                return false;
+             }
+          }
+        }
+        return true;
+      }).toList();
+    }
+
+    if (searchQuery != null && searchQuery.isNotEmpty) {
+      final queryTerms = searchQuery.toLowerCase().split(' ').where((s) => s.isNotEmpty).toList();
+      filtered = filtered.where((l) {
+        final title = l.title.toLowerCase();
+        final desc = l.description.toLowerCase();
+        // Also check if any keyword matches exactly (improves relevance slightly)
+        return queryTerms.any((term) => title.contains(term) || desc.contains(term));
+      }).toList();
+    }
+
+    return filtered;
+  }
+
+  @override
+  Stream<List<Listing>> watchListings({
+    int? limit,
+    String? category,
+    List<String>? conditions,
+    double? minPrice,
+    double? maxPrice,
+    bool? isFeatured,
+    String? searchQuery,
+    ListingSortType? sortBy,
+    ListingStatus? status,
+    Map<String, dynamic>? categoryAttributes,
+    Listing? startAfter,
+  }) async* {
+    Query query = _buildListingsQuery(
+      category: category,
+      sortBy: sortBy,
+      status: status,
+      minPrice: minPrice,
+      maxPrice: maxPrice,
+      isFeatured: isFeatured,
+    );
+
+    if (startAfter != null) {
+      final doc = await _firestore.collection('listings').doc(startAfter.id).get();
+      if (doc.exists) {
+        query = query.startAfterDocument(doc);
+      }
+    }
+
+    final fetchLimit = limit ?? 20;
+    
+    yield* query.limit(fetchLimit).snapshots().map((snapshot) {
       var items = snapshot.docs
           .map((doc) => Listing.fromJson(doc.data() as Map<String, dynamic>))
           .toList();
 
-      // Remaining client-side filters (complex types or less frequent)
-      if (isFeatured == true) {
-        items = items.where((l) => l.isFeatured == true).toList();
-      }
-
-      if (minPrice != null) {
-        items = items.where((l) => l.price >= minPrice).toList();
-      }
-      if (maxPrice != null) {
-        items = items.where((l) => l.price <= maxPrice).toList();
-      }
-
-      if (conditions != null && conditions.isNotEmpty) {
-        items = items.where((l) => conditions.contains(l.condition.name)).toList();
-      }
-
-      if (categoryAttributes != null && categoryAttributes.isNotEmpty) {
-        items = items.where((l) {
-          for (var entry in categoryAttributes.entries) {
-            final key = entry.key;
-            final value = entry.value;
-            if (value == null) continue;
-
-            if (key == 'brand' && l.brand != value) return false;
-            if (key == 'storage' && l.storage != value) return false;
-            if (key == 'color' && l.color != value) return false;
-
-            if (l.attributes.containsKey(key)) {
-               if (l.attributes[key] != value) return false;
-            } else {
-               if (['brand', 'storage', 'color'].contains(key)) {
-               } else {
-                  return false;
-               }
-            }
-          }
-          return true;
-        }).toList();
-      }
-
-      if (searchQuery != null && searchQuery.isNotEmpty) {
-        final queryTerms = searchQuery.toLowerCase().split(' ').where((s) => s.isNotEmpty).toList();
-        
-        final excludedTerms = {
-          'house', 'hostel', 'rent', 'roommate', 'bedsit', 'apartment',
-          'note', 'exam', 'paper', 'tutorial', 'document', 'study',
-          'job', 'gig', 'freelance', 'work', 'internship', 'hire'
-        };
-
-        if (queryTerms.any((term) => excludedTerms.contains(term))) {
-          return <Listing>[];
-        }
-
-        items = items.where((l) {
-          final title = l.title.toLowerCase();
-          final desc = l.description.toLowerCase();
-          return queryTerms.any((term) => title.contains(term) || desc.contains(term));
-        }).toList();
-      }
-
-      return limit != null ? items.take(limit).toList() : items;
-    }).handleError((error) {
-      debugPrint('❌ Firestore Error in watchListings: $error');
-      return <Listing>[];
+      return _applyClientFilters(
+        items,
+        conditions: conditions,
+        categoryAttributes: categoryAttributes,
+        searchQuery: searchQuery,
+      );
     });
   }
 
   @override
-  Stream<List<Listing>> watchRecentlyViewed(String userId) {
-    if (userId.isEmpty) return Stream.value([]);
-    
-    return _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('recently_viewed')
-        .orderBy('viewedAt', descending: true)
-        .limit(30)
-        .snapshots()
-        .asyncMap((snapshot) async {
-          final ids = snapshot.docs.map((doc) => doc.id).where((id) => id.isNotEmpty).toList();
-          if (ids.isEmpty) return [];
-          
-          final listingsSnapshot = await _firestore
-              .collection('listings')
-              .where(FieldPath.documentId, whereIn: ids.take(30).toList())
-              .get();
+  Future<List<Listing>> getListings({
+    int limit = 20, 
+    Listing? startAfter,
+    String? category,
+    List<String>? conditions,
+    double? minPrice,
+    double? maxPrice,
+    bool? isFeatured,
+    String? searchQuery,
+    ListingSortType? sortBy,
+    ListingStatus? status,
+    Map<String, dynamic>? categoryAttributes,
+  }) async {
+    Query query = _buildListingsQuery(
+      category: category,
+      sortBy: sortBy,
+      status: status,
+      minPrice: minPrice,
+      maxPrice: maxPrice,
+      isFeatured: isFeatured,
+    );
 
-          final listings = listingsSnapshot.docs
-              .map((doc) => Listing.fromJson(doc.data() as Map<String, dynamic>))
-              .where((l) => l.status == ListingStatus.active)
-              .toList();
-              
-          listings.sort((a, b) => ids.indexOf(a.id).compareTo(ids.indexOf(b.id)));
-          return listings;
-        });
+    if (startAfter != null) {
+      final doc = await _firestore.collection('listings').doc(startAfter.id).get();
+      if (doc.exists) {
+        query = query.startAfterDocument(doc);
+      }
+    }
+
+    final fetchLimit = searchQuery != null && searchQuery.isNotEmpty ? limit * 3 : limit;
+
+    final snapshot = await query.limit(fetchLimit).get(const GetOptions(source: Source.serverAndCache));
+    
+    var items = snapshot.docs
+        .map((doc) => Listing.fromJson(doc.data() as Map<String, dynamic>))
+        .toList();
+
+    items = _applyClientFilters(
+      items,
+      conditions: conditions,
+      categoryAttributes: categoryAttributes,
+      searchQuery: searchQuery,
+    );
+
+    return items.take(limit).toList();
+  }
+
+  @override
+  Stream<List<Listing>> watchRecentlyViewed(String userId) {
+    if (userId.isEmpty || _userActivityRepository == null) return Stream.value([]);
+    
+    return _userActivityRepository.watchActivityIds(
+      userId: userId, 
+      activityType: ActivityType.recentlyViewed, 
+      contentType: ContentType.marketplace,
+      limit: 100, // Scaled for RC-3
+    ).asyncMap((ids) async {
+      if (ids.isEmpty) return [];
+      
+      final List<Listing> allListings = [];
+      const int chunkSize = 30;
+      
+      for (var i = 0; i < ids.length; i += chunkSize) {
+        final end = (i + chunkSize < ids.length) ? i + chunkSize : ids.length;
+        final chunk = ids.sublist(i, end);
+
+        final listingsSnapshot = await _firestore
+            .collection('listings')
+            .where(FieldPath.documentId, whereIn: chunk)
+            .get();
+
+        allListings.addAll(listingsSnapshot.docs
+            .map((doc) => Listing.fromJson(doc.data() as Map<String, dynamic>))
+            .where((l) => l.status == ListingStatus.active));
+      }
+          
+      allListings.sort((a, b) => ids.indexOf(a.id).compareTo(ids.indexOf(b.id)));
+      return allListings;
+    });
   }
 
   @override
   Future<void> clearRecentlyViewed(String userId) async {
-    if (userId.isEmpty) return;
-    
-    final batch = _firestore.batch();
-    final collection = _firestore.collection('users').doc(userId).collection('recently_viewed');
-    final snapshot = await collection.get();
-    
-    for (var doc in snapshot.docs) {
-      batch.delete(doc.reference);
-    }
-    
-    await batch.commit();
+    if (userId.isEmpty || _userActivityRepository == null) return;
+    await _userActivityRepository.clearActivity(
+      userId: userId, 
+      activityType: ActivityType.recentlyViewed, 
+      contentType: ContentType.marketplace,
+    );
   }
 
   @override
@@ -201,7 +272,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
               .map((doc) => Listing.fromJson(doc.data() as Map<String, dynamic>))
               .toList();
 
-          if (_browsingCampus != null && _browsingCampus!.isNotEmpty) {
+          if (_browsingCampus != null && _browsingCampus.isNotEmpty) {
             items = items.where((l) => l.sellerUniversity == _browsingCampus).toList();
           }
 
@@ -259,7 +330,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
           .where('status', isEqualTo: ListingStatus.active.name)
           .orderBy('createdAt', descending: true);
 
-      if (_browsingCampus != null && _browsingCampus!.isNotEmpty) {
+      if (_browsingCampus != null && _browsingCampus.isNotEmpty) {
         query = query.where('sellerUniversity', isEqualTo: _browsingCampus);
       }
 
@@ -420,17 +491,24 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
           final ids = snapshot.docs.map((doc) => doc.id).toList();
           if (ids.isEmpty) return [];
           
-          final listingsSnapshot = await _firestore
-              .collection('listings')
-              .where(FieldPath.documentId, whereIn: ids.take(30).toList())
-              .get();
+          final List<Listing> allListings = [];
+          const int chunkSize = 30;
+          
+          for (var i = 0; i < ids.length; i += chunkSize) {
+            final end = (i + chunkSize < ids.length) ? i + chunkSize : ids.length;
+            final chunk = ids.sublist(i, end);
 
-          final listings = listingsSnapshot.docs
-              .map((doc) => Listing.fromJson(doc.data() as Map<String, dynamic>))
-              .toList();
+            final listingsSnapshot = await _firestore
+                .collection('listings')
+                .where(FieldPath.documentId, whereIn: chunk)
+                .get();
+
+            allListings.addAll(listingsSnapshot.docs
+                .map((doc) => Listing.fromJson(doc.data() as Map<String, dynamic>)));
+          }
               
-          listings.sort((a, b) => ids.indexOf(a.id).compareTo(ids.indexOf(b.id)));
-          return listings;
+          allListings.sort((a, b) => ids.indexOf(a.id).compareTo(ids.indexOf(b.id)));
+          return allListings;
         });
   }
 
@@ -438,9 +516,9 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
   Future<void> makeOffer(Offer offer) async {
     await _firestore.collection('offers').doc(offer.id).set(offer.toJson());
     
-    if (_notificationService != null) {
+    if (_notificationSender != null) {
       final listing = await getListingById(offer.listingId);
-      await _notificationService!.sendNotification(
+      await _notificationSender.sendNotification(
         recipientId: offer.sellerId,
         actorId: offer.buyerId,
         title: 'New Offer!',
@@ -462,7 +540,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     final offerDoc = await _firestore.collection('offers').doc(offerId).get();
     if (!offerDoc.exists) return;
     
-    final offer = Offer.fromJson(offerDoc.data()!);
+    final offer = Offer.fromJson(offerDoc.data() as Map<String, dynamic>);
     final batch = _firestore.batch();
     
     batch.update(_firestore.collection('offers').doc(offerId), {
@@ -486,7 +564,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     
     await batch.commit();
 
-    if (_notificationService != null) {
+    if (_notificationSender != null) {
       String title = '';
       String body = '';
       final listing = await getListingById(offer.listingId);
@@ -513,7 +591,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       }
       
       if (title.isNotEmpty) {
-        await _notificationService!.sendNotification(
+        await _notificationSender.sendNotification(
           recipientId: offer.buyerId,
           actorId: offer.sellerId,
           title: title,
@@ -538,7 +616,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
         .where('listingId', isEqualTo: listingId)
         .orderBy('timestamp', descending: true)
         .snapshots()
-        .map((s) => s.docs.map((d) => Offer.fromJson(d.data())).toList());
+        .map((s) => s.docs.map((d) => Offer.fromJson(d.data() as Map<String, dynamic>)).toList());
   }
 
   @override
@@ -548,7 +626,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
         .where('buyerId', isEqualTo: userId)
         .orderBy('timestamp', descending: true)
         .snapshots()
-        .map((s) => s.docs.map((d) => Offer.fromJson(d.data())).toList());
+        .map((s) => s.docs.map((d) => Offer.fromJson(d.data() as Map<String, dynamic>)).toList());
   }
 
   @override
@@ -576,8 +654,11 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       totalSaves += saves;
       totalChats += chats;
       
-      if (statusStr == ListingStatus.sold.name) soldCount++;
-      else if (statusStr == ListingStatus.active.name) activeCount++;
+      if (statusStr == ListingStatus.sold.name) {
+        soldCount++;
+      } else if (statusStr == ListingStatus.active.name) {
+        activeCount++;
+      }
       
       engagementList.add(ListingEngagement(
         listingId: doc.id,
@@ -613,7 +694,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
         .where('sellerId', isEqualTo: sellerId)
         .where('status', isEqualTo: status.name)
         .snapshots()
-        .map((s) => s.docs.map((d) => Listing.fromJson(d.data())).toList());
+        .map((s) => s.docs.map((d) => Listing.fromJson(d.data() as Map<String, dynamic>)).toList());
   }
 
   @override
@@ -635,43 +716,35 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
 
   @override
   Future<void> saveSearchQuery(String userId, String query) async {
-    if (userId.isEmpty || query.isEmpty) return;
+    if (userId.isEmpty || query.isEmpty || _userActivityRepository == null) return;
     
-    await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('recent_searches')
-        .doc(query.toLowerCase().trim())
-        .set({'timestamp': FieldValue.serverTimestamp()});
+    await _userActivityRepository.recordActivity(
+      userId: userId, 
+      contentId: query.toLowerCase().trim(), 
+      activityType: ActivityType.searched, 
+      contentType: ContentType.marketplace,
+    );
   }
 
   @override
   Stream<List<String>> watchRecentSearches(String userId) {
-    if (userId.isEmpty) return Stream.value([]);
+    if (userId.isEmpty || _userActivityRepository == null) return Stream.value([]);
     
-    return _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('recent_searches')
-        .orderBy('timestamp', descending: true)
-        .limit(10)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => doc.id).toList());
+    return _userActivityRepository.watchActivityIds(
+      userId: userId, 
+      activityType: ActivityType.searched, 
+      contentType: ContentType.marketplace,
+    );
   }
 
   @override
   Future<void> clearRecentSearches(String userId) async {
-    if (userId.isEmpty) return;
-    
-    final batch = _firestore.batch();
-    final collection = _firestore.collection('users').doc(userId).collection('recent_searches');
-    final snapshot = await collection.get();
-    
-    for (var doc in snapshot.docs) {
-      batch.delete(doc.reference);
-    }
-    
-    await batch.commit();
+    if (userId.isEmpty || _userActivityRepository == null) return;
+    await _userActivityRepository.clearActivity(
+      userId: userId, 
+      activityType: ActivityType.searched, 
+      contentType: ContentType.marketplace,
+    );
   }
 
   @override
@@ -709,7 +782,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => SavedSearch.fromJson(doc.data()))
+            .map((doc) => SavedSearch.fromJson(doc.data() as Map<String, dynamic>))
             .toList());
   }
 
@@ -721,29 +794,6 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
         .collection('saved_searches')
         .doc(searchId)
         .update({'notificationsEnabled': enabled});
-  }
-
-  @override
-  Future<List<Listing>> getListings({int limit = 20, Listing? startAfter}) async {
-    Query query = _firestore.collection('listings')
-        .where('status', isEqualTo: ListingStatus.active.name)
-        .orderBy('createdAt', descending: true);
-
-    if (_browsingCampus != null && _browsingCampus!.isNotEmpty) {
-      query = query.where('sellerUniversity', isEqualTo: _browsingCampus);
-    }
-
-    if (startAfter != null) {
-      final doc = await _firestore.collection('listings').doc(startAfter.id).get();
-      if (doc.exists) {
-        query = query.startAfterDocument(doc);
-      }
-    }
-
-    final snapshot = await query.limit(limit).get(const GetOptions(source: Source.serverAndCache));
-    return snapshot.docs
-        .map((doc) => Listing.fromJson(doc.data() as Map<String, dynamic>))
-        .toList();
   }
 
   @override
@@ -783,32 +833,37 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
 
   @override
   Stream<List<Listing>> watchSavedListings(String userId) {
-    if (userId.isEmpty) return Stream.value([]);
+    if (userId.isEmpty || _userActivityRepository == null) return Stream.value([]);
     
-    return _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('saved_listings')
-        .orderBy('savedAt', descending: true)
-        .snapshots()
-        .asyncMap((snapshot) async {
-          final ids = snapshot.docs.map((doc) => doc.id).where((id) => id.isNotEmpty).toList();
-          if (ids.isEmpty) return [];
-          
-          final limitedIds = ids.take(30).toList();
-          
-          final listingsSnapshot = await _firestore
-              .collection('listings')
-              .where(FieldPath.documentId, whereIn: limitedIds)
-              .get();
+    return _userActivityRepository.watchActivityIds(
+      userId: userId, 
+      activityType: ActivityType.saved, 
+      contentType: ContentType.marketplace,
+      limit: 100, // Scaled for RC-3
+    ).asyncMap((ids) async {
+      if (ids.isEmpty) return [];
+      
+      // Scalable fetch: Chunk ids to overcome Firestore whereIn limit (30)
+      final List<Listing> allListings = [];
+      const int chunkSize = 30;
+      
+      for (var i = 0; i < ids.length; i += chunkSize) {
+        final end = (i + chunkSize < ids.length) ? i + chunkSize : ids.length;
+        final chunk = ids.sublist(i, end);
+        
+        final listingsSnapshot = await _firestore
+            .collection('listings')
+            .where(FieldPath.documentId, whereIn: chunk)
+            .get();
 
-          final listings = listingsSnapshot.docs
-              .map((doc) => Listing.fromJson(doc.data() as Map<String, dynamic>))
-              .toList();
+        allListings.addAll(listingsSnapshot.docs
+            .map((doc) => Listing.fromJson(doc.data() as Map<String, dynamic>)));
+      }
               
-          listings.sort((a, b) => limitedIds.indexOf(a.id).compareTo(limitedIds.indexOf(b.id)));
-          return listings;
-        });
+      // Maintain original sort order from savedAt
+      allListings.sort((a, b) => ids.indexOf(a.id).compareTo(ids.indexOf(b.id)));
+      return allListings;
+    });
   }
 
   @override
@@ -835,63 +890,99 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
 
   @override
   Future<void> updateListing(Listing listing) async {
-    // SECURITY FIX: Re-verify ownership before update
-    final doc = await _firestore.collection('listings').doc(listing.id).get();
-    if (!doc.exists) throw Exception('Listing not found');
-    if (doc.data()?['sellerId'] != listing.sellerId) {
-      throw Exception('Unauthorized: You do not own this listing');
+    if (listing.id.isEmpty) return;
+    
+    try {
+      final listingRef = _firestore.collection('listings').doc(listing.id);
+      final doc = await listingRef.get();
+      if (!doc.exists) throw Exception('Listing not found');
+      
+      final currentSellerId = doc.data()?['sellerId'];
+      if (currentSellerId != listing.sellerId) {
+        throw Exception('Unauthorized: You do not own this listing');
+      }
+
+      final data = listing.toJson();
+      // SECURITY: Never allow changing sellerId via update
+      data['sellerId'] = currentSellerId;
+      
+      await listingRef.update(data);
+      AppLogger.info('Listing ${listing.id} updated', 'MARKETPLACE');
+    } catch (e) {
+      AppLogger.error('Failed to update listing ${listing.id}', e, null, 'MARKETPLACE');
+      rethrow;
     }
-    await _firestore.collection('listings').doc(listing.id).update(listing.toJson());
   }
 
   @override
   Future<void> deleteListing(String id, String userId) async {
-    if (id.isEmpty) return;
+    if (id.isEmpty || userId.isEmpty) return;
     
-    final doc = await _firestore.collection('listings').doc(id).get();
-    if (!doc.exists) return;
-    
-    final sellerId = doc.data()?['sellerId'];
-    if (sellerId != userId) {
-       throw Exception('Unauthorized: You do not own this listing');
-    }
+    try {
+      final doc = await _firestore.collection('listings').doc(id).get();
+      if (!doc.exists) return;
+      
+      final sellerId = doc.data()?['sellerId'];
+      if (sellerId != userId) {
+         throw Exception('Unauthorized: You do not own this listing');
+      }
 
-    final batch = _firestore.batch();
-    batch.delete(_firestore.collection('listings').doc(id));
-    
-    if (sellerId != null && (sellerId as String).isNotEmpty) {
-      batch.update(_firestore.collection('users').doc(sellerId), {
-        'activeListingsCount': FieldValue.increment(-1),
-      });
-    }
+      final batch = _firestore.batch();
+      batch.delete(_firestore.collection('listings').doc(id));
+      
+      if (sellerId != null && (sellerId as String).isNotEmpty) {
+        batch.update(_firestore.collection('users').doc(sellerId), {
+          'activeListingsCount': FieldValue.increment(-1),
+        });
+      }
 
-    await batch.commit();
+      await batch.commit();
+      AppLogger.info('Listing $id deleted by user $userId', 'MARKETPLACE');
+    } catch (e) {
+      AppLogger.error('Failed to delete listing $id', e, null, 'MARKETPLACE');
+      rethrow;
+    }
   }
 
   @override
   Future<void> toggleSaveListing(String userId, String listingId) async {
-    if (userId.isEmpty || listingId.isEmpty) return;
+    if (userId.isEmpty || listingId.isEmpty || _userActivityRepository == null) return;
     
-    final saveRef = _firestore.collection('users').doc(userId).collection('saved_listings').doc(listingId);
-    final doc = await saveRef.get();
-    if (doc.exists) {
-      await saveRef.delete();
-      await recordSave(listingId, false);
-    } else {
-      await saveRef.set({'savedAt': FieldValue.serverTimestamp()});
-      await recordSave(listingId, true);
+    try {
+      final doc = await _firestore.collection('users').doc(userId).collection('saved_listings').doc(listingId).get();
+      final isSaved = doc.exists;
       
-      final listing = await getListingById(listingId);
-      if (listing != null && listing.sellerId.isNotEmpty && _notificationService != null) {
-        await _notificationService!.sendNotification(
-          recipientId: listing.sellerId,
-          title: 'Item Saved!',
-          body: 'Someone saved your listing: ${listing.title}',
-          type: NotificationType.marketplace,
-          targetId: listingId,
-          targetType: 'marketplace',
+      if (isSaved) {
+        await _userActivityRepository.removeActivity(
+          userId: userId, 
+          contentId: listingId, 
+          activityType: ActivityType.saved, 
+          contentType: ContentType.marketplace,
         );
+        await recordSave(listingId, false);
+      } else {
+        await _userActivityRepository.recordActivity(
+          userId: userId, 
+          contentId: listingId, 
+          activityType: ActivityType.saved, 
+          contentType: ContentType.marketplace,
+        );
+        await recordSave(listingId, true);
+        
+        final listing = await getListingById(listingId);
+        if (listing != null && listing.sellerId.isNotEmpty && _notificationSender != null) {
+          await _notificationSender.sendNotification(
+            recipientId: listing.sellerId,
+            title: 'Item Saved! 💖',
+            body: 'Someone saved your listing: ${listing.title}',
+            type: NotificationType.marketplace,
+            targetId: listingId,
+            targetType: 'marketplace',
+          );
+        }
       }
+    } catch (e) {
+      AppLogger.error('Failed to toggle save for listing $listingId', e, null, 'MARKETPLACE');
     }
   }
 
@@ -920,29 +1011,36 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     });
   }
 
+  // In-memory throttle for the current app session to prevent "running rising" views bug
+  final Set<String> _sessionViewedIds = {};
+
   @override
   Future<void> recordView(String listingId, {String? userId}) async {
     if (listingId.isEmpty) return;
     
-    if (userId == null || userId.isEmpty) {
+    // 1. Session-level de-duplication (fast check)
+    if (_sessionViewedIds.contains(listingId)) return;
+    _sessionViewedIds.add(listingId);
+
+    // 2. Anonymous View Handling
+    if (userId == null || userId.isEmpty || _userActivityRepository == null) {
+      // Check Firestore document for throttle even for anonymous users if we want 
+      // but session-level is usually enough for a single app instance.
+      // We limit update frequency to avoid loop costs.
       await _firestore.collection('listings').doc(listingId).update({
         'viewsCount': FieldValue.increment(1),
-      });
+      }).timeout(const Duration(seconds: 5)).catchError((_) => null);
       return;
     }
 
     try {
-      final historyRef = _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('recently_viewed')
-          .doc(listingId);
-
-      final doc = await historyRef.get();
+      // 3. Authenticated View Handling with 12h throttle
+      final collection = _firestore.collection('users').doc(userId).collection('recently_viewed');
+      final doc = await collection.doc(listingId).get().timeout(const Duration(seconds: 5));
       bool shouldIncrement = true;
 
       if (doc.exists) {
-        final lastViewed = (doc.data()?['viewedAt'] as Timestamp?)?.toDate();
+        final lastViewed = (doc.data()?['timestamp'] as Timestamp?)?.toDate();
         if (lastViewed != null) {
           final difference = DateTime.now().difference(lastViewed);
           if (difference.inHours < 12) {
@@ -951,16 +1049,35 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
         }
       }
 
-      final batch = _firestore.batch();
+      // Security: Fetch listing to check if viewer is seller
+      final listingDoc = await _firestore.collection('listings').doc(listingId).get();
+      if (listingDoc.exists && listingDoc.data()?['sellerId'] == userId) {
+        shouldIncrement = false;
+      }
+
       if (shouldIncrement) {
-        batch.update(_firestore.collection('listings').doc(listingId), {
+        await _firestore.collection('listings').doc(listingId).update({
           'viewsCount': FieldValue.increment(1),
+        }).timeout(const Duration(seconds: 5)).catchError((e) {
+          AppLogger.warning('Failed to increment viewsCount for $listingId: $e');
+          return null;
         });
       }
-      batch.set(historyRef, {'viewedAt': FieldValue.serverTimestamp()});
-      await batch.commit();
+
+      // Always update "recently viewed" time even if we don't increment total view count
+      await _userActivityRepository.recordActivity(
+        userId: userId, 
+        contentId: listingId, 
+        activityType: ActivityType.recentlyViewed, 
+        contentType: ContentType.marketplace,
+      ).timeout(const Duration(seconds: 5)).catchError((e) {
+         AppLogger.warning('Failed to record activity for $listingId: $e');
+         return null;
+      });
     } catch (e) {
-      debugPrint('Error recording view: $e');
+      if (kDebugMode) {
+        debugPrint('Error recording view: $e');
+      }
     }
   }
 
@@ -1037,17 +1154,18 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     required String reporterId,
     required String reason,
   }) async {
+    if (listingId.isEmpty) return;
     await _firestore.collection('reports').add({
       'type': 'listing',
       'targetId': listingId,
       'reporterId': reporterId,
       'reason': reason,
-      'timestamp': FieldValue.serverTimestamp(),
+      'createdAt': FieldValue.serverTimestamp(),
       'status': 'pending',
     });
 
-    if (_notificationService != null) {
-      await _notificationService!.notifyAdmins(
+    if (_notificationSender != null) {
+      await _notificationSender.notifyAdmins(
         title: 'Marketplace Report 📦',
         body: 'A listing has been reported for: $reason',
         route: '/admin/reports',
@@ -1063,44 +1181,187 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     required double rating,
     required String comment,
   }) async {
-    final batch = _firestore.batch();
-    final reviewRef = _firestore.collection('users').doc(sellerId).collection('reviews').doc(listingId);
-    batch.set(reviewRef, {
-      'buyerId': buyerId,
-      'listingId': listingId,
-      'rating': rating,
-      'comment': comment,
-      'timestamp': FieldValue.serverTimestamp(),
+    final buyerDoc = await _firestore.collection('users').doc(buyerId).get();
+    final buyerName = buyerDoc.data()?['fullName'] ?? 'A Student';
+
+    await _firestore.runTransaction((transaction) async {
+      final reviewRef = _firestore.collection('users').doc(sellerId).collection('reviews').doc(listingId);
+      final userRef = _firestore.collection('users').doc(sellerId);
+
+      final userDoc = await transaction.get(userRef);
+      final reviewDoc = await transaction.get(reviewRef);
+
+      final reviewData = {
+        'id': listingId,
+        'reviewerId': buyerId,
+        'reviewerName': buyerName,
+        'targetUserId': sellerId,
+        'listingId': listingId,
+        'rating': rating,
+        'comment': comment,
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      transaction.set(reviewRef, reviewData);
+      
+      if (userDoc.exists) {
+        final data = userDoc.data() as Map<String, dynamic>;
+        final currentAvg = (data['averageRating'] ?? 0.0).toDouble();
+        final currentCount = (data['ratingsCount'] ?? 0).toInt();
+        
+        double newAvg;
+        int newCount;
+
+        if (reviewDoc.exists) {
+          final reviewDataMap = reviewDoc.data() as Map<String, dynamic>;
+          final oldRating = (reviewDataMap['rating'] ?? 0.0).toDouble();
+          newCount = currentCount;
+          newAvg = currentCount > 0 
+              ? ((currentAvg * currentCount) - oldRating + rating) / newCount
+              : rating;
+        } else {
+          newCount = currentCount + 1;
+          newAvg = ((currentAvg * currentCount) + rating) / newCount;
+        }
+        
+        transaction.update(userRef, {
+          'averageRating': newAvg,
+          'ratingsCount': newCount,
+          'trustScore': FieldValue.increment(rating >= 4 ? 2.0 : -1.0),
+        });
+      }
     });
-    
-    final userRef = _firestore.collection('users').doc(sellerId);
-    final userDoc = await userRef.get();
-    
-    if (userDoc.exists) {
-      final currentAvg = (userDoc.data()?['averageRating'] ?? 0.0).toDouble();
-      final currentCount = (userDoc.data()?['ratingsCount'] ?? 0).toInt();
-      
-      final newCount = currentCount + 1;
-      final newAvg = ((currentAvg * currentCount) + rating) / newCount;
-      
-      batch.update(userRef, {
-        'averageRating': newAvg,
-        'ratingsCount': newCount,
-        'trustScore': FieldValue.increment(rating >= 4 ? 2.0 : -1.0),
-      });
-    }
 
-    await batch.commit();
-
-    if (_notificationService != null) {
-      await _notificationService!.sendNotification(
+    if (_notificationSender != null) {
+      await _notificationSender.sendNotification(
         recipientId: sellerId,
-        title: 'New Review!',
-        body: 'A buyer left you a $rating-star review.',
+        title: 'New Review! ⭐',
+        body: '$buyerName left you a $rating-star review.',
         type: NotificationType.review,
         targetId: listingId,
         targetType: 'marketplace',
       );
     }
+  }
+
+  @override
+  Future<void> flagListing({
+    required String listingId,
+    required String reason,
+    String? adminNotes,
+  }) async {
+    await _firestore.collection('listings').doc(listingId).update({
+      'flagged': true,
+      'flagReason': reason,
+      'flagAdminNotes': adminNotes,
+      'flaggedAt': FieldValue.serverTimestamp(),
+    });
+
+    final listingDoc = await _firestore.collection('listings').doc(listingId).get();
+    if (listingDoc.exists && _notificationSender != null) {
+      await _notificationSender.notifyAdmins(
+        title: 'Marketplace Listing Flagged 🚩',
+        body: 'Reason: $reason',
+        route: '/admin/flags/marketplace',
+      );
+    }
+  }
+
+  @override
+  Future<void> approveListing(String listingId) async {
+    final listingDoc = await _firestore.collection('listings').doc(listingId).get();
+    if (!listingDoc.exists) return;
+
+    await _firestore.collection('listings').doc(listingId).update({
+      'status': ListingStatus.active.name,
+      'flagged': false,
+      'approvedAt': FieldValue.serverTimestamp(),
+    });
+
+    final sellerId = listingDoc.data()?['sellerId'];
+    if (sellerId != null && _notificationSender != null) {
+      await _notificationSender.sendNotification(
+        recipientId: sellerId,
+        title: 'Listing Approved! ✅',
+        body: 'Your listing "${listingDoc.data()?['title']}" has been approved and is now live.',
+        type: NotificationType.marketplace,
+        targetId: listingId,
+        targetType: 'marketplace',
+      );
+    }
+  }
+
+  @override
+  Future<void> suspendListing({
+    required String listingId,
+    required String reason,
+    required String adminId,
+  }) async {
+    final listingDoc = await _firestore.collection('listings').doc(listingId).get();
+    if (!listingDoc.exists) return;
+
+    await _firestore.collection('listings').doc(listingId).update({
+      'status': ListingStatus.archived.name,
+      'suspensionReason': reason,
+      'suspendedBy': adminId,
+      'suspendedAt': FieldValue.serverTimestamp(),
+    });
+
+    final sellerId = listingDoc.data()?['sellerId'];
+    if (sellerId != null && _notificationSender != null) {
+      await _notificationSender.sendNotification(
+        recipientId: sellerId,
+        title: 'Listing Suspended',
+        body: 'Your listing "${listingDoc.data()?['title']}" has been suspended. Reason: $reason',
+        type: NotificationType.marketplace,
+        targetId: listingId,
+        targetType: 'marketplace',
+      );
+    }
+  }
+
+  @override
+  Future<void> removeListing({
+    required String listingId,
+    required String reason,
+    required String adminId,
+  }) async {
+    final listingDoc = await _firestore.collection('listings').doc(listingId).get();
+    if (!listingDoc.exists) return;
+
+    final sellerId = listingDoc.data()?['sellerId'];
+    final batch = _firestore.batch();
+
+    batch.delete(_firestore.collection('listings').doc(listingId));
+    
+    if (sellerId != null && (sellerId as String).isNotEmpty) {
+      batch.update(_firestore.collection('users').doc(sellerId), {
+        'activeListingsCount': FieldValue.increment(-1),
+      });
+
+      if (_notificationSender != null) {
+        await _notificationSender.sendNotification(
+          recipientId: sellerId,
+          title: 'Listing Removed',
+          body: 'Your listing "${listingDoc.data()?['title']}" has been removed. Reason: $reason',
+          type: NotificationType.marketplace,
+          targetId: listingId,
+          targetType: 'marketplace',
+        );
+      }
+    }
+
+    await batch.commit();
+  }
+
+  @override
+  Stream<List<Listing>> watchFlaggedListings(String campusId) {
+    return _firestore
+        .collection('listings')
+        .where('flagged', isEqualTo: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => Listing.fromJson(doc.data() as Map<String, dynamic>))
+            .toList());
   }
 }

@@ -8,55 +8,84 @@ import '../../models/feed_type.dart';
 import '../../widgets/feed/feed_card.dart';
 
 class FeedItemDetailScreen extends ConsumerWidget {
-  final FeedItem item;
-  const FeedItemDetailScreen({super.key, required this.item});
+  final FeedItem? item;
+  final String itemId;
+
+  const FeedItemDetailScreen({
+    super.key, 
+    this.item, 
+    required this.itemId,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(appUserProvider).valueOrNull;
-    final isGig = item.type == FeedType.gig;
-    
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(isGig ? 'Gig Details' : 'Post Details'),
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: FeedCard(
-                item: item,
-                isLiked: user != null && item.likedBy.contains(user.uid),
-                showDelete: user != null && item.authorId == user.uid,
-                onLike: () => ref.read(feedRepositoryProvider).toggleLike(item.id, user!.uid),
-                onDelete: () {
-                  ref.read(feedRepositoryProvider).deleteFeedItem(item.id);
-                  Navigator.pop(context);
-                },
-              ),
-            ),
-            if (isGig && item.authorId != user?.uid)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 55,
-                  child: FilledButton.icon(
-                    onPressed: () => _contactAuthor(context, ref, item),
-                    icon: const Icon(Icons.send_rounded),
-                    label: const Text('Apply for Gig'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.indigo,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
+    final theme = Theme.of(context);
+    final feedAsync = ref.watch(feedItemByIdProvider(itemId));
+
+    return feedAsync.when(
+      data: (feedItem) {
+        final currentItem = feedItem ?? item;
+        if (currentItem == null) {
+          return const Scaffold(body: Center(child: Text('Post no longer available.')));
+        }
+
+        final user = ref.watch(appUserProvider).valueOrNull;
+        final isGig = currentItem.type == FeedType.gig;
+        
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(isGig ? 'Gig Details' : 'Post Details'),
+          ),
+          body: SingleChildScrollView(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: FeedCard(
+                    item: currentItem,
+                    isLiked: user != null && currentItem.likedBy.contains(user.uid),
+                    showDelete: user != null && currentItem.authorId == user.uid,
+                    onLike: () => ref.read(feedRepositoryProvider).toggleLike(currentItem.id, user!.uid),
+                    onDelete: () {
+                      ref.read(feedRepositoryProvider).deleteFeedItem(currentItem.id);
+                      Navigator.pop(context);
+                    },
                   ),
                 ),
-              ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
+                if (isGig && currentItem.authorId != user?.uid)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 55,
+                      child: FilledButton.icon(
+                        onPressed: () => _contactAuthor(context, ref, currentItem),
+                        icon: const Icon(Icons.send_rounded),
+                        label: const Text('Apply for Gig'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.indigo,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => item != null 
+          ? _buildInitialState(item!) 
+          : const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (err, _) => Scaffold(body: Center(child: Text('Error: $err'))),
+    );
+  }
+
+  Widget _buildInitialState(FeedItem item) {
+    return Scaffold(
+      appBar: AppBar(title: Text(item.type == FeedType.gig ? 'Gig Details' : 'Post Details')),
+      body: const Center(child: CircularProgressIndicator()),
     );
   }
 

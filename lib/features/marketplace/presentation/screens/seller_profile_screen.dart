@@ -14,6 +14,7 @@ import 'package:unihub_mobile/features/marketplace/shared/providers.dart';
 import 'package:unihub_mobile/features/marketplace/domain/models/listing.dart';
 import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
 import 'package:unihub_mobile/features/chat/shared/providers.dart';
+import 'package:unihub_mobile/core/constants/campus_constants.dart';
 
 class SellerProfileScreen extends ConsumerStatefulWidget {
   final String userId;
@@ -51,69 +52,74 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                   // 1. Identity Header Section (Transition)
                   SliverToBoxAdapter(
                     child: RepaintBoundary(
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          ClipPath(
-                            clipper: _HeaderClipper(),
-                            child: Container(
-                              height: 220,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    theme.brightness == Brightness.dark ? const Color(0xFF0F172A) : const Color(0xFF1e293b),
-                                    theme.colorScheme.primary,
-                                    const Color(0xFF19D3C5),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
+                      child: Semantics(
+                        label: 'Seller profile header for ${seller.fullName}',
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            ClipPath(
+                              clipper: _HeaderClipper(),
+                              child: Container(
+                                height: 220,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      theme.brightness == Brightness.dark ? const Color(0xFF0F172A) : const Color(0xFF1e293b),
+                                      theme.colorScheme.primary,
+                                      const Color(0xFF19D3C5),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          Positioned(
-                            top: MediaQuery.of(context).padding.top + 10,
-                            left: 16,
-                            right: 16,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-                                  onPressed: () => context.pop(),
-                                ),
-                                Row(
-                                  children: [
-                                    _buildBlockButton(seller),
-                                    const SizedBox(width: 8),
-                                    IconButton(
-                                      icon: const Icon(Icons.share_outlined, color: Colors.white),
-                                      onPressed: () {},
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          Positioned(
-                            top: 130,
-                            left: 16,
-                            right: 16,
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                _buildAvatar(seller),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(bottom: 4),
-                                    child: _buildIdentityInfo(context, seller),
+                            Positioned(
+                              top: MediaQuery.of(context).padding.top + 10,
+                              left: 16,
+                              right: 16,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+                                    onPressed: () => context.pop(),
+                                    tooltip: 'Back',
                                   ),
-                                ),
-                              ],
+                                  Row(
+                                    children: [
+                                      _buildBlockButton(seller),
+                                      const SizedBox(width: 8),
+                                      IconButton(
+                                        icon: const Icon(Icons.share_outlined, color: Colors.white),
+                                        onPressed: () {},
+                                        tooltip: 'Share Profile',
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                            Positioned(
+                              top: 130,
+                              left: 16,
+                              right: 16,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  _buildAvatar(seller),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(bottom: 4),
+                                      child: _buildIdentityInfo(context, seller),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -339,7 +345,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              _buildSmallInfoPill(context, Icons.school_rounded, seller.university ?? 'Uni'),
+              _buildSmallInfoPill(context, Icons.school_rounded, CampusConstants.getDisplayName(seller.university)),
               const SizedBox(width: 8),
               _buildSmallInfoPill(context, Icons.calendar_today_rounded, seller.yearOfStudy ?? 'Year'),
             ],
@@ -387,18 +393,26 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.success.withValues(alpha: 0.08),
+        color: (score > 80 ? AppColors.success : AppColors.warning).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: AppColors.success.withValues(alpha: 0.1)),
+        border: Border.all(color: (score > 80 ? AppColors.success : AppColors.warning).withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.shield_rounded, size: 14, color: AppColors.success),
+          Icon(
+            Icons.shield_rounded, 
+            size: 14, 
+            color: score > 80 ? AppColors.success : AppColors.warning
+          ),
           const SizedBox(width: 6),
           Text(
-            'Trust Score $score%',
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.success),
+            '$score% Trust',
+            style: TextStyle(
+              fontSize: 12, 
+              fontWeight: FontWeight.w800, 
+              color: score > 80 ? AppColors.success : AppColors.warning
+            ),
           ),
         ],
       ),
@@ -451,7 +465,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
             _buildVerticalDivider(),
             _buildStatItem(Icons.handshake_outlined, seller.completedSalesCount.toString(), 'Deals'),
             _buildVerticalDivider(),
-            _buildStatItem(Icons.calendar_today_outlined, seller.createdAt != null ? DateFormat('yyyy').format(seller.createdAt!) : '2024', 'Joined'),
+            _buildStatItem(Icons.calendar_today_outlined, seller.createdAt != null ? DateFormat('yyyy').format(seller.createdAt!) : DateTime.now().year.toString(), 'Joined'),
             _buildVerticalDivider(),
             _buildStatItem(Icons.timer_outlined, seller.responseRate, 'Responds'),
           ],
@@ -590,7 +604,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
       'Marketplace Context',
       Column(
         children: [
-          _buildInfoItem(Icons.location_on_rounded, 'Preferred Meetup', seller.campus ?? 'Main Campus'),
+          _buildInfoItem(Icons.location_on_rounded, 'Preferred Meetup', CampusConstants.getDisplayName(seller.campus)),
           _buildInfoItem(Icons.category_rounded, 'Selling Expertise', seller.skills.isNotEmpty ? seller.skills.join(', ') : 'General Items'),
         ],
       ),
@@ -659,7 +673,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
   Widget _buildListingCard(BuildContext context, Listing listing) {
     final theme = Theme.of(context);
     return GestureDetector(
-      onTap: () => context.push('/listing-detail', extra: listing),
+      onTap: () => context.push('/listing-detail/${listing.id}', extra: listing),
       child: Container(
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),

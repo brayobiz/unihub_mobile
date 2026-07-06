@@ -1,24 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-
-enum NotificationType {
-  chat,
-  listing,
-  community,
-  gig,
-  support,
-  follower,
-  review,
-  system,
-  marketplace,
-  housing,
-  notes,
-}
-
-enum NotificationPriority {
-  low,
-  normal,
-  high,
-}
+import 'package:unihub_mobile/core/services/notification_sender.dart';
+export 'package:unihub_mobile/core/services/notification_sender.dart';
 
 class UniNotification {
   final String id;

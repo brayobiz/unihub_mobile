@@ -8,6 +8,7 @@ import '../../models/feed_type.dart';
 import '../auth/shared/providers.dart';
 import 'feed_repository.dart';
 import 'storage_repository.dart';
+import 'package:unihub_mobile/core/widgets/creation_success_dialog.dart';
 import '../marketplace/domain/models/marketplace_categories.dart';
 import '../gigs/domain/models/gig_categories.dart';
 
@@ -36,6 +37,39 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
     _contentController.dispose();
     _priceController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleBack() async {
+    final bool isDirty = _titleController.text.isNotEmpty || 
+                        _contentController.text.isNotEmpty || 
+                        _selectedImages.isNotEmpty;
+    
+    if (!isDirty) {
+      Navigator.pop(context);
+      return;
+    }
+
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Discard changes'),
+        content: const Text('You have unsaved changes. Are you sure you want to discard them?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep Editing'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Discard', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (proceed == true && mounted) {
+      Navigator.pop(context);
+    }
   }
 
   Future<void> _submit() async {
@@ -90,7 +124,24 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
       );
 
       await ref.read(feedRepositoryProvider).postToFeed(item);
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        String successTitle = 'Post Shared!';
+        String successMsg = 'Your post is now visible in the community feed.';
+        
+        if (widget.type == FeedType.gig) {
+          successTitle = 'Gig Listed!';
+          successMsg = 'Your student gig is now live. Interested students can now apply.';
+        } else if (widget.type == FeedType.confession) {
+          successTitle = 'Confession Shared!';
+          successMsg = 'Your anonymous confession has been posted to the feed.';
+        }
+
+        CreationSuccessDialog.show(
+          context,
+          title: successTitle,
+          message: successMsg,
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -107,196 +158,224 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
     final isConfession = widget.type == FeedType.confession;
     
     String title = 'Post to Community';
-    if (isGig) title = 'Post a Student Gig';
-    if (isConfession) title = 'Anonymous Confession';
+    if (isGig) title = 'Create Gig';
+    if (isConfession) title = 'Share Confession';
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _handleBack();
+      },
+      child: Scaffold(
         backgroundColor: theme.colorScheme.surface,
-        elevation: 0,
-        title: Text(title, 
-          style: TextStyle(
-            color: theme.colorScheme.onSurface, 
-            fontWeight: FontWeight.bold
-          )),
-        leading: IconButton(
-          icon: Icon(Icons.close, color: theme.colorScheme.onSurface),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: FilledButton(
-              onPressed: _isLoading ? null : _submit,
-              style: FilledButton.styleFrom(
-                backgroundColor: isGig ? theme.colorScheme.primary : (isConfession ? Colors.red : Colors.blue),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: _isLoading 
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Post'),
-            ),
+        appBar: AppBar(
+          backgroundColor: theme.colorScheme.surface,
+          elevation: 0,
+          title: Text(title, 
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: theme.colorScheme.onSurface, 
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            )),
+          centerTitle: true,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+            onPressed: _handleBack,
           ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (isGig) ...[
-                _buildSectionLabel(context, 'What service do you need?'),
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (isGig) ...[
+                  _buildSectionLabel(context, 'Gig Details', Icons.work_outline),
+                  const SizedBox(height: 16),
+                  _buildModernField(
+                    context,
+                    controller: _titleController,
+                    hint: 'e.g., Graphic Designer for Logo',
+                    validator: (v) => v!.isEmpty ? 'Please enter a title' : null,
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSectionLabel(context, 'Classification', Icons.category_outlined),
+                  const SizedBox(height: 16),
+                  _buildGigCategoryPicker(context),
+                  const SizedBox(height: 24),
+                  _buildSectionLabel(context, 'Budget & Deadline', Icons.payments_outlined),
+                  const SizedBox(height: 16),
+                  _buildModernField(
+                    context,
+                    controller: _priceController,
+                    hint: 'Budget (e.g., 1000)',
+                    keyboardType: TextInputType.number,
+                    prefixText: 'KES ',
+                  ),
+                  const SizedBox(height: 16),
+                  InkWell(
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now().add(const Duration(days: 7)),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(const Duration(days: 90)),
+                      );
+                      if (date != null) setState(() => _selectedDeadline = date);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.calendar_today_rounded, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7), size: 20),
+                          const SizedBox(width: 12),
+                          Text(
+                            _selectedDeadline == null 
+                                ? 'Select application deadline' 
+                                : 'Deadline: ${DateFormat.yMMMd().format(_selectedDeadline!)}',
+                            style: TextStyle(
+                              color: _selectedDeadline == null 
+                                  ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5) 
+                                  : theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  _buildSectionLabel(context, 'Photos & Media', Icons.camera_alt_outlined),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 100,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        GestureDetector(
+                          onTap: () async {
+                            final picker = ImagePicker();
+                            final images = await picker.pickMultiImage();
+                            if (images.isNotEmpty) {
+                              setState(() => _selectedImages.addAll(images));
+                            }
+                          },
+                          child: Container(
+                            width: 100,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), style: BorderStyle.solid),
+                            ),
+                            child: Icon(Icons.add_a_photo_outlined, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
+                          ),
+                        ),
+                        ..._selectedImages.map((img) => Container(
+                          width: 100,
+                          margin: const EdgeInsets.only(left: 12),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            image: DecorationImage(
+                              image: FileImage(File(img.path)),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          child: Align(
+                            alignment: Alignment.topRight,
+                            child: GestureDetector(
+                              onTap: () => setState(() => _selectedImages.remove(img)),
+                              child: Container(
+                                margin: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                                child: const Icon(Icons.close, color: Colors.white, size: 16),
+                              ),
+                            ),
+                          ),
+                        )),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  _buildSectionLabel(context, 'Description', Icons.description_outlined),
+                  const SizedBox(height: 16),
+                ] else if (!isConfession) ...[
+                  _buildSectionLabel(context, 'Post Details', Icons.title_rounded),
+                  const SizedBox(height: 16),
+                  _buildModernField(
+                    context,
+                    controller: _titleController,
+                    hint: 'Title (optional)',
+                  ),
+                  const SizedBox(height: 20),
+                ] else ...[
+                  _buildSectionLabel(context, 'Confession', Icons.favorite_rounded),
+                  const SizedBox(height: 16),
+                ],
+                
                 _buildModernField(
                   context,
-                  controller: _titleController,
-                  hint: 'e.g., Graphic Designer for Logo',
-                  icon: Icons.work_outline,
-                  validator: (v) => v!.isEmpty ? 'Please enter a title' : null,
+                  controller: _contentController,
+                  hint: isGig 
+                      ? 'Describe the work, requirements, and what you expect...' 
+                      : (isConfession ? 'Share your secret anonymously...' : 'What\'s on your mind?'),
+                  maxLines: 8,
+                  validator: (v) => v!.isEmpty ? 'Content cannot be empty' : null,
                 ),
-                const SizedBox(height: 24),
-                _buildGigCategoryPicker(context),
-                const SizedBox(height: 24),
-                _buildSectionLabel(context, 'Budget / Pay'),
-                _buildModernField(
-                  context,
-                  controller: _priceController,
-                  hint: 'e.g., 1000',
-                  icon: Icons.payments_outlined,
-                  keyboardType: TextInputType.number,
-                  prefixText: 'KES ',
-                ),
-                const SizedBox(height: 24),
-                _buildSectionLabel(context, 'Application Deadline (Optional)'),
-                InkWell(
-                  onTap: () async {
-                    final date = await showDatePicker(
-                      context: context,
-                      initialDate: DateTime.now().add(const Duration(days: 7)),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 90)),
-                    );
-                    if (date != null) setState(() => _selectedDeadline = date);
-                  },
-                  child: Container(
+                
+                if (isGig) ...[
+                  const SizedBox(height: 32),
+                  Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                      color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.calendar_today, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
+                        Icon(Icons.lightbulb_outline, color: theme.colorScheme.primary, size: 20),
                         const SizedBox(width: 12),
-                        Text(
-                          _selectedDeadline == null 
-                              ? 'Select a deadline' 
-                              : 'Deadline: ${DateFormat.yMMMd().format(_selectedDeadline!)}',
-                          style: TextStyle(
-                            color: _selectedDeadline == null 
-                                ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5) 
-                                : theme.colorScheme.onSurface,
+                        Expanded(
+                          child: Text(
+                            'Keep it campus-focused for better responses from fellow students.',
+                            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.w500),
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                _buildSectionLabel(context, 'Attachments / Images'),
+                ],
+                const SizedBox(height: 40),
+                if (_isLoading)
+                  Column(
+                    children: [
+                      LinearProgressIndicator(value: _uploadProgress, color: theme.colorScheme.primary, minHeight: 6, borderRadius: BorderRadius.circular(4)),
+                      const SizedBox(height: 8),
+                      Text('Sharing your post... ${(_uploadProgress * 100).toInt()}%', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 12)),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
                 SizedBox(
-                  height: 100,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      GestureDetector(
-                        onTap: () async {
-                          final picker = ImagePicker();
-                          final images = await picker.pickMultiImage();
-                          if (images.isNotEmpty) {
-                            setState(() => _selectedImages.addAll(images));
-                          }
-                        },
-                        child: Container(
-                          width: 100,
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), style: BorderStyle.solid),
-                          ),
-                          child: Icon(Icons.add_a_photo_outlined, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
-                        ),
-                      ),
-                      ..._selectedImages.map((img) => Container(
-                        width: 100,
-                        margin: const EdgeInsets.only(left: 12),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          image: DecorationImage(
-                            image: FileImage(File(img.path)),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        child: Align(
-                          alignment: Alignment.topRight,
-                          child: IconButton(
-                            icon: const Icon(Icons.cancel, color: Colors.white),
-                            onPressed: () => setState(() => _selectedImages.remove(img)),
-                          ),
-                        ),
-                      )),
-                    ],
+                  width: double.infinity,
+                  height: 58,
+                  child: FilledButton(
+                    onPressed: _isLoading ? null : _submit,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: isGig ? theme.colorScheme.primary : (isConfession ? theme.colorScheme.error : theme.colorScheme.secondary),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: Text(isGig ? 'Create Gig' : 'Post Now', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                   ),
                 ),
-                const SizedBox(height: 24),
-                _buildSectionLabel(context, 'Describe the work'),
-              ] else if (!isConfession) ...[
-                _buildModernField(
-                  context,
-                  controller: _titleController,
-                  hint: 'Title (optional)',
-                  icon: Icons.title,
-                ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 40),
               ],
-              
-              _buildModernField(
-                context,
-                controller: _contentController,
-                hint: isGig 
-                    ? 'Provide details about the gig, requirements, and deadline...' 
-                    : (isConfession ? 'Share your secret anonymously...' : 'What\'s on your mind?'),
-                maxLines: 8,
-                validator: (v) => v!.isEmpty ? 'Content cannot be empty' : null,
-              ),
-              
-              if (isGig) ...[
-                const SizedBox(height: 32),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.lightbulb_outline, color: theme.colorScheme.primary),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Keep it campus-focused for better responses from fellow students.',
-                          style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
+            ),
           ),
         ),
       ),
@@ -311,7 +390,7 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _buildSectionLabel(context, 'Gig Category'),
+            _buildSectionLabel(context, 'Gig Category', Icons.category_outlined),
             GestureDetector(
               onTap: () => _showMarketplaceDifferentiator(),
               child: Text('Selling an item?', 
@@ -357,7 +436,7 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: theme.colorScheme.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (context) => Container(
         constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
         padding: const EdgeInsets.symmetric(vertical: 30),
@@ -466,14 +545,21 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
     );
   }
 
-  Widget _buildSectionLabel(BuildContext context, String label) {
+  Widget _buildSectionLabel(BuildContext context, String label, IconData icon) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8, left: 4),
-      child: Text(
-        label,
-        style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
-      ),
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: theme.colorScheme.primary),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+      ],
     );
   }
 
@@ -504,15 +590,15 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
         fillColor: theme.colorScheme.surfaceContainerHighest,
         contentPadding: const EdgeInsets.all(16),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
         ),
       ),

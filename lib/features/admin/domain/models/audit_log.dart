@@ -13,6 +13,8 @@ enum AdminActionType {
   reportDismissal,
   trustScoreAdjustment,
   bulkAction,
+  eventApproval,
+  eventRejection,
 }
 
 class AdminAuditLog {

@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class UniversalSearchBar extends StatelessWidget {
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final String? hintText;
 
   const UniversalSearchBar({
     super.key, 
-    required this.onTap,
+    this.onTap,
     this.hintText,
   });
 
@@ -15,7 +16,7 @@ class UniversalSearchBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return GestureDetector(
-      onTap: onTap,
+      onTap: onTap ?? () => context.push('/global-search'),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -50,7 +51,7 @@ class UniversalSearchBar extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(Icons.tune_rounded, color: theme.colorScheme.onSurfaceVariant, size: 16),

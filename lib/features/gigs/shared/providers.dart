@@ -15,7 +15,7 @@ final gigsRepositoryProvider = Provider<GigsRepository>((ref) {
   );
 });
 
-final gigsFeedProvider = StreamProvider<List<FeedItem>>((ref) {
+final gigsFeedProvider = StreamProvider.autoDispose<List<FeedItem>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
   return ref.watch(feedRepositoryProvider).watchFeed(FeedType.gig).map((items) {
     if (user == null || user.blockedUids.isEmpty) return items;

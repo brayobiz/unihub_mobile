@@ -29,7 +29,7 @@ class SavedHousingScreen extends ConsumerWidget {
                 itemCount: listings.length,
                 itemBuilder: (context, index) => HousingCard(
                   listing: listings[index],
-                  onTap: () => context.push('/housing-detail', extra: listings[index]),
+                  onTap: () => context.push('/housing-detail/${listings[index].id}', extra: listings[index]),
                 ),
               ),
         loading: () => const Center(child: CircularProgressIndicator()),

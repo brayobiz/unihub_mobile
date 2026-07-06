@@ -15,19 +15,19 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   );
 });
 
-final conversationsProvider = StreamProvider.family<List<Conversation>, String>((ref, userId) {
+final conversationsProvider = StreamProvider.autoDispose.family<List<Conversation>, String>((ref, userId) {
   return ref.watch(chatRepositoryProvider).watchConversations(userId);
 });
 
-final conversationProvider = StreamProvider.family<Conversation?, String>((ref, conversationId) {
+final conversationProvider = StreamProvider.autoDispose.family<Conversation?, String>((ref, conversationId) {
   return ref.watch(chatRepositoryProvider).watchConversation(conversationId);
 });
 
-final messagesStreamProvider = StreamProvider.family<List<Message>, String>((ref, conversationId) {
+final messagesStreamProvider = StreamProvider.autoDispose.family<List<Message>, String>((ref, conversationId) {
   return ref.watch(chatRepositoryProvider).watchMessages(conversationId);
 });
 
-final totalUnreadChatCountProvider = StreamProvider.family<int, String>((ref, userId) {
+final totalUnreadChatCountProvider = StreamProvider.autoDispose.family<int, String>((ref, userId) {
   return ref.watch(chatRepositoryProvider).watchConversations(userId).map((conversations) {
     return conversations.fold(0, (sum, conv) => sum + (conv.unreadCounts[userId] ?? 0));
   });

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -30,6 +31,7 @@ class _UserDetailAdminScreenState extends ConsumerState<UserDetailAdminScreen> {
   List<AdminReport>? _reportsReceived;
   List<AdminReport>? _reportsSubmitted;
   bool _isLoadingExtra = true;
+  bool _isProcessing = false;
 
   @override
   void initState() {
@@ -55,7 +57,9 @@ class _UserDetailAdminScreenState extends ConsumerState<UserDetailAdminScreen> {
         });
       }
     } catch (e) {
-      debugPrint('Error loading extra user data: $e');
+      if (kDebugMode) {
+        debugPrint('Error loading extra user data: $e');
+      }
       if (mounted) setState(() => _isLoadingExtra = false);
     }
   }
@@ -394,40 +398,47 @@ class _UserDetailAdminScreenState extends ConsumerState<UserDetailAdminScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _ActionButton(
-          label: user.isBanned ? 'Restore Account' : 'Ban Permanently',
-          icon: Icons.gavel,
-          color: AppColors.error,
-          onPressed: () => _showBanDialog(user),
-        ),
-        const SizedBox(height: 12),
-        _ActionButton(
-          label: user.isCurrentlySuspended ? 'Remove Suspension' : 'Suspend Account',
-          icon: Icons.timer,
-          color: AppColors.warning,
-          onPressed: () => _showSuspendDialog(user),
-        ),
-        const SizedBox(height: 12),
-        _ActionButton(
-          label: 'Edit User Roles',
-          icon: Icons.admin_panel_settings,
-          color: Colors.purple,
-          onPressed: () => _showRolesDialog(user),
-        ),
-        const SizedBox(height: 12),
-        _ActionButton(
-          label: 'Reset Verification',
-          icon: Icons.refresh,
-          color: AppColors.primary,
-          onPressed: () => _showResetVerifDialog(user),
-        ),
-        const SizedBox(height: 12),
-        _ActionButton(
-          label: 'Adjust Trust Score',
-          icon: Icons.star,
-          color: AppColors.success,
-          onPressed: () => _showTrustScoreDialog(user),
-        ),
+        if (_isProcessing)
+          const Center(child: Padding(
+            padding: EdgeInsets.all(16.0),
+            child: CircularProgressIndicator(),
+          ))
+        else ...[
+          _ActionButton(
+            label: user.isBanned ? 'Restore Account' : 'Ban Permanently',
+            icon: Icons.gavel,
+            color: AppColors.error,
+            onPressed: () => _showBanDialog(user),
+          ),
+          const SizedBox(height: 12),
+          _ActionButton(
+            label: user.isCurrentlySuspended ? 'Remove Suspension' : 'Suspend Account',
+            icon: Icons.timer,
+            color: AppColors.warning,
+            onPressed: () => _showSuspendDialog(user),
+          ),
+          const SizedBox(height: 12),
+          _ActionButton(
+            label: 'Edit User Roles',
+            icon: Icons.admin_panel_settings,
+            color: Colors.purple,
+            onPressed: () => _showRolesDialog(user),
+          ),
+          const SizedBox(height: 12),
+          _ActionButton(
+            label: 'Reset Verification',
+            icon: Icons.refresh,
+            color: AppColors.primary,
+            onPressed: () => _showResetVerifDialog(user),
+          ),
+          const SizedBox(height: 12),
+          _ActionButton(
+            label: 'Adjust Trust Score',
+            icon: Icons.star,
+            color: AppColors.success,
+            onPressed: () => _showTrustScoreDialog(user),
+          ),
+        ],
       ],
     );
   }
@@ -442,15 +453,23 @@ class _UserDetailAdminScreenState extends ConsumerState<UserDetailAdminScreen> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
+              if (_isProcessing) return;
               final admin = ref.read(appUserProvider).valueOrNull;
               if (admin == null) return;
-
-              await ref.read(adminRepositoryProvider).resetUserVerification(
-                user.uid,
-                adminId: admin.uid,
-                adminName: admin.fullName,
-              );
-              if (mounted) Navigator.pop(context);
+              
+              final navigator = Navigator.of(context);
+              setState(() => _isProcessing = true);
+              
+              try {
+                await ref.read(adminRepositoryProvider).resetUserVerification(
+                  user.uid,
+                  adminId: admin.uid,
+                  adminName: admin.fullName,
+                );
+              } finally {
+                if (mounted) setState(() => _isProcessing = false);
+                navigator.pop();
+              }
             },
             child: const Text('Confirm Reset'),
           ),
@@ -474,11 +493,20 @@ class _UserDetailAdminScreenState extends ConsumerState<UserDetailAdminScreen> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
+              if (_isProcessing) return;
               final admin = ref.read(appUserProvider).valueOrNull;
-              if (admin != null && noteController.text.isNotEmpty) {
-                await ref.read(adminRepositoryProvider).addAdminNote(user.uid, noteController.text, admin.uid);
+              if (admin == null) return;
+              
+              final navigator = Navigator.of(context);
+              if (noteController.text.isNotEmpty) {
+                setState(() => _isProcessing = true);
+                try {
+                  await ref.read(adminRepositoryProvider).addAdminNote(user.uid, noteController.text, admin.uid);
+                } finally {
+                  if (mounted) setState(() => _isProcessing = false);
+                }
               }
-              if (mounted) Navigator.pop(context);
+              navigator.pop();
             },
             child: const Text('Save Note'),
           ),
@@ -510,19 +538,26 @@ class _UserDetailAdminScreenState extends ConsumerState<UserDetailAdminScreen> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
+              if (_isProcessing) return;
               final admin = ref.read(appUserProvider).valueOrNull;
               if (admin == null) return;
-
+              
+              final navigator = Navigator.of(context);
               final score = double.tryParse(scoreController.text);
               if (score != null) {
-                await ref.read(adminRepositoryProvider).updateUserTrustScore(
-                  user.uid, 
-                  score,
-                  adminId: admin.uid,
-                  adminName: admin.fullName,
-                );
+                setState(() => _isProcessing = true);
+                try {
+                  await ref.read(adminServiceProvider).updateUserTrustScore(
+                    user.uid, 
+                    score,
+                    adminId: admin.uid,
+                    adminName: admin.fullName,
+                  );
+                } finally {
+                  if (mounted) setState(() => _isProcessing = false);
+                }
               }
-              if (mounted) Navigator.pop(context);
+              navigator.pop();
             },
             child: const Text('Save Score'),
           ),
@@ -542,16 +577,23 @@ class _UserDetailAdminScreenState extends ConsumerState<UserDetailAdminScreen> {
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
+                if (_isProcessing) return;
                 final admin = ref.read(appUserProvider).valueOrNull;
                 if (admin == null) return;
 
-                await ref.read(adminRepositoryProvider).toggleUserBan(
-                  user.uid, 
-                  false,
-                  adminId: admin.uid,
-                  adminName: admin.fullName,
-                );
-                if (mounted) Navigator.pop(context);
+                final navigator = Navigator.of(context);
+                setState(() => _isProcessing = true);
+                try {
+                  await ref.read(adminServiceProvider).toggleUserBan(
+                    user.uid, 
+                    false,
+                    adminId: admin.uid,
+                    adminName: admin.fullName,
+                  );
+                } finally {
+                  if (mounted) setState(() => _isProcessing = false);
+                }
+                navigator.pop();
               },
               child: const Text('Restore Account'),
             ),
@@ -580,17 +622,24 @@ class _UserDetailAdminScreenState extends ConsumerState<UserDetailAdminScreen> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
               onPressed: () async {
+                if (_isProcessing) return;
                 final admin = ref.read(appUserProvider).valueOrNull;
                 if (admin == null) return;
 
-                await ref.read(adminRepositoryProvider).toggleUserBan(
-                  user.uid, 
-                  true, 
-                  reason: reasonController.text,
-                  adminId: admin.uid,
-                  adminName: admin.fullName,
-                );
-                if (mounted) Navigator.pop(context);
+                final navigator = Navigator.of(context);
+                setState(() => _isProcessing = true);
+                try {
+                  await ref.read(adminServiceProvider).toggleUserBan(
+                    user.uid, 
+                    true, 
+                    reason: reasonController.text,
+                    adminId: admin.uid,
+                    adminName: admin.fullName,
+                  );
+                } finally {
+                  if (mounted) setState(() => _isProcessing = false);
+                }
+                navigator.pop();
               },
               child: const Text('Ban Permanently', style: TextStyle(color: Colors.white)),
             ),
@@ -611,17 +660,24 @@ class _UserDetailAdminScreenState extends ConsumerState<UserDetailAdminScreen> {
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
+                if (_isProcessing) return;
                 final admin = ref.read(appUserProvider).valueOrNull;
                 if (admin == null) return;
 
-                await ref.read(adminRepositoryProvider).suspendUser(
-                  user.uid, 
-                  DateTime.now().subtract(const Duration(days: 1)), 
-                  'Suspension lifted by admin',
-                  adminId: admin.uid,
-                  adminName: admin.fullName,
-                );
-                if (mounted) Navigator.pop(context);
+                final navigator = Navigator.of(context);
+                setState(() => _isProcessing = true);
+                try {
+                  await ref.read(adminServiceProvider).suspendUser(
+                    user.uid, 
+                    DateTime.now().subtract(const Duration(days: 1)), 
+                    'Suspension lifted by admin',
+                    adminId: admin.uid,
+                    adminName: admin.fullName,
+                  );
+                } finally {
+                  if (mounted) setState(() => _isProcessing = false);
+                }
+                navigator.pop();
               },
               child: const Text('Lift Suspension'),
             ),
@@ -660,18 +716,25 @@ class _UserDetailAdminScreenState extends ConsumerState<UserDetailAdminScreen> {
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
+                if (_isProcessing) return;
                 final admin = ref.read(appUserProvider).valueOrNull;
                 if (admin == null) return;
 
+                final navigator = Navigator.of(context);
                 final until = DateTime.now().add(Duration(days: days));
-                await ref.read(adminRepositoryProvider).suspendUser(
-                  user.uid, 
-                  until, 
-                  reasonController.text,
-                  adminId: admin.uid,
-                  adminName: admin.fullName,
-                );
-                if (mounted) Navigator.pop(context);
+                setState(() => _isProcessing = true);
+                try {
+                  await ref.read(adminServiceProvider).suspendUser(
+                    user.uid, 
+                    until, 
+                    reasonController.text,
+                    adminId: admin.uid,
+                    adminName: admin.fullName,
+                  );
+                } finally {
+                  if (mounted) setState(() => _isProcessing = false);
+                }
+                navigator.pop();
               },
               child: const Text('Suspend'),
             ),
@@ -710,16 +773,23 @@ class _UserDetailAdminScreenState extends ConsumerState<UserDetailAdminScreen> {
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
+                if (_isProcessing) return;
                 final admin = ref.read(appUserProvider).valueOrNull;
                 if (admin == null) return;
 
-                await ref.read(adminRepositoryProvider).updateUserRoles(
-                  user.uid, 
-                  currentRoles,
-                  adminId: admin.uid,
-                  adminName: admin.fullName,
-                );
-                if (mounted) Navigator.pop(context);
+                final navigator = Navigator.of(context);
+                setState(() => _isProcessing = true);
+                try {
+                  await ref.read(adminRepositoryProvider).updateUserRoles(
+                    user.uid, 
+                    currentRoles,
+                    adminId: admin.uid,
+                    adminName: admin.fullName,
+                  );
+                } finally {
+                  if (mounted) setState(() => _isProcessing = false);
+                }
+                navigator.pop();
               },
               child: const Text('Update Roles'),
             ),

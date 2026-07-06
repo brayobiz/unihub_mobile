@@ -23,6 +23,12 @@ abstract class NotesRepository {
   Future<void> deleteNote(String noteId);
   Future<NoteListing?> getNoteById(String noteId);
   Stream<List<NoteListing>> watchNotesByAuthor(String authorId);
+  
+  Future<void> reportNote({
+    required String noteId,
+    required String reporterId,
+    required String reason,
+  });
 
   // Study Experience
   Future<void> updateStudyProgress(StudyProgress progress);
@@ -30,4 +36,27 @@ abstract class NotesRepository {
   Stream<StudyProgress?> watchNoteProgress(String userId, String noteId);
   Stream<List<StudyProgress>> watchStudyHistory(String userId);
   Stream<List<StudyProgress>> watchBookmarks(String userId);
+
+  // Moderation & Admin Methods
+  Future<void> flagNote({
+    required String noteId,
+    required String reason,
+    String? adminNotes,
+  });
+
+  Future<void> approveNote(String noteId);
+
+  Future<void> suspendNote({
+    required String noteId,
+    required String reason,
+    required String adminId,
+  });
+
+  Future<void> removeNote({
+    required String noteId,
+    required String reason,
+    required String adminId,
+  });
+
+  Stream<List<NoteListing>> watchFlaggedNotes(String campusId);
 }

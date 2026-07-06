@@ -28,6 +28,8 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
   }
 
   Future<void> _handleAction(String action, {int? suspensionDays}) async {
+    if (_isProcessing) return;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -45,27 +47,58 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
     );
 
     if (confirmed != true) return;
+    if (!mounted) return;
 
     setState(() => _isProcessing = true);
+    
+    // Capture dependencies before the async gap to avoid using 'ref' after dispose
+    final adminService = ref.read(adminServiceProvider);
+    final currentAdmin = ref.read(appUserProvider).valueOrNull;
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    final notes = _notesController.text.trim();
+
     try {
-      final currentAdmin = ref.read(appUserProvider).valueOrNull;
       if (currentAdmin == null) throw Exception('Admin not logged in');
 
-      await ref.read(adminRepositoryProvider).resolveReport(
+      if (widget.report.id.isEmpty) {
+        throw Exception('Invalid report ID - cannot process');
+      }
+
+      await adminService.resolveReport(
         report: widget.report,
         action: action,
         adminId: currentAdmin.uid,
         adminName: currentAdmin.fullName,
-        notes: _notesController.text.trim(),
+        notes: notes,
         suspensionDays: suspensionDays,
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Report ${action}ed successfully')));
-        context.pop();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('✅ Report $action completed successfully'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        // Small delay to ensure database reflects change
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // Safety check again before popping
+        if (mounted && router.canPop()) {
+          router.pop(true);
+        }
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('❌ Error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
@@ -211,10 +244,13 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
                     style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 16),
-                  if (widget.report.type == ReportType.marketplace || widget.report.type == ReportType.housing || widget.report.type == ReportType.feedItem)
+                  if (widget.report.type == ReportType.marketplace || widget.report.type == ReportType.housing || widget.report.type == ReportType.note || widget.report.type == ReportType.event)
                     ElevatedButton(
                       onPressed: () {
-                        final path = widget.report.type == ReportType.marketplace ? '/admin/marketplace' : '/admin/housing';
+                        String path = '/admin/marketplace';
+                        if (widget.report.type == ReportType.housing) path = '/admin/housing';
+                        if (widget.report.type == ReportType.note) path = '/admin/notes';
+                        if (widget.report.type == ReportType.event) path = '/admin/events';
                         context.push(path);
                       },
                       child: const Text('Open Content Queue'),

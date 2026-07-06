@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:uuid/uuid.dart';
 import 'package:path/path.dart' as p;
 import 'package:unihub_mobile/app/theme/app_colors.dart';
+import 'package:unihub_mobile/core/widgets/creation_success_dialog.dart';
 import '../../../auth/shared/providers.dart';
 import '../../domain/models/note.dart';
 import '../../shared/providers.dart';
@@ -132,6 +133,39 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     }
   }
 
+  Future<void> _handleBack() async {
+    final bool isDirty = _titleController.text.isNotEmpty || 
+                        _selectedFile != null || 
+                        _courseController.text.isNotEmpty;
+    
+    if (!isDirty) {
+      context.pop();
+      return;
+    }
+
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Discard changes'),
+        content: const Text('You have unsaved changes. Are you sure you want to discard them?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep Editing'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Discard', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+
+    if (proceed == true && mounted) {
+      context.pop();
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedFile == null && widget.note == null) {
@@ -188,13 +222,13 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
       await ref.read(notesRepositoryProvider).createNote(note);
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(widget.note == null ? 'Note published successfully!' : 'Note updated successfully!'),
-            backgroundColor: Colors.green,
-          )
+        CreationSuccessDialog.show(
+          context,
+          title: widget.note == null ? 'Study Material Listed!' : 'Note Updated!',
+          message: widget.note == null
+              ? 'Your study notes have been successfully shared with fellow students.'
+              : 'Your study material has been updated successfully.',
         );
-        context.pop();
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -206,132 +240,154 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      appBar: AppBar(
-        title: Text(widget.note == null ? 'Share Study Notes' : 'Edit Study Note', 
-          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: 18)),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _handleBack();
+      },
+      child: Scaffold(
         backgroundColor: theme.colorScheme.surface,
-        elevation: 0,
-        foregroundColor: theme.colorScheme.onSurface,
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildHeaderHint(context),
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildFileSelector(context),
-                    const SizedBox(height: 32),
-                    
-                    _buildSectionHeader(context, 'Note Details', Icons.description_outlined),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      context,
-                      controller: _titleController,
-                      label: 'Title',
-                      hint: 'e.g. Introduction to Database Systems',
-                      validator: (v) => v!.isEmpty ? 'Please enter a title' : null,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      context,
-                      controller: _descriptionController,
-                      label: 'Brief Description',
-                      hint: 'Help others understand what is covered...',
-                      maxLines: 3,
-                    ),
-                    
-                    const SizedBox(height: 32),
-                    _buildSectionHeader(context, 'Academic Context', Icons.school_outlined),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      context,
-                      controller: _courseController,
-                      label: 'Course / Program',
-                      hint: 'e.g. BSc. Computer Science',
-                      validator: (v) => v!.isEmpty ? 'Please enter your course' : null,
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildTextField(
-                            context,
-                            controller: _unitCodeController,
-                            label: 'Unit Code',
-                            hint: 'e.g. COM 2101',
-                            validator: (v) => v!.isEmpty ? 'Required' : null,
+        appBar: AppBar(
+          title: Text(widget.note == null ? 'Upload Notes' : 'Edit Study Material', 
+            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: 18)),
+          backgroundColor: theme.colorScheme.surface,
+          elevation: 0,
+          foregroundColor: theme.colorScheme.onSurface,
+          centerTitle: true,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.colorScheme.onSurface, size: 20),
+            onPressed: _handleBack,
+          ),
+        ),
+        body: SingleChildScrollView(
+          child: Column(
+            children: [
+              _buildHeaderHint(context),
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSectionHeader(context, 'Document File', Icons.upload_file_rounded),
+                      const SizedBox(height: 16),
+                      _buildFileSelector(context),
+                      const SizedBox(height: 32),
+                      
+                      _buildSectionHeader(context, 'Note Details', Icons.description_outlined),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        context,
+                        controller: _titleController,
+                        label: 'Title',
+                        hint: 'e.g. Introduction to Database Systems',
+                        validator: (v) => v!.isEmpty ? 'Please enter a title' : null,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        context,
+                        controller: _descriptionController,
+                        label: 'Brief Description',
+                        hint: 'Help others understand what is covered...',
+                        maxLines: 3,
+                      ),
+                      
+                      const SizedBox(height: 32),
+                      _buildSectionHeader(context, 'Academic Context', Icons.school_outlined),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        context,
+                        controller: _courseController,
+                        label: 'Course / Program',
+                        hint: 'e.g. BSc. Computer Science',
+                        validator: (v) => v!.isEmpty ? 'Please enter your course' : null,
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              context,
+                              controller: _unitCodeController,
+                              label: 'Unit Code',
+                              hint: 'e.g. COM 2101',
+                              validator: (v) => v!.isEmpty ? 'Required' : null,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildDropdown(
-                            context: context,
-                            label: 'Year of Study',
-                            value: _selectedYear,
-                            items: const ['1', '2', '3', '4', '5', '6'],
-                            onChanged: (v) => setState(() => _selectedYear = v!),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildDropdown(
+                              context: context,
+                              label: 'Year of Study',
+                              value: _selectedYear,
+                              items: const ['1', '2', '3', '4', '5', '6'],
+                              onChanged: (v) => setState(() => _selectedYear = v!),
+                            ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        context,
+                        controller: _unitNameController,
+                        label: 'Unit Name',
+                        hint: 'e.g. Operating Systems',
+                        validator: (v) => v!.isEmpty ? 'Please enter the unit name' : null,
+                      ),
+                      
+                      const SizedBox(height: 32),
+                      _buildSectionHeader(context, 'Classification', Icons.category_outlined),
+                      const SizedBox(height: 16),
+                      _buildDropdown(
+                        context: context,
+                        label: 'Subject Category',
+                        value: _selectedCategory,
+                        items: _categories,
+                        onChanged: (v) => setState(() => _selectedCategory = v!),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildDropdown(
+                        context: context,
+                        label: 'Note Type',
+                        value: _selectedNoteType,
+                        items: _noteTypes,
+                        onChanged: (v) => setState(() => _selectedNoteType = v!),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildTagsInput(context),
+                      
+                      const SizedBox(height: 32),
+                      _buildSectionHeader(context, 'Access & Pricing', Icons.payments_outlined),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        context,
+                        controller: _priceController,
+                        label: 'Price (KES)',
+                        hint: 'Leave empty or 0 for FREE',
+                        keyboardType: TextInputType.number,
+                        prefixIcon: Icons.payments_outlined,
+                      ),
+                      
+                      const SizedBox(height: 48),
+                      if (_isLoading)
+                        Column(
+                          children: [
+                            LinearProgressIndicator(value: _uploadProgress, color: theme.colorScheme.primary, minHeight: 6, borderRadius: BorderRadius.circular(4)),
+                            const SizedBox(height: 8),
+                            Text('Uploading material... ${(_uploadProgress * 100).toInt()}%', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 12)),
+                            const SizedBox(height: 24),
+                          ],
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      context,
-                      controller: _unitNameController,
-                      label: 'Unit Name',
-                      hint: 'e.g. Operating Systems',
-                      validator: (v) => v!.isEmpty ? 'Please enter the unit name' : null,
-                    ),
-                    
-                    const SizedBox(height: 32),
-                    _buildSectionHeader(context, 'Classification', Icons.category_outlined),
-                    const SizedBox(height: 16),
-                    _buildDropdown(
-                      context: context,
-                      label: 'Subject Category',
-                      value: _selectedCategory,
-                      items: _categories,
-                      onChanged: (v) => setState(() => _selectedCategory = v!),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildDropdown(
-                      context: context,
-                      label: 'Note Type',
-                      value: _selectedNoteType,
-                      items: _noteTypes,
-                      onChanged: (v) => setState(() => _selectedNoteType = v!),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTagsInput(context),
-                    
-                    const SizedBox(height: 32),
-                    _buildSectionHeader(context, 'Access & Pricing', Icons.payments_outlined),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      context,
-                      controller: _priceController,
-                      label: 'Price (KES)',
-                      hint: 'Leave empty or 0 for FREE',
-                      keyboardType: TextInputType.number,
-                      prefixIcon: Icons.payments_outlined,
-                    ),
-                    
-                    const SizedBox(height: 48),
-                    _buildSubmitButton(context),
-                    const SizedBox(height: 40),
-                  ],
+                      _buildSubmitButton(context),
+                      const SizedBox(height: 40),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -388,14 +444,14 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
 
     return InkWell(
       onTap: _isLoading ? null : _pickFile,
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: hasFile ? AppColors.success : theme.colorScheme.outlineVariant, 
             width: 2, 
@@ -477,8 +533,8 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                   hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
                   filled: true,
                   fillColor: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
                 ),
                 onFieldSubmitted: (_) => _addTag(),
               ),
@@ -526,8 +582,8 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
             filled: true,
             fillColor: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
             contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
           ),
         ),
       ],
@@ -554,9 +610,9 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
             filled: true,
             fillColor: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
             contentPadding: const EdgeInsets.all(18),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5)),
             errorStyle: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
@@ -573,20 +629,11 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
         onPressed: _isLoading ? null : _submit,
         style: FilledButton.styleFrom(
           backgroundColor: theme.colorScheme.primary, 
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 0,
         ),
-        child: _isLoading
-            ? Row(
-                mainAxisAlignment: MainAxisAlignment.center, 
-                children: [
-                  const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)), 
-                  const SizedBox(width: 16), 
-                  Text('Uploading ${(_uploadProgress * 100).toInt()}%', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                ]
-              )
-            : Text(widget.note == null ? 'Publish Study Material' : 'Save Changes', 
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+        child: Text(widget.note == null ? 'Upload Notes' : 'Save Changes',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
       ),
     );
   }

@@ -41,7 +41,7 @@ class _ReportQueueScreenState extends ConsumerState<ReportQueueScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Bulk $action'),
-        content: Text('Are you sure you want to $action ${selectedReports.length} reports?'),
+        content: Text('Are you sure you want to $action ${selectedReports.length} report(s)?\n\n${selectedReports.map((r) => '• ${r.reason.length > 40 ? r.reason.substring(0, 40) + "..." : r.reason}').take(5).join('\n')}${selectedReports.length > 5 ? '\n... and ${selectedReports.length - 5} more' : ''}'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm')),
@@ -52,31 +52,48 @@ class _ReportQueueScreenState extends ConsumerState<ReportQueueScreen> {
     if (confirmed != true) return;
 
     setState(() => _isBulkProcessing = true);
+    final messenger = ScaffoldMessenger.of(context);
+    
     try {
       final admin = ref.read(appUserProvider).valueOrNull;
       if (admin == null) throw Exception('Admin session not found');
 
-      await ref.read(adminRepositoryProvider).bulkResolveReports(
+      if (selectedReports.isEmpty) {
+        throw Exception('No reports selected for processing');
+      }
+
+      await ref.read(adminServiceProvider).bulkResolveReports(
         reports: selectedReports,
         action: action,
         adminId: admin.uid,
         adminName: admin.fullName,
       );
       
-      setState(() {
-        _selectedIds.clear();
-        _isBulkProcessing = false;
-      });
-      
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Bulk $action completed successfully')),
+        setState(() {
+          _selectedIds.clear();
+          _isBulkProcessing = false;
+        });
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('✅ Bulk $action completed: ${selectedReports.length} report(s) processed'),
+            backgroundColor: AppColors.success,
+            duration: const Duration(seconds: 3),
+          ),
         );
+        // Refresh the provider
+        ref.refresh(adminReportsProvider((status: _selectedStatus, type: _selectedType)));
       }
     } catch (e) {
-      setState(() => _isBulkProcessing = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        setState(() => _isBulkProcessing = false);
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('❌ Bulk action failed: $e'),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 5),
+          ),
+        );
       }
     }
   }
@@ -294,7 +311,7 @@ class _ReportListItem extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Flexible(
+                        Expanded(
                           child: Text(
                             report.reason,
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -303,7 +320,9 @@ class _ReportListItem extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        _buildStatusChip(),
+                        Flexible(
+                          child: _buildStatusChip(),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -365,6 +384,14 @@ class _ReportListItem extends StatelessWidget {
       case ReportType.chat:
         icon = Icons.chat;
         color = AppColors.secondary;
+        break;
+      case ReportType.note:
+        icon = Icons.description;
+        color = AppColors.notes;
+        break;
+      case ReportType.event:
+        icon = Icons.event;
+        color = AppColors.primary;
         break;
     }
 

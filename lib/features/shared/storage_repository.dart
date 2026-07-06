@@ -16,10 +16,12 @@ class StorageRepository {
     bool isPrivate = false,
     Function(int, int)? onProgress,
   }) async {
-    // We map Firebase style path/id to Cloudinary folder structure
-    final folder = path.replaceAll('/', '_');
+    // Standardize folder structure. Slashes are supported in Cloudinary folders.
+    final folder = path.startsWith('/') ? path.substring(1) : path;
     
-    debugPrint('📦 StorageRepo: Prepared folder name: $folder');
+    if (kDebugMode) {
+      debugPrint('📦 StorageRepo: Prepared folder path: $folder');
+    }
     
     return await _cloudinaryService.uploadFile(
       file: file,
@@ -35,7 +37,7 @@ class StorageRepository {
     required String path,
     required List<File> files,
   }) async {
-    final folder = path.replaceAll('/', '_');
+    final folder = path.startsWith('/') ? path.substring(1) : path;
     return await _cloudinaryService.uploadMultipleFiles(
       files: files,
       folder: folder,

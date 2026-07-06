@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:unihub_mobile/core/utils/app_logger.dart';
+import 'package:unihub_mobile/core/services/notification_sender.dart';
 import 'package:unihub_mobile/features/shared/domain/models/uni_notification.dart';
 import 'package:unihub_mobile/features/shared/domain/repositories/notification_repository.dart';
 

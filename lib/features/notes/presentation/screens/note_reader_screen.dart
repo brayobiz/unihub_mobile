@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:path/path.dart' as p;
 import 'package:open_filex/open_filex.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
+import 'package:unihub_mobile/core/utils/app_logger.dart';
 import '../../domain/models/note.dart';
 import '../../shared/providers.dart';
 import '../../../../services/download_service.dart';
@@ -88,12 +90,11 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
   }
 
   void _initPdfController() {
-    debugPrint('🚩 Reader: Initializing PDF Controller');
-    debugPrint('🚩 Reader: Local Path: $_localPath');
+    AppLogger.info('🚩 Reader: Initializing PDF Controller', 'NoteReader');
     
     try {
       if (_localPath == null) {
-        debugPrint('🚩 Reader: localPath is NULL, triggering download');
+        AppLogger.info('🚩 Reader: localPath is NULL, triggering download', 'NoteReader');
         _downloadAndInitPdf();
         return;
       }
@@ -102,25 +103,23 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
       final exists = file.existsSync();
       final size = exists ? file.lengthSync() : 0;
       
-      debugPrint('🚩 Reader: File Exists: $exists');
-      debugPrint('🚩 Reader: File Size: $size bytes');
+      AppLogger.info('🚩 Reader: File Exists: $exists, Size: $size bytes', 'NoteReader');
 
       if (!exists || size == 0) {
-        debugPrint('🚩 Reader: File missing or empty, downloading...');
+        AppLogger.info('🚩 Reader: File missing or empty, downloading...', 'NoteReader');
         _downloadAndInitPdf();
         return;
       }
       
-      debugPrint('🚩 Reader: Attempting to open PDF with pdfx...');
+      AppLogger.info('🚩 Reader: Attempting to open PDF with pdfx...', 'NoteReader');
       _pdfController = PdfControllerPinch(
         document: PdfDocument.openFile(_localPath!),
         initialPage: widget.initialPage + 1,
       );
       setState(() => _isError = false);
-      debugPrint('🚩 Reader: PDF Controller initialized successfully');
+      AppLogger.info('🚩 Reader: PDF Controller initialized successfully', 'NoteReader');
     } catch (e, stack) {
-      debugPrint('❌ Reader: PDF Init Error: $e');
-      debugPrint('❌ Reader: StackTrace: $stack');
+      AppLogger.error('❌ Reader: PDF Init Error', e, stack, 'NoteReader');
       setState(() {
         _isError = true;
         _errorMessage = 'UniHub cannot render this specific document internally. It might be too large or uses a complex format.';
@@ -130,8 +129,7 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
 
   Future<void> _downloadAndInitPdf() async {
     if (!mounted) return;
-    debugPrint('🚩 Reader: Starting Download Pipeline');
-    debugPrint('🚩 Reader: Remote URL: ${widget.note.fileUrl}');
+    AppLogger.info('🚩 Reader: Starting Download Pipeline', 'NoteReader');
 
     setState(() {
       _isDownloading = true;
@@ -151,18 +149,18 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
       final fileName = '$safeTitle$ext';
       final downloadService = ref.read(downloadServiceProvider);
       
-      debugPrint('🚩 Reader: Generated Filename: $fileName');
+      AppLogger.info('🚩 Reader: Generated Filename: $fileName', 'NoteReader');
 
       if (_isError) {
         final path = await downloadService.getSavePath(fileName);
         final file = File(path);
         if (file.existsSync()) {
-          debugPrint('🚩 Reader: Deleting existing failed file');
+          AppLogger.info('🚩 Reader: Deleting existing failed file', 'NoteReader');
           await file.delete();
         }
       }
 
-      debugPrint('🚩 Reader: Calling downloadService.downloadFile');
+      AppLogger.info('🚩 Reader: Calling downloadService.downloadFile', 'NoteReader');
       await downloadService.downloadFile(
         url: widget.note.fileUrl,
         fileName: fileName,
@@ -170,7 +168,7 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
       );
       
       _localPath = await downloadService.getSavePath(fileName);
-      debugPrint('🚩 Reader: Download complete. New Local Path: $_localPath');
+      AppLogger.info('🚩 Reader: Download complete', 'NoteReader');
 
       if (mounted) {
         setState(() => _isDownloading = false);
@@ -181,8 +179,7 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
         }
       }
     } catch (e, stack) {
-      debugPrint('❌ Reader: Download Pipeline Failed: $e');
-      debugPrint('❌ Reader: StackTrace: $stack');
+      AppLogger.error('❌ Reader: Download Pipeline Failed', e, stack, 'NoteReader');
       if (mounted) {
         setState(() {
           _isDownloading = false;
@@ -212,7 +209,7 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
           onPageStarted: (url) => setState(() => _isWebLoading = true),
           onPageFinished: (url) => setState(() => _isWebLoading = false),
           onWebResourceError: (error) {
-             debugPrint('🌐 WebView Error: ${error.description}');
+             AppLogger.error('🌐 WebView Error: ${error.description}', error, null, 'NoteReader');
              if (mounted && error.errorType != WebResourceErrorType.unknown) {
                setState(() {
                  _isError = true;
@@ -589,7 +586,7 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
                 }
               },
               icon: const Icon(Icons.refresh),
-              label: const Text('Try Again', style: TextStyle(fontWeight: FontWeight.bold)),
+              label: const Text('Retry', style: TextStyle(fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: theme.colorScheme.primary,
                 foregroundColor: Colors.white,

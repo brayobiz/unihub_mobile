@@ -39,7 +39,7 @@ class SellerDashboardScreen extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/add-listing'),
-        label: const Text('Add Listing'),
+        label: const Text('Create Listing'),
         icon: const Icon(Icons.add),
       ),
     );
@@ -250,16 +250,14 @@ class _DashboardContent extends StatelessWidget {
             leading: const Icon(Icons.list_alt),
             title: const Text('Manage All Listings'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/marketplace/my-listings'),
+            onTap: () => context.push('/my-listings'),
           ),
           const Divider(height: 1),
           ListTile(
             leading: const Icon(Icons.check_circle_outline),
-            title: const Text('Sold Items'),
+            title: const Text('View Sales History'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              // Navigate to my listings with sold filter or similar
-            },
+            onTap: () => context.push('/my-listings'),
           ),
         ],
       ),

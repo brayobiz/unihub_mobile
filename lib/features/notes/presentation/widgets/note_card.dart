@@ -53,7 +53,7 @@ class NoteCard extends ConsumerWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.04),

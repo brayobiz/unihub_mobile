@@ -28,9 +28,6 @@ class AuthTextField extends StatelessWidget {
       decoration: InputDecoration(
         hintText: hintText,
         prefixIcon: Icon(icon),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
       ),
     );
   }

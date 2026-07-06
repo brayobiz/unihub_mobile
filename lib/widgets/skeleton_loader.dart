@@ -47,7 +47,7 @@ class SkeletonFeedItem extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
       ),
-      child: const Row(
+      child: Row(
         children: [
           SkeletonLoader(width: 48, height: 48, borderRadius: 12),
           SizedBox(width: 12),

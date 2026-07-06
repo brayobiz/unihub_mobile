@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import 'package:unihub_mobile/features/auth/domain/repositories/auth_repository.dart';
+import 'package:unihub_mobile/core/utils/app_logger.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   final FirebaseAuth _firebaseAuth;
@@ -21,20 +22,17 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> signInWithEmailAndPassword(String email, String password) async {
     try {
-      // SECURITY FIX: Do not log full email in production
-      if (kDebugMode) {
-        debugPrint('🔑 Auth: Attempting sign in for ${email.split('@').first}@...');
-      }
+      AppLogger.info('Auth: Attempting sign in for ${email.split('@').first}@...', 'AUTH');
       await _firebaseAuth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
-      debugPrint('✅ Auth: Sign in successful');
+      AppLogger.info('Auth: Sign in successful', 'AUTH');
     } on FirebaseAuthException catch (e) {
-      debugPrint('❌ Auth: FirebaseAuthException: ${e.code} - ${e.message}');
+      AppLogger.warning('Auth: FirebaseAuthException: ${e.code}', 'AUTH');
       throw _handleAuthException(e);
     } catch (e) {
-      debugPrint('❌ Auth: General Exception: $e');
+      AppLogger.error('Auth: General Exception', e, StackTrace.current, 'AUTH');
       if (e.toString().contains('Connection reset by peer')) {
         throw Exception('Network error: Connection reset by peer. Please check your internet connection or VPN.');
       }
@@ -60,25 +58,47 @@ class AuthRepositoryImpl implements AuthRepository {
       final User? user = userCredential.user;
 
       if (user != null) {
-        final doc = await _firestore.collection('users').doc(user.uid).get();
-        if (!doc.exists) {
-          final appUser = AppUser(
-            uid: user.uid,
-            email: user.email ?? '',
-            fullName: user.displayName ?? 'UniHub User',
-            photoUrl: user.photoURL,
-            createdAt: DateTime.now(),
-          );
-          await _firestore.collection('users').doc(user.uid).set(appUser.toJson());
-        }
+        // Use a more robust check and creation logic
+        await _ensureUserDocumentExists(user);
       }
     } on FirebaseAuthException catch (e) {
+      AppLogger.warning('Auth: Google Sign-in Firebase Error: ${e.code}', 'AUTH');
       throw _handleAuthException(e);
     } catch (e) {
+      AppLogger.error('Auth: Google Sign-in General Error', e, StackTrace.current, 'AUTH');
       if (e.toString().contains('7000') || e.toString().contains('developer_error')) {
         throw Exception('Google Sign-In configuration error: Please verify that you have added your SHA-1 fingerprint to the Firebase Console and enabled Google Auth.');
       }
       throw Exception('Failed to sign in with Google: $e');
+    }
+  }
+
+  Future<void> _ensureUserDocumentExists(User user) async {
+    try {
+      final docRef = _firestore.collection('users').doc(user.uid);
+      final doc = await docRef.get();
+      
+      if (!doc.exists) {
+        AppLogger.info('Auth: Creating new user document for ${user.uid}', 'AUTH');
+        final appUser = AppUser(
+          uid: user.uid,
+          email: user.email ?? '',
+          fullName: user.displayName ?? 'UniHub User',
+          photoUrl: user.photoURL,
+          createdAt: DateTime.now(),
+        );
+        await docRef.set(appUser.toJson());
+      } else {
+        // Optional: Update last seen or FCM token if needed
+        await docRef.update({
+          'lastSeen': FieldValue.serverTimestamp(),
+        }).catchError((_) => null);
+      }
+    } catch (e) {
+      AppLogger.error('Auth: Error ensuring user document exists', e, null, 'AUTH');
+      // We don't throw here to avoid failing sign-in if just the document creation fails,
+      // though the app might be limited until the doc is created.
+      // In a production app, we might want to retry or handle this in a splash screen.
     }
   }
 
@@ -104,28 +124,43 @@ class AuthRepositoryImpl implements AuthRepository {
 
         await _firestore.collection('users').doc(appUser.uid).set(appUser.toJson());
         await credential.user!.updateDisplayName(fullName);
+        
+        try {
+          await credential.user!.sendEmailVerification();
+          AppLogger.info('Auth: New user registered and verification sent: ${appUser.uid}', 'AUTH');
+        } catch (e) {
+          AppLogger.warning('Auth: User registered but verification email failed: $e', 'AUTH');
+          // We don't rethrow here to allow the user to see the verification screen
+          // where they can manually trigger a resend.
+        }
       }
     } on FirebaseAuthException catch (e) {
+      AppLogger.warning('Auth: Sign-up error: ${e.code}', 'AUTH');
       throw _handleAuthException(e);
+    } catch (e) {
+      AppLogger.error('Auth: Sign-up general error', e, null, 'AUTH');
+      rethrow;
     }
   }
 
   @override
   Future<void> signOut() async {
     try {
+      AppLogger.info('Auth: Signing out...', 'AUTH');
+      
       // 1. Sign out from Google (with timeout to prevent hanging)
       try {
         await _googleSignIn.signOut().timeout(const Duration(seconds: 3));
       } catch (e) {
-        debugPrint('Google SignOut error or timeout: $e');
+        AppLogger.warning('Auth: Google SignOut error or timeout: $e', 'AUTH');
       }
 
       // 2. Sign out from Firebase
       await _firebaseAuth.signOut();
       
-      debugPrint('✅ Auth: Sign out successful');
+      AppLogger.info('Auth: Sign out successful', 'AUTH');
     } catch (e) {
-      debugPrint('❌ Auth: Error during sign out: $e');
+      AppLogger.error('Auth: Error during sign out', e, null, 'AUTH');
       // Final attempt to sign out from Firebase regardless of previous errors
       try {
         await _firebaseAuth.signOut();
@@ -138,6 +173,20 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> resetPassword(String email) async {
     try {
       await _firebaseAuth.sendPasswordResetEmail(email: email);
+      AppLogger.info('Auth: Password reset email sent to $email', 'AUTH');
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
+  @override
+  Future<void> sendEmailVerification() async {
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user != null) {
+        await user.sendEmailVerification();
+        AppLogger.info('Auth: Email verification sent to ${user.email}', 'AUTH');
+      }
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
     }
@@ -147,6 +196,7 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> reauthenticate(String email, String password) async {
     final user = _firebaseAuth.currentUser;
     if (user != null) {
+      AppLogger.info('Auth: Re-authenticating user...', 'AUTH');
       final credential = EmailAuthProvider.credential(email: email, password: password);
       await user.reauthenticateWithCredential(credential);
     }
@@ -156,22 +206,23 @@ class AuthRepositoryImpl implements AuthRepository {
   Stream<AppUser?> watchUser(String uid) {
     return _firestore.collection('users').doc(uid).snapshots().map((snapshot) {
       if (snapshot.exists && snapshot.data() != null) {
-        final user = AppUser.fromJson(snapshot.data()!);
-        debugPrint('Fetched AppUser: ${user.fullName} (${user.uid})');
-        return user;
+        return AppUser.fromJson(snapshot.data()!);
       }
-      debugPrint('AppUser document does not exist for UID: $uid');
       return null;
     }).handleError((error) {
-      debugPrint('Firestore User Watch Error: $error');
+      AppLogger.error('Auth: Firestore User Watch Error', error, null, 'AUTH');
     });
   }
 
   @override
   Future<AppUser?> getUser(String uid) async {
-    final doc = await _firestore.collection('users').doc(uid).get();
-    if (doc.exists && doc.data() != null) {
-      return AppUser.fromJson(doc.data()!);
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (doc.exists && doc.data() != null) {
+        return AppUser.fromJson(doc.data()!);
+      }
+    } catch (e) {
+      AppLogger.error('Auth: Error getting user', e, null, 'AUTH');
     }
     return null;
   }
@@ -198,18 +249,13 @@ class AuthRepositoryImpl implements AuthRepository {
     Map<String, bool>? notificationSettings,
   }) async {
     try {
+      AppLogger.info('Auth: Updating profile for $uid', 'AUTH');
       final Map<String, dynamic> data = {};
       if (fullName != null) data['fullName'] = fullName;
       if (username != null) data['username'] = username;
       if (bio != null) data['bio'] = bio;
-      if (photoUrl != null) {
-        data['photoUrl'] = photoUrl;
-        debugPrint('📝 Firestore: Updating photoUrl to $photoUrl');
-      }
-      if (coverPhotoUrl != null) {
-        data['coverPhotoUrl'] = coverPhotoUrl;
-        debugPrint('📝 Firestore: Updating coverPhotoUrl to $coverPhotoUrl');
-      }
+      if (photoUrl != null) data['photoUrl'] = photoUrl;
+      if (coverPhotoUrl != null) data['coverPhotoUrl'] = coverPhotoUrl;
       if (university != null) data['university'] = university;
       if (campus != null) data['campus'] = campus;
       if (course != null) data['course'] = course;
@@ -219,44 +265,30 @@ class AuthRepositoryImpl implements AuthRepository {
       if (phoneNumber != null) data['phoneNumber'] = phoneNumber;
       if (skills != null) data['skills'] = skills;
       if (interests != null) data['interests'] = interests;
-      if (socialLinks != null) data['socialLinks'] = socialLinks;
-      if (privacySettings != null) data['privacySettings'] = privacySettings;
-      if (notificationSettings != null) data['notificationSettings'] = notificationSettings;
+      
+      final docRef = _firestore.collection('users').doc(uid);
+      final batch = _firestore.batch();
+
+      if (privacySettings != null) {
+        privacySettings.forEach((k, v) => data['privacySettings.$k'] = v);
+      }
+
+      if (notificationSettings != null) {
+        notificationSettings.forEach((k, v) => data['notificationSettings.$k'] = v);
+      }
 
       if (data.isNotEmpty) {
-        debugPrint('Updating Firestore profile for UID: $uid');
-        
-        // Use a batch or direct update to ensure nested maps are handled correctly
-        final docRef = _firestore.collection('users').doc(uid);
-        
-        // If we have privacySettings, we want to update nested keys to avoid overwriting the whole map
-        if (privacySettings != null) {
-          final Map<String, dynamic> nestedData = {};
-          privacySettings.forEach((k, v) => nestedData['privacySettings.$k'] = v);
-          // Remove privacySettings from main data and use dot notation
-          data.remove('privacySettings');
-          await docRef.update(nestedData);
-        }
-
-        if (notificationSettings != null) {
-           final Map<String, dynamic> nestedData = {};
-           notificationSettings.forEach((k, v) => nestedData['notificationSettings.$k'] = v);
-           data.remove('notificationSettings');
-           await docRef.update(nestedData);
-        }
-
-        if (data.isNotEmpty) {
-          await docRef.set(data, SetOptions(merge: true));
-        }
+        batch.update(docRef, data);
         
         final currentUser = _firebaseAuth.currentUser;
         if (currentUser != null && fullName != null && currentUser.displayName != fullName) {
-          debugPrint('Updating Firebase Auth displayName to: $fullName');
           await currentUser.updateDisplayName(fullName);
         }
       }
+      
+      await batch.commit();
     } catch (e) {
-      debugPrint('Firestore Update Profile Error: $e');
+      AppLogger.error('Auth: Firestore Update Profile Error', e, null, 'AUTH');
       rethrow;
     }
   }
@@ -271,73 +303,87 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> deleteAccount() async {
     final user = _firebaseAuth.currentUser;
-    if (user != null) {
-      final uid = user.uid;
-      final batch = _firestore.batch();
+    if (user == null) return;
+    
+    final uid = user.uid;
+    AppLogger.warning('Auth: PERMANENTLY DELETING ACCOUNT: $uid', 'AUTH');
 
-      // 1. Delete marketplace listings
-      final listings = await _firestore.collection('listings')
-          .where('sellerId', isEqualTo: uid).get();
-      for (var doc in listings.docs) {
-        batch.delete(doc.reference);
-      }
+    try {
+      // 0. Mark user document as deleted first (while we still have Auth)
+      // This ensures that even if Auth deletion fails, we know this account is "gone"
+      await _firestore.collection('users').doc(uid).update({
+        'isDeleted': true,
+        'deletedAt': FieldValue.serverTimestamp(),
+      }).catchError((_) => null);
 
-      // 2. Delete housing listings
-      final housing = await _firestore.collection('housing_listings')
-          .where('plugId', isEqualTo: uid).get();
-      for (var doc in housing.docs) {
-        batch.delete(doc.reference);
-      }
-
-      // 3. Delete academic notes
-      final notes = await _firestore.collection('notes')
-          .where('authorId', isEqualTo: uid).get();
-      for (var doc in notes.docs) {
-        batch.delete(doc.reference);
-      }
-
-      // 4. Delete feed items (Community, Gigs, Confessions)
-      final feedItems = await _firestore.collection('feed')
-          .where('authorId', isEqualTo: uid).get();
-      for (var doc in feedItems.docs) {
-        batch.delete(doc.reference);
-      }
-
-      // 5. Delete gig applications
-      final applications = await _firestore.collection('gig_applications')
-          .where('freelancerId', isEqualTo: uid).get();
-      for (var doc in applications.docs) {
-        batch.delete(doc.reference);
-      }
-      final employerApps = await _firestore.collection('gig_applications')
-          .where('employerId', isEqualTo: uid).get();
-      for (var doc in employerApps.docs) {
-        batch.delete(doc.reference);
-      }
-
-      // 6. Delete verification records (Sensitive IDs)
-      batch.delete(_firestore.collection('student_verifications').doc(uid));
-      batch.delete(_firestore.collection('identity_verifications').doc(uid));
-      
-      final verApps = await _firestore.collection('verification_applications')
-          .where('userId', isEqualTo: uid).get();
-      for (var doc in verApps.docs) {
-        batch.delete(doc.reference);
-      }
-
-      // 7. Delete notifications
-      final notifications = await _firestore.collection('users').doc(uid).collection('notifications').get();
-      for (var doc in notifications.docs) {
-        batch.delete(doc.reference);
-      }
-
-      // 8. Delete user profile
-      batch.delete(_firestore.collection('users').doc(uid));
-      
-      await batch.commit();
-      
-      // 9. Delete the user from Firebase Auth
+      // 1. Try to delete Auth user first to catch 'requires-recent-login'
       await user.delete();
+      AppLogger.info('Auth: Firebase Auth user deleted successfully', 'AUTH');
+      
+      // 2. Proceed with Firestore cleanup (Best effort on client)
+      await _performCleanup(uid);
+      
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        AppLogger.warning('Auth: Delete account failed: Requires recent login', 'AUTH');
+        throw Exception('This operation is sensitive and requires recent authentication. Please sign in again.');
+      }
+      AppLogger.error('Auth: Delete account FirebaseAuthException', e, null, 'AUTH');
+      throw _handleAuthException(e);
+    } catch (e) {
+      AppLogger.error('Auth: General error during account deletion', e, null, 'AUTH');
+      rethrow;
+    }
+  }
+
+  Future<void> _performCleanup(String uid) async {
+    try {
+      // We process collections sequentially to avoid massive memory spikes
+      final collections = [
+        'listings', 'housing_listings', 'notes', 'feed', 'gig_applications', 
+        'verification_applications', 'student_verifications', 'identity_verifications'
+      ];
+
+      for (var coll in collections) {
+        String queryField = 'authorId';
+        if (coll == 'listings') queryField = 'sellerId';
+        if (coll == 'housing_listings') queryField = 'plugId';
+        if (coll == 'gig_applications') queryField = 'freelancerId';
+        if (coll == 'verification_applications') queryField = 'userId';
+        
+        if (coll == 'student_verifications' || coll == 'identity_verifications') {
+          await _firestore.collection(coll).doc(uid).delete().catchError((_) => null);
+          continue;
+        }
+
+        final snapshots = await _firestore.collection(coll)
+            .where(queryField, isEqualTo: uid)
+            .limit(100) // Process in chunks to avoid batch limits
+            .get();
+
+        if (snapshots.docs.isNotEmpty) {
+          final batch = _firestore.batch();
+          for (var doc in snapshots.docs) {
+            batch.delete(doc.reference);
+          }
+          await batch.commit().catchError((_) => null);
+        }
+      }
+
+      // Delete user notifications subcollection and user document
+      final notifications = await _firestore.collection('users').doc(uid).collection('notifications').limit(50).get();
+      if (notifications.docs.isNotEmpty) {
+        final batch = _firestore.batch();
+        for (var doc in notifications.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit().catchError((_) => null);
+      }
+
+      await _firestore.collection('users').doc(uid).delete().catchError((_) => null);
+      AppLogger.info('Auth: Best-effort Firestore cleanup completed for $uid', 'AUTH');
+    } catch (e) {
+      AppLogger.warning('Auth: Firestore cleanup encountered errors: $e', 'AUTH');
     }
   }
 
@@ -373,7 +419,6 @@ class AuthRepositoryImpl implements AuthRepository {
   }) async {
     final batch = _firestore.batch();
     
-    // 1. Add review doc
     final reviewRef = _firestore.collection('users').doc(targetUid).collection('reviews').doc();
     batch.set(reviewRef, {
       'reviewerId': reviewerId,
@@ -384,7 +429,6 @@ class AuthRepositoryImpl implements AuthRepository {
       'createdAt': FieldValue.serverTimestamp(),
     });
     
-    // 2. Update target user stats
     final userRef = _firestore.collection('users').doc(targetUid);
     final userDoc = await userRef.get();
     final currentAvg = (userDoc.data()?['averageRating'] ?? 0.0).toDouble();
@@ -396,7 +440,6 @@ class AuthRepositoryImpl implements AuthRepository {
     batch.update(userRef, {
       'averageRating': newAvg,
       'ratingsCount': newCount,
-      // Increase trust score for getting a review
       'trustScore': FieldValue.increment(rating >= 4 ? 2.0 : -1.0),
     });
 
@@ -404,7 +447,7 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   Exception _handleAuthException(FirebaseAuthException e) {
-    debugPrint('🛑 Auth Error Code: ${e.code}');
+    AppLogger.warning('🛑 Auth Error Code: ${e.code}', 'AUTH');
     switch (e.code) {
       case 'user-not-found':
       case 'user-disabled':
@@ -427,3 +470,4 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 }
+

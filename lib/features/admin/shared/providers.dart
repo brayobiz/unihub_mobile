@@ -13,10 +13,30 @@ import '../../../../services/notification_service.dart';
 import '../data/repositories/system_settings_repository.dart';
 import '../domain/models/system_settings.dart';
 
+import 'package:unihub_mobile/features/shared/data/services/platform_event_service.dart';
+import '../domain/services/admin_service.dart';
+import '../../trust/domain/services/trust_engine.dart';
+import '../../announcements/shared/providers.dart';
+import '../../events/domain/models/event.dart';
+
+final platformEventServiceProvider = Provider<PlatformEventService>((ref) {
+  final firestore = ref.watch(firestoreProvider);
+  final notificationSender = ref.watch(notificationServiceProvider);
+  return PlatformEventService(firestore, notificationSender);
+});
+
 final adminRepositoryProvider = Provider<AdminRepository>((ref) {
   final firestore = ref.watch(firestoreProvider);
-  final notificationService = ref.watch(notificationServiceProvider);
-  return AdminRepository(firestore, notificationService);
+  return AdminRepository(firestore);
+});
+
+final adminServiceProvider = Provider<AdminService>((ref) {
+  final repository = ref.watch(adminRepositoryProvider);
+  final settingsRepo = ref.watch(systemSettingsRepositoryProvider);
+  final announcementRepo = ref.watch(announcementRepositoryProvider);
+  final eventService = ref.watch(platformEventServiceProvider);
+  final firestore = ref.watch(firestoreProvider);
+  return AdminService(repository, settingsRepo, announcementRepo, eventService, firestore);
 });
 
 final systemSettingsRepositoryProvider = Provider<SystemSettingsRepository>((ref) {
@@ -24,32 +44,32 @@ final systemSettingsRepositoryProvider = Provider<SystemSettingsRepository>((ref
   return SystemSettingsRepository(firestore);
 });
 
-final systemSettingsProvider = StreamProvider<SystemSettings>((ref) {
+final systemSettingsProvider = StreamProvider.autoDispose<SystemSettings>((ref) {
   final repository = ref.watch(systemSettingsRepositoryProvider);
   return repository.watchSettings();
 });
 
-final adminStatsProvider = StreamProvider<AdminStats>((ref) {
+final adminStatsProvider = StreamProvider.autoDispose<AdminStats>((ref) {
   final repository = ref.watch(adminRepositoryProvider);
   return repository.watchStats();
 });
 
-final verificationRequestsProvider = StreamProvider.family<List<AdminVerificationRequest>, ({AdminVerificationStatus? status, AdminVerificationType? type})>((ref, filters) {
+final verificationRequestsProvider = StreamProvider.autoDispose.family<List<AdminVerificationRequest>, ({AdminVerificationStatus? status, AdminVerificationType? type})>((ref, filters) {
   final repository = ref.watch(adminRepositoryProvider);
   return repository.watchVerificationRequests(status: filters.status, type: filters.type);
 });
 
-final adminReportsProvider = StreamProvider.family<List<AdminReport>, ({ReportStatus? status, ReportType? type})>((ref, filters) {
+final adminReportsProvider = StreamProvider.autoDispose.family<List<AdminReport>, ({ReportStatus? status, ReportType? type})>((ref, filters) {
   final repository = ref.watch(adminRepositoryProvider);
   return repository.watchReports(status: filters.status, type: filters.type);
 });
 
-final moderatedContentProvider = StreamProvider.family<List<ModeratedContent>, ({ContentType type, String? status})>((ref, filters) {
+final moderatedContentProvider = StreamProvider.autoDispose.family<List<ModeratedContent>, ({ContentType type, String? status})>((ref, filters) {
   final repository = ref.watch(adminRepositoryProvider);
   return repository.watchContent(filters.type, status: filters.status);
 });
 
-final adminUsersProvider = StreamProvider.family<List<AppUser>, ({String? search, bool? isBanned, bool? isSuspended, bool? isVerified, String? role, String? university, String? sortBy, bool descending, DateTime? startDate, DateTime? endDate})>((ref, filters) {
+final adminUsersProvider = StreamProvider.autoDispose.family<List<AppUser>, ({String? search, bool? isBanned, bool? isSuspended, bool? isVerified, String? role, String? university, String? sortBy, bool descending, DateTime? startDate, DateTime? endDate})>((ref, filters) {
   final repository = ref.watch(adminRepositoryProvider);
   return repository.watchUsers(
     searchQuery: filters.search,
@@ -65,12 +85,12 @@ final adminUsersProvider = StreamProvider.family<List<AppUser>, ({String? search
   );
 });
 
-final adminAuditLogsProvider = StreamProvider.family<List<AdminAuditLog>, int>((ref, limit) {
+final adminAuditLogsProvider = StreamProvider.autoDispose.family<List<AdminAuditLog>, int>((ref, limit) {
   final repository = ref.watch(adminRepositoryProvider);
   return repository.watchAuditLogs(limit: limit);
 });
 
-final supportConversationsProvider = StreamProvider.family<List<Conversation>, ({String? status, String? priority, String? assignedAdminId, String? search})>((ref, filters) {
+final supportConversationsProvider = StreamProvider.autoDispose.family<List<Conversation>, ({String? status, String? priority, String? assignedAdminId, String? search})>((ref, filters) {
   final repository = ref.watch(adminRepositoryProvider);
   return repository.watchSupportConversations(
     status: filters.status,
@@ -80,7 +100,15 @@ final supportConversationsProvider = StreamProvider.family<List<Conversation>, (
   );
 });
 
-final supportStatsProvider = FutureProvider<Map<String, dynamic>>((ref) {
+final supportStatsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
   final repository = ref.watch(adminRepositoryProvider);
   return repository.getSupportStats();
 });
+
+// Event Approval Providers
+final pendingEventsProvider = StreamProvider.autoDispose.family<List<Event>, String?>((ref, campusId) {
+  final repository = ref.watch(adminRepositoryProvider);
+  return repository.watchSubmittedEvents(campusId: campusId);
+});
+
+

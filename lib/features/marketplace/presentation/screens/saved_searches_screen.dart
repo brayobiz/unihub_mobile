@@ -175,7 +175,7 @@ class _SavedSearchCard extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Saved Search?'),
+        title: const Text('Delete Saved Search'),
         content: const Text('You will no longer receive notifications for this search.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),

@@ -9,6 +9,8 @@ class AdminStats {
   final int resolvedReports;
   final int openSupportTickets;
   final int activeAnnouncements;
+  final int totalEvents;
+  final int pendingEventApprovals;
 
   AdminStats({
     required this.totalUsers,
@@ -21,6 +23,8 @@ class AdminStats {
     this.resolvedReports = 0,
     this.openSupportTickets = 0,
     this.activeAnnouncements = 0,
+    this.totalEvents = 0,
+    this.pendingEventApprovals = 0,
   });
 
   factory AdminStats.empty() => AdminStats(
@@ -34,5 +38,7 @@ class AdminStats {
     resolvedReports: 0,
     openSupportTickets: 0,
     activeAnnouncements: 0,
+    totalEvents: 0,
+    pendingEventApprovals: 0,
   );
 }

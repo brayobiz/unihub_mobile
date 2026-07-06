@@ -1,4 +1,4 @@
-enum AdminVerificationType { identity, student, professional }
+enum AdminVerificationType { identity, student, professional, organizer }
 
 enum AdminVerificationStatus { pending, underReview, approved, rejected, resubmissionRequested }
 

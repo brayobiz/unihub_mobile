@@ -9,6 +9,11 @@ import 'package:unihub_mobile/core/utils/category_utils.dart';
 import 'package:unihub_mobile/features/campus_filter/presentation/widgets/campus_filter_selector.dart';
 import 'package:unihub_mobile/features/campus_filter/shared/providers.dart';
 import 'package:unihub_mobile/features/campus_filter/domain/models/browsing_scope.dart';
+import '../housing/domain/models/roommate_profile.dart';
+import '../housing/domain/models/housing_listing.dart';
+import '../notes/domain/models/note.dart';
+import '../marketplace/domain/models/listing.dart';
+import 'feed_repository.dart';
 
 class GlobalSearchScreen extends ConsumerStatefulWidget {
   const GlobalSearchScreen({super.key});
@@ -227,13 +232,27 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
 
   void _handleItemTap(BuildContext context, SmartFeedItem item) {
     if (item.model.type == FeedType.housing) {
-      context.push('/housing-detail', extra: item.originalData);
+      if (item.originalData is RoommateProfile) {
+        context.push('/roommates');
+      } else if (item.originalData is HousingListing) {
+        final h = item.originalData as HousingListing;
+        context.push('/housing-detail/${h.id}', extra: h);
+      }
     } else if (item.model.type == FeedType.notes) {
-      context.push('/note-detail', extra: item.originalData);
+      if (item.originalData is NoteListing) {
+        final n = item.originalData as NoteListing;
+        context.push('/note-detail/${n.id}', extra: n);
+      }
     } else if (item.model.type == FeedType.marketplace) {
-      context.push('/listing-detail', extra: item.originalData);
+      if (item.originalData is Listing) {
+        final l = item.originalData as Listing;
+        context.push('/listing-detail/${l.id}', extra: l);
+      }
     } else if (item.model.type == FeedType.gig) {
-      context.push('/gig-detail', extra: item.originalData);
+      if (item.originalData is FeedItem) {
+        final g = item.originalData as FeedItem;
+        context.push('/gig-detail/${g.id}', extra: g);
+      }
     }
   }
 }
@@ -307,7 +326,7 @@ class _SearchCategoryRow extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: theme.colorScheme.surface,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
             ),
             child: Icon(icon, color: color, size: 24),

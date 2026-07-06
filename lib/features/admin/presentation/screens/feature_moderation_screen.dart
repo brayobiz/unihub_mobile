@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../../../../app/theme/app_colors.dart';
@@ -54,12 +55,16 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
 
     if (confirmed != true) return;
 
+    if (!mounted) return;
+    
     setState(() => _isBulkProcessing = true);
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
       final admin = ref.read(appUserProvider).valueOrNull;
       if (admin == null) throw Exception('Admin session not found');
 
-      await ref.read(adminRepositoryProvider).bulkUpdateContentStatus(
+      await ref.read(adminServiceProvider).bulkUpdateContentStatus(
         contentIds: selectedItems.map((i) => i.id).toList(),
         type: widget.contentType,
         newStatus: newStatus,
@@ -67,17 +72,18 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
         adminName: admin.fullName,
       );
       
-      setState(() {
-        _selectedIds.clear();
-        _isBulkProcessing = false;
-      });
-      
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bulk update completed successfully')));
+        setState(() {
+          _selectedIds.clear();
+          _isBulkProcessing = false;
+        });
+        messenger.showSnackBar(const SnackBar(content: Text('Bulk update completed successfully')));
       }
     } catch (e) {
-      setState(() => _isBulkProcessing = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) {
+        setState(() => _isBulkProcessing = false);
+        messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 
@@ -127,6 +133,8 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
       statuses = ['active', 'sold', 'paused', 'expired', 'archived', 'removed'];
     } else if (widget.contentType == ContentType.housing) {
       statuses = ['available', 'taken', 'pendingReview', 'reported', 'archived', 'removed'];
+    } else if (widget.contentType == ContentType.events) {
+      statuses = ['submitted', 'approved', 'scheduled', 'live', 'ended', 'archived', 'removed'];
     }
 
     return Container(
@@ -289,6 +297,7 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
       case ContentType.marketplace: icon = Icons.shopping_bag; break;
       case ContentType.housing: icon = Icons.home; break;
       case ContentType.notes: icon = Icons.description; break;
+      case ContentType.events: icon = Icons.event; break;
     }
     return Container(
       width: 60, height: 60,
@@ -299,9 +308,10 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
 
   Widget _buildStatusChip(String status) {
     Color color = AppColors.primary;
-    if (status == 'removed') color = AppColors.error;
-    if (status == 'active' || status == 'available') color = AppColors.success;
-    if (status == 'sold' || status == 'taken') color = AppColors.grey600;
+    if (status == 'removed' || status == 'suspended') color = AppColors.error;
+    if (status == 'active' || status == 'available' || status == 'approved' || status == 'live') color = AppColors.success;
+    if (status == 'submitted' || status == 'pendingReview') color = AppColors.warning;
+    if (status == 'sold' || status == 'taken' || status == 'ended') color = AppColors.grey600;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -321,11 +331,27 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
               leading: const Icon(Icons.visibility),
               title: const Text('View Full Details'),
               onTap: () {
-                // TODO: Navigate to the actual detail screen of the feature
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Detail view navigation coming in future update')));
+                if (widget.contentType == ContentType.events) {
+                  context.push('/events/${item.id}');
+                } else if (widget.contentType == ContentType.marketplace) {
+                  context.push('/listing-detail/${item.id}');
+                } else if (widget.contentType == ContentType.housing) {
+                  context.push('/housing-detail/${item.id}');
+                } else if (widget.contentType == ContentType.notes) {
+                  context.push('/note-detail/${item.id}');
+                }
               },
             ),
+            if (widget.contentType == ContentType.events && item.status == 'submitted')
+              ListTile(
+                leading: const Icon(Icons.check_circle_outline, color: AppColors.success),
+                title: const Text('Approve Event', style: TextStyle(color: AppColors.success)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmAction('approved', item);
+                },
+              ),
             if (item.status != 'removed')
               ListTile(
                 leading: const Icon(Icons.delete, color: AppColors.error),
@@ -376,19 +402,26 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
     );
 
     if (confirmed == true) {
+      if (!mounted) return;
+
       try {
         final admin = ref.read(appUserProvider).valueOrNull;
         if (admin == null) throw Exception('Admin session not found');
+        final messenger = ScaffoldMessenger.of(context);
 
-        await ref.read(adminRepositoryProvider).updateContentStatus(
+        await ref.read(adminServiceProvider).updateContentStatus(
           widget.contentType,
           item.id,
-          newStatus == 'remove' ? 'removed' : (widget.contentType == ContentType.housing ? 'available' : 'active'),
+          newStatus == 'remove' 
+              ? 'removed' 
+              : (newStatus == 'active' 
+                  ? (widget.contentType == ContentType.housing ? 'available' : 'active')
+                  : newStatus),
           adminId: admin.uid,
           adminName: admin.fullName,
         );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Status updated successfully')));
+          messenger.showSnackBar(SnackBar(content: Text('Status updated successfully')));
         }
       } catch (e) {
         if (mounted) {

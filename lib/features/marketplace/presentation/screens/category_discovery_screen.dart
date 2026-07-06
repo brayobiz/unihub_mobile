@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../domain/models/listing.dart';
 import '../../domain/repositories/marketplace_repository.dart';
 import '../../shared/providers.dart';
 import '../../domain/models/listing_filter.dart';
 import '../widgets/marketplace_card.dart';
-import '../../../auth/shared/providers.dart';
 import '../../../../widgets/skeleton_loader.dart';
 
 class CategoryDiscoveryScreen extends ConsumerWidget {
@@ -95,7 +92,7 @@ class CategoryDiscoveryScreen extends ConsumerWidget {
   Widget _buildSection(
     BuildContext context, {
     required String title,
-    required StreamProvider<List<Listing>> provider,
+    required ProviderListenable<AsyncValue<List<Listing>>> provider,
   }) {
     final theme = Theme.of(context);
     return Consumer(
@@ -139,7 +136,7 @@ class CategoryDiscoveryScreen extends ConsumerWidget {
               ],
             );
           },
-          loading: () => SkeletonLoader(width: double.infinity, height: 200, color: theme.colorScheme.surfaceVariant),
+          loading: () => SkeletonLoader(width: double.infinity, height: 200, color: theme.colorScheme.surfaceContainerHighest),
           error: (_, __) => const SizedBox.shrink(),
         );
       },

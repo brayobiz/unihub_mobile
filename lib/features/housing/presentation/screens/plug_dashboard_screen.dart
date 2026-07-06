@@ -7,6 +7,7 @@ import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/housing/shared/providers.dart';
 import 'package:unihub_mobile/features/housing/domain/models/housing_listing.dart';
+import 'package:unihub_mobile/features/housing/domain/models/viewing_request.dart';
 import 'package:unihub_mobile/features/trust/domain/models/professional_role.dart';
 import 'package:unihub_mobile/features/trust/domain/models/verification_application.dart';
 import 'package:unihub_mobile/features/trust/presentation/providers/trust_providers.dart';
@@ -64,6 +65,8 @@ class PlugDashboardScreen extends ConsumerWidget {
           children: [
             _buildProfileSummary(context, user),
             const SizedBox(height: 16),
+            _buildViewingRequestsCard(context, ref, user.uid),
+            const SizedBox(height: 16),
             applicationAsync.when(
               data: (application) => _buildVerificationStatusCard(context, user, application),
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -72,6 +75,14 @@ class PlugDashboardScreen extends ConsumerWidget {
             const SizedBox(height: 24),
             _buildOpportunityCTA(context),
             const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Performance Overview', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                _buildBulkRefreshButton(context, listingsAsync, ref),
+              ],
+            ),
+            const SizedBox(height: 16),
             _buildStatsSection(context, listingsAsync),
             const SizedBox(height: 32),
             Row(
@@ -90,6 +101,52 @@ class PlugDashboardScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildViewingRequestsCard(BuildContext context, WidgetRef ref, String plugId) {
+    final requestsAsync = ref.watch(plugViewingRequestsProvider(plugId));
+    final theme = Theme.of(context);
+
+    return requestsAsync.when(
+      data: (requests) {
+        final pending = requests.where((r) => r.status == ViewingRequestStatus.pending).length;
+        if (pending == 0) return const SizedBox.shrink();
+
+        return GestureDetector(
+          onTap: () => context.push('/viewing-requests'),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(color: AppColors.warning, shape: BoxShape.circle),
+                  child: const Icon(Icons.calendar_today_rounded, color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('$pending Pending Viewing Requests', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      Text('Schedule visits with potential tenants', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: AppColors.warning),
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 
@@ -359,7 +416,7 @@ class PlugDashboardScreen extends ConsumerWidget {
     if (application == null) return const SizedBox.shrink();
 
     return switch (application.status) {
-      VerificationStatus.pending => Container(
+      VerificationStatus.pending || VerificationStatus.underReview => Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
@@ -368,16 +425,29 @@ class PlugDashboardScreen extends ConsumerWidget {
           ),
           child: Row(
             children: [
-              Icon(Icons.hourglass_top_rounded, color: theme.colorScheme.onSurfaceVariant, size: 28),
+              Icon(
+                application.status == VerificationStatus.underReview 
+                  ? Icons.rate_review_rounded 
+                  : Icons.hourglass_top_rounded, 
+                color: theme.colorScheme.onSurfaceVariant, 
+                size: 28
+              ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Trust Review Pending', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: theme.colorScheme.onSurface)),
+                    Text(
+                      application.status == VerificationStatus.underReview 
+                        ? 'Actively Reviewing' 
+                        : 'Trust Review Pending', 
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: theme.colorScheme.onSurface)
+                    ),
                     const SizedBox(height: 4),
                     Text(
-                      'The platform Trust Engine is reviewing your application. Role activation follows identity confirmation.',
+                      application.status == VerificationStatus.underReview
+                        ? 'An administrator is currently reviewing your documents. This usually takes less than 12 hours.'
+                        : 'The platform Trust Engine is reviewing your application. Role activation follows identity confirmation.',
                       style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, height: 1.4),
                     ),
                   ],
@@ -477,6 +547,34 @@ class PlugDashboardScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildBulkRefreshButton(BuildContext context, AsyncValue<List<HousingListing>> listingsAsync, WidgetRef ref) {
+    final theme = Theme.of(context);
+    return listingsAsync.when(
+      data: (listings) {
+        final availableCount = listings.where((l) => l.status == HousingStatus.available).length;
+        if (availableCount < 2) return const SizedBox.shrink();
+        
+        return TextButton.icon(
+          onPressed: () async {
+            final available = listings.where((l) => l.status == HousingStatus.available).toList();
+            for (var l in available) {
+              await ref.read(housingRepositoryProvider).refreshListingStatus(l.id);
+            }
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Refreshed $availableCount listings! They are now "Verified Today".'))
+              );
+            }
+          },
+          icon: const Icon(Icons.bolt_rounded, size: 18, color: Colors.amber),
+          label: Text('Verify All', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
   Widget _buildStatsSection(BuildContext context, AsyncValue<List<HousingListing>> listingsAsync) {
     final theme = Theme.of(context);
     return listingsAsync.when(
@@ -484,14 +582,19 @@ class PlugDashboardScreen extends ConsumerWidget {
         final active = listings.where((l) => l.status == HousingStatus.available).length;
         final views = listings.fold(0, (sum, l) => sum + l.views);
         final saves = listings.fold(0, (sum, l) => sum + l.saves);
+        final chats = listings.fold(0, (sum, l) => sum + l.chatCount);
 
-        return Row(
+        return Column(
           children: [
-            _buildStatCard(context, 'Active', active.toString(), theme.colorScheme.primary),
-            const SizedBox(width: 12),
-            _buildStatCard(context, 'Total Views', views.toString(), theme.colorScheme.secondary),
-            const SizedBox(width: 12),
-            _buildStatCard(context, 'Saves', saves.toString(), AppColors.warning),
+            Row(
+              children: [
+                _buildStatCard(context, 'Active', active.toString(), theme.colorScheme.primary),
+                const SizedBox(width: 12),
+                _buildStatCard(context, 'Total Views', views.toString(), theme.colorScheme.secondary),
+                const SizedBox(width: 12),
+                _buildStatCard(context, 'Chats', chats.toString(), AppColors.success),
+              ],
+            ),
           ],
         );
       },
@@ -609,13 +712,15 @@ class PlugDashboardScreen extends ConsumerWidget {
                   children: [
                     _buildSmallBadge(statusLabel, statusColor),
                     const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Updated ${_formatTimeAgo(listing.updatedAt)}', 
-                        style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), fontWeight: FontWeight.w500),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    _buildListingMetric(Icons.visibility_outlined, listing.views.toString()),
+                    const SizedBox(width: 8),
+                    _buildListingMetric(Icons.favorite_border_rounded, listing.saves.toString()),
+                    const SizedBox(width: 8),
+                    _buildListingMetric(Icons.chat_bubble_outline_rounded, listing.chatCount.toString()),
+                    const Spacer(),
+                    Text(
+                      'Upd. ${_formatTimeAgo(listing.updatedAt)}', 
+                      style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
@@ -625,7 +730,10 @@ class PlugDashboardScreen extends ConsumerWidget {
           PopupMenuButton<String>(
             color: theme.colorScheme.surface,
             onSelected: (val) {
-              if (val == 'status_available') {
+              if (val == 'refresh') {
+                ref.read(housingRepositoryProvider).refreshListingStatus(listing.id);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Listing availability verified!')));
+              } else if (val == 'status_available') {
                 ref.read(housingRepositoryProvider).updateListingStatus(listing.id, HousingStatus.available);
               } else if (val == 'status_taken') {
                 ref.read(housingRepositoryProvider).updateListingStatus(listing.id, HousingStatus.taken);
@@ -638,6 +746,13 @@ class PlugDashboardScreen extends ConsumerWidget {
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(value: 'refresh', child: Row(
+                children: [
+                  Icon(Icons.auto_awesome, color: AppColors.success, size: 18),
+                  SizedBox(width: 8),
+                  Text('Verify Availability'),
+                ],
+              )),
               if (listing.status != HousingStatus.available)
                 const PopupMenuItem(value: 'status_available', child: Text('Mark as Available')),
               if (listing.status != HousingStatus.taken)
@@ -679,6 +794,16 @@ class PlugDashboardScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildListingMetric(IconData icon, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 12, color: Colors.grey),
+        const SizedBox(width: 2),
+        Text(value, style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+      ],
     );
   }
 

@@ -18,9 +18,12 @@ class NotesRepositoryImpl implements NotesRepository {
     String? query,
     int? limit,
   }) {
-    debugPrint('📖 Firestore: Watching notes. Category: $subjectCategory, Type: $noteType, Global Campus: $_browsingCampus');
+    if (kDebugMode) {
+      debugPrint('📖 Firestore: Watching notes. Category: $subjectCategory, Type: $noteType, Global Campus: $_browsingCampus');
+    }
     
-    Query queryRef = _firestore.collection('notes');
+    Query queryRef = _firestore.collection('notes')
+        .where('status', isEqualTo: 'active');
 
     if (subjectCategory != null && subjectCategory != 'All') {
       queryRef = queryRef.where('subjectCategory', isEqualTo: subjectCategory);
@@ -39,7 +42,9 @@ class NotesRepositoryImpl implements NotesRepository {
     // Sorting will be done in-memory below.
 
     return queryRef.snapshots().map((snapshot) {
-      debugPrint('📖 Firestore: Received notes snapshot with ${snapshot.docs.length} docs');
+      if (kDebugMode) {
+        debugPrint('📖 Firestore: Received notes snapshot with ${snapshot.docs.length} docs');
+      }
       var items = snapshot.docs
           .map((doc) => NoteListing.fromJson(doc.data() as Map<String, dynamic>))
           .toList();
@@ -77,6 +82,7 @@ class NotesRepositoryImpl implements NotesRepository {
     NoteListing? startAfter,
   }) async {
     Query queryRef = _firestore.collection('notes')
+        .where('status', isEqualTo: 'active')
         .orderBy('createdAt', descending: true);
 
     if (_browsingCampus != null && _browsingCampus!.isNotEmpty) {
@@ -97,7 +103,9 @@ class NotesRepositoryImpl implements NotesRepository {
   @override
   Future<void> createNote(NoteListing note) async {
     if (note.id.isEmpty) throw Exception('Note ID cannot be empty');
-    debugPrint('📝 Firestore: Processing note ${note.id}');
+    if (kDebugMode) {
+      debugPrint('📝 Firestore: Processing note ${note.id}');
+    }
     
     final noteRef = _firestore.collection('notes').doc(note.id);
     final doc = await noteRef.get();
@@ -119,9 +127,13 @@ class NotesRepositoryImpl implements NotesRepository {
 
     try {
       await batch.commit();
-      debugPrint('✅ Firestore: Note ${isNew ? 'created' : 'updated'} successfully');
+      if (kDebugMode) {
+        debugPrint('✅ Firestore: Note ${isNew ? 'created' : 'updated'} successfully');
+      }
     } catch (e) {
-      debugPrint('❌ Firestore: Failed to process note: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Firestore: Failed to process note: $e');
+      }
       rethrow;
     }
   }
@@ -159,6 +171,22 @@ class NotesRepositoryImpl implements NotesRepository {
           items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           return items;
         });
+  }
+
+  @override
+  Future<void> reportNote({
+    required String noteId,
+    required String reporterId,
+    required String reason,
+  }) async {
+    await _firestore.collection('reports').add({
+      'type': 'note',
+      'targetId': noteId,
+      'reporterId': reporterId,
+      'reason': reason,
+      'createdAt': FieldValue.serverTimestamp(),
+      'status': 'pending',
+    });
   }
 
   @override
@@ -230,5 +258,83 @@ class NotesRepositoryImpl implements NotesRepository {
           items.sort((a, b) => b.lastAccessed.compareTo(a.lastAccessed));
           return items;
         });
+  }
+
+  @override
+  Future<void> flagNote({
+    required String noteId,
+    required String reason,
+    String? adminNotes,
+  }) async {
+    await _firestore.collection('notes').doc(noteId).update({
+      'flagged': true,
+      'flagReason': reason,
+      'flagAdminNotes': adminNotes,
+      'flaggedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  @override
+  Future<void> approveNote(String noteId) async {
+    final noteDoc = await _firestore.collection('notes').doc(noteId).get();
+    if (!noteDoc.exists) return;
+
+    await _firestore.collection('notes').doc(noteId).update({
+      'status': 'active',
+      'flagged': false,
+      'approvedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  @override
+  Future<void> suspendNote({
+    required String noteId,
+    required String reason,
+    required String adminId,
+  }) async {
+    final noteDoc = await _firestore.collection('notes').doc(noteId).get();
+    if (!noteDoc.exists) return;
+
+    await _firestore.collection('notes').doc(noteId).update({
+      'status': 'suspended',
+      'suspensionReason': reason,
+      'suspendedBy': adminId,
+      'suspendedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  @override
+  Future<void> removeNote({
+    required String noteId,
+    required String reason,
+    required String adminId,
+  }) async {
+    final noteDoc = await _firestore.collection('notes').doc(noteId).get();
+    if (!noteDoc.exists) return;
+
+    await _firestore.collection('notes').doc(noteId).update({
+      'status': 'removed',
+      'removalReason': reason,
+      'removedBy': adminId,
+      'removedAt': FieldValue.serverTimestamp(),
+    });
+
+    final authorId = noteDoc.data()?['authorId'];
+    if (authorId != null && (authorId as String).isNotEmpty) {
+      await _firestore.collection('users').doc(authorId).update({
+        'resourcesSharedCount': FieldValue.increment(-1),
+      });
+    }
+  }
+
+  @override
+  Stream<List<NoteListing>> watchFlaggedNotes(String campusId) {
+    return _firestore
+        .collection('notes')
+        .where('flagged', isEqualTo: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => NoteListing.fromJson(doc.data() as Map<String, dynamic>))
+            .toList());
   }
 }

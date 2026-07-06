@@ -47,9 +47,12 @@ final appUserProvider = StreamProvider<AppUser?>((ref) {
   });
 });
 
-final userByIdProvider = StreamProvider.family<AppUser?, String>((ref, uid) {
+final userByIdProvider = StreamProvider.autoDispose.family<AppUser?, String>((ref, uid) {
   return ref.watch(authRepositoryProvider).watchUser(uid);
 });
+
+// To track if account was just deleted to show farewell screen
+final accountDeletedProvider = StateProvider<bool>((ref) => false);
 
 // To track if the device has seen the initial introduction
 final deviceOnboardingCompletedProvider = StateProvider<bool>((ref) {

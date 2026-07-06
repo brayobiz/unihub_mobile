@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
@@ -36,7 +37,9 @@ class RelevantAnnouncementsWidget extends ConsumerWidget {
       },
       loading: () => const SizedBox.shrink(),
       error: (err, stack) {
-        debugPrint('📣 Announcement System Error: $err');
+        if (kDebugMode) {
+          debugPrint('📣 Announcement System Error: $err');
+        }
         return const SizedBox.shrink();
       },
     );

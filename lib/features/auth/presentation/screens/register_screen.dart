@@ -106,7 +106,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Join the campus marketplace',
+              'Join the campus ecosystem',
               style: TextStyle(
                 fontSize: 16,
                 color: theme.colorScheme.onSurfaceVariant,
@@ -201,19 +201,36 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                     ),
                   ),
+                  const SizedBox(height: 4),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      TextButton(
-                        onPressed: () => _launchUrl('https://unihub-3663e.web.app/terms'),
-                        style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                        child: Text('Terms of Service', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+                      Semantics(
+                        button: true,
+                        label: 'Terms of Service',
+                        child: TextButton(
+                          onPressed: () => _launchUrl('https://unihub-3663e.web.app/terms'),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            minimumSize: const Size(0, 32),
+                            tapTargetSize: MaterialTapTargetSize.padded,
+                          ),
+                          child: Text('Terms of Service', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+                        ),
                       ),
                       Text(' and ', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7))),
-                      TextButton(
-                        onPressed: () => _launchUrl('https://unihub-3663e.web.app/privacy'),
-                        style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                        child: Text('Privacy Policy', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+                      Semantics(
+                        button: true,
+                        label: 'Privacy Policy',
+                        child: TextButton(
+                          onPressed: () => _launchUrl('https://unihub-3663e.web.app/privacy'),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            minimumSize: const Size(0, 32),
+                            tapTargetSize: MaterialTapTargetSize.padded,
+                          ),
+                          child: Text('Privacy Policy', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+                        ),
                       ),
                     ],
                   ),

@@ -17,6 +17,7 @@ abstract class MarketplaceRepository {
     ListingSortType? sortBy,
     ListingStatus? status,
     Map<String, dynamic>? categoryAttributes,
+    Listing? startAfter,
   });
   
   Stream<List<Listing>> watchSellerListings(String sellerId);
@@ -60,7 +61,19 @@ abstract class MarketplaceRepository {
   Future<SellerStats> getSellerStats(String userId);
   Stream<List<Listing>> watchSellerListingsByStatus(String sellerId, ListingStatus status);
 
-  Future<List<Listing>> getListings({int limit = 20, Listing? startAfter});
+  Future<List<Listing>> getListings({
+    int limit = 20, 
+    Listing? startAfter,
+    String? category,
+    List<String>? conditions,
+    double? minPrice,
+    double? maxPrice,
+    bool? isFeatured,
+    String? searchQuery,
+    ListingSortType? sortBy,
+    ListingStatus? status,
+    Map<String, dynamic>? categoryAttributes,
+  });
   Future<Listing?> getListingById(String id);
   Stream<Listing?> watchListingById(String id);
 
@@ -89,4 +102,27 @@ abstract class MarketplaceRepository {
     required double rating,
     required String comment,
   });
+
+  // Moderation & Admin Methods
+  Future<void> flagListing({
+    required String listingId,
+    required String reason,
+    String? adminNotes,
+  });
+
+  Future<void> approveListing(String listingId);
+
+  Future<void> suspendListing({
+    required String listingId,
+    required String reason,
+    required String adminId,
+  });
+
+  Future<void> removeListing({
+    required String listingId,
+    required String reason,
+    required String adminId,
+  });
+
+  Stream<List<Listing>> watchFlaggedListings(String campusId);
 }

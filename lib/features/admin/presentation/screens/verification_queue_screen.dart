@@ -39,7 +39,7 @@ class _VerificationQueueScreenState extends ConsumerState<VerificationQueueScree
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Bulk ${status.name}'),
-        content: Text('Are you sure you want to ${status.name} ${selectedRequests.length} requests?'),
+        content: Text('Are you sure you want to ${status.name} ${selectedRequests.length} verification request(s)?\n\n${selectedRequests.map((r) => '• ${r.type.name} for ${r.userId}').take(5).join('\n')}${selectedRequests.length > 5 ? '\n... and ${selectedRequests.length - 5} more' : ''}'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm')),
@@ -50,31 +50,48 @@ class _VerificationQueueScreenState extends ConsumerState<VerificationQueueScree
     if (confirmed != true) return;
 
     setState(() => _isBulkProcessing = true);
+    final messenger = ScaffoldMessenger.of(context);
+    
     try {
       final admin = ref.read(appUserProvider).valueOrNull;
       if (admin == null) throw Exception('Admin session not found');
 
-      await ref.read(adminRepositoryProvider).bulkProcessVerifications(
+      if (selectedRequests.isEmpty) {
+        throw Exception('No requests selected for processing');
+      }
+
+      await ref.read(adminServiceProvider).bulkProcessVerifications(
         requests: selectedRequests,
         status: status,
         adminId: admin.uid,
         adminName: admin.fullName,
       );
       
-      setState(() {
-        _selectedIds.clear();
-        _isBulkProcessing = false;
-      });
-      
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Bulk ${status.name} completed successfully')),
+        setState(() {
+          _selectedIds.clear();
+          _isBulkProcessing = false;
+        });
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('✅ Bulk ${status.name} completed: ${selectedRequests.length} verification(s) processed'),
+            backgroundColor: AppColors.success,
+            duration: const Duration(seconds: 3),
+          ),
         );
+        // Refresh the provider
+        ref.refresh(verificationRequestsProvider((status: _selectedStatus, type: _selectedType)));
       }
     } catch (e) {
-      setState(() => _isBulkProcessing = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        setState(() => _isBulkProcessing = false);
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('❌ Bulk action failed: $e'),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 5),
+          ),
+        );
       }
     }
   }
@@ -254,7 +271,7 @@ class _VerificationListItem extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Flexible(
+                        Expanded(
                           child: Text(
                             _getDisplayName(),
                             style: const TextStyle(
@@ -266,7 +283,9 @@ class _VerificationListItem extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        _buildStatusChip(),
+                        Flexible(
+                          child: _buildStatusChip(),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -321,12 +340,16 @@ class _VerificationListItem extends StatelessWidget {
         icon = Icons.workspace_premium;
         color = AppColors.warning;
         break;
+      case AdminVerificationType.organizer:
+        icon = Icons.groups_rounded;
+        color = AppColors.primary;
+        break;
     }
 
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         shape: BoxShape.circle,
       ),
       child: Icon(icon, color: color, size: 24),
@@ -339,6 +362,7 @@ class _VerificationListItem extends StatelessWidget {
       case AdminVerificationType.identity: return 'Identity Verification';
       case AdminVerificationType.student: return 'Student Verification';
       case AdminVerificationType.professional: return '${request.role ?? "Professional"} App';
+      case AdminVerificationType.organizer: return 'Organizer Profile';
     }
   }
 
@@ -355,7 +379,7 @@ class _VerificationListItem extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(

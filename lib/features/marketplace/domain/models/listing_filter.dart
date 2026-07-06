@@ -51,6 +51,37 @@ class ListingFilter {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'searchQuery': searchQuery,
+      'selectedCategory': selectedCategory,
+      'selectedConditions': selectedConditions,
+      'priceRangeStart': priceRange?.start,
+      'priceRangeEnd': priceRange?.end,
+      'isFeaturedOnly': isFeaturedOnly,
+      'itemsLimit': itemsLimit,
+      'sortBy': sortBy.name,
+      'status': status.name,
+      'categoryAttributes': categoryAttributes,
+    };
+  }
+
+  factory ListingFilter.fromJson(Map<String, dynamic> json) {
+    return ListingFilter(
+      searchQuery: json['searchQuery'] ?? '',
+      selectedCategory: json['selectedCategory'],
+      selectedConditions: List<String>.from(json['selectedConditions'] ?? []),
+      priceRange: (json['priceRangeStart'] != null && json['priceRangeEnd'] != null)
+          ? RangeValues(json['priceRangeStart'], json['priceRangeEnd'])
+          : null,
+      isFeaturedOnly: json['isFeaturedOnly'] ?? false,
+      itemsLimit: json['itemsLimit'] ?? 50,
+      sortBy: ListingSortType.values.firstWhere((e) => e.name == json['sortBy'], orElse: () => ListingSortType.newest),
+      status: ListingStatus.values.firstWhere((e) => e.name == json['status'], orElse: () => ListingStatus.active),
+      categoryAttributes: Map<String, dynamic>.from(json['categoryAttributes'] ?? {}),
+    );
+  }
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||

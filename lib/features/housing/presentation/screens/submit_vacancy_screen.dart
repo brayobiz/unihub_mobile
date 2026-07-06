@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:unihub_mobile/app/theme/app_colors.dart';
+import 'package:unihub_mobile/core/widgets/creation_success_dialog.dart';
 import '../../../auth/shared/providers.dart';
 import '../../domain/models/housing_listing.dart';
 import '../../domain/models/vacancy_request.dart';
@@ -42,6 +44,39 @@ class _SubmitVacancyScreenState extends ConsumerState<SubmitVacancyScreen> {
     super.dispose();
   }
 
+  Future<void> _handleBack() async {
+    final bool isDirty = _locationController.text.isNotEmpty || 
+                        _rentController.text.isNotEmpty || 
+                        _descriptionController.text.isNotEmpty;
+    
+    if (!isDirty) {
+      context.pop();
+      return;
+    }
+
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Discard changes'),
+        content: const Text('You have unsaved changes. Are you sure you want to discard them?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep Editing'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Discard', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+
+    if (proceed == true && mounted) {
+      context.pop();
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -68,10 +103,11 @@ class _SubmitVacancyScreenState extends ConsumerState<SubmitVacancyScreen> {
       await ref.read(housingRepositoryProvider).submitVacancyRequest(request);
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Vacancy submitted! Housing Plugs will be notified.'))
+        CreationSuccessDialog.show(
+          context,
+          title: 'Vacancy Reported!',
+          message: 'Thank you! A verified Housing Plug will verify these details and list them for other students.',
         );
-        context.pop();
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -83,65 +119,108 @@ class _SubmitVacancyScreenState extends ConsumerState<SubmitVacancyScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      appBar: AppBar(
-        title: Text('Report a Vacancy', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _handleBack();
+      },
+      child: Scaffold(
         backgroundColor: theme.colorScheme.surface,
-        elevation: 0,
-        foregroundColor: theme.colorScheme.onSurface,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(context),
-              const SizedBox(height: 32),
-              _buildTypeDropdown(),
-              const SizedBox(height: 24),
-              _buildTextField(
-                controller: _locationController,
-                label: 'Location / Area',
-                hint: 'e.g. Wendani, Juja South',
-                validator: (v) => v!.isEmpty ? 'Required' : null,
-              ),
-              const SizedBox(height: 24),
-              _buildTextField(
-                controller: _rentController,
-                label: 'Expected Rent (KES)',
-                hint: 'e.g. 8000',
-                keyboardType: TextInputType.number,
-                validator: (v) {
-                  if (v == null || v.isEmpty) return 'Required';
-                  final rent = double.tryParse(v);
-                  if (rent == null || rent <= 0) return 'Invalid amount';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 24),
-              _buildTextField(
-                controller: _phoneController,
-                label: 'Your Phone Number',
-                hint: '07...',
-                keyboardType: TextInputType.phone,
-                validator: (v) => v!.isEmpty ? 'Required' : null,
-              ),
-              const SizedBox(height: 24),
-              _buildTextField(
-                controller: _descriptionController,
-                label: 'Brief Details',
-                hint: 'How many rooms? When available? Any special rules?',
-                maxLines: 3,
-              ),
-              const SizedBox(height: 40),
-              _buildSubmitButton(),
-            ],
+        appBar: AppBar(
+          title: Text('Create Vacancy', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: 18)),
+          backgroundColor: theme.colorScheme.surface,
+          elevation: 0,
+          foregroundColor: theme.colorScheme.onSurface,
+          centerTitle: true,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.colorScheme.onSurface, size: 20),
+            onPressed: _handleBack,
+          ),
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(context),
+                const SizedBox(height: 32),
+                _buildSectionHeader(context, 'Basic Details', Icons.home_work_outlined),
+                const SizedBox(height: 16),
+                _buildTypeDropdown(),
+                const SizedBox(height: 24),
+                _buildTextField(
+                  controller: _locationController,
+                  label: 'Location / Area',
+                  hint: 'e.g. Wendani, Juja South',
+                  validator: (v) => v!.isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 32),
+                _buildSectionHeader(context, 'Pricing & Contact', Icons.payments_outlined),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  controller: _rentController,
+                  label: 'Expected Rent (KES)',
+                  hint: 'e.g. 8000',
+                  keyboardType: TextInputType.number,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Required';
+                    final rent = double.tryParse(v);
+                    if (rent == null || rent <= 0) return 'Invalid amount';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+                _buildTextField(
+                  controller: _phoneController,
+                  label: 'Your Phone Number',
+                  hint: '07...',
+                  keyboardType: TextInputType.phone,
+                  validator: (v) => v!.isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 32),
+                _buildSectionHeader(context, 'Additional Info', Icons.description_outlined),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  controller: _descriptionController,
+                  label: 'Brief Details',
+                  hint: 'How many rooms? When available? Any special rules?',
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 40),
+                if (_isLoading)
+                  Column(
+                    children: [
+                      LinearProgressIndicator(color: theme.colorScheme.primary, minHeight: 6, borderRadius: BorderRadius.circular(4)),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                _buildSubmitButton(),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: theme.colorScheme.primary),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+      ],
     );
   }
 
@@ -229,11 +308,9 @@ class _SubmitVacancyScreenState extends ConsumerState<SubmitVacancyScreen> {
         onPressed: _isLoading ? null : _submit,
         style: FilledButton.styleFrom(
           backgroundColor: theme.colorScheme.primary,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
-        child: _isLoading 
-            ? const CircularProgressIndicator(color: Colors.white) 
-            : const Text('Submit Vacancy', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+        child: const Text('Create Vacancy', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       ),
     );
   }

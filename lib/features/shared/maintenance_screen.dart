@@ -50,7 +50,7 @@ class MaintenanceScreen extends ConsumerWidget {
               const SizedBox(height: 40),
               ElevatedButton(
                 onPressed: () => ref.invalidate(systemSettingsProvider),
-                child: const Text('Check Again'),
+                child: const Text('Retry'),
               ),
             ],
           ),

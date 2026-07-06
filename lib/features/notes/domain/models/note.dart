@@ -18,6 +18,7 @@ class NoteListing {
   final String yearOfStudy;
   final double price;
   final int downloadsCount;
+  final String status;
   final DateTime createdAt;
 
   NoteListing({
@@ -37,6 +38,7 @@ class NoteListing {
     required this.yearOfStudy,
     required this.price,
     this.downloadsCount = 0,
+    this.status = 'active',
     required this.createdAt,
   });
 
@@ -58,6 +60,7 @@ class NoteListing {
       'yearOfStudy': yearOfStudy,
       'price': price,
       'downloadsCount': downloadsCount,
+      'status': status,
       'createdAt': Timestamp.fromDate(createdAt),
     };
   }
@@ -80,6 +83,7 @@ class NoteListing {
       yearOfStudy: json['yearOfStudy'] ?? '1',
       price: (json['price'] ?? 0.0).toDouble(),
       downloadsCount: json['downloadsCount'] ?? 0,
+      status: json['status'] ?? 'active',
       createdAt: json['createdAt'] != null 
           ? (json['createdAt'] as Timestamp).toDate() 
           : DateTime.now(),

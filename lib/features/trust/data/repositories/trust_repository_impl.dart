@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:unihub_mobile/services/notification_service.dart';
+import 'package:unihub_mobile/core/services/notification_sender.dart';
+import 'package:unihub_mobile/core/utils/app_logger.dart';
 import '../../domain/models/verification_application.dart';
 import '../../domain/models/professional_role.dart';
 import '../../domain/models/student_verification.dart';
@@ -8,9 +9,9 @@ import '../../domain/repositories/trust_repository.dart';
 
 class TrustRepositoryImpl implements TrustRepository {
   final FirebaseFirestore _firestore;
-  final NotificationService? _notificationService;
+  final NotificationSender? _notificationSender;
 
-  TrustRepositoryImpl(this._firestore, [this._notificationService]);
+  TrustRepositoryImpl(this._firestore, [this._notificationSender]);
 
   @override
   Future<void> submitProfessionalApplication(VerificationApplication application) async {
@@ -18,8 +19,8 @@ class TrustRepositoryImpl implements TrustRepository {
       application.toFirestore(),
     );
 
-    if (_notificationService != null) {
-      await _notificationService!.notifyAdmins(
+    if (_notificationSender != null) {
+      await _notificationSender!.notifyAdmins(
         title: 'New Professional Application 💼',
         body: 'A user has applied for the ${application.role.label} role.',
         route: '/admin/verifications',
@@ -63,6 +64,11 @@ class TrustRepositoryImpl implements TrustRepository {
 
   @override
   Future<void> submitStudentVerification(String userId, String studentIdUrl) async {
+    if (userId.isEmpty) {
+      AppLogger.error('submitStudentVerification called with empty userId', null, null, 'TrustRepository');
+      throw Exception('Invalid userId');
+    }
+
     await _firestore.collection('student_verifications').doc(userId).set({
       'userId': userId,
       'studentIdUrl': studentIdUrl,
@@ -70,8 +76,8 @@ class TrustRepositoryImpl implements TrustRepository {
       'submittedAt': FieldValue.serverTimestamp(),
     });
 
-    if (_notificationService != null) {
-      await _notificationService!.notifyAdmins(
+    if (_notificationSender != null) {
+      await _notificationSender!.notifyAdmins(
         title: 'New Student Verification 🎓',
         body: 'A user has submitted their student ID for verification.',
         route: '/admin/verifications',
@@ -81,21 +87,50 @@ class TrustRepositoryImpl implements TrustRepository {
 
   @override
   Future<StudentVerification?> getStudentVerification(String userId) async {
-    final doc = await _firestore.collection('student_verifications').doc(userId).get();
-    if (!doc.exists) return null;
-    return StudentVerification.fromFirestore(doc);
+    if (userId.isEmpty) {
+      AppLogger.warning('getStudentVerification called with empty userId', 'TrustRepository');
+      return null;
+    }
+
+    try {
+      final doc = await _firestore.collection('student_verifications').doc(userId).get();
+      if (!doc.exists) return null;
+      return StudentVerification.fromFirestore(doc);
+    } catch (e, st) {
+      AppLogger.error('Error getting StudentVerification for $userId', e, st, 'TrustRepository');
+      return null;
+    }
   }
 
   @override
   Stream<StudentVerification?> watchStudentVerification(String userId) {
+    // Defensive: avoid calling .doc('') which causes Firestore exception
+    if (userId.isEmpty) {
+      AppLogger.warning('watchStudentVerification called with empty userId', 'TrustRepository');
+      return Stream.value(null);
+    }
+
     return _firestore.collection('student_verifications')
         .doc(userId)
         .snapshots()
-        .map((doc) => doc.exists ? StudentVerification.fromFirestore(doc) : null);
+        .map((doc) {
+          try {
+            if (!doc.exists) return null;
+            return StudentVerification.fromFirestore(doc);
+          } catch (e, st) {
+            AppLogger.error('Error parsing StudentVerification for $userId', e, st, 'TrustRepository');
+            return null;
+          }
+        });
   }
 
   @override
   Future<void> submitIdentityVerification(String userId, String idUrl, String selfieUrl) async {
+    if (userId.isEmpty) {
+      AppLogger.error('submitIdentityVerification called with empty userId', null, null, 'TrustRepository');
+      throw Exception('Invalid userId');
+    }
+
     await _firestore.collection('identity_verifications').doc(userId).set({
       'userId': userId,
       'idDocumentUrl': idUrl,
@@ -105,12 +140,16 @@ class TrustRepositoryImpl implements TrustRepository {
     });
     
     // Also update the user document status for immediate UI feedback if needed
-    await _firestore.collection('users').doc(userId).update({
-      'identityStatus': 'pending',
-    });
+    if (userId.isNotEmpty) {
+      await _firestore.collection('users').doc(userId).update({
+        'identityStatus': 'pending',
+      });
+    } else {
+      AppLogger.warning('Skipping users/{userId} update because userId is empty', 'TrustRepository');
+    }
 
-    if (_notificationService != null) {
-      await _notificationService!.notifyAdmins(
+    if (_notificationSender != null) {
+      await _notificationSender!.notifyAdmins(
         title: 'New Identity Verification 🛡️',
         body: 'A user has submitted identity documents and a selfie for review.',
         route: '/admin/verifications',
@@ -120,21 +159,50 @@ class TrustRepositoryImpl implements TrustRepository {
 
   @override
   Future<IdentityVerification?> getIdentityVerification(String userId) async {
-    final doc = await _firestore.collection('identity_verifications').doc(userId).get();
-    if (!doc.exists) return null;
-    return IdentityVerification.fromFirestore(doc);
+    if (userId.isEmpty) {
+      AppLogger.warning('getIdentityVerification called with empty userId', 'TrustRepository');
+      return null;
+    }
+
+    try {
+      final doc = await _firestore.collection('identity_verifications').doc(userId).get();
+      if (!doc.exists) return null;
+      return IdentityVerification.fromFirestore(doc);
+    } catch (e, st) {
+      AppLogger.error('Error getting IdentityVerification for $userId', e, st, 'TrustRepository');
+      return null;
+    }
   }
 
   @override
   Stream<IdentityVerification?> watchIdentityVerification(String userId) {
+    // Defensive: avoid calling .doc('') which causes Firestore exception
+    if (userId.isEmpty) {
+      AppLogger.warning('watchIdentityVerification called with empty userId', 'TrustRepository');
+      return Stream.value(null);
+    }
+
     return _firestore.collection('identity_verifications')
         .doc(userId)
         .snapshots()
-        .map((doc) => doc.exists ? IdentityVerification.fromFirestore(doc) : null);
+        .map((doc) {
+          try {
+            if (!doc.exists) return null;
+            return IdentityVerification.fromFirestore(doc);
+          } catch (e, st) {
+            AppLogger.error('Error parsing IdentityVerification for $userId', e, st, 'TrustRepository');
+            return null;
+          }
+        });
   }
 
   @override
   Future<void> updateReputation(String userId, Map<String, dynamic> delta) async {
+    if (userId.isEmpty) {
+      AppLogger.error('updateReputation called with empty userId', null, null, 'TrustRepository');
+      throw Exception('Invalid userId');
+    }
+
     await _firestore.collection('users').doc(userId).update(delta);
   }
 }

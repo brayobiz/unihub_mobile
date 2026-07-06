@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
+import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import '../../../auth/shared/providers.dart';
 import '../../domain/models/listing.dart';
 import '../../shared/providers.dart';
@@ -18,7 +19,7 @@ class MyListingsScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('My Seller Hub'),
+        title: const Text('Seller Hub'),
         elevation: 0,
         backgroundColor: theme.colorScheme.surface,
         foregroundColor: theme.colorScheme.onSurface,
@@ -95,7 +96,11 @@ class _MyListingCard extends ConsumerWidget {
                   child: listing.imageUrls.isNotEmpty
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: Image.network(listing.imageUrls.first, fit: BoxFit.cover),
+                          child: OptimizedImage(
+                            imageUrl: listing.imageUrls.first, 
+                            fit: BoxFit.cover,
+                            thumbnailWidth: 200,
+                          ),
                         )
                       : Icon(Icons.shopping_bag_outlined, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
                 ),
@@ -233,7 +238,7 @@ class _MyListingCard extends ConsumerWidget {
                       }
                     },
                     icon: const Icon(Icons.bolt, size: 18),
-                    label: const Text('Boost Ad'),
+                    label: const Text('Boost Listing'),
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.orange,
                       foregroundColor: Colors.white,

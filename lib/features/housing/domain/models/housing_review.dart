@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class HousingReview {
   final String id;
   final String plugId;
+  final String? listingId;
   final String userId;
   final String userName;
   final String? userPhotoUrl;
@@ -13,6 +14,7 @@ class HousingReview {
   HousingReview({
     required this.id,
     required this.plugId,
+    this.listingId,
     required this.userId,
     required this.userName,
     this.userPhotoUrl,
@@ -26,6 +28,7 @@ class HousingReview {
     return HousingReview(
       id: doc.id,
       plugId: data['plugId'] ?? '',
+      listingId: data['listingId'],
       userId: data['userId'] ?? '',
       userName: data['userName'] ?? '',
       userPhotoUrl: data['userPhotoUrl'],
@@ -38,6 +41,7 @@ class HousingReview {
   Map<String, dynamic> toFirestore() {
     return {
       'plugId': plugId,
+      'listingId': listingId,
       'userId': userId,
       'userName': userName,
       'userPhotoUrl': userPhotoUrl,

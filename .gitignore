@@ -48,6 +48,9 @@ ios/Runner/GoogleService-Info.plist
 
 # Local configuration
 android/local.properties
+android/key.properties
+android/app/*.jks
+android/app/*.keystore
 
 # Dart package lock (optional for apps, usually keep it)
 # pubspec.lock

@@ -5,14 +5,15 @@ import 'package:unihub_mobile/features/chat/domain/models/message.dart';
 import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
 import 'package:unihub_mobile/features/chat/domain/repositories/chat_repository.dart';
 import 'package:unihub_mobile/services/notification_service.dart';
+import 'package:unihub_mobile/core/services/notification_sender.dart';
 import 'package:unihub_mobile/features/shared/notification_repository.dart';
 import 'package:unihub_mobile/core/utils/app_logger.dart';
 
 class ChatRepositoryImpl implements ChatRepository {
   final FirebaseFirestore _firestore;
-  final NotificationService _notificationService;
+  final NotificationSender _notificationSender;
 
-  ChatRepositoryImpl(this._firestore, this._notificationService);
+  ChatRepositoryImpl(this._firestore, this._notificationSender);
 
   @override
   Stream<List<Conversation>> watchConversations(String userId) {
@@ -197,7 +198,7 @@ class ChatRepositoryImpl implements ChatRepository {
           } else {
             // NEW: Unassigned ticket: Notify the generic support identity or use a broadcast
             // Since 'unihub_admin' might not have a token, we broadcast to 'admins' topic
-            await _notificationService.triggerPushNotification(
+            await _notificationSender.triggerPushNotification(
               recipientId: '',
               isBroadcast: true,
               title: 'New Support Message',
@@ -224,7 +225,7 @@ class ChatRepositoryImpl implements ChatRepository {
         final contextData = data['context'] as Map<String, dynamic>?;
         final module = contextData?['type'] as String?;
         
-        await _notificationService.sendNotification(
+        await _notificationSender.sendNotification(
           recipientId: recipientId,
           actorName: actorName,
           title: isSupport ? (actorName != null ? 'UniHub Support ($actorName)' : 'UniHub Support') : 'New Message',
@@ -235,7 +236,9 @@ class ChatRepositoryImpl implements ChatRepository {
         );
       }
     } catch (e) {
-      debugPrint('Error sending notification: $e');
+      if (kDebugMode) {
+        debugPrint('Error sending notification: $e');
+      }
     }
   }
 
@@ -289,7 +292,7 @@ class ChatRepositoryImpl implements ChatRepository {
     }
 
     // 2. Clear associated notifications
-    await _notificationService.markAsReadByTarget(userId, conversationId);
+    await _notificationSender.markAsReadByTarget(userId, conversationId);
 
     // 3. Mark messages from others as read
     // Use a single property filter to avoid composite index requirement

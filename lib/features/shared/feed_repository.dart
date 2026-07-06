@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/feed_type.dart';
 import '../../features/auth/shared/providers.dart';
 import '../../services/notification_service.dart';
+import '../../core/services/notification_sender.dart';
 import '../campus_filter/shared/providers.dart';
 import '../../core/constants/campus_constants.dart';
 
@@ -13,6 +14,14 @@ final feedRepositoryProvider = Provider((ref) {
     campus,
     ref.watch(notificationServiceProvider),
   );
+});
+
+final feedItemByIdProvider = StreamProvider.autoDispose.family<FeedItem?, String>((ref, id) {
+  return ref.watch(feedRepositoryProvider).watchFeedItemById(id);
+});
+
+final commentsStreamProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, itemId) {
+  return ref.watch(feedRepositoryProvider).watchComments(itemId);
 });
 
 class FeedItem {
@@ -98,22 +107,21 @@ class FeedItem {
 class FeedRepository {
   final FirebaseFirestore _firestore;
   final String? _browsingCampus;
-  final NotificationService? _notificationService;
+  final NotificationSender? _notificationSender;
 
-  FeedRepository(this._firestore, this._browsingCampus, [this._notificationService]);
+  FeedRepository(this._firestore, this._browsingCampus, [this._notificationSender]);
 
   Stream<List<FeedItem>> watchFeed(FeedType type, {int limit = 20}) {
     // Basic query to avoid complex index requirements
     Query query = _firestore.collection('feed')
-        .where('type', isEqualTo: type.name);
+        .where('type', isEqualTo: type.name)
+        .orderBy('createdAt', descending: true)
+        .limit(limit);
     
     return query.snapshots().map((snapshot) {
       final items = snapshot.docs
           .map((doc) => FeedItem.fromJson(doc.data() as Map<String, dynamic>))
           .toList();
-      
-      // Sort in-memory to avoid the "The query requires an index" error
-      items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       
       var filteredItems = items;
       
@@ -185,6 +193,13 @@ class FeedRepository {
     return FeedItem.fromJson(doc.data() as Map<String, dynamic>);
   }
 
+  Stream<FeedItem?> watchFeedItemById(String id) {
+    return _firestore.collection('feed').doc(id).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      return FeedItem.fromJson(doc.data() as Map<String, dynamic>);
+    });
+  }
+
   Future<void> deleteFeedItem(String id) async {
     await _firestore.collection('feed').doc(id).delete();
   }
@@ -242,8 +257,8 @@ class FeedRepository {
       'status': 'pending',
     });
 
-    if (_notificationService != null) {
-      await _notificationService!.notifyAdmins(
+    if (_notificationSender != null) {
+      await _notificationSender!.notifyAdmins(
         title: 'New Community Report ⚠️',
         body: 'A feed item has been reported for: $reason',
         route: '/admin/reports',

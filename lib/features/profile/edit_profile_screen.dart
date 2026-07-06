@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +8,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/shared/storage_repository.dart';
+import 'package:unihub_mobile/core/constants/campus_constants.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -43,7 +45,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _nameController = TextEditingController(text: user?.fullName);
     _usernameController = TextEditingController(text: user?.username);
     _bioController = TextEditingController(text: user?.bio);
-    _universityController = TextEditingController(text: user?.university);
+    _universityController = TextEditingController(text: CampusConstants.getDisplayName(user?.university));
     _courseController = TextEditingController(text: user?.course);
     _yearController = TextEditingController(text: user?.yearOfStudy);
     _housingController = TextEditingController(text: user?.housingStatus);
@@ -124,7 +126,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         context.pop();
       }
     } catch (e) {
-      debugPrint('Update Profile Error: $e');
+      if (kDebugMode) {
+        debugPrint('Update Profile Error: $e');
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error));
       }
@@ -554,7 +558,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             child: _isLoading 
               ? const CircularProgressIndicator(color: Colors.white)
               : const Text(
-                  'SAVE CHANGES',
+                  'Save Changes',
                   style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.5),
                 ),
           ),

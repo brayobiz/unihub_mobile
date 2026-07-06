@@ -7,6 +7,10 @@ import '../auth/shared/providers.dart';
 import '../marketplace/domain/models/listing.dart';
 import '../marketplace/shared/providers.dart';
 import '../housing/shared/providers.dart';
+import '../housing/domain/models/roommate_profile.dart';
+import '../housing/domain/models/housing_listing.dart';
+import '../notes/domain/models/note.dart';
+import '../shared/feed_repository.dart';
 import '../housing/presentation/widgets/housing_card.dart';
 import '../notes/shared/providers.dart';
 import '../../widgets/app_drawer.dart';
@@ -24,6 +28,7 @@ import '../shared/global_search_screen.dart';
 import '../shared/campus_pulse_screen.dart';
 import '../announcements/presentation/widgets/announcement_display.dart';
 import '../campus_filter/presentation/widgets/campus_filter_selector.dart';
+import '../events/presentation/widgets/homepage_event_sections.dart';
 import '../ads/ads_module.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -34,13 +39,36 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  final ScrollController _scrollController = ScrollController();
+  bool _isCollapsed = false;
+
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_scrollListener);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(notificationServiceProvider).requestPermission();
       ref.read(historyServiceProvider).updateLastVisit();
     });
+  }
+
+  void _scrollListener() {
+    if (_scrollController.hasClients) {
+      // Threshold for collapse (expandedHeight is 110)
+      final isCollapsed = _scrollController.offset > 60;
+      if (isCollapsed != _isCollapsed) {
+        setState(() {
+          _isCollapsed = isCollapsed;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_scrollListener);
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -48,7 +76,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      drawer: const AppDrawer(),
+      drawer: AppDrawer(),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(smartFeedProvider);
@@ -58,9 +86,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ref.invalidate(trendingFeedProvider);
         },
         child: CustomScrollView(
+          controller: _scrollController,
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           slivers: [
-            const _DashboardAppBar(),
+            _DashboardAppBar(isCollapsed: _isCollapsed),
             const SliverToBoxAdapter(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -70,16 +99,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             const SliverToBoxAdapter(
               child: RelevantAnnouncementsWidget(),
             ),
-            SliverToBoxAdapter(
+            const SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.only(top: 12),
+                padding: EdgeInsets.only(top: 12),
                 child: UniversalSearchBar(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const GlobalSearchScreen()),
-                    );
-                  },
+                  onTap: null, // Tap logic handled internally now or via GoRouter
                 ),
               ),
             ),
@@ -94,6 +118,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             const SliverToBoxAdapter(child: _ContinueReadingSection()),
             const SliverToBoxAdapter(child: _RecentlyViewedSection()),
             const SliverToBoxAdapter(child: _CampusPulseSection()),
+            const SliverToBoxAdapter(child: EventsDashboardOrchestrator()),
             const SliverToBoxAdapter(child: _TrendingSection()),
             const SliverToBoxAdapter(child: _HousingPreviewSection()),
             const SliverToBoxAdapter(child: _SavedItemsSection()),
@@ -107,7 +132,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 }
 
 class _DashboardAppBar extends ConsumerWidget {
-  const _DashboardAppBar();
+  final bool isCollapsed;
+  const _DashboardAppBar({required this.isCollapsed});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -121,6 +147,8 @@ class _DashboardAppBar extends ConsumerWidget {
     }
 
     final theme = Theme.of(context);
+    final contentColor = isCollapsed ? theme.colorScheme.onSurface : Colors.white;
+
     return SliverAppBar(
       expandedHeight: 110,
       pinned: true,
@@ -129,13 +157,39 @@ class _DashboardAppBar extends ConsumerWidget {
       scrolledUnderElevation: 0,
       leading: Builder(
         builder: (context) => IconButton(
-          icon: Icon(Icons.menu_rounded, color: theme.colorScheme.onSurface),
+          icon: Icon(Icons.menu_rounded, color: contentColor),
           onPressed: () => Scaffold.of(context).openDrawer(),
+          tooltip: 'Open campus utilities drawer',
         ),
       ),
-      actions: const [
-        NotificationBadge(iconColor: Colors.white),
-        SizedBox(width: 12),
+      actions: [
+        Semantics(
+          label: 'Notifications',
+          button: true,
+          child: NotificationBadge(iconColor: contentColor),
+        ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: () => context.push('/profile'),
+          child: Semantics(
+            label: 'View Profile',
+            button: true,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: CircleAvatar(
+                radius: 16,
+                backgroundColor: isCollapsed ? theme.colorScheme.primary.withOpacity(0.1) : Colors.white24,
+                backgroundImage: user?.photoUrl != null ? NetworkImage(user!.photoUrl!) : null,
+                child: user?.photoUrl == null 
+                    ? Text(
+                        user?.fullName.isNotEmpty == true ? user!.fullName[0].toUpperCase() : 'U',
+                        style: TextStyle(color: isCollapsed ? theme.colorScheme.primary : Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                      )
+                    : null,
+              ),
+            ),
+          ),
+        ),
       ],
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
@@ -209,26 +263,21 @@ class _QuickActions extends StatelessWidget {
               ),
               _ActionItem(
                 icon: CategoryUtils.getIcon(FeedType.marketplace),
-                label: 'Sell Item',
+                label: 'Create Listing',
                 color: CategoryUtils.getColor(FeedType.marketplace),
                 onTap: () => context.push('/add-listing'),
               ),
               _ActionItem(
                 icon: CategoryUtils.getIcon(FeedType.housing),
-                label: 'Report Vacancy',
+                label: 'Create Vacancy',
                 color: CategoryUtils.getColor(FeedType.housing),
                 onTap: () => context.push('/submit-vacancy'),
               ),
               _ActionItem(
                 icon: CategoryUtils.getIcon(FeedType.gig),
-                label: 'Post Gig',
+                label: 'Create Gig',
                 color: CategoryUtils.getColor(FeedType.gig),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const AddFeedItemScreen(type: FeedType.gig)),
-                  );
-                },
+                onTap: () => context.push('/community', extra: FeedType.gig), // Adjusting to the community route if it handles gigs
               ),
             ],
           ),
@@ -255,34 +304,39 @@ class _ActionItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Expanded(
-      child: InkWell(
+      child: Semantics(
+        button: true,
+        label: label,
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(icon, color: color, size: 24),
                 ),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                  color: theme.colorScheme.onSurfaceVariant,
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -428,7 +482,7 @@ class _TrendingSection extends ConsumerWidget {
                         margin: const EdgeInsets.only(right: 14),
                         decoration: BoxDecoration(
                           color: theme.colorScheme.surface,
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: theme.colorScheme.outlineVariant),
                           boxShadow: [
                             BoxShadow(
@@ -442,7 +496,7 @@ class _TrendingSection extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             ClipRRect(
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                               child: Stack(
                                 children: [
                                   OptimizedImage(
@@ -721,7 +775,7 @@ class _CampusPulseSection extends ConsumerWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.highlightIndigoBorder.withOpacity(0.5)),
           ),
           child: Column(
@@ -777,12 +831,7 @@ class _CampusPulseSection extends ConsumerWidget {
                     ),
                   ),
                   TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const CampusPulseScreen()),
-                      );
-                    },
+                    onPressed: () => context.push('/campus-pulse'),
                     style: TextButton.styleFrom(
                       backgroundColor: theme.colorScheme.surface,
                       foregroundColor: AppColors.secondary,
@@ -866,7 +915,7 @@ class _HousingPreviewSection extends ConsumerWidget {
                       child: HousingCard(
                         listing: listings[index],
                         isCompact: true,
-                        onTap: () => context.push('/housing-detail', extra: listings[index]),
+                        onTap: () => context.push('/housing-detail/${listings[index].id}', extra: listings[index]),
                       ),
                     ),
                   ),
@@ -931,15 +980,32 @@ class _SmartFeedSection extends ConsumerWidget {
 
 void _handleItemTap(BuildContext context, SmartFeedItem item) {
   if (item.model.type == FeedType.housing) {
-    context.push('/housing-detail', extra: item.originalData);
+    if (item.originalData is RoommateProfile) {
+      context.push('/roommates'); // Or a specific detail screen if I had one
+    } else if (item.originalData is HousingListing) {
+      final h = item.originalData as HousingListing;
+      context.push('/housing-detail/${h.id}', extra: h);
+    }
   } else if (item.model.type == FeedType.notes) {
-    context.push('/note-detail', extra: item.originalData);
+    if (item.originalData is NoteListing) {
+      final n = item.originalData as NoteListing;
+      context.push('/note-detail/${n.id}', extra: n);
+    }
   } else if (item.model.type == FeedType.marketplace) {
-    context.push('/listing-detail', extra: item.originalData);
+    if (item.originalData is Listing) {
+      final l = item.originalData as Listing;
+      context.push('/listing-detail/${l.id}', extra: l);
+    }
   } else if (item.model.type == FeedType.gig) {
-    context.push('/gig-detail', extra: item.originalData);
+    if (item.originalData is FeedItem) {
+      final g = item.originalData as FeedItem;
+      context.push('/gig-detail/${g.id}', extra: g);
+    }
   } else if (item.model.type == FeedType.community) {
-    context.push('/community-detail', extra: item.originalData);
+    if (item.originalData is FeedItem) {
+      final f = item.originalData as FeedItem;
+      context.push('/community-detail/${f.id}', extra: f);
+    }
   }
 }
 
@@ -1028,7 +1094,7 @@ class _ContinueReadingSection extends ConsumerWidget {
                           ),
                           const SizedBox(width: 12),
                           FilledButton(
-                            onPressed: () => context.push('/note-detail', extra: note),
+                            onPressed: () => context.push('/note-detail/${note.id}', extra: note),
                             style: FilledButton.styleFrom(
                               backgroundColor: Colors.indigo,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -1111,7 +1177,7 @@ class _RecentlyViewedSection extends ConsumerWidget {
                         height: 65,
                         decoration: BoxDecoration(
                           color: theme.colorScheme.surface,
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: theme.colorScheme.outlineVariant),
                           image: item.imageUrl != null 
                             ? DecorationImage(image: NetworkImage(item.imageUrl!), fit: BoxFit.cover)
@@ -1171,7 +1237,7 @@ class _SavedItemsSection extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
             child: Text(
-              'Your Favorites',
+              'Saved Items',
               style: theme.textTheme.titleLarge?.copyWith(
                 fontSize: 17,
                 fontWeight: FontWeight.w800,
@@ -1181,24 +1247,34 @@ class _SavedItemsSection extends ConsumerWidget {
           ),
           SizedBox(
             height: 170,
-            child: ListView(
+            child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
-              children: [
-                ...savedHousing.take(3).map((h) => _SavedItemCard(
-                  title: h.title,
-                  subtitle: 'KES ${h.rent.toInt()}',
-                  imageUrl: h.images.isNotEmpty ? h.images.first : null,
-                  onTap: () => context.push('/housing-detail', extra: h),
-                )),
-                ...savedListings.take(3).map((l) => _SavedItemCard(
-                  title: l.title,
-                  subtitle: 'KES ${l.price.toInt()}',
-                  imageUrl: l.imageUrls.isNotEmpty ? l.imageUrls.first : null,
-                  onTap: () => context.push('/listing-detail', extra: l),
-                )),
-              ],
+              itemCount: (savedHousing.length > 3 ? 3 : savedHousing.length) + 
+                         (savedListings.length > 3 ? 3 : savedListings.length),
+              itemBuilder: (context, index) {
+                final limitedHousing = savedHousing.take(3).toList();
+                final limitedListings = savedListings.take(3).toList();
+                
+                if (index < limitedHousing.length) {
+                  final h = limitedHousing[index];
+                  return _SavedItemCard(
+                    title: h.title,
+                    subtitle: 'KES ${h.rent.toInt()}',
+                    imageUrl: h.images.isNotEmpty ? h.images.first : null,
+                    onTap: () => context.push('/housing-detail/${h.id}', extra: h),
+                  );
+                } else {
+                  final l = limitedListings[index - limitedHousing.length];
+                  return _SavedItemCard(
+                    title: l.title,
+                    subtitle: 'KES ${l.price.toInt()}',
+                    imageUrl: l.imageUrls.isNotEmpty ? l.imageUrls.first : null,
+                    onTap: () => context.push('/listing-detail/${l.id}', extra: l),
+                  );
+                }
+              },
             ),
           ),
         ],
@@ -1246,7 +1322,13 @@ class _SavedItemCard extends StatelessWidget {
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
               child: imageUrl != null 
-                ? Image.network(imageUrl!, height: 95, width: 135, fit: BoxFit.cover)
+                ? OptimizedImage(
+                    imageUrl: imageUrl!, 
+                    height: 95, 
+                    width: 135, 
+                    fit: BoxFit.cover,
+                    thumbnailWidth: 300,
+                  )
                 : Container(
                     height: 95, 
                     width: 135, 

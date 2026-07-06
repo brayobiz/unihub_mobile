@@ -66,7 +66,7 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
                 hintText: 'Search for gigs...',
                 hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
                 prefixIcon: Icon(Icons.search, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 filled: true,
                 fillColor: theme.colorScheme.surfaceContainerHighest,
                 contentPadding: EdgeInsets.zero,
@@ -179,7 +179,7 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
                     return Padding(
                       padding: const EdgeInsets.only(top: 8.0),
                       child: GestureDetector(
-                        onTap: () => context.push('/gig-detail', extra: item),
+                        onTap: () => context.push('/gig-detail/${item.id}', extra: item),
                         child: FeedCard(
                           item: _truncateGigDescription(item),
                           isLiked: isLiked,
@@ -212,7 +212,7 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
             MaterialPageRoute(builder: (context) => const AddFeedItemScreen(type: FeedType.gig)),
           );
         },
-        label: const Text('Post a Gig', style: TextStyle(fontWeight: FontWeight.bold)),
+        label: const Text('Create Gig', style: TextStyle(fontWeight: FontWeight.bold)),
         icon: const Icon(Icons.add_task_rounded),
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: Colors.white,
@@ -288,7 +288,7 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
                   onPressed: () => context.push(isIdentityRejected ? '/trust-center' : '/verify-identity'),
                   style: FilledButton.styleFrom(
                     backgroundColor: isIdentityRejected ? theme.colorScheme.error : theme.colorScheme.primary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: Text(isIdentityRejected ? 'Fix Identity Issues' : 'Verify Identity'),
                 ),

@@ -37,7 +37,7 @@ class CampusFilterSelector extends ConsumerWidget {
     }
 
     return InkWell(
-      onTap: () => _showCampusBottomSheet(context, ref),
+      onTap: () => showCampusBottomSheet(context),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -83,7 +83,7 @@ class CampusFilterSelector extends ConsumerWidget {
     );
   }
 
-  void _showCampusBottomSheet(BuildContext context, WidgetRef ref) {
+  static void showCampusBottomSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -196,16 +196,16 @@ class _CampusSelectionSheet extends ConsumerWidget {
               itemBuilder: (context, index) {
                 final campus = CampusConstants.campuses[index];
                 final isSelected = currentScope.type == BrowsingScopeType.specific && 
-                                  currentScope.campusId == campus.campusId;
+                                  currentScope.campusId == campus.id;
                 
                 return _buildOption(
                   context: context,
-                  title: campus.officialName,
+                  title: campus.name,
                   icon: Icons.location_on_outlined,
                   selectedIcon: Icons.location_on_rounded,
                   isSelected: isSelected,
                   onTap: () {
-                    notifier.setScope(BrowsingScope.specific(campus.campusId));
+                    notifier.setScope(BrowsingScope.specific(campus.id));
                     Navigator.pop(context);
                   },
                 );

@@ -5,17 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:unihub_mobile/core/utils/app_logger.dart';
+import 'package:unihub_mobile/core/services/notification_sender.dart';
 import '../features/auth/shared/providers.dart';
 import '../app/router/app_router.dart';
 import 'package:unihub_mobile/features/shared/notification_repository.dart';
-import 'package:unihub_mobile/features/shared/feed_repository.dart';
-import 'package:unihub_mobile/features/marketplace/shared/providers.dart';
-import 'package:unihub_mobile/features/housing/shared/providers.dart';
-import 'package:unihub_mobile/features/notes/shared/providers.dart';
 
-final notificationServiceProvider = Provider((ref) => NotificationService(ref));
+final notificationServiceProvider = Provider<NotificationService>((ref) => NotificationService(ref));
 
-class NotificationService {
+class NotificationService implements NotificationSender {
   final Ref _ref;
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
   
@@ -136,7 +133,7 @@ class NotificationService {
   Future<void> _updateTokenInFirestore(String token) async {
     final user = _ref.read(authStateProvider).valueOrNull;
     if (user != null) {
-      AppLogger.info('Saving FCM token for user ${user.uid}: ${token.substring(0, 8)}...', 'NOTIF_SERVICE');
+      AppLogger.info('Saving FCM token for user (masked): ${token.substring(0, 8)}...', 'NOTIF_SERVICE');
       await _firestore
           .collection('users')
           .doc(user.uid)
@@ -237,24 +234,19 @@ class NotificationService {
 
         case NotificationType.marketplace:
         case NotificationType.listing:
-          final listing = await _ref.read(marketplaceRepositoryProvider).getListingById(n.targetId!);
-          if (listing != null) {
-            router.push('/listing-detail', extra: listing);
-          }
+          router.push('/listing-detail/${n.targetId}');
           break;
 
         case NotificationType.housing:
-          final listing = await _ref.read(housingRepositoryProvider).getListingById(n.targetId!);
-          if (listing != null) {
-            router.push('/housing-detail', extra: listing);
+          if (n.targetType == 'viewing_request') {
+            router.push('/viewing-requests');
+          } else {
+            router.push('/housing-detail/${n.targetId}');
           }
           break;
 
         case NotificationType.notes:
-          final note = await _ref.read(notesRepositoryProvider).getNoteById(n.targetId!);
-          if (note != null) {
-            router.push('/note-detail', extra: note);
-          }
+          router.push('/note-detail/${n.targetId}');
           break;
 
         case NotificationType.gig:
@@ -263,23 +255,26 @@ class NotificationService {
           } else if (n.title.contains('New Gig Application')) {
             router.push('/employer-dashboard');
           } else {
-            final gig = await _ref.read(feedRepositoryProvider).getFeedItemById(n.targetId!);
-            if (gig != null) {
-              router.push('/gig-detail', extra: gig);
-            } else {
-              router.push('/gigs');
-            }
+            router.push('/gig-detail/${n.targetId}');
           }
           break;
 
         case NotificationType.follower:
           if (n.actorId != null) {
-            router.push('/seller-profile', extra: n.actorId);
+            router.push('/seller-profile/${n.actorId}');
           }
           break;
 
         case NotificationType.community:
           router.push('/community');
+          break;
+
+        case NotificationType.events:
+          if (n.targetType == 'organizer') {
+            router.push('/organizers/${n.targetId}');
+          } else {
+            router.push('/events/${n.targetId}');
+          }
           break;
 
         default:
@@ -456,6 +451,9 @@ class NotificationService {
               case NotificationType.community:
                 isEnabled = settings['community_activity'] ?? true;
                 break;
+              case NotificationType.events:
+                isEnabled = settings['events'] ?? true;
+                break;
             }
 
             if (!isEnabled) return;
@@ -483,6 +481,9 @@ class NotificationService {
           break;
         case NotificationType.community:
           effectiveTargetType = 'community';
+          break;
+        case NotificationType.events:
+          effectiveTargetType = 'events';
           break;
         default: break;
       }

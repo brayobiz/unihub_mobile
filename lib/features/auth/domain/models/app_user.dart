@@ -120,6 +120,7 @@ class AppUser {
       'reviews': true,
       'followers': true,
       'system': true,
+      'events': true,
       'community_activity': true,
     },
     this.blockedUids = const [],

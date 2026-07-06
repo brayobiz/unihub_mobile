@@ -1,4 +1,4 @@
-enum ReportType { marketplace, housing, feedItem, user, chat }
+enum ReportType { marketplace, housing, feedItem, user, chat, note, event }
 
 enum ReportStatus { pending, underReview, resolved, dismissed }
 

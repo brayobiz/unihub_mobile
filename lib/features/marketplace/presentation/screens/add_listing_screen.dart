@@ -6,6 +6,7 @@ import 'package:unihub_mobile/features/marketplace/domain/models/listing.dart';
 import 'package:unihub_mobile/features/marketplace/presentation/controllers/add_listing_controller.dart';
 import 'package:unihub_mobile/features/marketplace/presentation/widgets/marketplace_card.dart';
 import 'package:unihub_mobile/features/marketplace/domain/models/marketplace_categories.dart';
+import 'package:unihub_mobile/core/widgets/creation_success_dialog.dart';
 
 class AddListingScreen extends ConsumerStatefulWidget {
   final Listing? listing;
@@ -37,7 +38,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
     final state = ref.watch(addListingControllerProvider(widget.listing));
     final controller = ref.read(addListingControllerProvider(widget.listing).notifier);
 
-    final int currentStep = (state.currentStep as dynamic) ?? 0;
+    final int currentStep = state.currentStep;
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -58,7 +59,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
         title: Column(
           children: [
             Text(
-              widget.listing == null ? 'Post Listing' : 'Edit Listing',
+              widget.listing == null ? 'Create Listing' : 'Edit Listing',
               style: theme.textTheme.titleMedium?.copyWith(
                 color: theme.colorScheme.onSurface, 
                 fontWeight: FontWeight.bold, 
@@ -180,14 +181,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
           const SizedBox(height: 24),
           _buildConditionPicker(state, controller),
           const SizedBox(height: 32),
-          Text(
-            'Specifications', 
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontSize: 18, 
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.onSurface,
-            ),
-          ),
+          _buildSectionHeader(context, 'Specifications', Icons.settings_suggest_outlined),
           const SizedBox(height: 16),
           _buildCategorySpecificFields(state, controller),
         ],
@@ -195,9 +189,27 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
     );
   }
 
+  Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: theme.colorScheme.primary),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildStep3(AddListingState state, AddListingController controller) {
     final theme = Theme.of(context);
-    final int quantity = (state.quantity as dynamic) ?? 1;
+    final int quantity = state.quantity;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -288,7 +300,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
           child: Container(
             decoration: BoxDecoration(
               color: isSelected ? theme.colorScheme.primary.withValues(alpha: 0.05) : theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: isSelected ? theme.colorScheme.primary : Colors.transparent,
                 width: 2,
@@ -367,7 +379,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                   margin: const EdgeInsets.only(right: 12),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 2, style: BorderStyle.solid),
                   ),
                   child: Column(
@@ -412,7 +424,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
       width: 120,
       margin: const EdgeInsets.only(right: 12),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(16),
         image: DecorationImage(image: image, fit: BoxFit.cover),
       ),
       child: Stack(
@@ -591,8 +603,8 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
             filled: true,
             fillColor: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
             contentPadding: const EdgeInsets.all(20),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5)),
           ),
         ),
       ],
@@ -624,7 +636,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
                     color: isSelected ? theme.colorScheme.primary : theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
                     child: Text(
@@ -647,14 +659,14 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
 
   Widget _buildQualityIndicator(AddListingState state) {
     final theme = Theme.of(context);
-    final double qualityScore = (state.qualityScore as dynamic) ?? 0.0;
-    final Color qualityColor = (state.qualityColor as dynamic) ?? AppColors.grey;
+    final double qualityScore = state.qualityScore;
+    final Color qualityColor = state.qualityColor;
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: qualityColor.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         children: [
@@ -689,7 +701,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
 
   Widget _buildBottomAction(AddListingState state, AddListingController controller) {
     final theme = Theme.of(context);
-    final int currentStep = (state.currentStep as dynamic) ?? 0;
+    final int currentStep = state.currentStep;
     final bool isLastStep = currentStep >= 2;
     
     return Container(
@@ -711,7 +723,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                 },
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
                 ),
                 child: Text(
@@ -741,10 +753,10 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
               style: FilledButton.styleFrom(
                 backgroundColor: theme.colorScheme.primary,
                 padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: Text(
-                isLastStep ? (widget.listing == null ? 'Publish Now' : 'Save Changes') : 'Continue',
+                isLastStep ? (widget.listing == null ? 'Create Listing' : 'Save Changes') : 'Continue',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
               ),
             ),
@@ -756,7 +768,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
 
   Widget _buildPreviewOverlay(AddListingState state) {
     final theme = Theme.of(context);
-    final int quantity = (state.quantity as dynamic) ?? 1;
+    final int quantity = state.quantity;
     return Positioned.fill(
       child: Container(
         color: Colors.black.withValues(alpha: 0.9),
@@ -810,9 +822,13 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: theme.colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text('Save draft?', style: TextStyle(color: theme.colorScheme.onSurface)),
-        content: Text('You can finish your listing later.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+        title: const Text('Discard changes'),
+        content: const Text('You have unsaved changes. Are you sure you want to discard them?'),
         actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Keep Editing'),
+          ),
           TextButton(
             onPressed: () {
               controller.clearDraft();
@@ -821,71 +837,18 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
             },
             child: const Text('Discard', style: TextStyle(color: AppColors.error)),
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.pop();
-            },
-            child: Text('Save Draft', style: TextStyle(color: theme.colorScheme.primary)),
-          ),
         ],
       ),
     );
   }
 
   void _showSuccessDialog(BuildContext context) {
-    final theme = Theme.of(context);
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Dialog(
-        backgroundColor: theme.colorScheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(color: AppColors.verifiedSellerBg, shape: BoxShape.circle),
-                child: const Icon(Icons.check_rounded, color: AppColors.verifiedSellerIcon, size: 48),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Live on UniHub!', 
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontSize: 22, 
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Your listing is now visible to everyone. Good luck with the sale!',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: theme.colorScheme.onSurfaceVariant, height: 1.5),
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    context.pop();
-                  },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: theme.colorScheme.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  child: const Text('Done', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    CreationSuccessDialog.show(
+      context,
+      title: widget.listing == null ? 'Item Listed!' : 'Listing Updated!',
+      message: widget.listing == null
+          ? 'Your item is now live on UniHub! Interested students can now view and make offers.'
+          : 'Your listing has been successfully updated.',
     );
   }
 }

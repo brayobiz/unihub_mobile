@@ -33,7 +33,7 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> with AutomaticK
   }
 
   Future<void> _prepareAndLoadAd() async {
-    if (_isLoading) return;
+    if (_isLoading || !AdConfig.enabled) return;
     
     // AdMob only supports Android and iOS
     if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) {
@@ -135,7 +135,7 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> with AutomaticK
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
 
-    if (_failed) {
+    if (!AdConfig.enabled || _failed) {
       return const SizedBox.shrink();
     }
 
@@ -143,13 +143,15 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> with AutomaticK
       return const SizedBox.shrink();
     }
 
-    return Container(
-      alignment: Alignment.center,
-      width: _adSize!.width.toDouble(),
-      height: _adSize!.height.toDouble(),
-      child: _isLoaded && _bannerAd != null
-          ? AdWidget(ad: _bannerAd!)
-          : const SizedBox.shrink(),
+    return RepaintBoundary(
+      child: Container(
+        alignment: Alignment.center,
+        width: _adSize!.width.toDouble(),
+        height: _adSize!.height.toDouble(),
+        child: _isLoaded && _bannerAd != null
+            ? AdWidget(ad: _bannerAd!)
+            : const SizedBox.shrink(),
+      ),
     );
   }
 }

@@ -91,6 +91,7 @@ class AdminDashboardScreen extends ConsumerWidget {
           icon: Icons.verified_user,
           color: AppColors.warning,
           trend: 'Requires action',
+          onTap: () => context.push('/admin/verifications'),
         ),
         _SummaryCard(
           title: 'Marketplace Listings',
@@ -111,11 +112,20 @@ class AdminDashboardScreen extends ConsumerWidget {
           color: AppColors.notes,
         ),
         _SummaryCard(
+          title: 'Total Events',
+          value: stats.totalEvents.toString(),
+          icon: Icons.event,
+          color: Colors.deepPurple,
+          trend: stats.pendingEventApprovals > 0 ? '${stats.pendingEventApprovals} pending' : null,
+          onTap: stats.pendingEventApprovals > 0 ? () => context.push('/admin/events/approvals') : null,
+        ),
+        _SummaryCard(
           title: 'Active Reports',
           value: stats.totalReports.toString(),
           icon: Icons.report,
           color: AppColors.error,
           trend: 'Urgent',
+          onTap: () => context.push('/admin/reports'),
         ),
         _SummaryCard(
           title: 'Support Tickets',
@@ -123,6 +133,7 @@ class AdminDashboardScreen extends ConsumerWidget {
           icon: Icons.support_agent,
           color: AppColors.secondary,
           trend: stats.openSupportTickets > 0 ? 'Action needed' : 'All clear',
+          onTap: () => context.push('/admin/support'),
         ),
         _SummaryCard(
           title: 'Active Announcements',
@@ -217,12 +228,16 @@ class AdminDashboardScreen extends ConsumerWidget {
         icon = Icons.delete_forever; color = AppColors.error; break;
       case AdminActionType.reportResolution:
         icon = Icons.check_circle; color = AppColors.primary; break;
+      case AdminActionType.eventApproval:
+        icon = Icons.event_available; color = AppColors.success; break;
+      case AdminActionType.eventRejection:
+        icon = Icons.event_busy; color = AppColors.error; break;
       default:
         icon = Icons.admin_panel_settings; color = AppColors.grey600;
     }
     return CircleAvatar(
       radius: 16,
-      backgroundColor: color.withOpacity(0.1),
+      backgroundColor: color.withValues(alpha: 0.1),
       child: Icon(icon, size: 16, color: color),
     );
   }
@@ -235,6 +250,8 @@ class AdminDashboardScreen extends ConsumerWidget {
       case AdminActionType.userSuspension: return 'Suspended user';
       case AdminActionType.contentRemoval: return 'Removed ${log.targetType} content';
       case AdminActionType.reportResolution: return 'Resolved report';
+      case AdminActionType.eventApproval: return 'Approved event';
+      case AdminActionType.eventRejection: return 'Rejected event';
       case AdminActionType.bulkAction: return log.reason ?? 'Performed bulk action';
       default: return 'Performed administrative action';
     }
@@ -247,6 +264,7 @@ class _SummaryCard extends StatelessWidget {
   final IconData icon;
   final Color color;
   final String? trend;
+  final VoidCallback? onTap;
 
   const _SummaryCard({
     required this.title,
@@ -254,67 +272,73 @@ class _SummaryCard extends StatelessWidget {
     required this.icon,
     required this.color,
     this.trend,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Theme.of(context).dividerColor),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
+    return Material(
+      child: InkWell(
+        onTap: onTap,
+        child: Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Theme.of(context).dividerColor),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(icon, color: color, size: 24),
-                ),
-                if (trend != null)
-                  Text(
-                    trend!,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: trend!.contains('Urgent') || trend!.contains('Requires') 
-                        ? AppColors.error 
-                        : AppColors.success,
-                      fontWeight: FontWeight.w500,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(icon, color: color, size: 24),
                     ),
-                  ),
+                    if (trend != null)
+                      Text(
+                        trend!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: trend!.contains('Urgent') || trend!.contains('Requires') || trend!.contains('pending')
+                            ? AppColors.error
+                            : AppColors.success,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      value,
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );

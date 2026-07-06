@@ -59,28 +59,31 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
     if (confirmed != true) return;
 
     setState(() => _isBulkProcessing = true);
+    final messenger = ScaffoldMessenger.of(context);
+    
     try {
       final admin = ref.read(appUserProvider).valueOrNull;
       if (admin == null) throw Exception('Admin session not found');
 
-      await ref.read(adminRepositoryProvider).bulkUpdateUserStatus(
+      await ref.read(adminServiceProvider).bulkUpdateUserStatus(
         userIds: selectedUsers.map((u) => u.uid).toList(),
         isBanned: action == 'ban',
         adminId: admin.uid,
         adminName: admin.fullName,
       );
       
-      setState(() {
-        _selectedIds.clear();
-        _isBulkProcessing = false;
-      });
-      
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Bulk $action completed successfully')));
+        setState(() {
+          _selectedIds.clear();
+          _isBulkProcessing = false;
+        });
+        messenger.showSnackBar(SnackBar(content: Text('Bulk $action completed successfully')));
       }
     } catch (e) {
-      setState(() => _isBulkProcessing = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) {
+        setState(() => _isBulkProcessing = false);
+        messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 

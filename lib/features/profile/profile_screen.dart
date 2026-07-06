@@ -3,11 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
+import 'package:unihub_mobile/features/auth/presentation/widgets/logout_dialog.dart';
 import 'package:unihub_mobile/widgets/app_drawer.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
+import 'package:unihub_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
-import 'package:unihub_mobile/features/trust/domain/models/professional_role.dart';
-import 'package:unihub_mobile/features/trust/domain/models/badge.dart';
+import 'package:unihub_mobile/features/events/shared/providers.dart';
+import 'package:unihub_mobile/features/events/domain/models/organizer.dart';
+
+import '../../../../core/constants/campus_constants.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -16,20 +20,58 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final appUserAsync = ref.watch(appUserProvider);
+    final authState = ref.watch(authControllerProvider);
 
-    return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      drawer: const AppDrawer(),
-      body: appUserAsync.when(
-        data: (user) {
-          if (user == null) {
-            return const Center(child: Text('User profile not found. Please log in again.'));
-          }
-          return _ProfileContent(user: user);
-        },
-        loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
-        error: (err, stack) => Center(child: Text('Live Sync Error: $err')),
-      ),
+    // Listen for auth errors (like sign out failure)
+    ref.listen<AsyncValue<void>>(authControllerProvider, (previous, next) {
+      next.whenOrNull(
+        error: (err, _) => ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(err.toString()),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        ),
+      );
+    });
+
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: theme.colorScheme.surface,
+          drawer: const AppDrawer(),
+          body: appUserAsync.when(
+            data: (user) {
+              if (user == null) {
+                return const Center(child: Text('User profile not found. Please log in again.'));
+              }
+              return _ProfileContent(user: user);
+            },
+            loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
+            error: (err, stack) => Center(child: Text('Live Sync Error: $err')),
+          ),
+        ),
+        if (authState.isLoading)
+          Container(
+            color: Colors.black45,
+            child: Center(
+              child: Card(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: theme.colorScheme.primary),
+                      const SizedBox(height: 16),
+                      Text('Signing out...', style: theme.textTheme.titleMedium),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -82,8 +124,8 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.menu_rounded, color: Colors.white),
-                        onPressed: () => Scaffold.of(context).openDrawer(),
+                        icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                        onPressed: () => context.pop(),
                       ),
                       _buildEditButton(context),
                     ],
@@ -132,15 +174,222 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
                 const SizedBox(height: 16),
                 _buildSocialLinks(),
               ],
-              const SizedBox(height: 24),
-              Text(
-                'Account Settings',
-                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface),
-              ),
-              const SizedBox(height: 16),
-              _buildActionButtons(context, ref),
+              
+              const SizedBox(height: 32),
+              _buildCampusActivitiesSection(context, ref),
+              
+              const SizedBox(height: 32),
+              // ACCOUNT HUB SECTIONS
+              _buildAccountHubSection(context),
+
+              if (user.isAdmin) ...[
+                const SizedBox(height: 32),
+                _buildAdminSection(context),
+              ],
+              
+              const SizedBox(height: 32),
+              _buildSupportSection(context, ref),
+              const SizedBox(height: 40),
             ]),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCampusActivitiesSection(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final managedAsync = ref.watch(userManagedOrganizersProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Campus Activities',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w900, 
+            color: theme.colorScheme.onSurface, 
+            letterSpacing: -0.5
+          ),
+        ),
+        const SizedBox(height: 16),
+        managedAsync.when(
+          data: (orgs) {
+            final approvedOrgs = orgs.where((o) => 
+              o.verificationStatus == OrganizerVerificationStatus.verified || 
+              o.verificationStatus == OrganizerVerificationStatus.official
+            ).toList();
+
+            final activeApp = orgs.firstWhere(
+              (o) => o.verificationStatus == OrganizerVerificationStatus.submitted || 
+                     o.verificationStatus == OrganizerVerificationStatus.underReview ||
+                     o.verificationStatus == OrganizerVerificationStatus.rejected ||
+                     o.verificationStatus == OrganizerVerificationStatus.draft,
+              orElse: () => orgs.isNotEmpty ? orgs.first : Organizer(id: '', ownerId: '', name: '', bio: '', campusId: '', createdAt: DateTime.now()),
+            );
+
+            final hasActiveApp = activeApp.id.isNotEmpty && !approvedOrgs.any((o) => o.id == activeApp.id);
+
+            if (approvedOrgs.isNotEmpty) {
+              return _buildActionButton(
+                Icons.dashboard_outlined, 
+                'Organizer Dashboard', 
+                () {
+                  if (approvedOrgs.length == 1) {
+                    context.push('/organizers/${approvedOrgs.first.id}/dashboard');
+                  } else {
+                    _showOrganizerPicker(context, approvedOrgs);
+                  }
+                },
+                subtitle: 'Manage your clubs and events',
+              );
+            }
+
+            if (hasActiveApp) {
+              final isRejected = activeApp.verificationStatus == OrganizerVerificationStatus.rejected;
+              return _buildActionButton(
+                isRejected ? Icons.edit_note_rounded : Icons.hourglass_empty_rounded, 
+                isRejected ? 'Application Needs Attention' : 'Application Processing', 
+                () {
+                  if (isRejected) {
+                    context.pushNamed('become-organizer', extra: activeApp);
+                  } else {
+                    context.push('/organizers/${activeApp.id}/dashboard');
+                  }
+                },
+                subtitle: isRejected ? 'Tap to review and resubmit' : 'View your application status',
+              );
+            }
+
+            return _buildActionButton(
+              Icons.campaign_outlined, 
+              'Host an Event', 
+              () => context.pushNamed('organizer-onboarding'),
+              subtitle: 'Create a profile to start hosting',
+            );
+          },
+          loading: () => const Center(child: LinearProgressIndicator()),
+          error: (_, __) => const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+
+  void _showOrganizerPicker(BuildContext context, List<Organizer> orgs) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Your Organizations', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            ...orgs.map((org) => ListTile(
+              leading: CircleAvatar(
+                backgroundImage: org.logoUrl != null ? NetworkImage(org.logoUrl!) : null,
+                child: org.logoUrl == null ? Text(org.name[0]) : null,
+              ),
+              title: Text(org.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text(org.type.name.toUpperCase()),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/organizers/${org.id}/dashboard');
+              },
+            )),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdminSection(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Administrative',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w900, 
+            color: theme.colorScheme.onSurface, 
+            letterSpacing: -0.5
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildActionButton(
+          Icons.admin_panel_settings_outlined, 
+          'Admin Dashboard', 
+          () => context.push('/admin/dashboard')
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAccountHubSection(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'My UniHub Activity',
+          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface, letterSpacing: -0.5),
+        ),
+        const SizedBox(height: 16),
+        _buildActionButton(Icons.notifications_outlined, 'Notifications Inbox', () => context.push('/notifications')),
+        const SizedBox(height: 8),
+        _buildActionButton(Icons.inventory_2_outlined, 'Seller Hub (My Listings)', () => context.push('/my-listings')),
+        const SizedBox(height: 8),
+        _buildActionButton(Icons.dashboard_customize_outlined, 'Housing Plug Dashboard', () => context.push('/plug-dashboard')),
+        const SizedBox(height: 8),
+        _buildActionButton(Icons.assignment_ind_outlined, 'Employer Dashboard', () => context.push('/employer-dashboard')),
+        const SizedBox(height: 8),
+        _buildActionButton(Icons.menu_book_outlined, 'My Uploaded Notes', () => context.push('/notes?tab=1'), subtitle: 'Manage in Library tab'),
+        const SizedBox(height: 8),
+        _buildActionButton(Icons.favorite_outline_rounded, 'Saved Vacancies', () => context.push('/saved-housing')),
+        const SizedBox(height: 8),
+        _buildActionButton(Icons.bookmarks_outlined, 'Saved Items', () => context.push('/saved')),
+        const SizedBox(height: 8),
+        _buildActionButton(Icons.history_rounded, 'Activity History', () => context.push('/activity-history')),
+        
+        const SizedBox(height: 32),
+        Text(
+          'Preferences',
+          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface, letterSpacing: -0.5),
+        ),
+        const SizedBox(height: 16),
+        _buildActionButton(Icons.settings_outlined, 'App Settings', () => context.push('/settings')),
+      ],
+    );
+  }
+
+  Widget _buildSupportSection(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Support',
+          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface, letterSpacing: -0.5),
+        ),
+        const SizedBox(height: 16),
+        _buildActionButton(Icons.help_outline, 'Help Center', () => context.push('/help')),
+        const SizedBox(height: 32),
+        Text(
+          'Account',
+          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface, letterSpacing: -0.5),
+        ),
+        const SizedBox(height: 16),
+        _buildActionButton(
+          Icons.logout_rounded, 
+          'Sign Out', 
+          () => LogoutDialog.show(context, ref),
+          isDestructive: true,
         ),
       ],
     );
@@ -166,7 +415,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
         children: [
           CircleAvatar(
             radius: avatarRadius,
-            backgroundColor: theme.colorScheme.surfaceVariant,
+            backgroundColor: theme.colorScheme.surfaceContainerHighest,
             backgroundImage: user.photoUrl != null ? CachedNetworkImageProvider(user.photoUrl!) : null,
             child: user.photoUrl == null
                 ? Text(
@@ -207,7 +456,6 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
 
   Widget _buildIdentityInfo(BuildContext context) {
     final user = widget.user;
-    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -238,7 +486,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              _buildSmallInfoPill(Icons.school_rounded, user.university ?? 'Uni'),
+              _buildSmallInfoPill(Icons.school_rounded, CampusConstants.getDisplayName(user.university)),
               const SizedBox(width: 8),
               _buildSmallInfoPill(Icons.calendar_today_rounded, user.yearOfStudy ?? 'Year'),
             ],
@@ -320,7 +568,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
       padding: const EdgeInsets.symmetric(vertical: 20),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 20, offset: const Offset(0, 10))
@@ -372,7 +620,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 20, offset: const Offset(0, 10))
@@ -399,7 +647,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
 
   Widget _buildAcademicSection() {
     return _buildSectionCard('Academic Information', Column(children: [
-      _buildAcademicItem(Icons.school_rounded, 'University', widget.user.university ?? 'Not set'),
+      _buildAcademicItem(Icons.school_rounded, 'University', CampusConstants.getDisplayName(widget.user.university)),
       _buildAcademicItem(Icons.book_rounded, 'Course', widget.user.course ?? 'Not set'),
       _buildAcademicItem(Icons.calendar_today_rounded, 'Year of Study', widget.user.yearOfStudy ?? 'Not set'),
     ]), icon: Icons.auto_stories_rounded);
@@ -464,34 +712,14 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
     }).toList()), icon: Icons.connect_without_contact_rounded);
   }
 
-  Widget _buildActionButtons(BuildContext context, WidgetRef ref) {
-    return Column(
-      children: [
-        if (widget.user.isAdmin) ...[
-          _buildActionButton(Icons.admin_panel_settings, 'Admin Panel', () => context.push('/admin/dashboard')),
-          const SizedBox(height: 8),
-        ],
-        _buildActionButton(Icons.verified_user_outlined, 'Trust & Verification', () => context.push('/trust-center')),
-        const SizedBox(height: 8),
-        _buildActionButton(Icons.favorite_outline_rounded, 'Saved Items', () => context.push('/saved-housing')),
-        const SizedBox(height: 8),
-        _buildActionButton(Icons.emoji_events_outlined, 'Achievements & Milestones', () {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Achievements are coming in the next update! Keep using UniHub to rack up points.'),
-            behavior: SnackBarBehavior.floating,
-          ));
-        }),
-      ],
-    );
-  }
 
-  Widget _buildActionButton(IconData icon, String title, VoidCallback onTap, {bool isDestructive = false}) {
+  Widget _buildActionButton(IconData icon, String title, VoidCallback onTap, {bool isDestructive = false, String? subtitle}) {
     final theme = Theme.of(context);
     return Container(
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
       child: Material(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         clipBehavior: Clip.antiAlias,
         child: ListTile(
           leading: Container(
@@ -500,9 +728,10 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
             child: Icon(icon, color: isDestructive ? AppColors.error : theme.colorScheme.primary, size: 20),
           ),
           title: Text(title, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: isDestructive ? AppColors.error : theme.colorScheme.onSurface)),
+          subtitle: subtitle != null ? Text(subtitle, style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)) : null,
           trailing: Icon(Icons.chevron_right_rounded, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), size: 20),
           onTap: onTap,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         ),
       ),
@@ -581,7 +810,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
     ];
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: BorderRadius.circular(24), border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)), boxShadow: [
+      decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)), boxShadow: [
         BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 20, offset: const Offset(0, 10))
       ]),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

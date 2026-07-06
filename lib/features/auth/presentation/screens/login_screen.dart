@@ -81,7 +81,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Sign in to your campus marketplace',
+              'Sign in to your campus ecosystem',
               style: TextStyle(
                 fontSize: 16,
                 color: theme.colorScheme.onSurfaceVariant,

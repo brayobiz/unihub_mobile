@@ -77,6 +77,12 @@ class AdminSidebar extends StatelessWidget {
                   path: '/admin/notes',
                   currentPath: currentPath,
                 ),
+                _SidebarItem(
+                  icon: Icons.event,
+                  title: 'Events',
+                  path: '/admin/events',
+                  currentPath: currentPath,
+                ),
                 const Divider(),
                 _SidebarItem(
                   icon: Icons.people,
@@ -137,38 +143,43 @@ class _SidebarItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final isSelected = currentPath.startsWith(path);
     
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: isSelected ? AppColors.primary : AppColors.grey600,
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: isSelected 
-              ? AppColors.primary 
-              : Theme.of(context).textTheme.bodyLarge?.color,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        ),
-      ),
-      trailing: isPlaceholder 
-        ? Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              'Soon',
-              style: TextStyle(
-                fontSize: 10, 
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          )
-        : null,
+    return Semantics(
+      label: '$title navigation link',
+      hint: 'Navigate to $title',
       selected: isSelected,
-      onTap: isPlaceholder ? null : () => context.go(path),
+      child: ListTile(
+        leading: Icon(
+          icon,
+          color: isSelected ? AppColors.primary : AppColors.grey600,
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: isSelected 
+                ? AppColors.primary 
+                : Theme.of(context).textTheme.bodyLarge?.color,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+        trailing: isPlaceholder 
+          ? Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                'Soon',
+                style: TextStyle(
+                  fontSize: 10, 
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            )
+          : null,
+        selected: isSelected,
+        onTap: isPlaceholder ? null : () => context.go(path),
+      ),
     );
   }
 }

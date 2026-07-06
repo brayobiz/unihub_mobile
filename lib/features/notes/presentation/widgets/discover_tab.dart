@@ -174,7 +174,7 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
         'initialPage': 0,
       });
     } else {
-      context.push('/note-detail', extra: note);
+      context.push('/note-detail/${note.id}', extra: note);
     }
   }
 

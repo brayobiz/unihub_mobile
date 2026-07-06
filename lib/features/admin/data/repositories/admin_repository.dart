@@ -1,24 +1,41 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:rxdart/rxdart.dart';
 import '../../domain/models/admin_stats.dart';
 import '../../domain/models/verification_request.dart';
 import '../../domain/models/report.dart';
 import '../../domain/models/moderation_content.dart';
 import '../../../../services/notification_service.dart';
+import 'package:unihub_mobile/core/services/notification_sender.dart';
 import '../../../../features/shared/domain/models/uni_notification.dart';
 import '../../../marketplace/domain/models/listing.dart';
 import '../../../housing/domain/models/housing_listing.dart';
 import '../../../notes/domain/models/note.dart';
+import '../../../events/domain/models/event.dart';
 import '../../../auth/domain/models/app_user.dart';
 import '../../domain/models/audit_log.dart';
 import '../../../chat/domain/models/conversation.dart';
 import '../../../chat/domain/models/message.dart';
+import '../../../trust/domain/services/trust_engine.dart';
+import '../../../../core/utils/app_logger.dart';
 
 class AdminRepository {
   final FirebaseFirestore _firestore;
-  final NotificationService? _notificationService;
 
-  AdminRepository(this._firestore, [this._notificationService]);
+  AdminRepository(this._firestore);
+
+  Future<bool> _isUserAdmin(String userId) async {
+    try {
+      final doc = await _firestore.collection('users').doc(userId).get();
+      if (!doc.exists) return false;
+      final data = doc.data() as Map<String, dynamic>;
+      final isAdminField = data['isAdmin'] ?? false;
+      final roles = List<String>.from(data['roles'] ?? []);
+      return isAdminField || roles.contains('admin');
+    } catch (e) {
+      return false;
+    }
+  }
 
   Future<AdminStats> getStats() async {
     final now = DateTime.now();
@@ -36,6 +53,8 @@ class AdminRepository {
       _firestore.collection('student_verifications')
           .where('status', isEqualTo: 'pending').count().get(),
       _firestore.collection('verification_applications')
+          .where('status', isEqualTo: 'pending').count().get(),
+      _firestore.collection('organizer_verification_requests')
           .where('status', isEqualTo: 'pending').count().get(),
           
       // Reports
@@ -60,9 +79,14 @@ class AdminRepository {
       _firestore.collection('announcements')
           .where('status', whereIn: ['published', 'scheduled'])
           .get(),
+
+      // Events
+      _firestore.collection('events').count().get(),
+      _firestore.collection('events')
+          .where('status', isEqualTo: 'submitted').count().get(),
     ]);
 
-    final announcementsSnap = results[12] as QuerySnapshot;
+    final announcementsSnap = results[13] as QuerySnapshot;
     final activeAnnouncements = announcementsSnap.docs.where((doc) {
       final data = doc.data() as Map<String, dynamic>;
       final publishAt = (data['publishAt'] as Timestamp?)?.toDate();
@@ -81,13 +105,16 @@ class AdminRepository {
       totalNotes: (results[3] as AggregateQuerySnapshot).count ?? 0,
       pendingVerifications: ((results[4] as AggregateQuerySnapshot).count ?? 0) + 
                            ((results[5] as AggregateQuerySnapshot).count ?? 0) + 
-                           ((results[6] as AggregateQuerySnapshot).count ?? 0),
-      totalReports: ((results[7] as AggregateQuerySnapshot).count ?? 0) + 
-                    ((results[8] as AggregateQuerySnapshot).count ?? 0),
-      newUsersToday: (results[9] as AggregateQuerySnapshot).count ?? 0,
-      resolvedReports: (results[10] as AggregateQuerySnapshot).count ?? 0,
-      openSupportTickets: (results[11] as AggregateQuerySnapshot).count ?? 0,
+                           ((results[6] as AggregateQuerySnapshot).count ?? 0) +
+                           ((results[7] as AggregateQuerySnapshot).count ?? 0),
+      totalReports: ((results[8] as AggregateQuerySnapshot).count ?? 0) + 
+                    ((results[9] as AggregateQuerySnapshot).count ?? 0),
+      newUsersToday: (results[10] as AggregateQuerySnapshot).count ?? 0,
+      resolvedReports: (results[11] as AggregateQuerySnapshot).count ?? 0,
+      openSupportTickets: (results[12] as AggregateQuerySnapshot).count ?? 0,
       activeAnnouncements: activeAnnouncements,
+      totalEvents: (results[14] as AggregateQuerySnapshot).count ?? 0,
+      pendingEventApprovals: (results[15] as AggregateQuerySnapshot).count ?? 0,
     );
   }
 
@@ -101,60 +128,132 @@ class AdminRepository {
   Stream<List<AdminVerificationRequest>> watchVerificationRequests({
     AdminVerificationStatus? status,
     AdminVerificationType? type,
-    int limit = 50,
+    int limit = 100,
   }) {
     // Combine multiple streams from different collections
-    final identityStream = _firestore.collection('identity_verifications').orderBy('submittedAt', descending: true).limit(limit).snapshots();
-    final studentStream = _firestore.collection('student_verifications').orderBy('submittedAt', descending: true).limit(limit).snapshots();
-    final professionalStream = _firestore.collection('verification_applications').orderBy('createdAt', descending: true).limit(limit).snapshots();
+    // Using a higher limit to ensure we find matching items after in-memory filtering if needed, 
+    // though we try to filter at Firestore level for status.
+    
+    Query identityQuery = _firestore.collection('identity_verifications');
+    Query studentQuery = _firestore.collection('student_verifications');
+    Query professionalQuery = _firestore.collection('verification_applications');
+    Query organizerQuery = _firestore.collection('organizer_verification_requests');
 
-    return Rx.combineLatest3<QuerySnapshot, QuerySnapshot, QuerySnapshot, List<AdminVerificationRequest>>(
+    if (status != null) {
+      final statusStr = _statusToDb(status);
+      identityQuery = identityQuery.where('status', isEqualTo: statusStr);
+      studentQuery = studentQuery.where('status', isEqualTo: statusStr);
+      professionalQuery = professionalQuery.where('status', isEqualTo: statusStr);
+      organizerQuery = organizerQuery.where('status', isEqualTo: statusStr);
+    }
+
+    // We only use orderBy if status is NOT filtered, or if composite indexes are likely to exist.
+    // To be safe for MVP and avoid "Query requires index" errors, we only orderBy on the 'All' view.
+    if (status == null) {
+      identityQuery = identityQuery.orderBy('submittedAt', descending: true);
+      studentQuery = studentQuery.orderBy('submittedAt', descending: true);
+      professionalQuery = professionalQuery.orderBy('createdAt', descending: true);
+      organizerQuery = organizerQuery.orderBy('submittedAt', descending: true);
+    }
+
+    final identityStream = identityQuery.limit(limit).snapshots();
+    final studentStream = studentQuery.limit(limit).snapshots();
+    final professionalStream = professionalQuery.limit(limit).snapshots();
+    final organizerStream = organizerQuery.limit(limit).snapshots();
+
+    return Rx.combineLatest4<QuerySnapshot, QuerySnapshot, QuerySnapshot, QuerySnapshot, List<AdminVerificationRequest>>(
       identityStream,
       studentStream,
       professionalStream,
-      (identitySnap, studentSnap, professionalSnap) {
+      organizerStream,
+      (identitySnap, studentSnap, professionalSnap, organizerSnap) {
         final List<AdminVerificationRequest> requests = [];
 
-        // Map Identity
-        for (var doc in identitySnap.docs) {
-          final data = doc.data() as Map<String, dynamic>;
-          requests.add(AdminVerificationRequest(
-            id: doc.id,
-            userId: data['userId'] ?? '',
-            type: AdminVerificationType.identity,
-            status: _mapStatus(data['status']),
-            submittedAt: (data['submittedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-            rejectionReason: data['rejectionReason'],
-            adminNotes: data['adminNotes'],
-            idDocumentUrl: data['idDocumentUrl'],
-            selfieUrl: data['selfieUrl'],
-          ));
-        }
+         // Map Identity
+         for (var doc in identitySnap.docs) {
+           final data = doc.data() as Map<String, dynamic>;
+           final userIdFromField = data['userId'];
+           final userId = userIdFromField?.toString() ?? '';
+           final docId = doc.id;
+           
+           AppLogger.info('🔍 Identity Verification Document Debug: docId: "$docId"', 'AdminRepository');
+           
+           // For identity verifications, the document ID should be the userId
+           // Defensive: if userId field is missing, use doc.id, but validate it's not empty
+           final finalUserId = userId.isNotEmpty ? userId : docId;
+           
+           if (docId.isEmpty || finalUserId.isEmpty) {
+             AppLogger.warning('⚠️ Skipping identity verification with empty ID: docId="$docId", userId="$finalUserId"', 'AdminRepository');
+             continue;
+           }
+           
+           if (finalUserId == docId && userId.isEmpty) {
+             AppLogger.warning('⚠️ ATTENTION: Identity verification using doc.id as userId! This is CORRUPTED DATA. docId="$docId"', 'AdminRepository');
+           }
+           
+           requests.add(AdminVerificationRequest(
+             id: docId,
+             userId: finalUserId,
+             type: AdminVerificationType.identity,
+             status: _mapStatus(data['status']),
+             submittedAt: (data['submittedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+             rejectionReason: data['rejectionReason'],
+             adminNotes: data['adminNotes'],
+             idDocumentUrl: data['idDocumentUrl'],
+             selfieUrl: data['selfieUrl'],
+           ));
+         }
 
-        // Map Student
-        for (var doc in studentSnap.docs) {
-          final data = doc.data() as Map<String, dynamic>;
-          requests.add(AdminVerificationRequest(
-            id: doc.id,
-            userId: data['userId'] ?? '',
-            type: AdminVerificationType.student,
-            status: _mapStatus(data['status']),
-            submittedAt: (data['submittedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-            rejectionReason: data['rejectionReason'],
-            adminNotes: data['adminNotes'],
-            studentIdUrl: data['studentIdUrl'],
-          ));
-        }
+         // Map Student
+         for (var doc in studentSnap.docs) {
+           final data = doc.data() as Map<String, dynamic>;
+           final userIdFromField = data['userId'];
+           final userId = userIdFromField?.toString() ?? '';
+           final docId = doc.id;
+           
+           AppLogger.info('🔍 Student Verification Document Debug: docId: "$docId"', 'AdminRepository');
+           
+           // For student verifications, the document ID should be the userId
+           // Defensive: if userId field is missing, use doc.id, but validate it's not empty
+           final finalUserId = userId.isNotEmpty ? userId : docId;
+           
+           if (docId.isEmpty || finalUserId.isEmpty) {
+             AppLogger.warning('⚠️ Skipping student verification with empty ID: docId="$docId", userId="$finalUserId"', 'AdminRepository');
+             continue;
+           }
+           
+           if (finalUserId == docId && userId.isEmpty) {
+             AppLogger.warning('⚠️ ATTENTION: Student verification using doc.id as userId! This is CORRUPTED DATA. docId="$docId"', 'AdminRepository');
+           }
+           
+           requests.add(AdminVerificationRequest(
+             id: docId,
+             userId: finalUserId,
+             type: AdminVerificationType.student,
+             status: _mapStatus(data['status']),
+             submittedAt: (data['submittedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+             rejectionReason: data['rejectionReason'],
+             adminNotes: data['adminNotes'],
+             studentIdUrl: data['studentIdUrl'],
+           ));
+         }
 
         // Map Professional
         for (var doc in professionalSnap.docs) {
           final data = doc.data() as Map<String, dynamic>;
+          final userId = data['userId']?.toString() ?? '';
+          
+          if (userId.isEmpty) {
+            AppLogger.warning('Professional application ${doc.id} missing userId', 'AdminRepository');
+            continue;
+          }
+
           requests.add(AdminVerificationRequest(
             id: doc.id,
-            userId: data['userId'] ?? '',
+            userId: userId,
             type: AdminVerificationType.professional,
             status: _mapStatus(data['status']),
-            submittedAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+            submittedAt: (data['createdAt'] as Timestamp?)?.toDate() ?? (data['submittedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
             rejectionReason: data['rejectionReason'],
             adminNotes: data['adminNotes'],
             fullName: data['fullName'],
@@ -166,7 +265,34 @@ class AdminRepository {
           ));
         }
 
-        // Filter in-memory
+        // Map Organizer
+        for (var doc in organizerSnap.docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final ownerId = data['ownerId']?.toString() ?? '';
+          
+          if (ownerId.isEmpty) {
+            AppLogger.warning('Organizer request ${doc.id} missing ownerId', 'AdminRepository');
+            continue;
+          }
+
+          requests.add(AdminVerificationRequest(
+            id: doc.id,
+            userId: ownerId, 
+            type: AdminVerificationType.organizer,
+            status: _mapStatus(data['status']),
+            submittedAt: (data['submittedAt'] as Timestamp?)?.toDate() ?? (data['resubmittedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+            rejectionReason: data['rejectionReason'],
+            adminNotes: data['adminNotes'],
+            fullName: data['name'], 
+            metadata: {
+              'organizerId': data['organizerId'],
+              'campusId': data['campusId'],
+              ...data,
+            },
+          ));
+        }
+
+        // Secondary Filter in-memory for safety and Type filtering
         var filtered = requests;
         if (status != null) {
           filtered = filtered.where((r) => r.status == status).toList();
@@ -211,116 +337,181 @@ class AdminRepository {
     required String adminName,
     String? reason,
     String? adminNotes,
+    double trustBoost = 0,
   }) async {
+    // DEBUG: Log all inputs
+    AppLogger.info('=== VERIFICATION APPROVAL DEBUG LOG === requestId: "${request.id}" newStatus: $newStatus', 'AdminRepository');
+    
     // Defense-in-depth: Re-verify admin status for destructive actions
-    final adminDoc = await _firestore.collection('users').doc(adminId).get();
-    final isAdmin = (adminDoc.data() as Map<String, dynamic>?)?['isAdmin'] ?? false;
-    if (!isAdmin) throw Exception('Unauthorized: Administrative privileges required.');
+    if (!await _isUserAdmin(adminId)) {
+      throw Exception('Unauthorized: Administrative privileges required.');
+    }
 
-    final batch = _firestore.batch();
     final timestamp = FieldValue.serverTimestamp();
 
-    // 1. Update the specific verification document
-    final collectionName = _getCollectionName(request.type);
-    final verifRef = _firestore.collection(collectionName).doc(request.id);
+    // ID Validation: Firestore doc() requires non-empty strings
+    if (request.id.isEmpty || request.id.trim().isEmpty) {
+      AppLogger.error('❌ Cannot process verification: EMPTY request.id', null, null, 'AdminRepository');
+      throw Exception('Invalid Verification Request ID - value is empty');
+    }
     
-    final Map<String, dynamic> updateData = {
-      'status': _statusToDb(newStatus),
-      'updatedAt': timestamp,
-      if (newStatus == AdminVerificationStatus.approved) 'verifiedAt': timestamp,
-      if (reason != null && reason.isNotEmpty) 'rejectionReason': reason,
-      if (adminNotes != null && adminNotes.isNotEmpty) 'adminNotes': adminNotes,
-    };
-
-    batch.update(verifRef, updateData);
-
-    // 2. Update the User document
-    final userRef = _firestore.collection('users').doc(request.userId);
-    final Map<String, dynamic> userUpdate = {};
-
-    if (request.type == AdminVerificationType.identity) {
-      userUpdate['isIdentityVerified'] = newStatus == AdminVerificationStatus.approved;
-      userUpdate['identityStatus'] = _statusToDb(newStatus);
-    } else if (request.type == AdminVerificationType.student) {
-      userUpdate['isStudentVerified'] = newStatus == AdminVerificationStatus.approved;
-    } else if (request.type == AdminVerificationType.professional && newStatus == AdminVerificationStatus.approved) {
-      // Add role to verifiedRoles
-      if (request.role != null) {
-        userUpdate['verifiedRoles'] = FieldValue.arrayUnion([request.role]);
-      }
+    final collectionName = _getCollectionName(request.type);
+    if (collectionName.isEmpty) {
+      AppLogger.error('❌ Cannot process verification with invalid type: ${request.type}', null, null, 'AdminRepository');
+      throw Exception('Invalid Verification Type');
     }
 
-    // Boost trust score on approval
-    if (newStatus == AdminVerificationStatus.approved) {
-      double boost = 0;
-      if (request.type == AdminVerificationType.identity) boost = 30;
-      if (request.type == AdminVerificationType.student) boost = 20;
-      if (request.type == AdminVerificationType.professional) boost = 15;
-      userUpdate['trustScore'] = FieldValue.increment(boost);
-    }
+    AppLogger.info('collectionName: "$collectionName"', 'AdminRepository');
 
-    batch.update(userRef, userUpdate);
+    final batch = _firestore.batch();
 
-    // 3. Commit changes
-    await batch.commit();
+    try {
+      // 1. Update the specific verification document
+      AppLogger.info('📝 About to update verification document at: $collectionName/$request.id', 'AdminRepository');
+      final verifRef = _firestore.collection(collectionName).doc(request.id);
+      
+      final Map<String, dynamic> updateData = {
+        'status': _statusToDb(newStatus),
+        'updatedAt': timestamp,
+        if (newStatus == AdminVerificationStatus.approved) 'verifiedAt': timestamp,
+        if (reason != null && reason.isNotEmpty) 'rejectionReason': reason,
+        if (adminNotes != null && adminNotes.isNotEmpty) 'adminNotes': adminNotes,
+      };
 
-    // 4. Send Notification
-    if (_notificationService != null) {
-      String title = '';
-      String body = '';
-      String deepLink = '';
+      batch.update(verifRef, updateData);
 
-      final typeStr = request.type.name.replaceAll('_', ' ');
+       // 2. Handle specific type updates
+       if (request.type == AdminVerificationType.organizer) {
+         final organizerId = request.metadata['organizerId']?.toString();
+         AppLogger.info('🏢 Processing ORGANIZER verification: $organizerId', 'AdminRepository');
+         
+         if (organizerId != null && organizerId.isNotEmpty && organizerId.trim().isNotEmpty) {
+           final organizerRef = _firestore.collection('organizers').doc(organizerId);
+           String organizerStatus = 'draft';
+           
+           switch (newStatus) {
+             case AdminVerificationStatus.approved:
+               organizerStatus = 'verified';
+               break;
+             case AdminVerificationStatus.rejected:
+               organizerStatus = 'rejected';
+               break;
+             case AdminVerificationStatus.underReview:
+               organizerStatus = 'underReview';
+               break;
+             case AdminVerificationStatus.resubmissionRequested:
+               organizerStatus = 'rejected'; 
+               break;
+             case AdminVerificationStatus.pending:
+               organizerStatus = 'submitted';
+               break;
+           }
 
-      switch (newStatus) {
-        case AdminVerificationStatus.approved:
-          title = 'Verification Approved! ✅';
-          body = 'Your $typeStr verification has been approved. Your profile trust score has increased!';
-          deepLink = '/trust-center';
-          break;
-        case AdminVerificationStatus.rejected:
-          title = 'Verification Rejected ❌';
-          body = 'Your $typeStr verification was rejected. Reason: ${reason ?? "Incomplete information"}.';
-          deepLink = '/trust-center';
-          break;
-        case AdminVerificationStatus.resubmissionRequested:
-          title = 'Action Required: Verification ⚠️';
-          body = 'Please resubmit your $typeStr documents. Reason: ${reason ?? "Documents unclear"}.';
-          deepLink = '/trust-center';
-          break;
-        case AdminVerificationStatus.underReview:
-          title = 'Verification Under Review 🔍';
-          body = 'An administrator is currently reviewing your $typeStr documents. We will notify you once a decision is made.';
-          deepLink = '/trust-center';
-          break;
-        default: break;
-      }
+           batch.update(organizerRef, {
+             'verificationStatus': organizerStatus,
+             'updatedAt': timestamp,
+             if (newStatus == AdminVerificationStatus.approved) 'trustScore': FieldValue.increment(trustBoost),
+           });
 
-      if (title.isNotEmpty) {
-        await _notificationService!.sendNotification(
-          recipientId: request.userId,
-          title: title,
-          body: body,
-          type: NotificationType.system,
-          deepLink: deepLink,
-          targetType: 'trust',
-        );
-      }
-    }
+           // Also update owner's trust score if approved
+           final ownerId = request.metadata['ownerId']?.toString();
+           AppLogger.info('ownerId: "$ownerId"', 'AdminRepository');
+           
+           if (ownerId != null && ownerId.isNotEmpty && ownerId.trim().isNotEmpty && newStatus == AdminVerificationStatus.approved) {
+             batch.update(_firestore.collection('users').doc(ownerId), {
+               'trustScore': FieldValue.increment(10.0), // Bonus for owning a verified organizer
+             });
+           }
 
-    await logAction(AdminAuditLog(
-      id: '',
-      adminId: adminId,
-      adminName: adminName,
-      actionType: newStatus == AdminVerificationStatus.approved 
-          ? AdminActionType.verificationApproval 
-          : AdminActionType.verificationRejection,
-      targetId: request.id,
-      targetType: request.type.name,
-      timestamp: DateTime.now(),
-      reason: reason,
-      metadata: {'userId': request.userId},
-    ));
+           // Add to audit trail
+           final auditRef = organizerRef.collection('audit_trail').doc();
+           batch.set(auditRef, {
+             'actorId': adminId,
+             'oldStatus': request.status.name,
+             'newStatus': organizerStatus,
+             'reason': reason,
+             'timestamp': timestamp,
+           });
+         } else {
+           AppLogger.warning('Skipping organizer update: organizerId is null or empty', 'AdminRepository');
+         }
+       } else {
+         // Update the User document for user-level verifications (Identity, Student, Professional)
+         if (request.userId == request.id) {
+           AppLogger.warning('⚠️ CORRUPTION DETECTED: userId equals document id: ${request.id}', 'AdminRepository');
+         }
+
+         if (request.userId.isEmpty || request.userId.trim().isEmpty) {
+           AppLogger.error('❌ Cannot process verification for user: EMPTY userId', null, null, 'AdminRepository');
+           throw Exception('Invalid User ID for verification - userId is empty string. This verification document has corrupted data (missing userId field).');
+         }
+         
+         final userRef = _firestore.collection('users').doc(request.userId);
+         
+         final Map<String, dynamic> userUpdate = {};
+
+         if (request.type == AdminVerificationType.identity) {
+           userUpdate['isIdentityVerified'] = newStatus == AdminVerificationStatus.approved;
+           userUpdate['identityStatus'] = _statusToDb(newStatus);
+         } else if (request.type == AdminVerificationType.student) {
+           userUpdate['isStudentVerified'] = newStatus == AdminVerificationStatus.approved;
+         } else if (request.type == AdminVerificationType.professional && newStatus == AdminVerificationStatus.approved) {
+           // Add role to verifiedRoles
+           if (request.role != null) {
+             userUpdate['verifiedRoles'] = FieldValue.arrayUnion([request.role]);
+           }
+         }
+
+         if (userUpdate.isNotEmpty) {
+           batch.update(userRef, userUpdate);
+         }
+       }
+
+       // 3. Commit changes
+       await batch.commit();
+
+       AppLogger.info('✅ Verification processed: ${request.type.name} for user ${request.userId} -> ${newStatus.name}', 'AdminRepository');
+
+       await logAction(AdminAuditLog(
+         id: '',
+         adminId: adminId,
+         adminName: adminName,
+         actionType: newStatus == AdminVerificationStatus.approved 
+             ? AdminActionType.verificationApproval 
+             : AdminActionType.verificationRejection,
+         targetId: request.id,
+         targetType: request.type.name,
+         timestamp: DateTime.now(),
+         reason: reason,
+         metadata: {
+           'userId': request.userId,
+           'type': request.type.name,
+           'newStatus': newStatus.name,
+           'boost': trustBoost,
+         },
+       ));
+     } catch (e, stack) {
+       AppLogger.error('❌ Failed to process verification: $e', e, stack, 'AdminRepository');
+       
+       // Log failure to audit trail
+       await logAction(AdminAuditLog(
+         id: '',
+         adminId: adminId,
+         adminName: adminName,
+         actionType: AdminActionType.bulkAction,
+         targetId: request.id,
+         targetType: 'verification_error',
+         timestamp: DateTime.now(),
+         reason: 'Verification processing failed: $e',
+         metadata: {
+           'userId': request.userId,
+           'type': request.type.name,
+           'error': e.toString(),
+         },
+       ));
+       
+       rethrow;
+     }
   }
 
   String _getCollectionName(AdminVerificationType type) {
@@ -328,6 +519,7 @@ class AdminRepository {
       case AdminVerificationType.identity: return 'identity_verifications';
       case AdminVerificationType.student: return 'student_verifications';
       case AdminVerificationType.professional: return 'verification_applications';
+      case AdminVerificationType.organizer: return 'organizer_verification_requests';
     }
   }
 
@@ -349,6 +541,8 @@ class AdminRepository {
             return ModeratedContent.fromHousing(HousingListing.fromFirestore(doc));
           case ContentType.notes:
             return ModeratedContent.fromNote(NoteListing.fromJson(data));
+          case ContentType.events:
+            return ModeratedContent.fromEvent(Event.fromFirestore(doc));
         }
       }).toList();
     });
@@ -360,6 +554,11 @@ class AdminRepository {
     String newStatus, 
     {required String adminId, required String adminName, String? reason}
   ) async {
+    // Defense-in-depth: ensure caller is an admin
+    if (!await _isUserAdmin(adminId)) {
+      throw Exception('Unauthorized: Administrative privileges required.');
+    }
+    if (contentId.isEmpty) throw Exception('Invalid Content ID');
     final collection = _getCollectionForType(type);
     final docRef = _firestore.collection(collection).doc(contentId);
     
@@ -368,28 +567,6 @@ class AdminRepository {
       'updatedAt': FieldValue.serverTimestamp(),
       if (reason != null) 'moderationReason': reason,
     });
-
-    // Notify Author
-    final doc = await docRef.get();
-    final data = doc.data() as Map<String, dynamic>;
-    final authorId = type == ContentType.notes ? data['authorId'] : (type == ContentType.housing ? data['plugId'] : data['sellerId']);
-    
-    if (authorId != null && _notificationService != null) {
-      String title = 'Content Update';
-      String body = 'Your ${type.name} listing "${data['title']}" status has been updated to $newStatus.';
-      
-      if (newStatus == 'removed') {
-        title = 'Content Removed ⚠️';
-        body = 'Your ${type.name} listing "${data['title']}" was removed for violating community guidelines.';
-      }
-
-      await _notificationService!.sendNotification(
-        recipientId: authorId,
-        title: title,
-        body: body,
-        type: NotificationType.system,
-      );
-    }
 
     await logAction(AdminAuditLog(
       id: '',
@@ -409,6 +586,7 @@ class AdminRepository {
       case ContentType.marketplace: return 'listings';
       case ContentType.housing: return 'housing_listings';
       case ContentType.notes: return 'notes';
+      case ContentType.events: return 'events';
     }
   }
 
@@ -427,14 +605,23 @@ class AdminRepository {
         for (var doc in reportsSnap.docs) {
           final data = doc.data() as Map<String, dynamic>;
           final typeStr = data['type']?.toString() ?? 'listing';
+          final reporterId = data['reporterId']?.toString() ?? '';
           
+          if (reporterId.isEmpty) {
+            AppLogger.warning('Report ${doc.id} missing reporterId', 'AdminRepository');
+            continue;
+          }
+
           ReportType rType = ReportType.marketplace;
           if (typeStr == 'feed_item') rType = ReportType.feedItem;
           if (typeStr == 'user') rType = ReportType.user;
+          if (typeStr == 'note') rType = ReportType.note;
+          if (typeStr == 'event') rType = ReportType.event;
+          if (typeStr == 'chat') rType = ReportType.chat;
 
           reports.add(AdminReport(
             id: doc.id,
-            reporterId: data['reporterId'] ?? '',
+            reporterId: reporterId,
             targetId: data['targetId'] ?? data['itemId'],
             reportedUserId: data['reportedUserId'],
             type: rType,
@@ -447,10 +634,18 @@ class AdminRepository {
 
         for (var doc in housingSnap.docs) {
           final data = doc.data() as Map<String, dynamic>;
+          final reporterId = data['reporterId']?.toString() ?? '';
+          
+          if (reporterId.isEmpty) {
+            AppLogger.warning('Housing report ${doc.id} missing reporterId', 'AdminRepository');
+            continue;
+          }
+          
           reports.add(AdminReport(
             id: doc.id,
-            reporterId: data['reporterId'] ?? '',
+            reporterId: reporterId,
             targetId: data['listingId'],
+            reportedUserId: data['reportedUserId'],
             type: ReportType.housing,
             reason: data['reason'] ?? data['category'] ?? 'Housing Violation',
             status: _mapReportStatus(data['status']),
@@ -471,9 +666,13 @@ class AdminRepository {
 
   ReportStatus _mapReportStatus(String? status) {
     switch (status) {
-      case 'under_review': return ReportStatus.underReview;
-      case 'resolved': return ReportStatus.resolved;
-      case 'dismissed': return ReportStatus.dismissed;
+      case 'under_review':
+      case 'underReview':
+        return ReportStatus.underReview;
+      case 'resolved':
+        return ReportStatus.resolved;
+      case 'dismissed':
+        return ReportStatus.dismissed;
       case 'pending':
       default:
         return ReportStatus.pending;
@@ -488,10 +687,12 @@ class AdminRepository {
     String? notes,
     int? suspensionDays,
   }) async {
+    if (report.id.isEmpty) throw Exception('Invalid Report ID');
+    
     // Defense-in-depth: Re-verify admin status for destructive actions
-    final adminDoc = await _firestore.collection('users').doc(adminId).get();
-    final isAdmin = (adminDoc.data() as Map<String, dynamic>?)?['isAdmin'] ?? false;
-    if (!isAdmin) throw Exception('Unauthorized: Administrative privileges required.');
+    if (!await _isUserAdmin(adminId)) {
+      throw Exception('Unauthorized: Administrative privileges required.');
+    }
 
     final batch = _firestore.batch();
     final timestamp = DateTime.now();
@@ -508,29 +709,26 @@ class AdminRepository {
     
     batch.update(reportRef, {
       'status': action == 'dismiss' ? 'dismissed' : 'resolved',
+      'lastAction': action,  // Track the specific action taken
       'history': FieldValue.arrayUnion([historyItem.toJson()]),
       'updatedAt': FieldValue.serverTimestamp(),
     });
 
     // 2. Perform Content/User Actions
-    if (action == 'remove' && report.targetId != null) {
+    if (action == 'remove' && report.targetId != null && report.targetId!.isNotEmpty) {
       await _removeContent(batch, report.type, report.targetId!);
-    } else if (action == 'warn' && report.reportedUserId != null) {
-      await _warnUser(report.reportedUserId!, notes ?? report.reason);
-    } else if (action == 'suspend' && report.reportedUserId != null) {
+    } else if (action == 'warn' && report.reportedUserId != null && report.reportedUserId!.isNotEmpty) {
+      // Notification handled in service
+    } else if (action == 'suspend' && report.reportedUserId != null && report.reportedUserId!.isNotEmpty) {
       final until = timestamp.add(Duration(days: suspensionDays ?? 7));
-      batch.update(_firestore.collection('users').doc(report.reportedUserId), {
+      batch.update(_firestore.collection('users').doc(report.reportedUserId!), {
         'suspendedUntil': Timestamp.fromDate(until),
       });
-      await _notifyModeration(report.reportedUserId!, 'Account Suspended', 
-          'Your account has been suspended until ${until.toString().split(' ').first} due to community violations.');
-    } else if (action == 'ban' && report.reportedUserId != null) {
-      batch.update(_firestore.collection('users').doc(report.reportedUserId), {
+    } else if (action == 'ban' && report.reportedUserId != null && report.reportedUserId!.isNotEmpty) {
+      batch.update(_firestore.collection('users').doc(report.reportedUserId!), {
         'isBanned': true,
         'banReason': notes ?? report.reason,
       });
-      await _notifyModeration(report.reportedUserId!, 'Account Banned', 
-          'Your account has been permanently banned from UniHub for violating our terms of service.');
     }
 
     await batch.commit();
@@ -544,7 +742,7 @@ class AdminRepository {
       targetType: 'report',
       timestamp: DateTime.now(),
       reason: notes,
-      metadata: {'action': action, 'targetId': report.targetId},
+      metadata: {'action': action, 'targetId': report.targetId, 'reportedUserId': report.reportedUserId},
     ));
   }
 
@@ -555,30 +753,12 @@ class AdminRepository {
       batch.update(_firestore.collection('housing_listings').doc(targetId), {'status': 'removed'});
     } else if (type == ReportType.feedItem) {
       batch.delete(_firestore.collection('feed').doc(targetId));
+    } else if (type == ReportType.note) {
+      batch.update(_firestore.collection('notes').doc(targetId), {'status': 'removed'});
+    } else if (type == ReportType.event) {
+      batch.update(_firestore.collection('events').doc(targetId), {'status': 'removed'});
     }
     // TODO: Notify content owner if possible
-  }
-
-  Future<void> _warnUser(String userId, String reason) async {
-    if (_notificationService != null) {
-      await _notificationService!.sendNotification(
-        recipientId: userId,
-        title: 'Community Warning ⚠️',
-        body: 'You have received a warning for: $reason. Repeated violations may lead to suspension.',
-        type: NotificationType.system,
-      );
-    }
-  }
-
-  Future<void> _notifyModeration(String userId, String title, String body) async {
-    if (_notificationService != null) {
-      await _notificationService!.sendNotification(
-        recipientId: userId,
-        title: title,
-        body: body,
-        type: NotificationType.system,
-      );
-    }
   }
 
   // --- User Management Methods ---
@@ -666,6 +846,11 @@ class AdminRepository {
   }
 
   Future<void> updateUserRoles(String userId, List<String> roles, {required String adminId, required String adminName}) async {
+    if (userId.isEmpty) throw Exception('Invalid User ID');
+    // Re-verify admin privileges
+    if (!await _isUserAdmin(adminId)) {
+      throw Exception('Unauthorized: Administrative privileges required.');
+    }
     await _firestore.collection('users').doc(userId).update({
       'roles': roles,
       'updatedAt': FieldValue.serverTimestamp(),
@@ -684,30 +869,18 @@ class AdminRepository {
   }
 
   Future<void> toggleUserBan(String userId, bool isBanned, {required String adminId, required String adminName, String? reason}) async {
+    if (userId.isEmpty) throw Exception('Invalid User ID');
+    
     // Defense-in-depth: Re-verify admin status for destructive actions
-    final adminDoc = await _firestore.collection('users').doc(adminId).get();
-    final isAdmin = (adminDoc.data() as Map<String, dynamic>?)?['isAdmin'] ?? false;
-    if (!isAdmin) throw Exception('Unauthorized: Administrative privileges required.');
+    if (!await _isUserAdmin(adminId)) {
+      throw Exception('Unauthorized: Administrative privileges required.');
+    }
 
     await _firestore.collection('users').doc(userId).update({
       'isBanned': isBanned,
       'banReason': isBanned ? reason : null,
       'updatedAt': FieldValue.serverTimestamp(),
     });
-
-    if (isBanned) {
-      await _notifyModeration(
-        userId, 
-        'Account Banned', 
-        'Your account has been permanently banned from UniHub for violating our terms of service.'
-      );
-    } else {
-       await _notifyModeration(
-        userId, 
-        'Account Reinstated', 
-        'Your account ban has been lifted. You can now access UniHub services again.'
-      );
-    }
 
     await logAction(AdminAuditLog(
       id: '',
@@ -722,16 +895,15 @@ class AdminRepository {
   }
 
   Future<void> suspendUser(String userId, DateTime until, String reason, {required String adminId, required String adminName}) async {
+    if (userId.isEmpty) throw Exception('Invalid User ID');
+    // Re-verify admin privileges
+    if (!await _isUserAdmin(adminId)) {
+      throw Exception('Unauthorized: Administrative privileges required.');
+    }
     await _firestore.collection('users').doc(userId).update({
       'suspendedUntil': Timestamp.fromDate(until),
       'updatedAt': FieldValue.serverTimestamp(),
     });
-
-    await _notifyModeration(
-      userId, 
-      'Account Suspended', 
-      'Your account has been suspended until ${until.toString().split(' ').first} due to community violations: $reason'
-    );
 
     await logAction(AdminAuditLog(
       id: '',
@@ -747,6 +919,11 @@ class AdminRepository {
   }
 
   Future<void> updateUserTrustScore(String userId, double score, {required String adminId, required String adminName}) async {
+    if (userId.isEmpty) throw Exception('Invalid User ID');
+    // Re-verify admin privileges
+    if (!await _isUserAdmin(adminId)) {
+      throw Exception('Unauthorized: Administrative privileges required.');
+    }
     await _firestore.collection('users').doc(userId).update({
       'trustScore': score,
       'updatedAt': FieldValue.serverTimestamp(),
@@ -765,6 +942,11 @@ class AdminRepository {
   }
 
   Future<void> resetUserVerification(String userId, {required String adminId, required String adminName}) async {
+    if (userId.isEmpty) throw Exception('Invalid User ID');
+    // Re-verify admin privileges
+    if (!await _isUserAdmin(adminId)) {
+      throw Exception('Unauthorized: Administrative privileges required.');
+    }
     final batch = _firestore.batch();
     final userRef = _firestore.collection('users').doc(userId);
     
@@ -791,6 +973,7 @@ class AdminRepository {
   }
 
   Future<Map<String, dynamic>> getUserActivityStats(String userId) async {
+    if (userId.isEmpty) throw Exception('Invalid User ID');
     final results = await Future.wait([
       _firestore.collection('listings').where('sellerId', isEqualTo: userId).count().get(),
       _firestore.collection('housing_listings').where('plugId', isEqualTo: userId).count().get(),
@@ -810,8 +993,7 @@ class AdminRepository {
   }
 
   Future<List<AdminVerificationRequest>> getUserVerificationHistory(String userId) async {
-    // This is similar to watchVerificationRequests but filtered for a single user
-    // and returns a Future list.
+    if (userId.isEmpty) return [];
     
     final snapshots = await Future.wait([
       _firestore.collection('identity_verifications').where('userId', isEqualTo: userId).get(),
@@ -877,6 +1059,7 @@ class AdminRepository {
   }
 
   Future<List<AdminReport>> getUserReports(String userId, {bool received = true}) async {
+    if (userId.isEmpty) return [];
     final queryField = received ? 'reportedUserId' : 'reporterId';
     
     final snapshots = await Future.wait([
@@ -929,6 +1112,11 @@ class AdminRepository {
   }
 
   Future<void> addAdminNote(String userId, String note, String adminId) async {
+    if (userId.isEmpty) throw Exception('Invalid User ID');
+    // Verify admin privileges
+    if (!await _isUserAdmin(adminId)) {
+      throw Exception('Unauthorized: Administrative privileges required.');
+    }
     final noteObj = {
       'adminId': adminId,
       'note': note,
@@ -949,47 +1137,122 @@ class AdminRepository {
 
   // --- Bulk Operations ---
 
-  Future<void> bulkProcessVerifications({
-    required List<AdminVerificationRequest> requests,
-    required AdminVerificationStatus status,
-    required String adminId,
-    required String adminName,
-    String? reason,
-  }) async {
-    final batch = _firestore.batch();
-    
-    for (var request in requests) {
-      final collectionName = _getCollectionName(request.type);
-      batch.update(_firestore.collection(collectionName).doc(request.id), {
-        'status': _statusToDb(status),
-        'updatedAt': FieldValue.serverTimestamp(),
-        if (reason != null) 'rejectionReason': reason,
-      });
+   Future<void> bulkProcessVerifications({
+     required List<AdminVerificationRequest> requests,
+     required AdminVerificationStatus status,
+     required String adminId,
+     required String adminName,
+     String? reason,
+   }) async {
+     // Authorization check - defense in depth
+     if (!await _isUserAdmin(adminId)) {
+       throw Exception('Unauthorized: Administrative privileges required.');
+     }
 
-      // Update user
-      final userRef = _firestore.collection('users').doc(request.userId);
-      if (status == AdminVerificationStatus.approved) {
-        if (request.type == AdminVerificationType.identity) {
-          batch.update(userRef, {'isIdentityVerified': true, 'identityStatus': 'approved'});
-        } else if (request.type == AdminVerificationType.student) {
-          batch.update(userRef, {'isStudentVerified': true});
-        }
-      }
-    }
+     AppLogger.info('=== BULK VERIFICATION PROCESSING === count: ${requests.length}', 'AdminRepository');
 
-    await batch.commit();
+     final batch = _firestore.batch();
+     final timestamp = FieldValue.serverTimestamp();
+     double totalBoost = 0.0;
+     int skipped = 0;
+     int processed = 0;
 
-    await logAction(AdminAuditLog(
-      id: '',
-      adminId: adminId,
-      adminName: adminName,
-      actionType: AdminActionType.bulkAction,
-      targetId: 'multiple',
-      targetType: 'verification',
-      timestamp: DateTime.now(),
-      reason: 'Bulk ${status.name} of ${requests.length} requests',
-    ));
-  }
+     for (var request in requests) {
+       if (request.id.isEmpty || request.id.trim().isEmpty) {
+         AppLogger.warning('⚠️ Skipping verification with empty ID', 'AdminRepository');
+         skipped++;
+         continue;
+       }
+       
+       if (request.userId.isEmpty || request.userId.trim().isEmpty) {
+         AppLogger.warning('⚠️ Skipping verification with empty userId: id=${request.id}', 'AdminRepository');
+         skipped++;
+         continue;
+       }
+       
+       final collectionName = _getCollectionName(request.type);
+       if (collectionName.isEmpty) {
+         AppLogger.warning('⚠️ Skipping verification with invalid type: ${request.type}', 'AdminRepository');
+         skipped++;
+         continue;
+       }
+
+       final boost = TrustEngine.getTrustBoost(request.type, status);
+       totalBoost += boost;
+
+       batch.update(_firestore.collection(collectionName).doc(request.id), {
+         'status': _statusToDb(status),
+         'updatedAt': timestamp,
+         if (status == AdminVerificationStatus.approved) 'verifiedAt': timestamp,
+         if (reason != null && reason.isNotEmpty) 'rejectionReason': reason,
+       });
+
+       // Update associated target (User or Organizer)
+       if (request.type == AdminVerificationType.organizer) {
+         final organizerId = request.metadata['organizerId']?.toString();
+         if (organizerId != null && organizerId.isNotEmpty && organizerId.trim().isNotEmpty) {
+           String organizerStatus = 'submitted';
+           switch (status) {
+             case AdminVerificationStatus.approved: organizerStatus = 'verified'; break;
+             case AdminVerificationStatus.rejected: organizerStatus = 'rejected'; break;
+             case AdminVerificationStatus.underReview: organizerStatus = 'underReview'; break;
+             case AdminVerificationStatus.resubmissionRequested: organizerStatus = 'rejected'; break;
+             case AdminVerificationStatus.pending: organizerStatus = 'submitted'; break;
+           }
+           
+           batch.update(_firestore.collection('organizers').doc(organizerId), {
+             'verificationStatus': organizerStatus,
+             'updatedAt': timestamp,
+             if (status == AdminVerificationStatus.approved) 'trustScore': FieldValue.increment(boost),
+           });
+           
+           // Also update owner's trust score if approved
+           final ownerId = request.metadata['ownerId']?.toString();
+           if (ownerId != null && ownerId.isNotEmpty && ownerId.trim().isNotEmpty && status == AdminVerificationStatus.approved) {
+             batch.update(_firestore.collection('users').doc(ownerId), {
+               'trustScore': FieldValue.increment(boost),
+             });
+           }
+         }
+       } else {
+         final userRef = _firestore.collection('users').doc(request.userId);
+         
+         if (request.type == AdminVerificationType.identity) {
+           batch.update(userRef, {
+             'isIdentityVerified': status == AdminVerificationStatus.approved,
+             'identityStatus': _statusToDb(status),
+           });
+         } else if (request.type == AdminVerificationType.student) {
+           batch.update(userRef, {
+             'isStudentVerified': status == AdminVerificationStatus.approved,
+           });
+         } else if (request.type == AdminVerificationType.professional && status == AdminVerificationStatus.approved) {
+            if (request.role != null) {
+              batch.update(userRef, {
+                'verifiedRoles': FieldValue.arrayUnion([request.role]),
+              });
+            }
+         }
+       }
+       
+       processed++;
+     }
+
+     AppLogger.info('📊 Bulk processing summary: $processed processed, $skipped skipped', 'AdminRepository');
+     await batch.commit();
+
+     await logAction(AdminAuditLog(
+       id: '',
+       adminId: adminId,
+       adminName: adminName,
+       actionType: AdminActionType.bulkAction,
+       targetId: 'multiple',
+       targetType: 'verification',
+       timestamp: DateTime.now(),
+       reason: 'Bulk ${status.name} of ${processed} verified requests (${skipped} skipped, Total Trust Boost: ${totalBoost.toStringAsFixed(1)})',
+       metadata: {'count': processed, 'skipped': skipped, 'totalBoost': totalBoost, 'status': status.name},
+     ));
+   }
 
   Future<void> bulkResolveReports({
     required List<AdminReport> reports,
@@ -1059,9 +1322,9 @@ class AdminRepository {
     required String adminName,
   }) async {
     // Defense-in-depth: Re-verify admin status
-    final adminDoc = await _firestore.collection('users').doc(adminId).get();
-    final isAdmin = (adminDoc.data() as Map<String, dynamic>?)?['isAdmin'] ?? false;
-    if (!isAdmin) throw Exception('Unauthorized: Administrative privileges required.');
+    if (!await _isUserAdmin(adminId)) {
+      throw Exception('Unauthorized: Administrative privileges required.');
+    }
 
     final batch = _firestore.batch();
     
@@ -1154,6 +1417,11 @@ class AdminRepository {
   }
 
   Future<void> updateSupportConversationStatus(String conversationId, String status, {required String adminId, required String adminName}) async {
+    if (conversationId.isEmpty) throw Exception('Invalid Conversation ID');
+    // Defense-in-depth: re-verify admin privileges
+    if (!await _isUserAdmin(adminId)) {
+      throw Exception('Unauthorized: Administrative privileges required.');
+    }
     final doc = await _firestore.collection('conversations').doc(conversationId).get();
     final currentStatus = (doc.data() as Map<String, dynamic>?)?['supportStatus'];
     
@@ -1178,24 +1446,14 @@ class AdminRepository {
       timestamp: DateTime.now(),
       reason: 'Status updated to $status',
     ));
-    
-    // Notify user if resolved
-    if (status == 'resolved' && _notificationService != null) {
-      final participants = List<String>.from(doc.data()?['participants'] ?? []);
-      final userId = participants.firstWhere((p) => p != 'unihub_admin', orElse: () => '');
-      if (userId.isNotEmpty) {
-        await _notificationService!.sendNotification(
-          recipientId: userId,
-          title: 'Support Case Resolved ✅',
-          body: 'Your support ticket has been marked as resolved. Thank you for using UniHub Support.',
-          type: NotificationType.support,
-          targetId: conversationId,
-        );
-      }
-    }
   }
 
   Future<void> updateSupportConversationPriority(String conversationId, String priority, {required String adminId, required String adminName}) async {
+    if (conversationId.isEmpty) throw Exception('Invalid Conversation ID');
+    // Ensure caller is an admin
+    if (!await _isUserAdmin(adminId)) {
+      throw Exception('Unauthorized: Administrative privileges required.');
+    }
     await _firestore.collection('conversations').doc(conversationId).update({
       'supportPriority': priority,
       'updatedAt': FieldValue.serverTimestamp(),
@@ -1203,6 +1461,11 @@ class AdminRepository {
   }
 
   Future<void> assignSupportConversation(String conversationId, String? adminId, {required String adminName, required String performingAdminId}) async {
+    if (conversationId.isEmpty) throw Exception('Invalid Conversation ID');
+    // Verify the performing admin
+    if (!await _isUserAdmin(performingAdminId)) {
+      throw Exception('Unauthorized: Administrative privileges required.');
+    }
     final batch = _firestore.batch();
     final convRef = _firestore.collection('conversations').doc(conversationId);
     
@@ -1233,6 +1496,10 @@ class AdminRepository {
   }
 
   Future<void> addSupportAdminNote(String conversationId, String note, String adminId) async {
+    if (conversationId.isEmpty) throw Exception('Invalid Conversation ID');
+    if (!await _isUserAdmin(adminId)) {
+      throw Exception('Unauthorized: Administrative privileges required.');
+    }
     final noteObj = {
       'adminId': adminId,
       'note': note,
@@ -1257,5 +1524,195 @@ class AdminRepository {
       'resolved': results[2].count ?? 0,
       'total': results[3].count ?? 0,
     };
+  }
+
+  // --- Event Approval Workflow ---
+
+  Stream<List<Event>> watchSubmittedEvents({String? campusId, int limit = 50}) {
+    Query query = _firestore.collection('events')
+        .where('status', isEqualTo: 'submitted')
+        .where('isDeleted', isEqualTo: false)
+        .orderBy('createdAt', descending: true)
+        .limit(limit);
+
+    if (campusId != null && campusId.isNotEmpty) {
+      query = query.where('campusId', isEqualTo: campusId);
+    }
+
+    return query.snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) => Event.fromFirestore(doc)).toList();
+    });
+  }
+
+  Future<Event?> getSubmittedEvent(String eventId) async {
+    final doc = await _firestore.collection('events').doc(eventId).get();
+    if (!doc.exists) return null;
+    return Event.fromFirestore(doc);
+  }
+
+  Future<void> approveEvent({
+    required String eventId,
+    required String adminId,
+    String? reason,
+  }) async {
+    if (!await _isUserAdmin(adminId)) {
+      throw Exception('Unauthorized: Administrative privileges required.');
+    }
+
+    final event = await getSubmittedEvent(eventId);
+    if (event == null) throw Exception('Event not found');
+    if (event.status != EventStatus.submitted) {
+      throw Exception('Only submitted events can be approved');
+    }
+
+    // Update event status to approved
+    await _firestore.collection('events').doc(eventId).update({
+      'status': EventStatus.approved.name,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    // Notify organizer members
+    final membersSnapshot = await _firestore
+        .collection('organizers')
+        .doc(event.organizerId)
+        .collection('members')
+        .get();
+
+    for (final memberDoc in membersSnapshot.docs) {
+      final memberData = memberDoc.data() as Map<String, dynamic>;
+      final userId = memberData['userId'] as String?;
+      if (userId != null) {
+        // Queue notification (will be sent by Cloud Function or NotificationService)
+        await _firestore.collection('notifications_queue').add({
+          'recipientId': userId,
+          'title': 'Event Approved! ✅',
+          'body': 'Your event "${event.title}" has been approved and is now live on campus.',
+          'type': 'events',
+          'targetId': eventId,
+          'targetType': 'event',
+          'createdAt': FieldValue.serverTimestamp(),
+          'status': 'pending',
+        });
+      }
+    }
+
+    // Log audit trail
+    await logAction(AdminAuditLog(
+      id: '',
+      adminId: adminId,
+      adminName: 'Admin',
+      actionType: AdminActionType.eventApproval,
+      targetId: eventId,
+      targetType: 'event',
+      timestamp: DateTime.now(),
+      reason: reason ?? 'Event approved and published to campus',
+    ));
+
+    AppLogger.info('Event Approved: $eventId by Admin: $adminId', 'AdminRepository');
+  }
+
+  Future<void> rejectEvent({
+    required String eventId,
+    required String adminId,
+    required String reason,
+  }) async {
+    if (!await _isUserAdmin(adminId)) {
+      throw Exception('Unauthorized: Administrative privileges required.');
+    }
+
+    if (reason.trim().isEmpty) {
+      throw Exception('Rejection reason is required');
+    }
+
+    final event = await getSubmittedEvent(eventId);
+    if (event == null) throw Exception('Event not found');
+    if (event.status != EventStatus.submitted) {
+      throw Exception('Only submitted events can be rejected');
+    }
+
+    // Update event status to draft with rejection metadata
+    await _firestore.collection('events').doc(eventId).update({
+      'status': EventStatus.draft.name,
+      'updatedAt': FieldValue.serverTimestamp(),
+      'rejectionReason': reason,
+      'rejectedAt': FieldValue.serverTimestamp(),
+      'rejectedBy': adminId,
+    });
+
+    // Notify organizer members
+    final membersSnapshot = await _firestore
+        .collection('organizers')
+        .doc(event.organizerId)
+        .collection('members')
+        .get();
+
+    for (final memberDoc in membersSnapshot.docs) {
+      final memberData = memberDoc.data() as Map<String, dynamic>;
+      final userId = memberData['userId'] as String?;
+      if (userId != null) {
+        await _firestore.collection('notifications_queue').add({
+          'recipientId': userId,
+          'title': 'Event Needs Review ⚠️',
+          'body': 'Your event "${event.title}" was not approved. Reason: $reason',
+          'type': 'events',
+          'targetId': eventId,
+          'targetType': 'event',
+          'createdAt': FieldValue.serverTimestamp(),
+          'status': 'pending',
+        });
+      }
+    }
+
+    // Log audit trail
+    await logAction(AdminAuditLog(
+      id: '',
+      adminId: adminId,
+      adminName: 'Admin',
+      actionType: AdminActionType.eventRejection,
+      targetId: eventId,
+      targetType: 'event',
+      timestamp: DateTime.now(),
+      reason: reason,
+    ));
+
+    AppLogger.info('Event Rejected: $eventId by Admin: $adminId. Reason: $reason', 'AdminRepository');
+  }
+
+  Future<void> bulkApproveEvents({
+    required List<String> eventIds,
+    required String adminId,
+    String? reason,
+  }) async {
+    if (!await _isUserAdmin(adminId)) {
+      throw Exception('Unauthorized: Administrative privileges required.');
+    }
+
+    for (final eventId in eventIds) {
+      try {
+        await approveEvent(eventId: eventId, adminId: adminId, reason: reason);
+      } catch (e) {
+        AppLogger.error('Failed to approve event $eventId', e, StackTrace.current, 'AdminRepository');
+        rethrow;
+      }
+    }
+  }
+
+  Future<void> bulkRejectEvents({
+    required List<String> eventIds,
+    required String adminId,
+    required String reason,
+  }) async {
+    if (!await _isUserAdmin(adminId)) {
+      throw Exception('Unauthorized: Administrative privileges required.');
+    }
+
+    for (final eventId in eventIds) {
+      try {
+        await rejectEvent(eventId: eventId, adminId: adminId, reason: reason);
+      } catch (e) {
+        AppLogger.error('Failed to reject event $eventId', e, StackTrace.current, 'AdminRepository');
+        rethrow;
+      }
+    }
   }
 }

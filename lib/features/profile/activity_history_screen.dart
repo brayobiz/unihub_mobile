@@ -129,19 +129,25 @@ class _ActivityHistoryScreenState extends ConsumerState<ActivityHistoryScreen> {
         final repo = ref.read(marketplaceRepositoryProvider);
         final listing = await repo.getListingById(item.id);
         if (listing != null && mounted) {
-          context.push('/listing-detail', extra: listing);
+          context.push('/listing-detail/${listing.id}', extra: listing);
+        } else if (mounted) {
+          context.push('/listing-detail/${item.id}');
         }
       } else if (item.type == 'housing') {
         final repo = ref.read(housingRepositoryProvider);
         final listing = await repo.getListingById(item.id);
         if (listing != null && mounted) {
-          context.push('/housing-detail', extra: listing);
+          context.push('/housing-detail/${listing.id}', extra: listing);
+        } else if (mounted) {
+          context.push('/housing-detail/${item.id}');
         }
       } else if (item.type == 'note') {
         final repo = ref.read(notesRepositoryProvider);
         final note = await repo.getNoteById(item.id);
         if (note != null && mounted) {
-          context.push('/note-detail', extra: note);
+          context.push('/note-detail/${note.id}', extra: note);
+        } else if (mounted) {
+          context.push('/note-detail/${item.id}');
         }
       }
     } catch (e) {

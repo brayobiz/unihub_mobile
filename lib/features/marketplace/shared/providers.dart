@@ -5,7 +5,8 @@ import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import '../data/repositories/marketplace_repository_impl.dart';
 import '../domain/models/listing.dart';
 import '../domain/repositories/marketplace_repository.dart';
-import '../../../../services/notification_service.dart';
+import 'package:unihub_mobile/services/notification_service.dart';
+import 'package:unihub_mobile/features/shared/notification_repository.dart';
 import '../domain/models/listing_filter.dart';
 import '../../campus_filter/shared/providers.dart';
 
@@ -15,10 +16,11 @@ final marketplaceRepositoryProvider = Provider<MarketplaceRepository>((ref) {
     ref.watch(firestoreProvider),
     campus,
     ref.watch(notificationServiceProvider),
+    ref.watch(userActivityRepositoryProvider),
   );
 });
 
-final listingsProvider = StreamProvider.family<List<Listing>, ListingFilter>((ref, filter) {
+final listingsProvider = StreamProvider.autoDispose.family<List<Listing>, ListingFilter>((ref, filter) {
   final repo = ref.watch(marketplaceRepositoryProvider);
   final user = ref.watch(appUserProvider).valueOrNull;
 
@@ -39,13 +41,13 @@ final listingsProvider = StreamProvider.family<List<Listing>, ListingFilter>((re
   });
 });
 
-final recentlyViewedProvider = StreamProvider<List<Listing>>((ref) {
+final recentlyViewedProvider = StreamProvider.autoDispose<List<Listing>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
   if (user == null) return Stream.value([]);
   return ref.watch(marketplaceRepositoryProvider).watchRecentlyViewed(user.uid);
 });
 
-final trendingListingsProvider = StreamProvider<List<Listing>>((ref) {
+final trendingListingsProvider = StreamProvider.autoDispose<List<Listing>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
   return ref.watch(marketplaceRepositoryProvider).watchTrendingListings().map((listings) {
     if (user == null || user.blockedUids.isEmpty) return listings;
@@ -53,7 +55,7 @@ final trendingListingsProvider = StreamProvider<List<Listing>>((ref) {
   });
 });
 
-final recommendedListingsProvider = StreamProvider<List<Listing>>((ref) {
+final recommendedListingsProvider = StreamProvider.autoDispose<List<Listing>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
   if (user == null) {
     return ref.watch(marketplaceRepositoryProvider).watchTrendingListings();
@@ -65,121 +67,63 @@ final recommendedListingsProvider = StreamProvider<List<Listing>>((ref) {
   });
 });
 
-final collectionNamesProvider = StreamProvider<List<String>>((ref) {
+final collectionNamesProvider = StreamProvider.autoDispose<List<String>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
   if (user == null) return Stream.value([]);
   return ref.watch(marketplaceRepositoryProvider).watchCollectionNames(user.uid);
 });
 
-final collectionListingsProvider = StreamProvider.family<List<Listing>, String>((ref, collectionName) {
+final collectionListingsProvider = StreamProvider.autoDispose.family<List<Listing>, String>((ref, collectionName) {
   final user = ref.watch(appUserProvider).valueOrNull;
   if (user == null) return Stream.value([]);
   return ref.watch(marketplaceRepositoryProvider).watchCollectionListings(user.uid, collectionName);
 });
 
-final recentSearchesProvider = StreamProvider<List<String>>((ref) {
+final recentSearchesProvider = StreamProvider.autoDispose<List<String>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
   if (user == null) return Stream.value([]);
   return ref.watch(marketplaceRepositoryProvider).watchRecentSearches(user.uid);
 });
 
-final sellerListingsProvider = StreamProvider.family<List<Listing>, String>((ref, sellerId) {
+final sellerListingsProvider = StreamProvider.autoDispose.family<List<Listing>, String>((ref, sellerId) {
   return ref.watch(marketplaceRepositoryProvider).watchSellerListings(sellerId);
 });
 
-final listingProvider = StreamProvider.family<Listing?, String>((ref, id) {
+final listingProvider = StreamProvider.autoDispose.family<Listing?, String>((ref, id) {
   return ref.watch(marketplaceRepositoryProvider).watchListingById(id);
 });
 
-final topListingsProvider = StreamProvider<List<Listing>>((ref) {
+final topListingsProvider = StreamProvider.autoDispose<List<Listing>>((ref) {
   return ref.watch(listingsProvider(ListingFilter()).stream);
 });
 
-final savedListingsProvider = StreamProvider<List<Listing>>((ref) {
+final savedListingsProvider = StreamProvider.autoDispose<List<Listing>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
   if (user == null) return Stream.value([]);
   return ref.watch(marketplaceRepositoryProvider).watchSavedListings(user.uid);
 });
 
-class MarketplaceDiscoveryData {
-  final List<Listing> recentlyViewed;
-  final List<Listing> recommended;
-  final List<Listing> trending;
-  final List<Listing> recentlyPosted;
-  final List<Listing> mostSaved;
-  final List<Listing> popular;
-
-  MarketplaceDiscoveryData({
-    required this.recentlyViewed,
-    required this.recommended,
-    required this.trending,
-    required this.recentlyPosted,
-    required this.mostSaved,
-    required this.popular,
-  });
-}
-
-final marketplaceDiscoveryProvider = Provider<AsyncValue<MarketplaceDiscoveryData>>((ref) {
-  final recentlyViewedAsync = ref.watch(recentlyViewedProvider);
-  final recommendedAsync = ref.watch(recommendedListingsProvider);
-  final trendingAsync = ref.watch(trendingListingsProvider);
-  
-  final recentlyPostedAsync = ref.watch(listingsProvider(ListingFilter(sortBy: ListingSortType.newest, itemsLimit: 10)));
-  final mostSavedAsync = ref.watch(listingsProvider(ListingFilter(sortBy: ListingSortType.mostSaved, itemsLimit: 10)));
-  final popularAsync = ref.watch(listingsProvider(ListingFilter(sortBy: ListingSortType.mostViewed, itemsLimit: 10)));
-
-  if (recentlyViewedAsync.isLoading || recommendedAsync.isLoading || trendingAsync.isLoading || 
-      recentlyPostedAsync.isLoading || mostSavedAsync.isLoading || popularAsync.isLoading) {
-    return const AsyncValue.loading();
-  }
-
-  if (recentlyViewedAsync.hasError) return AsyncValue.error(recentlyViewedAsync.error!, recentlyViewedAsync.stackTrace!);
-  if (recommendedAsync.hasError) return AsyncValue.error(recommendedAsync.error!, recommendedAsync.stackTrace!);
-  if (trendingAsync.hasError) return AsyncValue.error(trendingAsync.error!, trendingAsync.stackTrace!);
-  if (recentlyPostedAsync.hasError) return AsyncValue.error(recentlyPostedAsync.error!, recentlyPostedAsync.stackTrace!);
-  if (mostSavedAsync.hasError) return AsyncValue.error(mostSavedAsync.error!, mostSavedAsync.stackTrace!);
-  if (popularAsync.hasError) return AsyncValue.error(popularAsync.error!, popularAsync.stackTrace!);
-
-  final seenIds = <String>{};
-  
-  final recentlyViewed = (recentlyViewedAsync.value ?? []).where((l) => seenIds.add(l.id)).toList();
-  final recommended = (recommendedAsync.value ?? []).where((l) => seenIds.add(l.id)).toList();
-  final recentlyPosted = (recentlyPostedAsync.value ?? []).where((l) => seenIds.add(l.id)).toList();
-  final mostSaved = (mostSavedAsync.value ?? []).where((l) => seenIds.add(l.id)).toList();
-  final popular = (popularAsync.value ?? []).where((l) => seenIds.add(l.id)).toList();
-  final trending = (trendingAsync.value ?? []).where((l) => seenIds.add(l.id)).toList();
-
-  return AsyncValue.data(MarketplaceDiscoveryData(
-    recentlyViewed: recentlyViewed,
-    recommended: recommended,
-    trending: trending,
-    recentlyPosted: recentlyPosted,
-    mostSaved: mostSaved,
-    popular: popular,
-  ));
-});
-
-final sellerReviewsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, sellerId) {
+final sellerReviewsProvider = StreamProvider.autoDispose.family<List<Map<String, dynamic>>, String>((ref, sellerId) {
   if (sellerId.isEmpty) return Stream.value([]);
   
   return ref.watch(firestoreProvider)
       .collection('users')
       .doc(sellerId)
       .collection('reviews')
-      .orderBy('timestamp', descending: true)
+      .orderBy('createdAt', descending: true)
       .snapshots()
       .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
 });
 
-final similarListingsProvider = StreamProvider.family<List<Listing>, Listing>((ref, currentListing) {
+final similarListingsProvider = StreamProvider.autoDispose.family<List<Listing>, Listing>((ref, currentListing) {
   return ref.watch(marketplaceRepositoryProvider).watchSimilarListings(currentListing);
 });
 
-final moreFromSellerProvider = StreamProvider.family<List<Listing>, String>((ref, sellerId) {
+final moreFromSellerProvider = StreamProvider.autoDispose.family<List<Listing>, String>((ref, sellerId) {
   return ref.watch(marketplaceRepositoryProvider).watchSellerListingsByStatus(sellerId, ListingStatus.active);
 });
 
-final otherUserProvider = StreamProvider.family<AppUser, String>((ref, userId) {
+final otherUserProvider = StreamProvider.autoDispose.family<AppUser, String>((ref, userId) {
   if (userId.isEmpty) return Stream.error('Invalid User ID');
 
   final currentUser = ref.watch(appUserProvider).valueOrNull;

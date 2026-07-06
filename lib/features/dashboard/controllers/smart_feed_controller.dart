@@ -26,15 +26,16 @@ class SmartFeedItem {
   });
 }
 
-final smartFeedProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
+final smartFeedProvider = Provider.autoDispose<AsyncValue<List<SmartFeedItem>>>((ref) {
   final marketplaceAsync = ref.watch(listingsProvider(ListingFilter(itemsLimit: 10)));
   final housingAsync = ref.watch(housingListingsProvider(10));
   final notesAsync = ref.watch(notesListingsProvider(10));
   final gigsAsync = ref.watch(gigsFeedProvider);
   final communityAsync = ref.watch(communityFeedProvider);
+  final roommatesAsync = ref.watch(roommateProfilesProvider);
 
   if (marketplaceAsync.isLoading || housingAsync.isLoading || notesAsync.isLoading || 
-      gigsAsync.isLoading || communityAsync.isLoading) {
+      gigsAsync.isLoading || communityAsync.isLoading || roommatesAsync.isLoading) {
     return const AsyncValue.loading();
   }
 
@@ -43,10 +44,23 @@ final smartFeedProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
   final notes = notesAsync.valueOrNull ?? [];
   final gigs = gigsAsync.valueOrNull ?? [];
   final community = communityAsync.valueOrNull ?? [];
+  final roommates = roommatesAsync.valueOrNull ?? [];
 
   final List<SmartFeedItem> allItems = [];
 
   // Add items from all sources
+  for (var r in roommates) {
+    allItems.add(SmartFeedItem(
+      source: SmartFeedSource.fresh,
+      originalData: r,
+      model: FeedItemModel(
+        type: widgets.FeedType.housing,
+        title: 'Roommate: ${r.name}',
+        subtitle: 'Budget: KES ${r.budget.toInt()} • ${r.preferredLocation}',
+        time: r.campus,
+      ),
+    ));
+  }
   for (var l in listings) {
     allItems.add(SmartFeedItem(
       source: SmartFeedSource.fresh,
@@ -122,7 +136,7 @@ final smartFeedProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
   return AsyncValue.data(allItems);
 });
 
-final campusPulseProvider = Provider<AsyncValue<Map<String, int>>>((ref) {
+final campusPulseProvider = Provider.autoDispose<AsyncValue<Map<String, int>>>((ref) {
   final marketplaceAsync = ref.watch(listingsProvider(ListingFilter(itemsLimit: 20)));
   final housingAsync = ref.watch(housingListingsProvider(20));
   final notesAsync = ref.watch(notesListingsProvider(20));
@@ -140,7 +154,7 @@ final campusPulseProvider = Provider<AsyncValue<Map<String, int>>>((ref) {
   });
 });
 
-final personalizedRecommendationsProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
+final personalizedRecommendationsProvider = Provider.autoDispose<AsyncValue<List<SmartFeedItem>>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
   final allFeedAsync = ref.watch(smartFeedProvider);
   final browsingCampus = ref.watch(effectiveCampusFilterProvider);
@@ -184,7 +198,7 @@ final personalizedRecommendationsProvider = Provider<AsyncValue<List<SmartFeedIt
   });
 });
 
-final trendingFeedProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
+final trendingFeedProvider = Provider.autoDispose<AsyncValue<List<SmartFeedItem>>>((ref) {
   final allFeedAsync = ref.watch(smartFeedProvider);
 
   return allFeedAsync.whenData((items) {
@@ -218,7 +232,7 @@ final trendingFeedProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
   });
 });
 
-final newItemsSummaryProvider = Provider<AsyncValue<Map<String, int>>>((ref) {
+final newItemsSummaryProvider = Provider.autoDispose<AsyncValue<Map<String, int>>>((ref) {
   final lastVisit = ref.watch(lastVisitProvider);
   if (lastVisit == null) return const AsyncValue.data({});
 
@@ -249,7 +263,7 @@ final newItemsSummaryProvider = Provider<AsyncValue<Map<String, int>>>((ref) {
   return AsyncValue.data(summary);
 });
 
-final recentActivityProvider = Provider<AsyncValue<List<SmartFeedItem>>>((ref) {
+final recentActivityProvider = Provider.autoDispose<AsyncValue<List<SmartFeedItem>>>((ref) {
   final allFeedAsync = ref.watch(smartFeedProvider);
   
   return allFeedAsync.whenData((items) {
