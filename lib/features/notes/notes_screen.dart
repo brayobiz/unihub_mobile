@@ -98,14 +98,23 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
               button: true,
               child: Consumer(
                 builder: (context, ref, _) {
-                  final user = ref.watch(appUserProvider).valueOrNull;
+                  // Optimization: only watch photo and name
+                  final userData = ref.watch(appUserProvider.select((u) {
+                    final user = u.valueOrNull;
+                    if (user == null) return null;
+                    return (
+                      photoUrl: user.photoUrl,
+                      fullName: user.fullName,
+                    );
+                  }));
+                  
                   return CircleAvatar(
                     radius: 16,
                     backgroundColor: theme.colorScheme.surfaceVariant,
-                    backgroundImage: user?.photoUrl != null ? NetworkImage(user!.photoUrl!) : null,
-                    child: user?.photoUrl == null 
+                    backgroundImage: userData?.photoUrl != null ? NetworkImage(userData!.photoUrl!) : null,
+                    child: userData?.photoUrl == null 
                         ? Text(
-                            user?.fullName.isNotEmpty == true ? user!.fullName[0].toUpperCase() : 'U',
+                            userData?.fullName.isNotEmpty == true ? userData!.fullName[0].toUpperCase() : 'U',
                             style: TextStyle(color: theme.colorScheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
                           )
                         : null,
@@ -119,8 +128,9 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
       ),
       floatingActionButton: Consumer(
         builder: (context, ref, _) {
-          final user = ref.watch(appUserProvider).valueOrNull;
-          if (user == null || !user.isAdmin) return const SizedBox.shrink();
+          // Optimization: only watch isAdmin
+          final isAdmin = ref.watch(appUserProvider.select((user) => user.valueOrNull?.isAdmin)) ?? false;
+          if (!isAdmin) return const SizedBox.shrink();
           
           return FloatingActionButton.extended(
             heroTag: 'notes_fab',

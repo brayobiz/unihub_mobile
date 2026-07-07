@@ -137,7 +137,15 @@ class _DashboardAppBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(appUserProvider).valueOrNull;
+    // Optimization: only watch necessary user properties to avoid reloads on presence updates
+    final userData = ref.watch(appUserProvider.select((u) {
+      final user = u.valueOrNull;
+      if (user == null) return null;
+      return (
+        fullName: user.fullName,
+        photoUrl: user.photoUrl,
+      );
+    }));
 
     String getGreeting() {
       final hour = DateTime.now().hour;
@@ -179,10 +187,10 @@ class _DashboardAppBar extends ConsumerWidget {
               child: CircleAvatar(
                 radius: 16,
                 backgroundColor: isCollapsed ? theme.colorScheme.primary.withOpacity(0.1) : Colors.white24,
-                backgroundImage: user?.photoUrl != null ? NetworkImage(user!.photoUrl!) : null,
-                child: user?.photoUrl == null 
+                backgroundImage: userData?.photoUrl != null ? NetworkImage(userData!.photoUrl!) : null,
+                child: userData?.photoUrl == null 
                     ? Text(
-                        user?.fullName.isNotEmpty == true ? user!.fullName[0].toUpperCase() : 'U',
+                        userData?.fullName.isNotEmpty == true ? userData!.fullName[0].toUpperCase() : 'U',
                         style: TextStyle(color: isCollapsed ? theme.colorScheme.primary : Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                       )
                     : null,
@@ -207,7 +215,7 @@ class _DashboardAppBar extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Text(
-                  '${getGreeting()}, ${user?.fullName.split(' ').first ?? 'Student'}! 🎓',
+                  '${getGreeting()}, ${userData?.fullName.split(' ').first ?? 'Student'}! 🎓',
                   style: theme.textTheme.headlineSmall?.copyWith(
                     color: Colors.white,
                     fontSize: 20,

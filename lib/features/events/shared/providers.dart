@@ -59,9 +59,9 @@ final organizerProvider = StreamProvider.autoDispose.family<Organizer?, String>(
 });
 
 final userManagedOrganizersProvider = StreamProvider.autoDispose<List<Organizer>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
-  if (user == null) return Stream.value([]);
-  return ref.watch(organizerRepositoryProvider).watchUserManagedOrganizers(user.uid);
+  final uid = ref.watch(appUserProvider.select((user) => user.valueOrNull?.uid));
+  if (uid == null) return Stream.value([]);
+  return ref.watch(organizerRepositoryProvider).watchUserManagedOrganizers(uid);
 });
 
 final organizerMembersProvider = StreamProvider.autoDispose.family<List<OrganizerMember>, String>((ref, organizerId) {
@@ -69,15 +69,15 @@ final organizerMembersProvider = StreamProvider.autoDispose.family<List<Organize
 });
 
 final isFollowingOrganizerProvider = StreamProvider.autoDispose.family<bool, String>((ref, organizerId) {
-  final user = ref.watch(appUserProvider).valueOrNull;
-  if (user == null) return Stream.value(false);
-  return ref.watch(organizerRepositoryProvider).isFollowingOrganizer(user.uid, organizerId);
+  final uid = ref.watch(appUserProvider.select((user) => user.valueOrNull?.uid));
+  if (uid == null) return Stream.value(false);
+  return ref.watch(organizerRepositoryProvider).isFollowingOrganizer(uid, organizerId);
 });
 
 final followedOrganizersProvider = StreamProvider.autoDispose<List<Organizer>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
-  if (user == null) return Stream.value([]);
-  return ref.watch(organizerRepositoryProvider).watchFollowedOrganizers(user.uid);
+  final uid = ref.watch(appUserProvider.select((user) => user.valueOrNull?.uid));
+  if (uid == null) return Stream.value([]);
+  return ref.watch(organizerRepositoryProvider).watchFollowedOrganizers(uid);
 });
 
 // Events
@@ -141,27 +141,27 @@ final eventsByCategoryProvider = StreamProvider.autoDispose.family<List<Event>, 
 
 // Attendance
 final eventAttendanceProvider = StreamProvider.autoDispose.family<EventAttendance?, String>((ref, eventId) {
-  final user = ref.watch(appUserProvider).valueOrNull;
-  if (user == null) return Stream.value(null);
-  return ref.watch(attendanceRepositoryProvider).watchAttendance(user.uid, eventId);
+  final uid = ref.watch(appUserProvider.select((user) => user.valueOrNull?.uid));
+  if (uid == null) return Stream.value(null);
+  return ref.watch(attendanceRepositoryProvider).watchAttendance(uid, eventId);
 });
 
 final userGoingEventsProvider = StreamProvider.autoDispose<List<Event>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
-  if (user == null) return Stream.value([]);
-  return ref.watch(attendanceRepositoryProvider).watchGoingEvents(user.uid);
+  final uid = ref.watch(appUserProvider.select((user) => user.valueOrNull?.uid));
+  if (uid == null) return Stream.value([]);
+  return ref.watch(attendanceRepositoryProvider).watchGoingEvents(uid);
 });
 
 final userSavedEventsProvider = StreamProvider.autoDispose<List<Event>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
-  if (user == null) return Stream.value([]);
-  return ref.watch(attendanceRepositoryProvider).watchSavedEvents(user.uid);
+  final uid = ref.watch(appUserProvider.select((user) => user.valueOrNull?.uid));
+  if (uid == null) return Stream.value([]);
+  return ref.watch(attendanceRepositoryProvider).watchSavedEvents(uid);
 });
 
 final userPastEventsProvider = StreamProvider.autoDispose<List<Event>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
-  if (user == null) return Stream.value([]);
-  return ref.watch(attendanceRepositoryProvider).watchPastEvents(user.uid);
+  final uid = ref.watch(appUserProvider.select((user) => user.valueOrNull?.uid));
+  if (uid == null) return Stream.value([]);
+  return ref.watch(attendanceRepositoryProvider).watchPastEvents(uid);
 });
 
 class EventDiscoveryData {

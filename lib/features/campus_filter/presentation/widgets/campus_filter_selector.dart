@@ -12,7 +12,7 @@ class CampusFilterSelector extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scope = ref.watch(browsingScopeProvider);
-    final user = ref.watch(appUserProvider).valueOrNull;
+    final userUniversity = ref.watch(appUserProvider.select((u) => u.valueOrNull?.university));
     final theme = Theme.of(context);
 
     String label;
@@ -25,7 +25,7 @@ class CampusFilterSelector extends ConsumerWidget {
         break;
       case BrowsingScopeType.myCampus:
         final uniName = CampusConstants.getDisplayName(
-          CampusConstants.resolveToId(user?.university)
+          CampusConstants.resolveToId(userUniversity)
         );
         label = 'My Campus ($uniName)';
         icon = Icons.school_rounded;
@@ -100,7 +100,7 @@ class _CampusSelectionSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final currentScope = ref.watch(browsingScopeProvider);
-    final user = ref.watch(appUserProvider).valueOrNull;
+    final userUniversity = ref.watch(appUserProvider.select((u) => u.valueOrNull?.university));
     final notifier = ref.read(browsingScopeProvider.notifier);
 
     return Container(
@@ -150,7 +150,7 @@ class _CampusSelectionSheet extends ConsumerWidget {
             context: context,
             title: 'My Campus',
             subtitle: CampusConstants.getDisplayName(
-              CampusConstants.resolveToId(user?.university)
+              CampusConstants.resolveToId(userUniversity)
             ),
             icon: Icons.school_outlined,
             selectedIcon: Icons.school_rounded,

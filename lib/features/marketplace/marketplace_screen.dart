@@ -108,14 +108,23 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
               button: true,
               child: Consumer(
                 builder: (context, ref, _) {
-                  final user = ref.watch(appUserProvider).valueOrNull;
+                  // Optimization: only watch necessary user properties to avoid reloads on presence updates
+                  final userData = ref.watch(appUserProvider.select((u) {
+                    final user = u.valueOrNull;
+                    if (user == null) return null;
+                    return (
+                      photoUrl: user.photoUrl,
+                      fullName: user.fullName,
+                    );
+                  }));
+                  
                   return CircleAvatar(
                     radius: 16,
                     backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                    backgroundImage: user?.photoUrl != null ? NetworkImage(user!.photoUrl!) : null,
-                    child: user?.photoUrl == null 
+                    backgroundImage: userData?.photoUrl != null ? NetworkImage(userData!.photoUrl!) : null,
+                    child: userData?.photoUrl == null 
                         ? Text(
-                            user?.fullName.isNotEmpty == true ? user!.fullName[0].toUpperCase() : 'U',
+                            userData?.fullName.isNotEmpty == true ? userData!.fullName[0].toUpperCase() : 'U',
                             style: TextStyle(color: theme.colorScheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
                           )
                         : null,
@@ -535,15 +544,21 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
   }
 
   Widget _buildDiscoveryContent() {
+    // Optimization: watch specific user properties
+    final userData = ref.watch(appUserProvider.select((u) {
+      final user = u.valueOrNull;
+      if (user == null) return null;
+      return (university: user.university);
+    }));
+    
     final scope = ref.watch(browsingScopeProvider);
-    final user = ref.watch(appUserProvider).valueOrNull;
 
     String trendingTitle = 'Trending';
     String recentlyPostedTitle = 'Recently Posted';
     
     if (scope.type == BrowsingScopeType.myCampus) {
       final uniName = CampusConstants.getDisplayName(
-        CampusConstants.resolveToId(user?.university) ?? user?.university
+        CampusConstants.resolveToId(userData?.university) ?? userData?.university
       );
       trendingTitle = 'Trending in $uniName';
       recentlyPostedTitle = 'New in $uniName';
@@ -835,17 +850,26 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
 
   Widget _buildMyListingsTab() {
     final theme = Theme.of(context);
-    final user = ref.watch(appUserProvider).valueOrNull;
-    if (user == null) return const Center(child: Text('Please log in to see your listings'));
+    // Optimization: only watch necessary user properties
+    final userData = ref.watch(appUserProvider.select((u) {
+      final user = u.valueOrNull;
+      if (user == null) return null;
+      return (
+        uid: user.uid,
+        verifiedRoles: user.verifiedRoles,
+      );
+    }));
+
+    if (userData == null) return const Center(child: Text('Please log in to see your listings'));
 
     final applicationAsync = ref.watch(applicationByRoleProvider(ProfessionalRole.seller));
-    final myListingsAsync = ref.watch(sellerListingsProvider(user.uid));
+    final myListingsAsync = ref.watch(sellerListingsProvider(userData.uid));
 
     return ListView(
       physics: const BouncingScrollPhysics(),
       children: [
         applicationAsync.when(
-          data: (app) => (user.verifiedRoles.contains('seller')) ? const SizedBox.shrink() : _buildSellerVerificationCTA(app),
+          data: (app) => (userData.verifiedRoles.contains('seller')) ? const SizedBox.shrink() : _buildSellerVerificationCTA(app),
           loading: () => const LinearProgressIndicator(),
           error: (_, __) => const SizedBox.shrink(),
         ),
@@ -987,10 +1011,20 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
   }
 
   Widget _buildSellerVerificationCTA(VerificationApplication? app) {
-    final user = ref.watch(appUserProvider).valueOrNull;
-    final isVerified = user?.isVerified ?? false;
-    final isIdentityPending = user?.identityStatus == 'pending';
-    final isIdentityRejected = user?.identityStatus == 'rejected';
+    // Optimization: watch only verification-relevant properties
+    final userData = ref.watch(appUserProvider.select((u) {
+      final user = u.valueOrNull;
+      if (user == null) return null;
+      return (
+        isVerified: user.isVerified,
+        identityStatus: user.identityStatus,
+        verifiedRoles: user.verifiedRoles,
+      );
+    }));
+
+    final bool isVerified = userData?.isVerified ?? false;
+    final bool isIdentityPending = userData?.identityStatus == 'pending';
+    final bool isIdentityRejected = userData?.identityStatus == 'rejected';
     
     final isRolePending = app?.status == VerificationStatus.pending;
     final isRoleRejected = app?.status == VerificationStatus.rejected;

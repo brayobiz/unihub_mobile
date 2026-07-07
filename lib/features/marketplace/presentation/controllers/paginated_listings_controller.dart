@@ -17,6 +17,8 @@ class PaginatedListingsController extends StateNotifier<PaginatedState<Listing>>
   }
 
   List<Listing> _filterBlocked(List<Listing> items) {
+    // Note: We use read here because this is called inside listeners or async methods,
+    // and we want the latest value without triggering a rebuild of the entire controller.
     final user = _ref.read(appUserProvider).valueOrNull;
     if (user == null || user.blockedUids.isEmpty) return items;
     return items.where((l) => !user.blockedUids.contains(l.sellerId)).toList();

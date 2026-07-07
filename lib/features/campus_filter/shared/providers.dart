@@ -19,11 +19,11 @@ final browsingScopeProvider = StateNotifierProvider<BrowsingScopeNotifier, Brows
 /// Returns null if 'All Campuses' is selected.
 final effectiveCampusFilterProvider = Provider<String?>((ref) {
   final scope = ref.watch(browsingScopeProvider);
-  final user = ref.watch(appUserProvider).valueOrNull;
+  final university = ref.watch(appUserProvider.select((user) => user.valueOrNull?.university));
   
   return switch (scope.type) {
     BrowsingScopeType.all => null,
-    BrowsingScopeType.myCampus => CampusConstants.resolveToId(user?.university),
+    BrowsingScopeType.myCampus => CampusConstants.resolveToId(university),
     BrowsingScopeType.specific => scope.campusId,
   };
 });

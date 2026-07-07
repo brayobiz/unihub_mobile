@@ -22,7 +22,16 @@ class AdminLayout extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentPath = GoRouterState.of(context).matchedLocation;
     final isDesktop = MediaQuery.of(context).size.width > 900;
-    final admin = ref.watch(appUserProvider).valueOrNull;
+    
+    // Optimization: only watch necessary admin properties
+    final admin = ref.watch(appUserProvider.select((asyncUser) {
+      final user = asyncUser.valueOrNull;
+      if (user == null) return null;
+      return (
+        fullName: user.fullName,
+        photoUrl: user.photoUrl,
+      );
+    }));
 
     return Scaffold(
       appBar: AppBar(

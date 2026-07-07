@@ -66,8 +66,9 @@ class UniHubApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Initialize presence when user is logged in
-    ref.listen(authStateProvider, (previous, next) {
-      if (next.value != null) {
+    // Optimization: only listen to UID to avoid redundant init calls on presence updates
+    ref.listen(appUserProvider.select((user) => user.valueOrNull?.uid), (previous, next) {
+      if (next != null && previous == null) {
         ref.read(presenceServiceProvider).init();
       }
     });

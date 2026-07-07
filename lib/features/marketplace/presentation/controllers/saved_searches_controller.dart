@@ -64,7 +64,7 @@ final savedSearchesControllerProvider = StateNotifierProvider<SavedSearchesContr
 });
 
 final savedSearchesProvider = StreamProvider<List<SavedSearch>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
-  if (user == null) return Stream.value([]);
-  return ref.watch(marketplaceRepositoryProvider).watchSavedSearches(user.uid);
+  final uid = ref.watch(appUserProvider.select((user) => user.valueOrNull?.uid));
+  if (uid == null) return Stream.value([]);
+  return ref.watch(marketplaceRepositoryProvider).watchSavedSearches(uid);
 });

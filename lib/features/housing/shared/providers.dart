@@ -58,7 +58,10 @@ final housingListingsProvider = StreamProvider.autoDispose.family<List<HousingLi
   final maxRent = ref.watch(housingMaxRentFilterProvider);
   final gender = ref.watch(housingGenderFilterProvider);
   final furnished = ref.watch(housingFurnishedFilterProvider);
-  final user = ref.watch(appUserProvider).valueOrNull;
+  
+  // Optimization: only watch relevant user data to avoid presence-triggered reloads
+  final userAsync = ref.watch(appUserProvider.select((u) => u.valueOrNull));
+  final blockedUids = userAsync?.blockedUids ?? const [];
 
   // Ensure listeners are cleaned up when the user leaves the housing module
   ref.onDispose(() {});
@@ -81,8 +84,8 @@ final housingListingsProvider = StreamProvider.autoDispose.family<List<HousingLi
   ).map((listings) {
     var results = listings;
     
-    if (user != null && user.blockedUids.isNotEmpty) {
-      results = results.where((l) => !user.blockedUids.contains(l.plugId)).toList();
+    if (blockedUids.isNotEmpty) {
+      results = results.where((l) => !blockedUids.contains(l.plugId)).toList();
     }
 
     if (spatialContext != null) {
@@ -119,20 +122,20 @@ final topHousingProvider = StreamProvider.autoDispose<List<HousingListing>>((ref
 
 // Featured listings (could be based on verification or a 'featured' flag, or just most viewed)
 final featuredHousingProvider = StreamProvider.autoDispose<List<HousingListing>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
+  final blockedUids = ref.watch(appUserProvider.select((user) => user.valueOrNull?.blockedUids)) ?? const [];
   return ref.watch(housingRepositoryProvider).watchListings(
     limit: 10,
     // Add logic for featured here if needed
   ).map((listings) {
-    if (user == null || user.blockedUids.isEmpty) return listings;
-    return listings.where((l) => !user.blockedUids.contains(l.plugId)).toList();
+    if (blockedUids.isEmpty) return listings;
+    return listings.where((l) => !blockedUids.contains(l.plugId)).toList();
   });
 });
 
 final plugListingsProvider = StreamProvider.autoDispose.family<List<HousingListing>, String>((ref, plugId) {
-  final user = ref.watch(appUserProvider).valueOrNull;
+  final blockedUids = ref.watch(appUserProvider.select((user) => user.valueOrNull?.blockedUids)) ?? const [];
   return ref.watch(housingRepositoryProvider).watchPlugListings(plugId).map((listings) {
-    if (user != null && user.blockedUids.contains(plugId)) return [];
+    if (blockedUids.contains(plugId)) return [];
     return listings;
   });
 });
@@ -150,19 +153,21 @@ final housingListingReviewsProvider = StreamProvider.autoDispose.family<List<Hou
 });
 
 final savedHousingProvider = StreamProvider.autoDispose<List<HousingListing>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
-  if (user == null || user.uid.isEmpty) return Stream.value([]);
-  return ref.watch(housingRepositoryProvider).watchSavedListings(user.uid).map((listings) {
-    if (user.blockedUids.isEmpty) return listings;
-    return listings.where((l) => !user.blockedUids.contains(l.plugId)).toList();
+  final uid = ref.watch(appUserProvider.select((user) => user.valueOrNull?.uid));
+  final blockedUids = ref.watch(appUserProvider.select((user) => user.valueOrNull?.blockedUids)) ?? const [];
+  
+  if (uid == null || uid.isEmpty) return Stream.value([]);
+  return ref.watch(housingRepositoryProvider).watchSavedListings(uid).map((listings) {
+    if (blockedUids.isEmpty) return listings;
+    return listings.where((l) => !blockedUids.contains(l.plugId)).toList();
   });
 });
 
 final roommateProfilesProvider = StreamProvider.autoDispose<List<RoommateProfile>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
+  final blockedUids = ref.watch(appUserProvider.select((user) => user.valueOrNull?.blockedUids)) ?? const [];
   return ref.watch(housingRepositoryProvider).watchRoommates().map((profiles) {
-    if (user == null || user.blockedUids.isEmpty) return profiles;
-    return profiles.where((p) => !user.blockedUids.contains(p.userId)).toList();
+    if (blockedUids.isEmpty) return profiles;
+    return profiles.where((p) => !blockedUids.contains(p.userId)).toList();
   });
 });
 

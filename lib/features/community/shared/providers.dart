@@ -4,9 +4,9 @@ import '../../shared/feed_repository.dart';
 import '../../../models/feed_type.dart';
 
 final communityFeedProvider = StreamProvider.autoDispose<List<FeedItem>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
+  final blockedUids = ref.watch(appUserProvider.select((user) => user.valueOrNull?.blockedUids)) ?? const [];
   return ref.watch(feedRepositoryProvider).watchFeed(FeedType.community).map((items) {
-    if (user == null || user.blockedUids.isEmpty) return items;
-    return items.where((item) => !user.blockedUids.contains(item.authorId)).toList();
+    if (blockedUids.isEmpty) return items;
+    return items.where((item) => !blockedUids.contains(item.authorId)).toList();
   });
 });

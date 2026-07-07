@@ -23,7 +23,7 @@ final notesYearFilterProvider = StateProvider.autoDispose<String>((ref) => 'All'
 final notesCourseFilterProvider = StateProvider.autoDispose<String>((ref) => 'All');
 
 final notesListingsProvider = StreamProvider.autoDispose.family<List<NoteListing>, int>((ref, limit) {
-  final user = ref.watch(appUserProvider).valueOrNull;
+  final blockedUids = ref.watch(appUserProvider.select((user) => user.valueOrNull?.blockedUids)) ?? const [];
   final query = ref.watch(notesSearchQueryProvider);
   final category = ref.watch(notesCategoryFilterProvider);
   final type = ref.watch(notesTypeFilterProvider);
@@ -36,8 +36,8 @@ final notesListingsProvider = StreamProvider.autoDispose.family<List<NoteListing
     query: query,
     limit: limit,
   ).map((notes) {
-    if (user == null || user.blockedUids.isEmpty) return notes;
-    return notes.where((n) => !user.blockedUids.contains(n.authorId)).toList();
+    if (blockedUids.isEmpty) return notes;
+    return notes.where((n) => !blockedUids.contains(n.authorId)).toList();
   });
 });
 

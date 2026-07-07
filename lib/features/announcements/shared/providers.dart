@@ -21,10 +21,19 @@ final activeAnnouncementsProvider = StreamProvider.autoDispose<List<Announcement
 /// Filtered announcements based on the current user's profile and the specified feature
 final relevantAnnouncementsProvider = Provider.autoDispose.family<List<Announcement>, String?>((ref, feature) {
   final activeAsync = ref.watch(activeAnnouncementsProvider);
-  final userAsync = ref.watch(appUserProvider);
+  
+  // Optimization: only watch routing-relevant user properties to avoid reloads on presence updates
+  final userData = ref.watch(appUserProvider.select((userAsync) {
+    final user = userAsync.valueOrNull;
+    if (user == null) return null;
+    return (
+      roles: user.roles,
+      isVerified: user.isVerified,
+      university: user.university,
+    );
+  }));
 
   final announcements = activeAsync.valueOrNull ?? [];
-  final user = userAsync.valueOrNull;
 
   return announcements.where((a) {
     // 1. Feature filtering: If feature-specific, must match the current feature context
@@ -46,21 +55,21 @@ final relevantAnnouncementsProvider = Provider.autoDispose.family<List<Announcem
     }
 
     // If there ARE audience constraints, we need a logged-in user to evaluate them
-    if (user == null) return false;
+    if (userData == null) return false;
 
     if (targetRoles.isNotEmpty) {
-      final hasRole = user.roles.any((role) => targetRoles.contains(role));
+      final hasRole = userData.roles.any((role) => targetRoles.contains(role));
       if (!hasRole) return false;
     }
 
-    if (verifiedOnly && !user.isVerified) return false;
+    if (verifiedOnly && !userData.isVerified) return false;
 
     // 3. Campus/University filtering: 
     // Normalize both to IDs for robust comparison
     if (targetUniversity != 'All') {
       final targetId = CampusConstants.resolveToId(targetUniversity) ?? targetUniversity;
-      final userId = CampusConstants.resolveToId(user.university) ?? user.university;
-      if (userId != targetId) return false;
+      final userUniId = CampusConstants.resolveToId(userData.university) ?? userData.university;
+      if (userUniId != targetId) return false;
     }
 
     return true;

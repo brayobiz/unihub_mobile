@@ -155,17 +155,27 @@ final campusPulseProvider = Provider.autoDispose<AsyncValue<Map<String, int>>>((
 });
 
 final personalizedRecommendationsProvider = Provider.autoDispose<AsyncValue<List<SmartFeedItem>>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
+  // Optimization: only watch specific user properties to avoid reloads on presence updates
+  final userData = ref.watch(appUserProvider.select((userAsync) {
+    final user = userAsync.valueOrNull;
+    if (user == null) return null;
+    return (
+      university: user.university,
+      campus: user.campus,
+      course: user.course,
+    );
+  }));
+  
   final allFeedAsync = ref.watch(smartFeedProvider);
   final browsingCampus = ref.watch(effectiveCampusFilterProvider);
 
   return allFeedAsync.whenData((items) {
-    if (user == null) return items;
+    if (userData == null) return items;
 
     // Use browsing campus if set, otherwise fallback to user's university for personalization
     // Normalize both to IDs
-    final targetUniversity = browsingCampus ?? CampusConstants.resolveToId(user.university) ?? user.university;
-    final userCampus = CampusConstants.resolveToId(user.campus) ?? user.campus;
+    final targetUniversity = browsingCampus ?? CampusConstants.resolveToId(userData.university) ?? userData.university;
+    final userCampus = CampusConstants.resolveToId(userData.campus) ?? userData.campus;
 
     // Filter items based on target campus or university
     final personalizedItems = items.where((item) {
@@ -181,7 +191,7 @@ final personalizedRecommendationsProvider = Provider.autoDispose<AsyncValue<List
       // Check if it's notes and same course/uni
       if (item.model.type == widgets.FeedType.notes) {
         final itemUni = CampusConstants.resolveToId(data.university) ?? data.university;
-        return itemUni == targetUniversity || data.course == user.course;
+        return itemUni == targetUniversity || data.course == userData.course;
       }
 
       // Check if it's marketplace and same uni

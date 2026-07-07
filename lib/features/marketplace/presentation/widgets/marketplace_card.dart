@@ -29,7 +29,9 @@ class MarketplaceCard extends ConsumerWidget {
     final theme = Theme.of(context);
     final currentUserId = ref.watch(firebaseAuthProvider).currentUser?.uid;
     final isOwner = currentUserId == listing.sellerId;
-    final user = ref.watch(appUserProvider).valueOrNull;
+    
+    // Optimization: only watch current user ID for actions
+    final uid = ref.watch(appUserProvider.select((user) => user.valueOrNull?.uid));
     
     final isSaved = ref.watch(savedListingsProvider.select((value) => 
       value.valueOrNull?.any((l) => l.id == listing.id) ?? false
@@ -169,8 +171,8 @@ class MarketplaceCard extends ConsumerWidget {
                                     icon: isSaved ? Icons.favorite_rounded : Icons.favorite_outline_rounded,
                                     color: isSaved ? AppColors.error : theme.colorScheme.onSurfaceVariant,
                                     onTap: () {
-                                      if (user != null) {
-                                        ref.read(marketplaceRepositoryProvider).toggleSaveListing(user.uid, listing.id);
+                                      if (uid != null) {
+                                        ref.read(marketplaceRepositoryProvider).toggleSaveListing(uid, listing.id);
                                       }
                                     },
                                   ),

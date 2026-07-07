@@ -16,7 +16,9 @@ class AppDrawer extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final appUserAsync = ref.watch(appUserProvider);
+    
+    // Optimization: only watch isAdmin to avoid reloads on presence updates
+    final isAdmin = ref.watch(appUserProvider.select((u) => u.valueOrNull?.isAdmin)) ?? false;
 
     return Drawer(
       backgroundColor: theme.colorScheme.surface,
@@ -157,26 +159,16 @@ class AppDrawer extends ConsumerWidget {
                    _showAboutDialog(context);
                 }),
 
-                appUserAsync.when(
-                  data: (user) {
-                    return Column(
-                      children: [
-                        if (user?.isAdmin ?? false) ...[
-                          const Divider(),
-                          _sectionHeader(context, 'Administrative'),
-                          _drawerItem(
-                            context, 
-                            Icons.admin_panel_settings_outlined, 
-                            'Admin Dashboard', 
-                            onTap: () => context.push('/admin/dashboard'),
-                          ),
-                        ],
-                      ],
-                    );
-                  },
-                  loading: () => const SizedBox.shrink(),
-                  error: (_, __) => const SizedBox.shrink(),
-                ),
+                if (isAdmin) ...[
+                  const Divider(),
+                  _sectionHeader(context, 'Administrative'),
+                  _drawerItem(
+                    context, 
+                    Icons.admin_panel_settings_outlined, 
+                    'Admin Dashboard', 
+                    onTap: () => context.push('/admin/dashboard'),
+                  ),
+                ],
               ],
             ),
           ),

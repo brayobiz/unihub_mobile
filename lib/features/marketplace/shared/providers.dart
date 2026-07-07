@@ -22,7 +22,8 @@ final marketplaceRepositoryProvider = Provider<MarketplaceRepository>((ref) {
 
 final listingsProvider = StreamProvider.autoDispose.family<List<Listing>, ListingFilter>((ref, filter) {
   final repo = ref.watch(marketplaceRepositoryProvider);
-  final user = ref.watch(appUserProvider).valueOrNull;
+  // Optimization: only watch blockedUids to avoid reloads on presence updates
+  final blockedUids = ref.watch(appUserProvider.select((user) => user.valueOrNull?.blockedUids)) ?? const [];
 
   return repo.watchListings(
     limit: filter.itemsLimit,
@@ -36,62 +37,70 @@ final listingsProvider = StreamProvider.autoDispose.family<List<Listing>, Listin
     status: filter.status,
     categoryAttributes: filter.categoryAttributes,
   ).map((listings) {
-    if (user == null || user.blockedUids.isEmpty) return listings;
-    return listings.where((l) => !user.blockedUids.contains(l.sellerId)).toList();
+    if (blockedUids.isEmpty) return listings;
+    return listings.where((l) => !blockedUids.contains(l.sellerId)).toList();
   });
 });
 
 final recentlyViewedProvider = StreamProvider.autoDispose<List<Listing>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
-  if (user == null) return Stream.value([]);
-  return ref.watch(marketplaceRepositoryProvider).watchRecentlyViewed(user.uid).map((listings) {
-    if (user.blockedUids.isEmpty) return listings;
-    return listings.where((l) => !user.blockedUids.contains(l.sellerId)).toList();
+  final userAsync = ref.watch(appUserProvider.select((user) => user.valueOrNull));
+  if (userAsync == null) return Stream.value([]);
+  
+  final uid = userAsync.uid;
+  final blockedUids = userAsync.blockedUids;
+
+  return ref.watch(marketplaceRepositoryProvider).watchRecentlyViewed(uid).map((listings) {
+    if (blockedUids.isEmpty) return listings;
+    return listings.where((l) => !blockedUids.contains(l.sellerId)).toList();
   });
 });
 
 final trendingListingsProvider = StreamProvider.autoDispose<List<Listing>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
+  final blockedUids = ref.watch(appUserProvider.select((user) => user.valueOrNull?.blockedUids)) ?? const [];
+  
   return ref.watch(marketplaceRepositoryProvider).watchTrendingListings().map((listings) {
-    if (user == null || user.blockedUids.isEmpty) return listings;
-    return listings.where((l) => !user.blockedUids.contains(l.sellerId)).toList();
+    if (blockedUids.isEmpty) return listings;
+    return listings.where((l) => !blockedUids.contains(l.sellerId)).toList();
   });
 });
 
 final recommendedListingsProvider = StreamProvider.autoDispose<List<Listing>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
-  if (user == null) {
+  final userAsync = ref.watch(appUserProvider.select((user) => user.valueOrNull));
+  if (userAsync == null) {
     return ref.watch(marketplaceRepositoryProvider).watchTrendingListings();
   }
   
-  return ref.watch(marketplaceRepositoryProvider).watchRecommendedListings(user.uid).map((listings) {
-    if (user.blockedUids.isEmpty) return listings;
-    return listings.where((l) => !user.blockedUids.contains(l.sellerId)).toList();
+  final uid = userAsync.uid;
+  final blockedUids = userAsync.blockedUids;
+  
+  return ref.watch(marketplaceRepositoryProvider).watchRecommendedListings(uid).map((listings) {
+    if (blockedUids.isEmpty) return listings;
+    return listings.where((l) => !blockedUids.contains(l.sellerId)).toList();
   });
 });
 
 final collectionNamesProvider = StreamProvider.autoDispose<List<String>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
-  if (user == null) return Stream.value([]);
-  return ref.watch(marketplaceRepositoryProvider).watchCollectionNames(user.uid);
+  final uid = ref.watch(appUserProvider.select((user) => user.valueOrNull?.uid));
+  if (uid == null) return Stream.value([]);
+  return ref.watch(marketplaceRepositoryProvider).watchCollectionNames(uid);
 });
 
 final collectionListingsProvider = StreamProvider.autoDispose.family<List<Listing>, String>((ref, collectionName) {
-  final user = ref.watch(appUserProvider).valueOrNull;
-  if (user == null) return Stream.value([]);
-  return ref.watch(marketplaceRepositoryProvider).watchCollectionListings(user.uid, collectionName);
+  final uid = ref.watch(appUserProvider.select((user) => user.valueOrNull?.uid));
+  if (uid == null) return Stream.value([]);
+  return ref.watch(marketplaceRepositoryProvider).watchCollectionListings(uid, collectionName);
 });
 
 final recentSearchesProvider = StreamProvider.autoDispose<List<String>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
-  if (user == null) return Stream.value([]);
-  return ref.watch(marketplaceRepositoryProvider).watchRecentSearches(user.uid);
+  final uid = ref.watch(appUserProvider.select((user) => user.valueOrNull?.uid));
+  if (uid == null) return Stream.value([]);
+  return ref.watch(marketplaceRepositoryProvider).watchRecentSearches(uid);
 });
 
 final sellerListingsProvider = StreamProvider.autoDispose.family<List<Listing>, String>((ref, sellerId) {
-  final user = ref.watch(appUserProvider).valueOrNull;
+  final blockedUids = ref.watch(appUserProvider.select((user) => user.valueOrNull?.blockedUids)) ?? const [];
   return ref.watch(marketplaceRepositoryProvider).watchSellerListings(sellerId).map((listings) {
-    if (user != null && user.blockedUids.contains(sellerId)) return [];
+    if (blockedUids.contains(sellerId)) return [];
     return listings;
   });
 });
@@ -105,11 +114,15 @@ final topListingsProvider = StreamProvider.autoDispose<List<Listing>>((ref) {
 });
 
 final savedListingsProvider = StreamProvider.autoDispose<List<Listing>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
-  if (user == null) return Stream.value([]);
-  return ref.watch(marketplaceRepositoryProvider).watchSavedListings(user.uid).map((listings) {
-    if (user.blockedUids.isEmpty) return listings;
-    return listings.where((l) => !user.blockedUids.contains(l.sellerId)).toList();
+  final userAsync = ref.watch(appUserProvider.select((user) => user.valueOrNull));
+  if (userAsync == null || userAsync.uid.isEmpty) return Stream.value([]);
+  
+  final uid = userAsync.uid;
+  final blockedUids = userAsync.blockedUids;
+
+  return ref.watch(marketplaceRepositoryProvider).watchSavedListings(uid).map((listings) {
+    if (blockedUids.isEmpty) return listings;
+    return listings.where((l) => !blockedUids.contains(l.sellerId)).toList();
   });
 });
 
@@ -126,10 +139,10 @@ final sellerReviewsProvider = StreamProvider.autoDispose.family<List<Map<String,
 });
 
 final similarListingsProvider = StreamProvider.autoDispose.family<List<Listing>, Listing>((ref, currentListing) {
-  final user = ref.watch(appUserProvider).valueOrNull;
+  final blockedUids = ref.watch(appUserProvider.select((user) => user.valueOrNull?.blockedUids)) ?? const [];
   return ref.watch(marketplaceRepositoryProvider).watchSimilarListings(currentListing).map((listings) {
-    if (user == null || user.blockedUids.isEmpty) return listings;
-    return listings.where((l) => !user.blockedUids.contains(l.sellerId)).toList();
+    if (blockedUids.isEmpty) return listings;
+    return listings.where((l) => !blockedUids.contains(l.sellerId)).toList();
   });
 });
 

@@ -126,8 +126,29 @@ class RouterNotifier extends ChangeNotifier {
   RouterNotifier(this._ref) {
     // Consolidate listeners to avoid redundant rebuilds
     _ref.listen(authStateProvider, (_, __) => _safeNotify());
-    _ref.listen(appUserProvider, (_, __) => _safeNotify());
-    _ref.listen(systemSettingsProvider, (_, __) => _safeNotify());
+
+    // DECOUPLING Presence from Navigation:
+    // Only notify router if routing-critical properties change.
+    // We ignore volatile metadata like lastSeen and isOnline.
+    _ref.listen(appUserProvider.select((asyncUser) {
+      final user = asyncUser.valueOrNull;
+      if (user == null) return null;
+      return (
+        uid: user.uid,
+        university: user.university,
+        course: user.course,
+        isBanned: user.isBanned,
+        suspendedUntil: user.suspendedUntil,
+        isOnboardingCompleted: user.isOnboardingCompleted,
+        isAdmin: user.isAdmin,
+        isEmailVerified: user.isEmailVerified,
+      );
+    }), (_, __) => _safeNotify());
+
+    _ref.listen(systemSettingsProvider.select((asyncSettings) {
+      return asyncSettings.valueOrNull?.maintenanceMode;
+    }), (_, __) => _safeNotify());
+
     _ref.listen(deviceOnboardingCompletedProvider, (_, __) => _safeNotify());
     _ref.listen(accountDeletedProvider, (_, __) => _safeNotify());
     _ref.listen(authControllerProvider, (_, __) => _safeNotify());

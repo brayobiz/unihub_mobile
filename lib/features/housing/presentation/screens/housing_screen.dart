@@ -107,8 +107,18 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final user = ref.watch(appUserProvider).valueOrNull;
-    final isVerifiedPlug = user?.verifiedRoles.contains('housePlug') ?? false;
+    
+    // Optimization: only watch necessary user properties
+    final userData = ref.watch(appUserProvider.select((u) {
+      final user = u.valueOrNull;
+      if (user == null) return null;
+      return (
+        verifiedRoles: user.verifiedRoles,
+        isVerified: user.isVerified,
+      );
+    }));
+
+    final isVerifiedPlug = userData?.verifiedRoles.contains('housePlug') ?? false;
     final applicationAsync = ref.watch(applicationByRoleProvider(ProfessionalRole.housePlug));
     
     final locationFilter = ref.watch(housingLocationFilterProvider);
@@ -246,14 +256,23 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
           onTap: () => context.push('/profile'),
           child: Consumer(
             builder: (context, ref, _) {
-              final userProfile = ref.watch(appUserProvider).valueOrNull;
+              // Optimization: only watch photo and name
+              final userData = ref.watch(appUserProvider.select((u) {
+                final user = u.valueOrNull;
+                if (user == null) return null;
+                return (
+                  photoUrl: user.photoUrl,
+                  fullName: user.fullName,
+                );
+              }));
+              
               return CircleAvatar(
                 radius: 16,
                 backgroundColor: theme.colorScheme.surfaceVariant,
-                backgroundImage: userProfile?.photoUrl != null ? NetworkImage(userProfile!.photoUrl!) : null,
-                child: userProfile?.photoUrl == null 
+                backgroundImage: userData?.photoUrl != null ? NetworkImage(userData!.photoUrl!) : null,
+                child: userData?.photoUrl == null 
                     ? Text(
-                        userProfile?.fullName.isNotEmpty == true ? userProfile!.fullName[0].toUpperCase() : 'U',
+                        userData?.fullName.isNotEmpty == true ? userData!.fullName[0].toUpperCase() : 'U',
                         style: TextStyle(color: theme.colorScheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
                       )
                     : null,

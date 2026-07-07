@@ -73,14 +73,23 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
             onTap: () => context.push('/profile'),
             child: Consumer(
               builder: (context, ref, _) {
-                final userProfile = ref.watch(appUserProvider).valueOrNull;
+                // Optimization: only watch photo and name
+                final userData = ref.watch(appUserProvider.select((u) {
+                  final user = u.valueOrNull;
+                  if (user == null) return null;
+                  return (
+                    photoUrl: user.photoUrl,
+                    fullName: user.fullName,
+                  );
+                }));
+                
                 return CircleAvatar(
                   radius: 16,
                   backgroundColor: theme.colorScheme.surfaceVariant,
-                  backgroundImage: userProfile?.photoUrl != null ? NetworkImage(userProfile!.photoUrl!) : null,
-                  child: userProfile?.photoUrl == null 
+                  backgroundImage: userData?.photoUrl != null ? NetworkImage(userData!.photoUrl!) : null,
+                  child: userData?.photoUrl == null 
                       ? Text(
-                          userProfile?.fullName.isNotEmpty == true ? userProfile!.fullName[0].toUpperCase() : 'U',
+                          userData?.fullName.isNotEmpty == true ? userData!.fullName[0].toUpperCase() : 'U',
                           style: TextStyle(color: theme.colorScheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
                         )
                       : null,

@@ -17,10 +17,10 @@ final trustRepositoryProvider = Provider<TrustRepository>((ref) {
 });
 
 final userApplicationsProvider = StreamProvider.autoDispose<List<VerificationApplication>>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
+  final uid = ref.watch(appUserProvider.select((user) => user.valueOrNull?.uid));
   // Defensive: guard against null or empty UID to avoid invalid Firestore document paths
-  if (user == null || user.uid.isEmpty) return Stream.value([]);
-  return ref.watch(trustRepositoryProvider).watchUserApplications(user.uid);
+  if (uid == null || uid.isEmpty) return Stream.value([]);
+  return ref.watch(trustRepositoryProvider).watchUserApplications(uid);
 });
 
 final applicationByRoleProvider = Provider.autoDispose.family<AsyncValue<VerificationApplication?>, ProfessionalRole>((ref, role) {
@@ -44,17 +44,17 @@ final userApplicationByRoleProvider = FutureProvider.autoDispose.family<Verifica
 });
 
 final studentVerificationProvider = StreamProvider.autoDispose<StudentVerification?>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
+  final uid = ref.watch(appUserProvider.select((user) => user.valueOrNull?.uid));
   // Defensive: ensure UID is present and non-empty
-  if (user == null || user.uid.isEmpty) return Stream.value(null);
-  return ref.watch(trustRepositoryProvider).watchStudentVerification(user.uid);
+  if (uid == null || uid.isEmpty) return Stream.value(null);
+  return ref.watch(trustRepositoryProvider).watchStudentVerification(uid);
 });
 
 final identityVerificationProvider = StreamProvider.autoDispose<IdentityVerification?>((ref) {
-  final user = ref.watch(appUserProvider).valueOrNull;
+  final uid = ref.watch(appUserProvider.select((user) => user.valueOrNull?.uid));
   // Defensive: ensure UID is present and non-empty
-  if (user == null || user.uid.isEmpty) return Stream.value(null);
-  return ref.watch(trustRepositoryProvider).watchIdentityVerification(user.uid);
+  if (uid == null || uid.isEmpty) return Stream.value(null);
+  return ref.watch(trustRepositoryProvider).watchIdentityVerification(uid);
 });
 
 // Helper to check if user has a verified role
