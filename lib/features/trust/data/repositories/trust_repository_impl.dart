@@ -76,6 +76,13 @@ class TrustRepositoryImpl implements TrustRepository {
       'submittedAt': FieldValue.serverTimestamp(),
     });
 
+    // Also update the user document status for immediate UI feedback
+    if (userId.isNotEmpty) {
+      await _firestore.collection('users').doc(userId).update({
+        'studentStatus': 'pending',
+      });
+    }
+
     if (_notificationSender != null) {
       await _notificationSender!.notifyAdmins(
         title: 'New Student Verification 🎓',

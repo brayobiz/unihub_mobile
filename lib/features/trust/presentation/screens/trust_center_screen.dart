@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/trust/presentation/providers/trust_providers.dart';
 import 'package:unihub_mobile/features/trust/domain/models/student_verification.dart';
@@ -263,13 +264,15 @@ class TrustCenterScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildIdentityVerificationCard(BuildContext context, user, IdentityVerification? v) {
+  Widget _buildIdentityVerificationCard(BuildContext context, AppUser user, IdentityVerification? v) {
     final theme = Theme.of(context);
     final bool isVerified = user.isIdentityVerified;
-    final bool isPending = v?.status == IdentityVerificationStatus.pending;
-    final bool isRejected = v?.status == IdentityVerificationStatus.rejected;
-    final bool isUnderReview = v?.status == IdentityVerificationStatus.underReview;
-    final bool isResubmit = v?.status == IdentityVerificationStatus.resubmissionRequested;
+    
+    // Check both sources of truth
+    final bool isPending = v?.status == IdentityVerificationStatus.pending || user.identityStatus == 'pending';
+    final bool isRejected = v?.status == IdentityVerificationStatus.rejected || user.identityStatus == 'rejected';
+    final bool isUnderReview = v?.status == IdentityVerificationStatus.underReview || user.identityStatus == 'underReview';
+    final bool isResubmit = v?.status == IdentityVerificationStatus.resubmissionRequested || user.identityStatus == 'resubmissionRequested';
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -468,13 +471,15 @@ class TrustCenterScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStudentVerificationCard(BuildContext context, user, StudentVerification? v) {
+  Widget _buildStudentVerificationCard(BuildContext context, AppUser user, StudentVerification? v) {
     final theme = Theme.of(context);
     final bool isVerified = user.isStudentVerified;
-    final bool isPending = v?.status == StudentVerificationStatus.pending;
-    final bool isRejected = v?.status == StudentVerificationStatus.rejected;
-    final bool isUnderReview = v?.status == StudentVerificationStatus.underReview;
-    final bool isResubmit = v?.status == StudentVerificationStatus.resubmissionRequested;
+    
+    // Check both the verification document status and the user document status for robustness
+    final bool isPending = v?.status == StudentVerificationStatus.pending || user.studentStatus == 'pending';
+    final bool isRejected = v?.status == StudentVerificationStatus.rejected || user.studentStatus == 'rejected';
+    final bool isUnderReview = v?.status == StudentVerificationStatus.underReview || user.studentStatus == 'underReview';
+    final bool isResubmit = v?.status == StudentVerificationStatus.resubmissionRequested || user.studentStatus == 'resubmissionRequested';
 
     return Container(
       padding: const EdgeInsets.all(20),

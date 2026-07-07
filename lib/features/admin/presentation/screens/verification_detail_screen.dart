@@ -22,11 +22,13 @@ class _VerificationDetailScreenState extends ConsumerState<VerificationDetailScr
   final _reasonController = TextEditingController();
   final _adminNotesController = TextEditingController();
   bool _isProcessing = false;
+  late AdminVerificationStatus _currentStatus;
 
   @override
   void initState() {
     super.initState();
     _adminNotesController.text = widget.request.adminNotes ?? '';
+    _currentStatus = widget.request.status;
   }
 
   @override
@@ -37,28 +39,28 @@ class _VerificationDetailScreenState extends ConsumerState<VerificationDetailScr
   }
 
    Future<void> _processAction(AdminVerificationStatus status) async {
-     if (_isProcessing) return;
+     if (_isProcessing || !mounted) return;
 
-     if (status == AdminVerificationStatus.rejected || status == AdminVerificationStatus.resubmissionRequested) {
-       if (_reasonController.text.trim().isEmpty) {
-         if (mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(
-             SnackBar(content: Text('Reason is required for ${status.name}')),
-           );
-         }
-         return;
-       }
-     }
-
-     setState(() => _isProcessing = true);
-     
-     // Capture dependencies before the async gap to avoid using 'ref' after dispose
+     // IMPORTANT: Capture all dependencies from 'ref' and 'context' 
+     // at the VERY BEGINNING of the method before any async gaps 
+     // or state changes that might trigger rebuilds/disposal.
      final adminService = ref.read(adminServiceProvider);
      final admin = ref.read(appUserProvider).valueOrNull;
      final messenger = ScaffoldMessenger.of(context);
      final router = GoRouter.of(context);
      final reason = _reasonController.text.trim();
      final adminNotes = _adminNotesController.text.trim();
+
+     if (status == AdminVerificationStatus.rejected || status == AdminVerificationStatus.resubmissionRequested) {
+       if (reason.isEmpty) {
+         messenger.showSnackBar(
+           SnackBar(content: Text('Reason is required for ${status.name}')),
+         );
+         return;
+       }
+     }
+
+     setState(() => _isProcessing = true);
      
      try {
        if (admin == null) throw Exception('Admin session not found');
@@ -88,6 +90,9 @@ class _VerificationDetailScreenState extends ConsumerState<VerificationDetailScr
        );
        
        if (mounted) {
+         setState(() {
+           _currentStatus = status;
+         });
          messenger.showSnackBar(
            SnackBar(content: Text('✅ Verification ${status.name} successfully - user will be notified')),
          );
@@ -185,7 +190,7 @@ class _VerificationDetailScreenState extends ConsumerState<VerificationDetailScr
 
   Widget _buildStatusChip() {
     Color color;
-    switch (widget.request.status) {
+    switch (_currentStatus) {
       case AdminVerificationStatus.pending: color = AppColors.warning; break;
       case AdminVerificationStatus.underReview: color = AppColors.primary; break;
       case AdminVerificationStatus.approved: color = AppColors.success; break;
@@ -195,7 +200,7 @@ class _VerificationDetailScreenState extends ConsumerState<VerificationDetailScr
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
-      child: Text(widget.request.status.name.toUpperCase(), style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+      child: Text(_currentStatus.name.toUpperCase(), style: TextStyle(color: color, fontWeight: FontWeight.bold)),
     );
   }
 
@@ -290,11 +295,11 @@ class _VerificationDetailScreenState extends ConsumerState<VerificationDetailScr
               const SizedBox(height: 24),
               if (_isProcessing)
                 const Center(child: CircularProgressIndicator())
-              else if (widget.request.status == AdminVerificationStatus.pending || widget.request.status == AdminVerificationStatus.underReview)
+              else if (_currentStatus == AdminVerificationStatus.pending || _currentStatus == AdminVerificationStatus.underReview)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (widget.request.status == AdminVerificationStatus.pending) ...[
+                    if (_currentStatus == AdminVerificationStatus.pending) ...[
                       OutlinedButton(
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primary,

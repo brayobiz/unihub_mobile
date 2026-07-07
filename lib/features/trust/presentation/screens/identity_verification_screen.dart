@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/trust/presentation/providers/trust_providers.dart';
 import 'package:unihub_mobile/features/shared/storage_repository.dart';
@@ -36,7 +37,11 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
   }
 
   Future<void> _submit() async {
-    if (_idFile == null || _selfieFile == null) return;
+    if (_idFile == null || _selfieFile == null || _isSubmitting) return;
+
+    // Capture services before async gap
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
 
     setState(() {
       _isSubmitting = true;
@@ -56,7 +61,9 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
         file: _idFile!,
         isPrivate: true,
         onProgress: (sent, total) {
-          setState(() => _uploadProgress = (sent / total) * 0.5);
+          if (mounted) {
+            setState(() => _uploadProgress = (sent / total) * 0.5);
+          }
         },
       );
 
@@ -67,7 +74,9 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
         file: _selfieFile!,
         isPrivate: true,
         onProgress: (sent, total) {
-          setState(() => _uploadProgress = 0.5 + (sent / total) * 0.5);
+          if (mounted) {
+            setState(() => _uploadProgress = 0.5 + (sent / total) * 0.5);
+          }
         },
       );
 
@@ -78,19 +87,23 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
         selfieUrl,
       );
 
+      // 4. Invalidate provider to force a fresh fetch
+      ref.invalidate(identityVerificationProvider);
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        // Pop first, then show snackbar
+        router.pop();
+        messenger.showSnackBar(
           const SnackBar(
             content: Text('Identity verification submitted!'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
           ),
         );
-        Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text('Submission failed: ${e.toString()}'),
             backgroundColor: Colors.red,

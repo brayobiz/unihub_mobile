@@ -455,6 +455,7 @@ class AdminRepository {
            userUpdate['identityStatus'] = _statusToDb(newStatus);
          } else if (request.type == AdminVerificationType.student) {
            userUpdate['isStudentVerified'] = newStatus == AdminVerificationStatus.approved;
+           userUpdate['studentStatus'] = _statusToDb(newStatus);
          } else if (request.type == AdminVerificationType.professional && newStatus == AdminVerificationStatus.approved) {
            // Add role to verifiedRoles
            if (request.role != null) {
@@ -954,6 +955,7 @@ class AdminRepository {
       'isIdentityVerified': false,
       'identityStatus': 'none',
       'isStudentVerified': false,
+      'studentStatus': 'none',
       'verifiedRoles': [],
       'updatedAt': FieldValue.serverTimestamp(),
     });
@@ -1225,6 +1227,7 @@ class AdminRepository {
          } else if (request.type == AdminVerificationType.student) {
            batch.update(userRef, {
              'isStudentVerified': status == AdminVerificationStatus.approved,
+             'studentStatus': _statusToDb(status),
            });
          } else if (request.type == AdminVerificationType.professional && status == AdminVerificationStatus.approved) {
             if (request.role != null) {

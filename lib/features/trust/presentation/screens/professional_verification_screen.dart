@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/trust/domain/models/professional_role.dart';
 import 'package:unihub_mobile/features/trust/domain/models/verification_application.dart';
@@ -67,7 +68,11 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate() || _isSubmitting) return;
+    
+    // Capture context before async gap
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
     
     final user = ref.read(appUserProvider).valueOrNull;
     if (user == null) return;
@@ -75,7 +80,7 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
     final bool needsIdentity = !user.isVerified;
 
     if (needsIdentity && (_idDocumentFile == null || _selfieFile == null)) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(
           content: Text('Please upload both ID and selfie'),
           behavior: SnackBarBehavior.floating,
@@ -119,20 +124,24 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
       );
 
       await ref.read(trustRepositoryProvider).submitProfessionalApplication(application);
+      
+      // Invalidate to refresh UI
+      ref.invalidate(userApplicationsProvider);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        // Pop first
+        router.pop();
+        messenger.showSnackBar(
           const SnackBar(
             content: Text('Application submitted successfully!'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
           ),
         );
-        Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text('Error: ${e.toString()}'),
             backgroundColor: Colors.red,

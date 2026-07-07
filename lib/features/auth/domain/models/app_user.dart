@@ -28,6 +28,7 @@ class AppUser {
   final bool isEmailVerified;
   final bool isPhoneVerified;
   final bool isStudentVerified;
+  final String studentStatus; // 'none' | 'pending' | 'approved' | 'rejected'
   final bool isIdentityVerified;
   final String identityStatus; // 'none' | 'pending' | 'approved' | 'rejected'
   final List<String> verifiedRoles; // List of ProfessionalRole names
@@ -89,6 +90,7 @@ class AppUser {
     this.isEmailVerified = false,
     this.isPhoneVerified = false,
     this.isStudentVerified = false,
+    this.studentStatus = 'none',
     this.isIdentityVerified = false,
     this.identityStatus = 'none',
     this.verifiedRoles = const [],
@@ -290,6 +292,7 @@ class AppUser {
     bool? isEmailVerified,
     bool? isPhoneVerified,
     bool? isStudentVerified,
+    String? studentStatus,
     bool? isIdentityVerified,
     String? identityStatus,
     List<String>? verifiedRoles,
@@ -343,6 +346,7 @@ class AppUser {
       isEmailVerified: isEmailVerified ?? this.isEmailVerified,
       isPhoneVerified: isPhoneVerified ?? this.isPhoneVerified,
       isStudentVerified: isStudentVerified ?? this.isStudentVerified,
+      studentStatus: studentStatus ?? this.studentStatus,
       isIdentityVerified: isIdentityVerified ?? this.isIdentityVerified,
       identityStatus: identityStatus ?? this.identityStatus,
       verifiedRoles: verifiedRoles ?? this.verifiedRoles,
@@ -401,6 +405,7 @@ class AppUser {
       'isEmailVerified': isEmailVerified,
       'isPhoneVerified': isPhoneVerified,
       'isStudentVerified': isStudentVerified,
+      'studentStatus': studentStatus,
       'isIdentityVerified': isIdentityVerified,
       'identityStatus': identityStatus,
       'verifiedRoles': verifiedRoles,
@@ -485,6 +490,7 @@ class AppUser {
       isEmailVerified: safeBool(json['isEmailVerified'], false),
       isPhoneVerified: safeBool(json['isPhoneVerified'], false),
       isStudentVerified: safeBool(json['isStudentVerified'], false),
+      studentStatus: json['studentStatus']?.toString() ?? 'none',
       isIdentityVerified: safeBool(json['isIdentityVerified'], false),
       identityStatus: json['identityStatus']?.toString() ?? 'none',
       verifiedRoles: (json['verifiedRoles'] as List?)?.map((e) => e.toString()).toList() ?? <String>[],

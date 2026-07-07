@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/trust/presentation/providers/trust_providers.dart';
 import 'package:unihub_mobile/features/shared/storage_repository.dart';
@@ -34,7 +35,11 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
   }
 
   Future<void> _submit() async {
-    if (_imageFile == null) return;
+    if (_imageFile == null || _isSubmitting) return;
+
+    // Capture context-dependent services BEFORE any async gaps
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
 
     setState(() {
       _isSubmitting = true;
@@ -51,7 +56,9 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
         id: 'student_id_${user.uid}_${DateTime.now().millisecondsSinceEpoch}',
         file: _imageFile!,
         onProgress: (sent, total) {
-          setState(() => _uploadProgress = sent / total);
+          if (mounted) {
+            setState(() => _uploadProgress = sent / total);
+          }
         },
       );
 
@@ -61,19 +68,23 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
         imageUrl,
       );
 
+      // 3. Invalidate provider to force a fresh fetch of the verification status
+      ref.invalidate(studentVerificationProvider);
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        // Pop first, then show snackbar so it appears on the parent screen
+        router.pop();
+        messenger.showSnackBar(
           const SnackBar(
             content: Text('Verification submitted successfully!'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
           ),
         );
-        Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text('Submission failed: ${e.toString()}'),
             backgroundColor: Colors.red,
