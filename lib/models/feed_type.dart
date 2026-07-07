@@ -7,4 +7,5 @@ enum FeedType {
   event,
   gig,
   lostFound,
+  user,
 }

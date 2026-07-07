@@ -10,6 +10,7 @@ import '../../../auth/shared/providers.dart';
 import '../../domain/models/moderation_content.dart';
 import '../../domain/models/audit_log.dart';
 import '../../shared/providers.dart';
+import '../../../../services/notification_service.dart';
 
 class FeatureModerationScreen extends ConsumerStatefulWidget {
   final ContentType contentType;
@@ -109,6 +110,14 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
 
     return AdminLayout(
       title: '${widget.contentType.name[0].toUpperCase()}${widget.contentType.name.substring(1)} Moderation',
+      actions: [
+        if (widget.contentType == ContentType.marketplace)
+          IconButton(
+            icon: const Icon(Icons.campaign_outlined, color: AppColors.secondary),
+            tooltip: 'Broadcast Marketplace Reminder',
+            onPressed: () => _showBroadcastDialog(),
+          ),
+      ],
       child: Column(
         children: [
           _buildFilters(contentAsync.valueOrNull?.length ?? 0, contentAsync.valueOrNull ?? []),
@@ -318,6 +327,94 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
       child: Text(status.toUpperCase(), style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  void _showBroadcastDialog() {
+    final titleController = TextEditingController();
+    final bodyController = TextEditingController();
+    bool useCustomMessage = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Broadcast Marketplace Reminder'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'This will send a push notification to ALL UniHub users.',
+                style: TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 16),
+              SwitchListTile(
+                title: const Text('Use Custom Message', style: TextStyle(fontSize: 14)),
+                value: useCustomMessage,
+                onChanged: (val) => setDialogState(() => useCustomMessage = val),
+              ),
+              if (useCustomMessage) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Notification Title',
+                    hintText: 'e.g., Fresh Deals Today! 🛍️',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: bodyController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Notification Body',
+                    hintText: 'e.g., Check out the latest items...',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ] else
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12.0),
+                  child: Text(
+                    'A random marketing message will be selected (e.g., "New Deals Alert!").',
+                    style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
+                  ),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(context);
+                
+                try {
+                  await ref.read(notificationServiceProvider).triggerMarketplaceReminder(
+                    customTitle: useCustomMessage ? titleController.text.trim() : null,
+                    customBody: useCustomMessage ? bodyController.text.trim() : null,
+                  );
+                  
+                  navigator.pop();
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('✅ Marketplace broadcast triggered successfully')),
+                  );
+                } catch (e) {
+                  messenger.showSnackBar(
+                    SnackBar(content: Text('❌ Error: $e')),
+                  );
+                }
+              },
+              style: FilledButton.styleFrom(backgroundColor: AppColors.secondary),
+              child: const Text('Broadcast Now'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

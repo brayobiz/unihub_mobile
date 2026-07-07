@@ -133,6 +133,11 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => context.push('/user-search'),
+        backgroundColor: theme.colorScheme.primary,
+        child: const Icon(Icons.message_outlined, color: Colors.white),
+      ),
     );
   }
 

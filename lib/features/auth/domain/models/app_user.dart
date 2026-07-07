@@ -50,6 +50,8 @@ class AppUser {
   final Map<String, String> socialLinks;
   
   final List<String> roles; // 'student', 'housing_plug', 'seller', etc.
+  final bool _isAdmin; // Maps to 'isAdmin' in Firestore
+  bool get isAdmin => _isAdmin || roles.contains('admin');
   
   final Map<String, String> privacySettings;
   final Map<String, bool> notificationSettings;
@@ -106,6 +108,7 @@ class AppUser {
     this.achievements = const [],
     this.socialLinks = const {},
     this.roles = const ['student'],
+    bool isAdmin = false,
     this.privacySettings = const {
       'profile_visibility': 'university', // 'public', 'university', 'private'
       'show_socials': 'university',
@@ -132,12 +135,12 @@ class AppUser {
     this.isBanned = false,
     this.banReason,
     this.suspendedUntil,
-  }) : _reputationPoints = reputationPoints ?? 0.0;
+  }) : _reputationPoints = reputationPoints ?? 0.0,
+       _isAdmin = isAdmin;
 
   bool get isHousingPlug => roles.contains('housing_plug');
   bool get isVerifiedPlug => verifiedRoles.contains('housePlug');
   bool get isVerifiedSeller => verifiedRoles.contains('seller');
-  bool get isAdmin => roles.contains('admin');
   bool get isAnyRoleVerified => verifiedRoles.isNotEmpty;
   bool get isVerified => isIdentityVerified == true || isAnyRoleVerified == true;
   
@@ -306,6 +309,7 @@ class AppUser {
     List<String>? achievements,
     Map<String, String>? socialLinks,
     List<String>? roles,
+    bool? isAdmin,
     Map<String, String>? privacySettings,
     Map<String, bool>? notificationSettings,
     List<String>? blockedUids,
@@ -358,6 +362,7 @@ class AppUser {
       achievements: achievements ?? this.achievements,
       socialLinks: socialLinks ?? this.socialLinks,
       roles: roles ?? this.roles,
+      isAdmin: isAdmin ?? _isAdmin,
       privacySettings: privacySettings ?? this.privacySettings,
       notificationSettings: notificationSettings ?? this.notificationSettings,
       blockedUids: blockedUids ?? this.blockedUids,
@@ -377,7 +382,9 @@ class AppUser {
       'uid': uid,
       'email': email,
       'fullName': fullName,
+      'fullNameLower': fullName.toLowerCase(),
       'username': username,
+      'usernameLower': username?.toLowerCase(),
       'bio': bio,
       'photoUrl': photoUrl,
       'coverPhotoUrl': coverPhotoUrl,
@@ -413,6 +420,7 @@ class AppUser {
       'achievements': achievements,
       'socialLinks': socialLinks,
       'roles': roles,
+      'isAdmin': _isAdmin,
       'privacySettings': privacySettings,
       'notificationSettings': notificationSettings,
       'blockedUids': blockedUids,
@@ -500,6 +508,7 @@ class AppUser {
         (json['socialLinks'] as Map?)?.map((k, v) => MapEntry(k.toString(), v?.toString() ?? '')) ?? <String, String>{}
       ),
       roles: (json['roles'] as List?)?.map((e) => e.toString()).toList() ?? <String>['student'],
+      isAdmin: safeBool(json['isAdmin'], false),
       privacySettings: Map<String, String>.from(
         (json['privacySettings'] as Map?)?.map((k, v) => MapEntry(k.toString(), v?.toString() ?? '')) ?? <String, String>{
           'profile_visibility': 'university', // 'public', 'university', 'private'

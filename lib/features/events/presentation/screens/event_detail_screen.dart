@@ -14,6 +14,7 @@ import '../../domain/models/organizer.dart';
 import '../../domain/models/attendance.dart';
 import '../../presentation/controllers/organizer_profile_controller.dart';
 import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
+import 'package:unihub_mobile/features/chat/shared/providers.dart';
 
 class EventDetailScreen extends ConsumerWidget {
   final String eventId;
@@ -334,6 +335,11 @@ class EventDetailScreen extends ConsumerWidget {
                         ],
                       ),
                     ),
+                    IconButton(
+                      onPressed: () => _handleOrganizerChat(context, ref, organizer),
+                      icon: Icon(Icons.chat_bubble_outline_rounded, color: theme.colorScheme.primary),
+                      tooltip: 'Message Organizer',
+                    ),
                     TextButton(
                       onPressed: () => context.push('/organizers/$organizerId'),
                       child: const Text('View Profile'),
@@ -348,6 +354,45 @@ class EventDetailScreen extends ConsumerWidget {
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
     );
+  }
+
+  void _handleOrganizerChat(BuildContext context, WidgetRef ref, Organizer organizer) async {
+    final currentUser = ref.read(appUserProvider).valueOrNull;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please login to message organizers')));
+      return;
+    }
+
+    if (currentUser.uid == organizer.ownerId) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You are the owner of this organizer.')));
+      return;
+    }
+
+    try {
+      final chatContext = ChatContext(
+        type: 'event_organizer',
+        id: organizer.id,
+        title: organizer.name,
+        thumbnail: organizer.logoUrl,
+      );
+
+      final convId = await ref.read(chatRepositoryProvider).getOrCreateConversation(
+        participantIds: [currentUser.uid, organizer.ownerId],
+        context: chatContext,
+      );
+
+      if (context.mounted) {
+        context.push('/chat', extra: {
+          'conversationId': convId,
+          'otherUserName': organizer.name,
+          'context': chatContext,
+        });
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error starting chat: $e')));
+      }
+    }
   }
 
   Widget _buildTags(List<String> tags, ThemeData theme) {

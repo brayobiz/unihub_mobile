@@ -40,6 +40,9 @@ abstract class AuthRepository {
   Future<void> updateOnboardingStatus(String uid, bool completed);
   Future<void> deleteAccount();
 
+  // Search
+  Future<List<AppUser>> searchUsers(String query);
+
   // Blocking
   Future<void> blockUser(String uid, String blockedUid);
   Future<void> unblockUser(String uid, String blockedUid);

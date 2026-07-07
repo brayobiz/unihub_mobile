@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/shared/providers.dart';
 import 'package:unihub_mobile/core/constants/campus_constants.dart';
 import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
+import 'package:unihub_mobile/features/chat/shared/providers.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import '../../core/utils/category_utils.dart';
 
@@ -98,6 +99,8 @@ class FeedCard extends ConsumerWidget {
                       _showReportDialog(context, ref);
                     } else if (val == 'block') {
                       _showBlockConfirmation(context, ref);
+                    } else if (val == 'message') {
+                      _startMessage(context, ref);
                     }
                   },
                   itemBuilder: (context) {
@@ -111,6 +114,11 @@ class FeedCard extends ConsumerWidget {
                         PopupMenuItem(
                           value: 'delete', 
                           child: Text('Delete', style: TextStyle(color: theme.colorScheme.error))
+                        ),
+                      if (isNotMe && isNotConfession)
+                        PopupMenuItem(
+                          value: 'message', 
+                          child: Text('Message Author', style: TextStyle(color: theme.colorScheme.onSurface))
                         ),
                       PopupMenuItem(
                         value: 'report', 
@@ -231,6 +239,40 @@ class FeedCard extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  void _startMessage(BuildContext context, WidgetRef ref) async {
+    final currentUser = ref.read(appUserProvider).valueOrNull;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please login to message authors')));
+      return;
+    }
+
+    try {
+      final chatContext = ChatContext(
+        type: item.type.name,
+        id: item.id,
+        title: item.title.isEmpty ? 'Post from ${item.authorName}' : item.title,
+        thumbnail: item.images.isNotEmpty ? item.images.first : null,
+      );
+
+      final convId = await ref.read(chatRepositoryProvider).getOrCreateConversation(
+        participantIds: [currentUser.uid, item.authorId],
+        context: chatContext,
+      );
+
+      if (context.mounted) {
+        context.push('/chat', extra: {
+          'conversationId': convId,
+          'otherUserName': item.authorName,
+          'context': chatContext,
+        });
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
   }
 
   void _shareItem(BuildContext context, WidgetRef ref) {

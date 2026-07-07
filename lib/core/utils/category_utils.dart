@@ -21,6 +21,8 @@ class CategoryUtils {
         return Icons.event_outlined;
       case FeedType.lostFound:
         return Icons.search_off_outlined;
+      case FeedType.user:
+        return Icons.person_outline;
     }
   }
 
@@ -42,6 +44,8 @@ class CategoryUtils {
         return Colors.teal;
       case FeedType.lostFound:
         return Colors.brown;
+      case FeedType.user:
+        return Colors.blue;
     }
   }
 
@@ -63,6 +67,8 @@ class CategoryUtils {
         return 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?q=80&w=2070&auto=format&fit=crop';
       case FeedType.lostFound:
         return 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?q=80&w=2068&auto=format&fit=crop';
+      case FeedType.user:
+        return 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=2080&auto=format&fit=crop';
     }
   }
 }

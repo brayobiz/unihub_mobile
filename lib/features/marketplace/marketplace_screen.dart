@@ -100,13 +100,6 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
             button: true,
             child: const NotificationBadge(module: 'marketplace'),
           ),
-          const SizedBox(width: 4),
-          if (ref.watch(appUserProvider).valueOrNull?.isAdmin ?? false)
-            IconButton(
-              icon: const Icon(Icons.campaign_outlined, color: AppColors.secondary),
-              tooltip: 'Broadcast Marketplace Reminder',
-              onPressed: () => _showBroadcastConfirm(context, ref),
-            ),
           const SizedBox(width: 8),
           GestureDetector(
             onTap: () => context.push('/profile'),
@@ -1204,37 +1197,6 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
               );
             },
             child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showBroadcastConfirm(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Broadcast Reminder?'),
-        content: const Text(
-          'This will send a random marketplace push notification to ALL UniHub users. Are you sure?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await ref.read(notificationServiceProvider).triggerMarketplaceReminder();
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Marketplace reminder broadcast triggered!')),
-                );
-              }
-            },
-            style: FilledButton.styleFrom(backgroundColor: AppColors.secondary),
-            child: const Text('Broadcast Now'),
           ),
         ],
       ),

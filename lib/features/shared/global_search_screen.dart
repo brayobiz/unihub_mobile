@@ -13,7 +13,14 @@ import '../housing/domain/models/roommate_profile.dart';
 import '../housing/domain/models/housing_listing.dart';
 import '../notes/domain/models/note.dart';
 import '../marketplace/domain/models/listing.dart';
+import '../auth/domain/models/app_user.dart';
+import '../auth/shared/providers.dart';
+import '../chat/shared/providers.dart';
+import '../chat/domain/models/chat_context.dart';
 import 'feed_repository.dart';
+import '../../widgets/feed/feed_item_model.dart';
+
+import '../../../core/utils/debouncer.dart';
 
 class GlobalSearchScreen extends ConsumerStatefulWidget {
   const GlobalSearchScreen({super.key});
@@ -24,12 +31,44 @@ class GlobalSearchScreen extends ConsumerStatefulWidget {
 
 class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
   final _searchController = TextEditingController();
+  final _debouncer = Debouncer(milliseconds: 500);
   String _query = '';
+  List<AppUser> _userResults = [];
+  bool _isSearchingUsers = false;
 
   @override
   void dispose() {
     _searchController.dispose();
+    _debouncer.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    final query = value.trim().toLowerCase();
+    setState(() {
+      _query = query;
+      if (query.isEmpty) {
+        _userResults = [];
+        _isSearchingUsers = false;
+      }
+    });
+
+    if (query.isNotEmpty) {
+      setState(() => _isSearchingUsers = true);
+      _debouncer.run(() async {
+        try {
+          final results = await ref.read(authRepositoryProvider).searchUsers(query);
+          if (mounted) {
+            setState(() {
+              _userResults = results;
+              _isSearchingUsers = false;
+            });
+          }
+        } catch (e) {
+          if (mounted) setState(() => _isSearchingUsers = false);
+        }
+      });
+    }
   }
 
   @override
@@ -57,7 +96,7 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
             autofocus: true,
             style: TextStyle(color: theme.colorScheme.onSurface),
             decoration: InputDecoration(
-              hintText: 'Search marketplace, housing, notes...',
+              hintText: 'Search marketplace, housing, users...',
               hintStyle: TextStyle(
                 color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                 fontSize: 14,
@@ -66,9 +105,7 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(vertical: 10),
             ),
-            onChanged: (value) {
-              setState(() => _query = value.trim().toLowerCase());
-            },
+            onChanged: _onSearchChanged,
           ),
         ),
         actions: [
@@ -77,7 +114,7 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
               icon: Icon(Icons.clear_rounded, size: 20, color: theme.colorScheme.onSurfaceVariant),
               onPressed: () {
                 _searchController.clear();
-                setState(() => _query = '');
+                _onSearchChanged('');
               },
             ),
         ],
@@ -91,31 +128,63 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
           Expanded(
             child: _query.isEmpty 
                 ? _buildSearchSuggestions(context)
-                : allFeedAsync.when(
-                    data: (items) {
-                      final filtered = items.where((item) {
-                        return item.model.title.toLowerCase().contains(_query) ||
-                               item.model.subtitle.toLowerCase().contains(_query);
-                      }).toList();
+                : CustomScrollView(
+                    slivers: [
+                      if (_userResults.isNotEmpty) ...[
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                          sliver: SliverToBoxAdapter(
+                            child: Text('Students', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+                          ),
+                        ),
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) => _UserSearchCard(user: _userResults[index]),
+                              childCount: _userResults.length,
+                            ),
+                          ),
+                        ),
+                      ],
+                      
+                      allFeedAsync.when(
+                        data: (items) {
+                          final filteredItems = items.where((item) {
+                            return item.model.title.toLowerCase().contains(_query) ||
+                                   item.model.subtitle.toLowerCase().contains(_query);
+                          }).toList();
 
-                      if (filtered.isEmpty) {
-                        return _buildNoResults(context);
-                      }
+                          if (filteredItems.isEmpty && _userResults.isEmpty && !_isSearchingUsers) {
+                            return SliverFillRemaining(
+                              child: _buildNoResults(context),
+                            );
+                          }
 
-                      return ListView.builder(
-                        padding: const EdgeInsets.all(20),
-                        itemCount: filtered.length,
-                        itemBuilder: (context, index) {
-                          final item = filtered[index];
-                          return _SearchItemCard(
-                            item: item,
-                            onTap: () => _handleItemTap(context, item),
+                          return SliverPadding(
+                            padding: const EdgeInsets.all(20),
+                            sliver: SliverList(
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) {
+                                  final item = filteredItems[index];
+                                  return _SearchItemCard(
+                                    item: item,
+                                    onTap: () => _handleItemTap(context, item),
+                                  );
+                                },
+                                childCount: filteredItems.length,
+                              ),
+                            ),
                           );
                         },
-                      );
-                    },
-                    loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
-                    error: (err, _) => Center(child: Text('Error: $err')),
+                        loading: () => const SliverFillRemaining(
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                        error: (err, _) => SliverToBoxAdapter(
+                          child: Center(child: Text('Error: $err')),
+                        ),
+                      ),
+                    ],
                   ),
           ),
         ],
@@ -359,6 +428,86 @@ class _SearchCategoryRow extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _UserSearchCard extends ConsumerWidget {
+  final AppUser user;
+  const _UserSearchCard({required this.user});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final currentUser = ref.watch(appUserProvider).valueOrNull;
+    if (currentUser?.uid == user.uid) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Material(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          onTap: () => _startChat(context, ref, user),
+          contentPadding: const EdgeInsets.all(12),
+          leading: CircleAvatar(
+            radius: 24,
+            backgroundImage: user.photoUrl != null ? NetworkImage(user.photoUrl!) : null,
+            child: user.photoUrl == null ? Text(user.fullName[0].toUpperCase()) : null,
+          ),
+          title: Text(
+            user.fullName,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+          ),
+          subtitle: Text(
+            '${user.username != null ? '@${user.username} • ' : ''}${user.university ?? 'UniHub Student'}',
+            style: const TextStyle(fontSize: 12),
+          ),
+          trailing: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.chat_bubble_outline_rounded, size: 18, color: theme.colorScheme.primary),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _startChat(BuildContext context, WidgetRef ref, AppUser otherUser) async {
+    final currentUser = ref.read(appUserProvider).valueOrNull;
+    if (currentUser == null) return;
+
+    try {
+      final chatContext = ChatContext(
+        type: 'user',
+        id: otherUser.uid,
+        title: otherUser.fullName,
+        thumbnail: otherUser.photoUrl,
+      );
+
+      final convId = await ref.read(chatRepositoryProvider).getOrCreateConversation(
+        participantIds: [currentUser.uid, otherUser.uid],
+        context: chatContext,
+      );
+
+      if (context.mounted) {
+        context.push('/chat', extra: {
+          'conversationId': convId,
+          'otherUserName': otherUser.fullName,
+        });
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
   }
 }
 

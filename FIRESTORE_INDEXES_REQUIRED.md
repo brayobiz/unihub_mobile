@@ -4,7 +4,16 @@ To ensure the app functions correctly in production, the following composite ind
 
 ---
 
-## Listings Collection (`listings`)
+## User Search (Case-Insensitive)
+| Collection | Fields | Query Usage |
+|------------|--------|-------------|
+| `users` | `fullNameLower` (Asc), `usernameLower` (Asc), `email` (Asc) | Global Student Search |
+
+> **Note**: If you receive a "Query requires an index" error in the logs, Firestore will provide a direct link to create the necessary index.
+
+---
+
+## Marketplace Listings (`listings`)
 
 | Index Fields | Query Usage |
 |--------------|-------------|
@@ -122,6 +131,5 @@ The following indexes must be created for **All Collections** with the specified
 3. Select the **Indexes** tab.
 4. Click **Create Index**.
 5. Enter the Collection ID and the fields exactly as specified above.
-   * **IMPORTANT**: When copying field names, ensure there are **no trailing spaces** (e.g., `sellerUniversity` not `sellerUniversity `).
-   * Trailing spaces will cause an "Invalid property path" error in Firebase.
+   * **IMPORTANT**: When copying field names, ensure there are **no trailing spaces**.
 6. Note: Some indexes may already be prompted for creation via links in the Firebase Debug Console during testing.

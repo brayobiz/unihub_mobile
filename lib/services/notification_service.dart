@@ -6,6 +6,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:unihub_mobile/core/utils/app_logger.dart';
 import 'package:unihub_mobile/core/services/notification_sender.dart';
+import 'package:uuid/uuid.dart';
+import '../features/announcements/domain/models/announcement.dart';
 import '../features/auth/shared/providers.dart';
 import '../app/router/app_router.dart';
 import 'package:unihub_mobile/features/shared/notification_repository.dart';
@@ -547,38 +549,78 @@ class NotificationService implements NotificationSender {
     );
   }
 
-  Future<void> triggerMarketplaceReminder() async {
-    final messages = [
-      {
-        'title': 'New Deals Alert! 🛍️',
-        'body': 'Fresh items just landed in the marketplace. See what you can find today!',
-      },
-      {
-        'title': 'UniHub Marketplace 🎓',
-        'body': 'Looking for something specific? Your campus mates might be selling exactly what you need!',
-      },
-      {
-        'title': 'Save Money Today! 💸',
-        'body': 'Why buy new when you can get quality items from fellow students? Check out the marketplace.',
-      },
-      {
-        'title': 'Tired of the same old stuff? 📦',
-        'body': 'Discover hidden gems and great bargains in the marketplace right now!',
-      },
-    ];
+  Future<void> triggerMarketplaceReminder({String? customTitle, String? customBody}) async {
+    String title;
+    String body;
 
-    final randomMessage = (messages..shuffle()).first;
+    if (customTitle != null && customBody != null) {
+      title = customTitle;
+      body = customBody;
+    } else {
+      final messages = [
+        {
+          'title': 'New Deals Alert! 🛍️',
+          'body': 'Fresh items just landed in the marketplace. See what you can find today!',
+        },
+        {
+          'title': 'UniHub Marketplace 🎓',
+          'body': 'Looking for something specific? Your campus mates might be selling exactly what you need!',
+        },
+        {
+          'title': 'Save Money Today! 💸',
+          'body': 'Why buy new when you can get quality items from fellow students? Check out the marketplace.',
+        },
+        {
+          'title': 'Tired of the same old stuff? 📦',
+          'body': 'Discover hidden gems and great bargains in the marketplace right now!',
+        },
+      ];
 
+      final randomMessage = (messages..shuffle()).first;
+      title = randomMessage['title']!;
+      body = randomMessage['body']!;
+    }
+
+    // 1. Send Push Notification
     await triggerPushNotification(
       recipientId: '', // Ignored for broadcast
       isBroadcast: true,
-      title: randomMessage['title']!,
-      body: randomMessage['body']!,
+      title: title,
+      body: body,
       data: {
         'route': '/marketplace',
         'targetType': 'marketplace',
+        'topic': 'all_users',
       },
     );
+
+    // 2. Create In-App Announcement for 24 hours
+    try {
+      final user = _ref.read(appUserProvider).valueOrNull;
+      if (user == null || !user.isAdmin) return;
+
+      final announcement = Announcement(
+        id: const Uuid().v4(),
+        title: title,
+        content: body,
+        type: AnnouncementType.featureSpecific,
+        targetFeatures: ['marketplace'],
+        targetAudience: {'verifiedOnly': false, 'university': 'All', 'roles': []},
+        displayStyle: AnnouncementDisplayStyle.banner,
+        priority: AnnouncementPriority.normal,
+        status: AnnouncementStatus.published,
+        publishAt: DateTime.now(),
+        expiresAt: DateTime.now().add(const Duration(hours: 24)),
+        createdBy: user.uid,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await _firestore.collection('announcements').doc(announcement.id).set(announcement.toJson());
+      AppLogger.info('Marketplace broadcast persistent announcement created', 'NOTIF_SERVICE');
+    } catch (e) {
+      AppLogger.error('Failed to create persistent announcement for broadcast', e, null, 'NOTIF_SERVICE');
+    }
   }
 
   Future<void> markAsRead(String userId, String notificationId) async {

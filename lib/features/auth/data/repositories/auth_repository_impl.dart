@@ -27,6 +27,12 @@ class AuthRepositoryImpl implements AuthRepository {
         email: email,
         password: password,
       );
+      
+      final user = _firebaseAuth.currentUser;
+      if (user != null) {
+        await _updateSearchFields(user.uid);
+      }
+
       AppLogger.info('Auth: Sign in successful', 'AUTH');
     } on FirebaseAuthException catch (e) {
       AppLogger.warning('Auth: FirebaseAuthException: ${e.code}', 'AUTH');
@@ -60,6 +66,8 @@ class AuthRepositoryImpl implements AuthRepository {
       if (user != null) {
         // Use a more robust check and creation logic
         await _ensureUserDocumentExists(user);
+        // Self-healing: Ensure search fields exist for the logged-in user
+        await _updateSearchFields(user.uid);
       }
     } on FirebaseAuthException catch (e) {
       AppLogger.warning('Auth: Google Sign-in Firebase Error: ${e.code}', 'AUTH');
@@ -99,6 +107,32 @@ class AuthRepositoryImpl implements AuthRepository {
       // We don't throw here to avoid failing sign-in if just the document creation fails,
       // though the app might be limited until the doc is created.
       // In a production app, we might want to retry or handle this in a splash screen.
+    }
+  }
+
+  Future<void> _updateSearchFields(String uid) async {
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (!doc.exists) return;
+      
+      final data = doc.data() as Map<String, dynamic>;
+      final fullName = data['fullName'] ?? '';
+      final username = data['username'];
+      
+      final Map<String, dynamic> updates = {};
+      if (data['fullNameLower'] == null && fullName.isNotEmpty) {
+        updates['fullNameLower'] = fullName.toLowerCase();
+      }
+      if (data['usernameLower'] == null && username != null) {
+        updates['usernameLower'] = username.toLowerCase();
+      }
+      
+      if (updates.isNotEmpty) {
+        await doc.reference.update(updates);
+        AppLogger.info('Auth: Migrated search fields for user $uid', 'AUTH');
+      }
+    } catch (e) {
+      AppLogger.warning('Auth: Failed to update search fields: $e', 'AUTH');
     }
   }
 
@@ -250,8 +284,14 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       AppLogger.info('Auth: Updating profile for $uid', 'AUTH');
       final Map<String, dynamic> data = {};
-      if (fullName != null) data['fullName'] = fullName;
-      if (username != null) data['username'] = username;
+      if (fullName != null) {
+        data['fullName'] = fullName;
+        data['fullNameLower'] = fullName.toLowerCase();
+      }
+      if (username != null) {
+        data['username'] = username;
+        data['usernameLower'] = username.toLowerCase();
+      }
       if (bio != null) data['bio'] = bio;
       if (photoUrl != null) data['photoUrl'] = photoUrl;
       if (coverPhotoUrl != null) data['coverPhotoUrl'] = coverPhotoUrl;
@@ -386,6 +426,47 @@ class AuthRepositoryImpl implements AuthRepository {
       AppLogger.info('Auth: Best-effort Firestore cleanup completed for $uid', 'AUTH');
     } catch (e) {
       AppLogger.warning('Auth: Firestore cleanup encountered errors: $e', 'AUTH');
+    }
+  }
+
+  @override
+  Future<List<AppUser>> searchUsers(String query) async {
+    try {
+      if (query.isEmpty) return [];
+      final q = query.toLowerCase().trim();
+      
+      // Perform multiple searches to avoid complex composite index requirements
+      // and merge results in-memory. This makes searching highly resilient.
+      final results = await Future.wait([
+        _firestore.collection('users')
+            .where('fullNameLower', isGreaterThanOrEqualTo: q)
+            .where('fullNameLower', isLessThanOrEqualTo: '$q\uf8ff')
+            .limit(10)
+            .get(),
+        _firestore.collection('users')
+            .where('usernameLower', isGreaterThanOrEqualTo: q)
+            .where('usernameLower', isLessThanOrEqualTo: '$q\uf8ff')
+            .limit(10)
+            .get(),
+        _firestore.collection('users')
+            .where('email', isGreaterThanOrEqualTo: q)
+            .where('email', isLessThanOrEqualTo: '$q\uf8ff')
+            .limit(10)
+            .get(),
+      ]);
+      
+      final Map<String, AppUser> uniqueUsers = {};
+      for (var snap in results) {
+        for (var doc in snap.docs) {
+          final user = AppUser.fromJson(doc.data());
+          uniqueUsers[user.uid] = user;
+        }
+      }
+      
+      return uniqueUsers.values.toList();
+    } catch (e) {
+      AppLogger.error('Auth: Error searching users', e, null, 'AUTH');
+      return [];
     }
   }
 

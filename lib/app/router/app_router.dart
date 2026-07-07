@@ -24,6 +24,7 @@ import '../../features/marketplace/presentation/screens/seller_profile_screen.da
 import '../../features/marketplace/domain/models/listing.dart';
 import '../../features/chat/presentation/screens/chat_screen.dart';
 import '../../features/chat/presentation/screens/conversations_list_screen.dart';
+import '../../features/chat/presentation/screens/user_search_screen.dart';
 import '../../features/chat/domain/models/chat_context.dart';
 import '../../features/housing/presentation/screens/housing_comparison_screen.dart';
 import '../../features/housing/presentation/screens/roommate_feed_screen.dart';
@@ -390,6 +391,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/conversations',
         builder: (context, state) => const ConversationsListScreen(),
+      ),
+      GoRoute(
+        path: '/user-search',
+        builder: (context, state) => const UserSearchScreen(),
       ),
       GoRoute(
         path: '/chat',

@@ -35,6 +35,8 @@ class FeedItemCard extends StatelessWidget {
         return "Events";
       case FeedType.lostFound:
         return "Lost & Found";
+      case FeedType.user:
+        return "Student";
     }
   }
 

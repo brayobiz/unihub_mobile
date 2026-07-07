@@ -28,14 +28,13 @@ exports.processNotificationQueue = onDocumentCreated("notifications_queue/{queue
 
     if (isBroadcast) {
       console.log("Processing broadcast notification");
-      // Use the "all_users" topic for broadcast. Clients must subscribe to this.
       const message = {
         notification: {
           title: title,
           body: body,
         },
         data: payload || {},
-        topic: "all_users",
+        topic: (payload && payload.topic) ? payload.topic : "all_users",
       };
 
       await messaging.send(message);
