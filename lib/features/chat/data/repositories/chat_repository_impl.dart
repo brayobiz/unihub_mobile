@@ -12,14 +12,14 @@ import 'package:unihub_mobile/core/utils/app_logger.dart';
 class ChatRepositoryImpl implements ChatRepository {
   final FirebaseFirestore _firestore;
   final NotificationSender _notificationSender;
+  
+  // Cache for blocked users to avoid frequent Firestore reads during stream updates
+  final Map<String, List<String>> _blockedCache = {};
 
   ChatRepositoryImpl(this._firestore, this._notificationSender);
 
   @override
   Stream<List<Conversation>> watchConversations(String userId) {
-    // Cache for blocked users to avoid frequent Firestore reads during stream updates
-    final Map<String, List<String>> _blockedCache = {};
-    
     return _firestore
         .collection('conversations')
         .where('participants', arrayContains: userId)

@@ -113,10 +113,14 @@ class FeedRepository {
 
   Stream<List<FeedItem>> watchFeed(FeedType type, {int limit = 20}) {
     // Basic query to avoid complex index requirements
+    final fetchLimit = (_browsingCampus != null && _browsingCampus!.isNotEmpty) 
+        ? limit * 3 
+        : limit;
+
     Query query = _firestore.collection('feed')
         .where('type', isEqualTo: type.name)
         .orderBy('createdAt', descending: true)
-        .limit(limit);
+        .limit(fetchLimit);
     
     return query.snapshots().map((snapshot) {
       final items = snapshot.docs
@@ -142,10 +146,12 @@ class FeedRepository {
   Future<void> cleanupExpiredGigs() async {
     final threeDaysAgo = DateTime.now().subtract(const Duration(days: 3));
     
-    // Fetch only by type to avoid needing a composite index for createdAt
+    // Fetch with a limit to avoid massive reads, and try to use createdAt if possible
+    // Using a safe approach that works without complex indexes first
     final snapshot = await _firestore
         .collection('feed')
         .where('type', isEqualTo: FeedType.gig.name)
+        .limit(100)
         .get();
 
     if (snapshot.docs.isEmpty) return;

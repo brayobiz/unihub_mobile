@@ -58,9 +58,9 @@ class EventRepositoryImpl implements EventRepository {
 
     // Limit is still useful to keep the payload reasonable if the campus is huge,
     // though in-memory sorting works best on the full upcoming set.
-    if (limit != null && after == null) {
-       query = query.limit(limit);
-    }
+    // OPTIMIZATION: Always use a reasonable upper bound if no limit is specified
+    final fetchLimit = limit ?? 100;
+    query = query.limit(fetchLimit * 2);
 
     return query.snapshots().map((snapshot) {
       final events = snapshot.docs.map((d) => Event.fromFirestore(d)).toList();

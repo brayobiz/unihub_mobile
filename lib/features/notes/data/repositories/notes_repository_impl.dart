@@ -37,9 +37,13 @@ class NotesRepositoryImpl implements NotesRepository {
       queryRef = queryRef.where('university', isEqualTo: _browsingCampus);
     }
 
-    // REMOVED: queryRef = queryRef.orderBy('createdAt', descending: true);
-    // Reason: Avoids "Query requires an index" error when filtering by category/type.
-    // Sorting will be done in-memory below.
+    // IMPORTANT: Sorting is done in-memory to avoid composite index requirements 
+    // for every filter combination. We fetch a buffer to ensure good results.
+    if (limit != null) {
+      queryRef = queryRef.limit(limit * 3);
+    } else {
+      queryRef = queryRef.limit(100); // Default safety limit
+    }
 
     return queryRef.snapshots().map((snapshot) {
       if (kDebugMode) {
@@ -82,22 +86,25 @@ class NotesRepositoryImpl implements NotesRepository {
     NoteListing? startAfter,
   }) async {
     Query queryRef = _firestore.collection('notes')
-        .where('status', isEqualTo: 'active')
-        .orderBy('createdAt', descending: true);
+        .where('status', isEqualTo: 'active');
 
     if (_browsingCampus != null && _browsingCampus!.isNotEmpty) {
       queryRef = queryRef.where('university', isEqualTo: _browsingCampus);
     }
 
-    final snapshot = await queryRef.get(const GetOptions(source: Source.serverAndCache));
+    // Use a reasonable limit to avoid fetching the entire collection
+    final snapshot = await queryRef.limit(200).get(const GetOptions(source: Source.serverAndCache));
     var items = snapshot.docs.map((doc) => NoteListing.fromJson(doc.data() as Map<String, dynamic>)).toList();
+
+    // Sorting newest first in-memory to avoid index requirement
+    items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     // Secondary filtering
     if (subjectCategory != null && subjectCategory != 'All') items = items.where((n) => n.subjectCategory == subjectCategory).toList();
     if (noteType != null && noteType != 'All') items = items.where((n) => n.noteType == noteType).toList();
     if (yearOfStudy != null && yearOfStudy != 'All') items = items.where((n) => n.yearOfStudy == yearOfStudy).toList();
 
-    return items;
+    return items.take(limit).toList();
   }
 
   @override
@@ -257,11 +264,11 @@ class NotesRepositoryImpl implements NotesRepository {
         .collection('users')
         .doc(userId)
         .collection('study_progress')
+        .where('isBookmarked', isEqualTo: true)
         .snapshots()
         .map((snapshot) {
           var items = snapshot.docs
               .map((doc) => StudyProgress.fromJson(doc.data()))
-              .where((p) => p.isBookmarked)
               .toList();
           items.sort((a, b) => b.lastAccessed.compareTo(a.lastAccessed));
           return items;

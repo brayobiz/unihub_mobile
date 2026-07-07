@@ -34,16 +34,25 @@ class PresenceService with WidgetsBindingObserver {
     }
   }
 
+  DateTime? _lastUpdateTime;
+
   Future<void> _updateStatus(bool isOnline) async {
     final user = _ref.read(authStateProvider).valueOrNull;
     if (user == null) return;
+
+    // THROTTLE: Don't update more than once every 5 seconds unless status changed
+    final now = DateTime.now();
+    if (_lastUpdateTime != null && 
+        now.difference(_lastUpdateTime!) < const Duration(seconds: 5) &&
+        isOnline) {
+      return;
+    }
 
     try {
       final firestore = _ref.read(firestoreProvider);
       final docRef = firestore.collection('users').doc(user.uid);
       
-      // OPTIMIZATION: Only update if status actually changes or enough time passed
-      // For simplicity here, we just use a basic update.
+      _lastUpdateTime = now;
       await docRef.update({
         'isOnline': isOnline,
         'lastSeen': FieldValue.serverTimestamp(),

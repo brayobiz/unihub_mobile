@@ -21,6 +21,9 @@ import '../../../../core/utils/app_logger.dart';
 
 class AdminRepository {
   final FirebaseFirestore _firestore;
+  
+  // Cache to reduce redundant fetches for support and verification screens
+  final Map<String, AppUser> _userCache = {};
 
   AdminRepository(this._firestore);
 
@@ -1395,23 +1398,37 @@ class AdminRepository {
       if (searchQuery != null && searchQuery.isNotEmpty) {
         final searchLower = searchQuery.toLowerCase();
         // We need to fetch user details to search by name/email
-        // For performance, we'll do it in a batch
-        final userIds = conversations.map((c) => c.participants.firstWhere((p) => p != 'unihub_admin', orElse: () => '')).where((id) => id.isNotEmpty).toSet().toList();
+        // Optimization: Use cache and only fetch missing IDs
+        final participantIds = conversations
+            .map((c) => c.participants.firstWhere((p) => p != 'unihub_admin', orElse: () => ''))
+            .where((id) => id.isNotEmpty)
+            .toSet();
+            
+        final missingIds = participantIds.where((id) => !_userCache.containsKey(id)).toList();
         
-        if (userIds.isNotEmpty) {
-          final usersSnap = await _firestore.collection('users').where(FieldPath.documentId, whereIn: userIds).get();
-          final userMap = {for (var doc in usersSnap.docs) doc.id: AppUser.fromJson(doc.data())};
-
-          conversations = conversations.where((c) {
-            final userId = c.participants.firstWhere((p) => p != 'unihub_admin', orElse: () => '');
-            final user = userMap[userId];
-            if (user == null) return false;
-            return user.fullName.toLowerCase().contains(searchLower) ||
-                   user.email.toLowerCase().contains(searchLower) ||
-                   (user.username?.toLowerCase().contains(searchLower) ?? false) ||
-                   c.id.toLowerCase().contains(searchLower);
-          }).toList();
+        if (missingIds.isNotEmpty) {
+          // Fetch in chunks of 30 due to whereIn limit
+          const int chunkSize = 30;
+          for (var i = 0; i < missingIds.length; i += chunkSize) {
+            final end = (i + chunkSize < missingIds.length) ? i + chunkSize : missingIds.length;
+            final chunk = missingIds.sublist(i, end);
+            
+            final usersSnap = await _firestore.collection('users').where(FieldPath.documentId, whereIn: chunk).get();
+            for (var doc in usersSnap.docs) {
+              _userCache[doc.id] = AppUser.fromJson(doc.data());
+            }
+          }
         }
+
+        conversations = conversations.where((c) {
+          final userId = c.participants.firstWhere((p) => p != 'unihub_admin', orElse: () => '');
+          final user = _userCache[userId];
+          if (user == null) return false;
+          return user.fullName.toLowerCase().contains(searchLower) ||
+                 user.email.toLowerCase().contains(searchLower) ||
+                 (user.username?.toLowerCase().contains(searchLower) ?? false) ||
+                 c.id.toLowerCase().contains(searchLower);
+        }).toList();
       }
 
       conversations.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));

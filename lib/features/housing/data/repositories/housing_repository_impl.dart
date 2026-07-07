@@ -203,16 +203,21 @@ class HousingRepositoryImpl implements HousingRepository {
 
   @override
   Stream<List<RoommateProfile>> watchRoommates({int limit = 30}) {
+    // In-memory campus filtering to avoid composite index requirement for createdAt
+    final fetchLimit = (_browsingCampus != null && _browsingCampus!.isNotEmpty) 
+        ? limit * 3 
+        : limit;
+
     Query query = _firestore.collection('roommates')
         .orderBy('createdAt', descending: true)
-        .limit(limit);
+        .limit(fetchLimit);
 
     return query.snapshots().map((snapshot) {
       var profiles = snapshot.docs.map((doc) => RoommateProfile.fromFirestore(doc)).toList();
       if (_browsingCampus != null && _browsingCampus!.isNotEmpty) {
         profiles = profiles.where((p) => p.campus == _browsingCampus).toList();
       }
-      return profiles;
+      return profiles.take(limit).toList();
     });
   }
 
