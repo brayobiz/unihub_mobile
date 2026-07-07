@@ -246,7 +246,7 @@ class _HousingDetailContentState extends ConsumerState<_HousingDetailContent> {
     }
   }
 
-  void _showBookingDialog() {
+  void _showBookingDialog() async {
     final listing = widget.listing;
     final plug = ref.read(publicUserProvider(listing.plugId)).valueOrNull;
     if (plug == null) return;
@@ -255,29 +255,30 @@ class _HousingDetailContentState extends ConsumerState<_HousingDetailContent> {
     final notesController = TextEditingController();
     final theme = Theme.of(context);
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (modalContext) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(modalContext).viewInsets.bottom,
-          ),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Center(
-                  child: Container(width: 40, height: 4, decoration: BoxDecoration(color: theme.colorScheme.outlineVariant, borderRadius: BorderRadius.circular(2))),
-                ),
-                const SizedBox(height: 24),
+    try {
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (modalContext) => StatefulBuilder(
+          builder: (context, setModalState) => Container(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(modalContext).viewInsets.bottom,
+            ),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Container(width: 40, height: 4, decoration: BoxDecoration(color: theme.colorScheme.outlineVariant, borderRadius: BorderRadius.circular(2))),
+                  ),
+                  const SizedBox(height: 24),
                 Text('Book a Viewing', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
                 const SizedBox(height: 8),
                 Text('Request a time to visit this property', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
@@ -380,6 +381,9 @@ class _HousingDetailContentState extends ConsumerState<_HousingDetailContent> {
         ),
       ),
     );
+    } finally {
+      notesController.dispose();
+    }
   }
 
   @override
@@ -1363,123 +1367,127 @@ class _PropertyReviewsSection extends ConsumerWidget {
     );
   }
 
-  void _showAddReviewDialog(BuildContext context, WidgetRef ref, HousingReview? existingReview) {
+  void _showAddReviewDialog(BuildContext context, WidgetRef ref, HousingReview? existingReview) async {
     final theme = Theme.of(context);
     double rating = existingReview?.rating ?? 5.0;
     final commentController = TextEditingController(text: existingReview?.comment);
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.outlineVariant,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  existingReview != null ? 'Update Review' : 'Rate Your Experience',
-                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'How was your interaction with ${listing.plugName}?',
-                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                ),
-                const SizedBox(height: 32),
-                
-                // Star Rating
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(5, (index) {
-                    final isSelected = index < rating;
-                    return IconButton(
-                      onPressed: () => setModalState(() => rating = index + 1.0),
-                      icon: Icon(
-                        isSelected ? Icons.star_rounded : Icons.star_outline_rounded,
-                        color: isSelected ? Colors.amber : theme.colorScheme.outlineVariant,
-                        size: 40,
+    try {
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setModalState) => Container(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.outlineVariant,
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                    );
-                  }),
-                ),
-                
-                const SizedBox(height: 32),
-                TextField(
-                  controller: commentController,
-                  maxLines: 4,
-                  decoration: InputDecoration(
-                    labelText: 'Tell us more (Optional)',
-                    hintText: 'Was the property as described? Was the plug professional?',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                ),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  height: 58,
-                  child: FilledButton(
-                    onPressed: () async {
-                      final user = ref.read(appUserProvider).valueOrNull;
-                      if (user == null) return;
-
-                      final review = HousingReview(
-                        id: existingReview?.id ?? const Uuid().v4(),
-                        plugId: listing.plugId,
-                        listingId: listing.id,
-                        userId: user.uid,
-                        userName: user.fullName,
-                        userPhotoUrl: user.photoUrl,
-                        comment: commentController.text.trim(),
-                        rating: rating,
-                        createdAt: DateTime.now(),
-                      );
-
-                      await ref.read(housingRepositoryProvider).submitReview(review);
-                      
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Thank you for your feedback!'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      }
-                    },
-                    style: FilledButton.styleFrom(
-                      backgroundColor: theme.colorScheme.primary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
-                    child: const Text('Submit Review', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
                   ),
-                ),
-                const SizedBox(height: 16),
-              ],
+                  const SizedBox(height: 24),
+                  Text(
+                    existingReview != null ? 'Update Review' : 'Rate Your Experience',
+                    style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'How was your interaction with ${listing.plugName}?',
+                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 32),
+                  
+                  // Star Rating
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      final isSelected = index < rating;
+                      return IconButton(
+                        onPressed: () => setModalState(() => rating = index + 1.0),
+                        icon: Icon(
+                          isSelected ? Icons.star_rounded : Icons.star_outline_rounded,
+                          color: isSelected ? Colors.amber : theme.colorScheme.outlineVariant,
+                          size: 40,
+                        ),
+                      );
+                    }),
+                  ),
+                  
+                  const SizedBox(height: 32),
+                  TextField(
+                    controller: commentController,
+                    maxLines: 4,
+                    decoration: InputDecoration(
+                      labelText: 'Tell us more (Optional)',
+                      hintText: 'Was the property as described? Was the plug professional?',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 58,
+                    child: FilledButton(
+                      onPressed: () async {
+                        final user = ref.read(appUserProvider).valueOrNull;
+                        if (user == null) return;
+
+                        final review = HousingReview(
+                          id: existingReview?.id ?? const Uuid().v4(),
+                          plugId: listing.plugId,
+                          listingId: listing.id,
+                          userId: user.uid,
+                          userName: user.fullName,
+                          userPhotoUrl: user.photoUrl,
+                          comment: commentController.text.trim(),
+                          rating: rating,
+                          createdAt: DateTime.now(),
+                        );
+
+                        await ref.read(housingRepositoryProvider).submitReview(review);
+                        
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Thank you for your feedback!'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: theme.colorScheme.primary,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: const Text('Submit Review', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    } finally {
+      commentController.dispose();
+    }
   }
 }
 

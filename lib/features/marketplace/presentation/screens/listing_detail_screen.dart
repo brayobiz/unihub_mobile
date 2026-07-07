@@ -236,117 +236,121 @@ class _ListingDetailContentState extends ConsumerState<_ListingDetailContent> {
     );
   }
 
-  void _showMakeOfferSheet() {
+  void _showMakeOfferSheet() async {
     final listing = widget.listing;
     final user = ref.read(appUserProvider).valueOrNull;
     if (user == null) return;
     
     final controller = TextEditingController();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
-      builder: (context) {
-        final mTheme = Theme.of(context);
-        return Consumer(
-          builder: (context, ref, _) {
-            final offerState = ref.watch(offerControllerProvider);
-            final isLoading = offerState.isLoading;
+    try {
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+        builder: (context) {
+          final mTheme = Theme.of(context);
+          return Consumer(
+            builder: (context, ref, _) {
+              final offerState = ref.watch(offerControllerProvider);
+              final isLoading = offerState.isLoading;
 
-            // Handle success or error from the controller
-            ref.listen<AsyncValue<void>>(offerControllerProvider, (previous, next) {
-              if (next is AsyncData && previous is AsyncLoading) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Offer sent successfully!'), backgroundColor: AppColors.success),
-                );
-              } else if (next is AsyncError) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to send offer: ${next.error}'), backgroundColor: AppColors.error),
-                );
-              }
-            });
+              // Handle success or error from the controller
+              ref.listen<AsyncValue<void>>(offerControllerProvider, (previous, next) {
+                if (next is AsyncData && previous is AsyncLoading) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Offer sent successfully!'), backgroundColor: AppColors.success),
+                  );
+                } else if (next is AsyncError) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to send offer: ${next.error}'), backgroundColor: AppColors.error),
+                  );
+                }
+              });
 
-            return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-              child: Container(
-                padding: const EdgeInsets.all(30),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Make an Offer', 
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 20, 
-                        fontWeight: FontWeight.bold,
-                        color: mTheme.colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Listing Price: KES ${NumberFormat("#,###").format(listing.price)}', 
-                      style: TextStyle(color: mTheme.colorScheme.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: 24),
-                    TextField(
-                      controller: controller,
-                      keyboardType: TextInputType.number,
-                      autofocus: true,
-                      enabled: !isLoading,
-                      style: TextStyle(color: mTheme.colorScheme.onSurface),
-                      decoration: InputDecoration(
-                        labelText: 'Your Offer',
-                        prefixText: 'KES ',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: FilledButton(
-                        onPressed: isLoading ? null : () async {
-                          final amount = double.tryParse(controller.text);
-                          if (amount != null) {
-                            final offer = Offer(
-                              id: const Uuid().v4(),
-                              listingId: listing.id,
-                              buyerId: user.uid,
-                              sellerId: listing.sellerId,
-                              amount: amount,
-                              timestamp: DateTime.now(),
-                            );
-                            
-                            await ref.read(offerControllerProvider.notifier).makeOffer(offer);
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Please enter a valid amount')),
-                            );
-                          }
-                        },
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.marketplaceBlue,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              return Padding(
+                padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+                child: Container(
+                  padding: const EdgeInsets.all(30),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Make an Offer', 
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 20, 
+                          fontWeight: FontWeight.bold,
+                          color: mTheme.colorScheme.onSurface,
                         ),
-                        child: isLoading 
-                          ? const SizedBox(
-                              height: 20, 
-                              width: 20, 
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                            )
-                          : const Text('Send Offer', style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      Text(
+                        'Listing Price: KES ${NumberFormat("#,###").format(listing.price)}', 
+                        style: TextStyle(color: mTheme.colorScheme.onSurfaceVariant),
+                      ),
+                      const SizedBox(height: 24),
+                      TextField(
+                        controller: controller,
+                        keyboardType: TextInputType.number,
+                        autofocus: true,
+                        enabled: !isLoading,
+                        style: TextStyle(color: mTheme.colorScheme.onSurface),
+                        decoration: InputDecoration(
+                          labelText: 'Your Offer',
+                          prefixText: 'KES ',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: FilledButton(
+                          onPressed: isLoading ? null : () async {
+                            final amount = double.tryParse(controller.text);
+                            if (amount != null) {
+                              final offer = Offer(
+                                id: const Uuid().v4(),
+                                listingId: listing.id,
+                                buyerId: user.uid,
+                                sellerId: listing.sellerId,
+                                amount: amount,
+                                timestamp: DateTime.now(),
+                              );
+                              
+                              await ref.read(offerControllerProvider.notifier).makeOffer(offer);
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please enter a valid amount')),
+                              );
+                            }
+                          },
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.marketplaceBlue,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          child: isLoading 
+                            ? const SizedBox(
+                                height: 20, 
+                                width: 20, 
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                              )
+                            : const Text('Send Offer', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
-        );
-      },
-    );
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      controller.dispose();
+    }
   }
 
   @override

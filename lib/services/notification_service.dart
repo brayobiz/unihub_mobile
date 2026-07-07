@@ -12,7 +12,11 @@ import '../features/auth/shared/providers.dart';
 import '../app/router/app_router.dart';
 import 'package:unihub_mobile/features/shared/notification_repository.dart';
 
-final notificationServiceProvider = Provider<NotificationService>((ref) => NotificationService(ref));
+final notificationServiceProvider = Provider<NotificationService>((ref) {
+  final service = NotificationService(ref);
+  ref.onDispose(() => service.dispose());
+  return service;
+});
 
 class NotificationService implements NotificationSender {
   final Ref _ref;
@@ -20,11 +24,20 @@ class NotificationService implements NotificationSender {
   
   bool _isInitialized = false;
   StreamSubscription? _tokenSubscription;
+  StreamSubscription? _onMessageSubscription;
+  StreamSubscription? _onMessageOpenedAppSubscription;
 
   NotificationService(this._ref);
 
   FirebaseMessaging get _messaging => _ref.read(firebaseMessagingProvider);
   FirebaseFirestore get _firestore => _ref.read(firestoreProvider);
+
+  void dispose() {
+    _tokenSubscription?.cancel();
+    _onMessageSubscription?.cancel();
+    _onMessageOpenedAppSubscription?.cancel();
+    _isInitialized = false;
+  }
 
   Future<void> init() async {
     AppLogger.info('Initializing NotificationService...', 'NOTIF_SERVICE');
@@ -71,11 +84,13 @@ class NotificationService implements NotificationSender {
       },
     );
 
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    _onMessageSubscription?.cancel();
+    _onMessageSubscription = FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       _showLocalNotification(message);
     });
 
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+    _onMessageOpenedAppSubscription?.cancel();
+    _onMessageOpenedAppSubscription = FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       _handleRemoteMessageTap(message);
     });
 

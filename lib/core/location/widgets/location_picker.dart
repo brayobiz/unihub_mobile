@@ -139,9 +139,26 @@ class _LocationPickerState extends State<LocationPicker> {
             child: FloatingActionButton(
               heroTag: 'picker_my_location',
               onPressed: () async {
-                final loc = await geo.Geolocator.getCurrentPosition();
-                _mapController.move(LatLng(loc.latitude, loc.longitude), 16);
-                _currentLocation.value = LatLng(loc.latitude, loc.longitude);
+                try {
+                  final permission = await geo.Geolocator.checkPermission();
+                  if (permission == geo.LocationPermission.denied) {
+                    final requested = await geo.Geolocator.requestPermission();
+                    if (requested == geo.LocationPermission.denied || requested == geo.LocationPermission.deniedForever) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Location permission denied')));
+                      }
+                      return;
+                    }
+                  }
+                  
+                  final loc = await geo.Geolocator.getCurrentPosition();
+                  _mapController.move(LatLng(loc.latitude, loc.longitude), 16);
+                  _currentLocation.value = LatLng(loc.latitude, loc.longitude);
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to get location: $e')));
+                  }
+                }
               },
               child: const Icon(Icons.my_location),
             ),

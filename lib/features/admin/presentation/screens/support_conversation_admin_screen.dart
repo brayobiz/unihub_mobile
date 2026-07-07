@@ -739,10 +739,11 @@ class _SupportConversationAdminScreenState extends ConsumerState<SupportConversa
         children: [
           Text(note['note'] ?? '', style: const TextStyle(fontSize: 13)),
           const SizedBox(height: 4),
-          Text(
-            DateFormat('MMM dd, HH:mm').format((note['timestamp'] as Timestamp).toDate()),
-            style: const TextStyle(fontSize: 10, color: Colors.grey),
-          ),
+          if (note['timestamp'] != null)
+            Text(
+              DateFormat('MMM dd, HH:mm').format((note['timestamp'] as Timestamp).toDate()),
+              style: const TextStyle(fontSize: 10, color: Colors.grey),
+            ),
         ],
       ),
     );

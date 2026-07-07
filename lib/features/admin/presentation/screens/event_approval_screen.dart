@@ -101,72 +101,76 @@ class _EventApprovalScreenState extends ConsumerState<EventApprovalScreen> {
     }
 
     final controller = TextEditingController();
-    final reason = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reject Events'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Provide a reason for rejecting ${selected.length} event(s):'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'E.g., Event details violate community guidelines',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+    try {
+      final reason = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Reject Events'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Provide a reason for rejecting ${selected.length} event(s):'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'E.g., Event details violate community guidelines',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
               ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: const Text('Reject'),
             ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Reject'),
-          ),
-        ],
-      ),
-    );
-
-    if (reason == null || reason.isEmpty) return;
-
-    setState(() => _isProcessing = true);
-    try {
-      final admin = ref.read(appUserProvider).valueOrNull;
-      if (admin == null) throw Exception('Admin session not found');
-
-      final repository = ref.read(adminRepositoryProvider);
-      await repository.bulkRejectEvents(
-        eventIds: selected.map((e) => e.id).toList(),
-        adminId: admin.uid,
-        reason: reason,
       );
 
-      if (mounted) {
-        setState(() {
-          _selectedIds.clear();
-          _isProcessing = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ Rejected ${selected.length} event(s)'),
-            backgroundColor: AppColors.warning,
-          ),
+      if (reason == null || reason.isEmpty) return;
+
+      setState(() => _isProcessing = true);
+      try {
+        final admin = ref.read(appUserProvider).valueOrNull;
+        if (admin == null) throw Exception('Admin session not found');
+
+        final repository = ref.read(adminRepositoryProvider);
+        await repository.bulkRejectEvents(
+          eventIds: selected.map((e) => e.id).toList(),
+          adminId: admin.uid,
+          reason: reason,
         );
-        await ref.refresh(pendingEventsProvider(null).future);
+
+        if (mounted) {
+          setState(() {
+            _selectedIds.clear();
+            _isProcessing = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ Rejected ${selected.length} event(s)'),
+              backgroundColor: AppColors.warning,
+            ),
+          );
+          await ref.refresh(pendingEventsProvider(null).future);
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isProcessing = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('❌ Error: $e'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isProcessing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Error: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+    } finally {
+      controller.dispose();
     }
   }
 

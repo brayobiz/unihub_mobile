@@ -61,7 +61,7 @@ class _CampusMapState extends State<CampusMap> {
         initialCenter: LatLng(widget.initialLatitude, widget.initialLongitude),
         initialZoom: widget.initialZoom,
         onPositionChanged: (position, hasGesture) {
-          if (hasGesture && widget.onCameraMove != null) {
+          if (hasGesture && widget.onCameraMove != null && position.center != null) {
             widget.onCameraMove!(
               position.center!.latitude,
               position.center!.longitude,

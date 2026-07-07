@@ -330,92 +330,97 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
     );
   }
 
-  void _showBroadcastDialog() {
+  void _showBroadcastDialog() async {
     final titleController = TextEditingController();
     final bodyController = TextEditingController();
     bool useCustomMessage = false;
 
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Broadcast Marketplace Reminder'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'This will send a push notification to ALL UniHub users.',
-                style: TextStyle(fontSize: 12),
+    try {
+      await showDialog(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Broadcast Marketplace Reminder'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'This will send a push notification to ALL UniHub users.',
+                  style: TextStyle(fontSize: 12),
+                ),
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  title: const Text('Use Custom Message', style: TextStyle(fontSize: 14)),
+                  value: useCustomMessage,
+                  onChanged: (val) => setDialogState(() => useCustomMessage = val),
+                ),
+                if (useCustomMessage) ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: titleController,
+                    decoration: const InputDecoration(
+                      labelText: 'Notification Title',
+                      hintText: 'e.g., Fresh Deals Today! 🛍️',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: bodyController,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Notification Body',
+                      hintText: 'e.g., Check out the latest items...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ] else
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12.0),
+                    child: Text(
+                      'A random marketing message will be selected (e.g., "New Deals Alert!").',
+                      style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
+                    ),
+                  ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
               ),
-              const SizedBox(height: 16),
-              SwitchListTile(
-                title: const Text('Use Custom Message', style: TextStyle(fontSize: 14)),
-                value: useCustomMessage,
-                onChanged: (val) => setDialogState(() => useCustomMessage = val),
+              FilledButton(
+                onPressed: () async {
+                  final messenger = ScaffoldMessenger.of(context);
+                  final navigator = Navigator.of(context);
+                  
+                  try {
+                    await ref.read(notificationServiceProvider).triggerMarketplaceReminder(
+                      customTitle: useCustomMessage ? titleController.text.trim() : null,
+                      customBody: useCustomMessage ? bodyController.text.trim() : null,
+                    );
+                    
+                    navigator.pop();
+                    messenger.showSnackBar(
+                      const SnackBar(content: Text('✅ Marketplace broadcast triggered successfully')),
+                    );
+                  } catch (e) {
+                    messenger.showSnackBar(
+                      SnackBar(content: Text('❌ Error: $e')),
+                    );
+                  }
+                },
+                style: FilledButton.styleFrom(backgroundColor: AppColors.secondary),
+                child: const Text('Broadcast Now'),
               ),
-              if (useCustomMessage) ...[
-                const SizedBox(height: 12),
-                TextField(
-                  controller: titleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Notification Title',
-                    hintText: 'e.g., Fresh Deals Today! 🛍️',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: bodyController,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText: 'Notification Body',
-                    hintText: 'e.g., Check out the latest items...',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ] else
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12.0),
-                  child: Text(
-                    'A random marketing message will be selected (e.g., "New Deals Alert!").',
-                    style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
-                  ),
-                ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                final messenger = ScaffoldMessenger.of(context);
-                final navigator = Navigator.of(context);
-                
-                try {
-                  await ref.read(notificationServiceProvider).triggerMarketplaceReminder(
-                    customTitle: useCustomMessage ? titleController.text.trim() : null,
-                    customBody: useCustomMessage ? bodyController.text.trim() : null,
-                  );
-                  
-                  navigator.pop();
-                  messenger.showSnackBar(
-                    const SnackBar(content: Text('✅ Marketplace broadcast triggered successfully')),
-                  );
-                } catch (e) {
-                  messenger.showSnackBar(
-                    SnackBar(content: Text('❌ Error: $e')),
-                  );
-                }
-              },
-              style: FilledButton.styleFrom(backgroundColor: AppColors.secondary),
-              child: const Text('Broadcast Now'),
-            ),
-          ],
         ),
-      ),
-    );
+      );
+    } finally {
+      titleController.dispose();
+      bodyController.dispose();
+    }
   }
 
   void _showModerationOptions(ModeratedContent item) {

@@ -5,7 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/auth/shared/providers.dart';
 
-final presenceServiceProvider = Provider((ref) => PresenceService(ref));
+final presenceServiceProvider = Provider((ref) {
+  final service = PresenceService(ref);
+  ref.onDispose(() => service.dispose());
+  return service;
+});
 
 class PresenceService with WidgetsBindingObserver {
   final Ref _ref;

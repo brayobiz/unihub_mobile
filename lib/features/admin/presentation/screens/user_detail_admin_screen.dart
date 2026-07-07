@@ -479,95 +479,103 @@ class _UserDetailAdminScreenState extends ConsumerState<UserDetailAdminScreen> {
     );
   }
 
-  void _showAddNoteDialog(AppUser user) {
+  void _showAddNoteDialog(AppUser user) async {
     final noteController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Admin Note'),
-        content: TextField(
-          controller: noteController,
-          maxLines: 4,
-          decoration: const InputDecoration(hintText: 'Enter internal administrative note...'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              if (_isProcessing) return;
-              final admin = ref.read(appUserProvider).valueOrNull;
-              if (admin == null) return;
-              
-              final navigator = Navigator.of(context);
-              if (noteController.text.isNotEmpty) {
-                setState(() => _isProcessing = true);
-                try {
-                  await ref.read(adminRepositoryProvider).addAdminNote(user.uid, noteController.text, admin.uid);
-                } finally {
-                  if (mounted) setState(() => _isProcessing = false);
-                }
-              }
-              navigator.pop();
-            },
-            child: const Text('Save Note'),
+    try {
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Add Admin Note'),
+          content: TextField(
+            controller: noteController,
+            maxLines: 4,
+            decoration: const InputDecoration(hintText: 'Enter internal administrative note...'),
           ),
-        ],
-      ),
-    );
-  }
-
-  void _showTrustScoreDialog(AppUser user) {
-    final scoreController = TextEditingController(text: user.trustScore.toStringAsFixed(0));
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Adjust Trust Score'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Manual adjustments will override calculated scores.'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: scoreController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Score (0-100)'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                if (_isProcessing) return;
+                final admin = ref.read(appUserProvider).valueOrNull;
+                if (admin == null) return;
+                
+                final navigator = Navigator.of(context);
+                if (noteController.text.isNotEmpty) {
+                  setState(() => _isProcessing = true);
+                  try {
+                    await ref.read(adminRepositoryProvider).addAdminNote(user.uid, noteController.text, admin.uid);
+                  } finally {
+                    if (mounted) setState(() => _isProcessing = false);
+                  }
+                }
+                navigator.pop();
+              },
+              child: const Text('Save Note'),
             ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              if (_isProcessing) return;
-              final admin = ref.read(appUserProvider).valueOrNull;
-              if (admin == null) return;
-              
-              final navigator = Navigator.of(context);
-              final score = double.tryParse(scoreController.text);
-              if (score != null) {
-                setState(() => _isProcessing = true);
-                try {
-                  await ref.read(adminServiceProvider).updateUserTrustScore(
-                    user.uid, 
-                    score,
-                    adminId: admin.uid,
-                    adminName: admin.fullName,
-                  );
-                } finally {
-                  if (mounted) setState(() => _isProcessing = false);
-                }
-              }
-              navigator.pop();
-            },
-            child: const Text('Save Score'),
-          ),
-        ],
-      ),
-    );
+      );
+    } finally {
+      noteController.dispose();
+    }
   }
 
-  void _showBanDialog(AppUser user) {
+  void _showTrustScoreDialog(AppUser user) async {
+    final scoreController = TextEditingController(text: user.trustScore.toStringAsFixed(0));
+    
+    try {
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Adjust Trust Score'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Manual adjustments will override calculated scores.'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: scoreController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Score (0-100)'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                if (_isProcessing) return;
+                final admin = ref.read(appUserProvider).valueOrNull;
+                if (admin == null) return;
+                
+                final navigator = Navigator.of(context);
+                final score = double.tryParse(scoreController.text);
+                if (score != null) {
+                  setState(() => _isProcessing = true);
+                  try {
+                    await ref.read(adminServiceProvider).updateUserTrustScore(
+                      user.uid, 
+                      score,
+                      adminId: admin.uid,
+                      adminName: admin.fullName,
+                    );
+                  } finally {
+                    if (mounted) setState(() => _isProcessing = false);
+                  }
+                }
+                navigator.pop();
+              },
+              child: const Text('Save Score'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      scoreController.dispose();
+    }
+  }
+
+  void _showBanDialog(AppUser user) async {
     if (user.isBanned) {
       showDialog(
         context: context,
@@ -603,54 +611,58 @@ class _UserDetailAdminScreenState extends ConsumerState<UserDetailAdminScreen> {
       );
     } else {
       final reasonController = TextEditingController();
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Ban Permanently'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Enter reason for banning ${user.fullName}:'),
-              const SizedBox(height: 12),
-              TextField(
-                controller: reasonController,
-                decoration: const InputDecoration(hintText: 'e.g. Repeated scam attempts'),
+      try {
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Ban Permanently'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Enter reason for banning ${user.fullName}:'),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: reasonController,
+                  decoration: const InputDecoration(hintText: 'e.g. Repeated scam attempts'),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+                onPressed: () async {
+                  if (_isProcessing) return;
+                  final admin = ref.read(appUserProvider).valueOrNull;
+                  if (admin == null) return;
+
+                  final navigator = Navigator.of(context);
+                  setState(() => _isProcessing = true);
+                  try {
+                    await ref.read(adminServiceProvider).toggleUserBan(
+                      user.uid, 
+                      true, 
+                      reason: reasonController.text,
+                      adminId: admin.uid,
+                      adminName: admin.fullName,
+                    );
+                  } finally {
+                    if (mounted) setState(() => _isProcessing = false);
+                  }
+                  navigator.pop();
+                },
+                child: const Text('Ban Permanently', style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-              onPressed: () async {
-                if (_isProcessing) return;
-                final admin = ref.read(appUserProvider).valueOrNull;
-                if (admin == null) return;
-
-                final navigator = Navigator.of(context);
-                setState(() => _isProcessing = true);
-                try {
-                  await ref.read(adminServiceProvider).toggleUserBan(
-                    user.uid, 
-                    true, 
-                    reason: reasonController.text,
-                    adminId: admin.uid,
-                    adminName: admin.fullName,
-                  );
-                } finally {
-                  if (mounted) setState(() => _isProcessing = false);
-                }
-                navigator.pop();
-              },
-              child: const Text('Ban Permanently', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
-      );
+        );
+      } finally {
+        reasonController.dispose();
+      }
     }
   }
 
-  void _showSuspendDialog(AppUser user) {
+  void _showSuspendDialog(AppUser user) async {
     if (user.isCurrentlySuspended) {
       showDialog(
         context: context,
@@ -691,58 +703,62 @@ class _UserDetailAdminScreenState extends ConsumerState<UserDetailAdminScreen> {
     final reasonController = TextEditingController();
     int days = 7;
     
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Suspend User'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Suspend ${user.fullName} for:'),
-              DropdownButton<int>(
-                value: days,
-                isExpanded: true,
-                items: [3, 7, 14, 30, 90].map((d) => DropdownMenuItem(value: d, child: Text('$d Days'))).toList(),
-                onChanged: (val) => setDialogState(() => days = val!),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: reasonController,
-                decoration: const InputDecoration(hintText: 'Reason for suspension'),
+    try {
+      await showDialog(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Suspend User'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Suspend ${user.fullName} for:'),
+                DropdownButton<int>(
+                  value: days,
+                  isExpanded: true,
+                  items: [3, 7, 14, 30, 90].map((d) => DropdownMenuItem(value: d, child: Text('$d Days'))).toList(),
+                  onChanged: (val) => setDialogState(() => days = val!),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: reasonController,
+                  decoration: const InputDecoration(hintText: 'Reason for suspension'),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: () async {
+                  if (_isProcessing) return;
+                  final admin = ref.read(appUserProvider).valueOrNull;
+                  if (admin == null) return;
+
+                  final navigator = Navigator.of(context);
+                  final until = DateTime.now().add(Duration(days: days));
+                  setState(() => _isProcessing = true);
+                  try {
+                    await ref.read(adminServiceProvider).suspendUser(
+                      user.uid, 
+                      until, 
+                      reasonController.text,
+                      adminId: admin.uid,
+                      adminName: admin.fullName,
+                    );
+                  } finally {
+                    if (mounted) setState(() => _isProcessing = false);
+                  }
+                  navigator.pop();
+                },
+                child: const Text('Suspend'),
               ),
             ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () async {
-                if (_isProcessing) return;
-                final admin = ref.read(appUserProvider).valueOrNull;
-                if (admin == null) return;
-
-                final navigator = Navigator.of(context);
-                final until = DateTime.now().add(Duration(days: days));
-                setState(() => _isProcessing = true);
-                try {
-                  await ref.read(adminServiceProvider).suspendUser(
-                    user.uid, 
-                    until, 
-                    reasonController.text,
-                    adminId: admin.uid,
-                    adminName: admin.fullName,
-                  );
-                } finally {
-                  if (mounted) setState(() => _isProcessing = false);
-                }
-                navigator.pop();
-              },
-              child: const Text('Suspend'),
-            ),
-          ],
         ),
-      ),
-    );
+      );
+    } finally {
+      reasonController.dispose();
+    }
   }
 
   void _showRolesDialog(AppUser user) {

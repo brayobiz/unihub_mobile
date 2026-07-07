@@ -31,13 +31,13 @@ class EventsBrowseScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.search_rounded),
             onPressed: () {
-              // Future Search Integration
+              showSearch(context: context, delegate: EventSearchDelegate(ref: ref));
             },
           ),
           IconButton(
             icon: const Icon(Icons.tune_rounded),
             onPressed: () {
-              // Future Filter Integration
+              CampusFilterSelector.showCampusBottomSheet(context);
             },
           ),
         ],
@@ -655,6 +655,80 @@ class EventsBrowseScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class EventSearchDelegate extends SearchDelegate<String?> {
+  final WidgetRef ref;
+
+  EventSearchDelegate({required this.ref});
+
+  @override
+  List<Widget>? buildActions(BuildContext context) {
+    return [
+      if (query.isNotEmpty)
+        IconButton(
+          onPressed: () => query = '',
+          icon: const Icon(Icons.clear_rounded),
+        ),
+    ];
+  }
+
+  @override
+  Widget? buildLeading(BuildContext context) {
+    return IconButton(
+      onPressed: () => close(context, null),
+      icon: const Icon(Icons.arrow_back_rounded),
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    return _buildSearchResults(context);
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    return _buildSearchResults(context);
+  }
+
+  Widget _buildSearchResults(BuildContext context) {
+    if (query.length < 2) {
+      return const Center(child: Text('Search events by title or location...'));
+    }
+
+    final eventsAsync = ref.watch(campusEventsProvider(null));
+
+    return eventsAsync.when(
+      data: (events) {
+        final filtered = events.where((e) {
+          final q = query.toLowerCase();
+          return e.title.toLowerCase().contains(q) || 
+                 (e.venue.address?.toLowerCase().contains(q) ?? false);
+        }).toList();
+
+        if (filtered.isEmpty) {
+          return const Center(child: Text('No events found.'));
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.all(24),
+          itemCount: filtered.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 24),
+          itemBuilder: (context, index) {
+            final event = filtered[index];
+            return Center(
+              child: SizedBox(
+                width: 340, // Slightly wider for search list
+                child: EventCard(event: event, index: 0),
+              ),
+            );
+          },
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, _) => Center(child: Text('Error: $err')),
     );
   }
 }

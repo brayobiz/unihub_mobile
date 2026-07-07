@@ -82,11 +82,9 @@ class CreationSuccessDialog extends StatelessWidget {
               width: double.infinity,
               child: FilledButton(
                 onPressed: () {
-                  Navigator.pop(context);
+                  Navigator.pop(context); // Close the dialog
                   if (onDone != null) {
                     onDone!();
-                  } else {
-                    context.pop();
                   }
                 },
                 style: FilledButton.styleFrom(
