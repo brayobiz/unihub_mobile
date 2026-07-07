@@ -7,8 +7,11 @@ import '../../../../core/location/services/location_service.dart';
 import '../../../../core/constants/campus_constants.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../auth/shared/providers.dart';
 import '../../shared/providers.dart' as housing_providers;
+
+import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
 
 class HousingCard extends ConsumerWidget {
   final HousingListing listing;
@@ -140,6 +143,28 @@ class HousingCard extends ConsumerWidget {
                             ),
                           ],
                           const Spacer(),
+                          Semantics(
+                            label: 'Share property details',
+                            button: true,
+                            child: GestureDetector(
+                              onTap: () => _shareListing(context, ref),
+                              child: Container(
+                                height: 48,
+                                width: 48,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.surface.withValues(alpha: 0.9),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.share_outlined, 
+                                  size: 20, 
+                                  color: theme.colorScheme.onSurfaceVariant
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
                           Semantics(
                             label: isSaved ? 'Remove from favorites' : 'Save to favorites',
                             button: true,
@@ -364,6 +389,21 @@ class HousingCard extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  void _shareListing(BuildContext context, WidgetRef ref) {
+    final chatContext = ChatContext(
+      type: 'housing',
+      id: listing.id,
+      title: listing.title,
+      thumbnail: listing.images.isNotEmpty ? listing.images.first : null,
+      metadata: {
+        'rent': listing.rent,
+        'location': listing.location,
+      },
+    );
+    context.push('/share-to-chat', extra: chatContext);
+    ref.read(housing_providers.housingRepositoryProvider).incrementShareCount(listing.id);
   }
 
   Widget _buildCompact(

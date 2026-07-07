@@ -197,6 +197,14 @@ class NotesRepositoryImpl implements NotesRepository {
   }
 
   @override
+  Future<void> incrementShareCount(String noteId) async {
+    if (noteId.isEmpty) return;
+    await _firestore.collection('notes').doc(noteId).update({
+      'sharesCount': FieldValue.increment(1),
+    });
+  }
+
+  @override
   Future<void> updateStudyProgress(StudyProgress progress) async {
     await _firestore
         .collection('users')

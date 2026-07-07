@@ -66,6 +66,9 @@ import '../../features/confessions/confessions_screen.dart';
 import '../../features/campus_maps/presentation/screens/campus_maps_screen.dart';
 import '../../features/shared/feed_repository.dart';
 
+import '../../features/shared/add_feed_item_screen.dart';
+import '../../models/feed_type.dart';
+
 import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
 import '../../features/admin/presentation/screens/verification_queue_screen.dart';
 import '../../features/admin/presentation/screens/verification_detail_screen.dart';
@@ -85,6 +88,7 @@ import '../../features/admin/domain/models/verification_request.dart';
 import '../../features/admin/domain/models/report.dart';
 import '../../features/admin/domain/models/moderation_content.dart';
 import '../../features/chat/domain/models/conversation.dart';
+import '../../features/chat/presentation/screens/share_to_chat_screen.dart';
 import '../../features/auth/domain/models/app_user.dart';
 
 import '../../features/gigs/presentation/screens/gig_details_screen.dart';
@@ -433,6 +437,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        path: '/share-to-chat',
+        builder: (context, state) {
+          final shareContext = state.extra as ChatContext;
+          return ShareToChatScreen(shareContext: shareContext);
+        },
+      ),
+      GoRoute(
         path: '/add-housing',
         builder: (context, state) {
           final extra = state.extra;
@@ -572,6 +583,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             filePath: extra['filePath'] as String?,
             initialPage: extra['initialPage'] as int? ?? 0,
           );
+        },
+      ),
+      GoRoute(
+        path: '/add-feed-item',
+        builder: (context, state) {
+          final type = state.extra as FeedType? ?? FeedType.community;
+          return AddFeedItemScreen(type: type);
         },
       ),
       GoRoute(

@@ -678,6 +678,7 @@ class PlugDashboardScreen extends ConsumerWidget {
       HousingStatus.reported => Colors.deepOrange,
       HousingStatus.archived => Colors.blueGrey,
       HousingStatus.published => theme.colorScheme.primary,
+      HousingStatus.removed => AppColors.error,
     };
 
     final statusLabel = listing.status.name.replaceAll(RegExp(r'(?=[A-Z])'), ' ').toUpperCase();

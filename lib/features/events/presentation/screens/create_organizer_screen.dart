@@ -170,6 +170,22 @@ class _CreateOrganizerScreenState extends ConsumerState<CreateOrganizerScreen> {
           const SizedBox(height: 24),
           _buildCampusPicker(state, controller),
           const SizedBox(height: 24),
+          const Text('Contact Information', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          _buildTextField(
+            label: 'Contact Email',
+            hint: 'e.g. contact@mysociety.com',
+            initialValue: state.contactEmail,
+            onChanged: controller.updateContactEmail,
+          ),
+          const SizedBox(height: 16),
+          _buildTextField(
+            label: 'Contact Phone (Optional)',
+            hint: 'e.g. +1 234 567 890',
+            initialValue: state.contactPhone,
+            onChanged: controller.updateContactPhone,
+          ),
+          const SizedBox(height: 24),
           _buildTextField(
             label: 'Bio',
             hint: 'Describe what you do...',
@@ -340,6 +356,20 @@ class _CreateOrganizerScreenState extends ConsumerState<CreateOrganizerScreen> {
             leading: const Icon(Icons.school_outlined),
             contentPadding: EdgeInsets.zero,
           ),
+          if (state.contactEmail.isNotEmpty)
+            ListTile(
+              title: const Text('Contact Email'),
+              subtitle: Text(state.contactEmail),
+              leading: const Icon(Icons.email_outlined),
+              contentPadding: EdgeInsets.zero,
+            ),
+          if (state.contactPhone.isNotEmpty)
+            ListTile(
+              title: const Text('Contact Phone'),
+              subtitle: Text(state.contactPhone),
+              leading: const Icon(Icons.phone_outlined),
+              contentPadding: EdgeInsets.zero,
+            ),
           if (state.socialLinks.isNotEmpty) ...[
             const SizedBox(height: 16),
             const Text('Social Presence', style: TextStyle(fontWeight: FontWeight.bold)),

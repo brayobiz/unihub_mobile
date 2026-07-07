@@ -87,7 +87,6 @@ final eventProvider = StreamProvider.autoDispose.family<Event?, String>((ref, id
 
 final campusEventsProvider = StreamProvider.autoDispose.family<List<Event>, List<EventStatus>?>((ref, statuses) {
   final campusId = ref.watch(effectiveCampusFilterProvider);
-  if (campusId == null) return Stream.value([]);
   return ref.watch(eventRepositoryProvider).watchEventsByCampus(campusId, statuses: statuses);
 });
 
@@ -101,19 +100,16 @@ final eventCategoriesProvider = StreamProvider.autoDispose<List<EventCategory>>(
 
 final featuredEventsProvider = StreamProvider.autoDispose<List<Event>>((ref) {
   final campusId = ref.watch(effectiveCampusFilterProvider);
-  if (campusId == null) return Stream.value([]);
   return ref.watch(eventRepositoryProvider).watchFeaturedEvents(campusId);
 });
 
 final liveEventsProvider = StreamProvider.autoDispose<List<Event>>((ref) {
   final campusId = ref.watch(effectiveCampusFilterProvider);
-  if (campusId == null) return Stream.value([]);
   return ref.watch(eventRepositoryProvider).watchLiveEvents(campusId);
 });
 
 final todayEventsProvider = StreamProvider.autoDispose<List<Event>>((ref) {
   final campusId = ref.watch(effectiveCampusFilterProvider);
-  if (campusId == null) return Stream.value([]);
   final now = DateTime.now();
   final startOfDay = DateTime(now.year, now.month, now.day);
   final endOfDay = startOfDay.add(const Duration(days: 1));
@@ -126,7 +122,6 @@ final todayEventsProvider = StreamProvider.autoDispose<List<Event>>((ref) {
 
 final thisWeekEventsProvider = StreamProvider.autoDispose<List<Event>>((ref) {
   final campusId = ref.watch(effectiveCampusFilterProvider);
-  if (campusId == null) return Stream.value([]);
   final now = DateTime.now();
   final endOfWeek = now.add(const Duration(days: 7));
   
@@ -138,7 +133,6 @@ final thisWeekEventsProvider = StreamProvider.autoDispose<List<Event>>((ref) {
 
 final eventsByCategoryProvider = StreamProvider.autoDispose.family<List<Event>, String>((ref, categoryId) {
   final campusId = ref.watch(effectiveCampusFilterProvider);
-  if (campusId == null) return Stream.value([]);
   return ref.watch(eventRepositoryProvider).watchEventsByCampus(
     campusId,
     categoryId: categoryId,
@@ -203,10 +197,27 @@ final eventDiscoveryDataProvider = Provider.autoDispose<AsyncValue<EventDiscover
   if (thisWeek.hasError) return AsyncValue.error(thisWeek.error!, thisWeek.stackTrace!);
   if (categories.hasError) return AsyncValue.error(categories.error!, categories.stackTrace!);
 
+  final now = DateTime.now();
+  
+  // Refine Live: Explicit live status OR running approved events
+  final List<Event> liveEvents = (live.value ?? []).toList();
+  final liveIds = liveEvents.map((e) => e.id).toSet();
+  
+  final runningNow = (today.value ?? []).where((e) {
+    return !liveIds.contains(e.id) && e.startAt.isBefore(now) && e.endAt.isAfter(now);
+  });
+  liveEvents.addAll(runningNow);
+  liveIds.addAll(runningNow.map((e) => e.id));
+
+  // Refine Today: Show upcoming today that aren't already in Live
+  final todayUpcoming = (today.value ?? []).where((e) {
+    return !liveIds.contains(e.id) && e.startAt.isAfter(now);
+  }).toList();
+
   return AsyncValue.data(EventDiscoveryData(
     featured: featured.value ?? [],
-    live: live.value ?? [],
-    today: today.value ?? [],
+    live: liveEvents,
+    today: todayUpcoming,
     thisWeek: thisWeek.value ?? [],
     categories: categories.value ?? [],
   ));
@@ -240,24 +251,41 @@ final homepageEventsProvider = Provider.autoDispose<AsyncValue<HomepageEventsDat
   }
 
   final now = DateTime.now();
+  
+  // 1. Events user is going to (Reminders)
   final goingSoon = (goingAsync.value ?? []).where((e) {
     return e.startAt.isAfter(now) && e.startAt.isBefore(now.add(const Duration(hours: 24)));
   }).toList();
 
   final goingIds = goingSoon.map((e) => e.id).toSet();
   
-  final liveNow = (liveAsync.value ?? []).toList();
+  // 2. Currently Live or Running
+  // We include both explicitly 'live' events and 'approved' events that are currently within their time range
+  final List<Event> liveNow = (liveAsync.value ?? []).toList();
   final liveIds = liveNow.map((e) => e.id).toSet();
 
+  // Find approved events that are currently running but not explicitly marked live
+  final runningNow = (todayAsync.value ?? []).where((e) {
+    return !liveIds.contains(e.id) && 
+           e.startAt.isBefore(now) && 
+           e.endAt.isAfter(now) &&
+           (e.status == EventStatus.approved || e.status == EventStatus.scheduled);
+  });
+  liveNow.addAll(runningNow);
+  liveIds.addAll(runningNow.map((e) => e.id));
+
+  // 3. Upcoming Today
   final isLateEvening = now.hour >= 18;
   final startRange = isLateEvening ? DateTime(now.year, now.month, now.day + 1) : now;
   final endRange = DateTime(startRange.year, startRange.month, startRange.day + 1);
 
   final upcoming = (todayAsync.value ?? []).where((e) {
     if (goingIds.contains(e.id) || liveIds.contains(e.id)) return false;
+    // For "Today", we show anything that hasn't started yet but is today
     return e.startAt.isAfter(now) && e.startAt.isBefore(endRange);
   }).toList();
 
+  // 4. Featured
   final featured = (featuredAsync.value ?? []).where((e) {
     return !goingIds.contains(e.id) && !liveIds.contains(e.id) && 
            !upcoming.any((t) => t.id == e.id);

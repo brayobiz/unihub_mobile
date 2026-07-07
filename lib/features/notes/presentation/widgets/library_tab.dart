@@ -11,11 +11,18 @@ import '../../domain/models/note.dart';
 import '../../../../services/download_service.dart';
 import '../widgets/note_card.dart';
 
-class LibraryTab extends ConsumerWidget {
+class LibraryTab extends ConsumerStatefulWidget {
   const LibraryTab({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LibraryTab> createState() => _LibraryTabState();
+}
+
+class _LibraryTabState extends ConsumerState<LibraryTab> {
+  bool _isNavigating = false;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final continueReading = ref.watch(continueReadingProvider);
     final recentlyOpened = ref.watch(recentlyOpenedProvider);
@@ -524,6 +531,9 @@ class LibraryTab extends ConsumerWidget {
   }
 
   Future<void> _resumeNote(BuildContext context, WidgetRef ref, dynamic note) async {
+    if (_isNavigating) return;
+    _isNavigating = true;
+
     try {
       String ext = p.extension(note.fileUrl).toLowerCase();
       if (ext.isEmpty || ext.length > 5) {
@@ -558,6 +568,14 @@ class LibraryTab extends ConsumerWidget {
           'initialPage': 0,
         });
       }
+    } finally {
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (mounted) {
+          setState(() {
+            _isNavigating = false;
+          });
+        }
+      });
     }
   }
 }

@@ -17,6 +17,8 @@ class CreateOrganizerState {
   final String? logoUrl;
   final File? bannerFile;
   final String? bannerUrl;
+  final String contactEmail;
+  final String contactPhone;
   final Map<String, String> socialLinks;
   
   final bool isLoading;
@@ -33,6 +35,8 @@ class CreateOrganizerState {
     this.logoUrl,
     this.bannerFile,
     this.bannerUrl,
+    this.contactEmail = '',
+    this.contactPhone = '',
     this.socialLinks = const {},
     this.isLoading = false,
     this.error,
@@ -48,6 +52,8 @@ class CreateOrganizerState {
     String? logoUrl,
     File? bannerFile,
     String? bannerUrl,
+    String? contactEmail,
+    String? contactPhone,
     Map<String, String>? socialLinks,
     bool? isLoading,
     String? error,
@@ -63,6 +69,8 @@ class CreateOrganizerState {
       logoUrl: logoUrl ?? this.logoUrl,
       bannerFile: bannerFile ?? this.bannerFile,
       bannerUrl: bannerUrl ?? this.bannerUrl,
+      contactEmail: contactEmail ?? this.contactEmail,
+      contactPhone: contactPhone ?? this.contactPhone,
       socialLinks: socialLinks ?? this.socialLinks,
       isLoading: isLoading ?? this.isLoading,
       error: error,
@@ -93,6 +101,8 @@ class CreateOrganizerController extends StateNotifier<CreateOrganizerState> {
       type: organizer.type,
       logoUrl: organizer.logoUrl,
       bannerUrl: organizer.bannerUrl,
+      contactEmail: organizer.contactEmail ?? '',
+      contactPhone: organizer.contactPhone ?? '',
       socialLinks: organizer.socialLinks,
       isEditing: true,
     );
@@ -102,6 +112,8 @@ class CreateOrganizerController extends StateNotifier<CreateOrganizerState> {
   void updateBio(String val) => state = state.copyWith(bio: val, error: null);
   void updateType(OrganizerType val) => state = state.copyWith(type: val, error: null);
   void updateCampus(String val) => state = state.copyWith(campusId: val, error: null);
+  void updateContactEmail(String val) => state = state.copyWith(contactEmail: val, error: null);
+  void updateContactPhone(String val) => state = state.copyWith(contactPhone: val, error: null);
 
   void updateLogo(File file) => state = state.copyWith(logoFile: file, error: null);
   void updateBanner(File file) => state = state.copyWith(bannerFile: file, error: null);
@@ -211,6 +223,8 @@ class CreateOrganizerController extends StateNotifier<CreateOrganizerState> {
         bannerUrl: bannerUrl,
         campusId: state.campusId,
         type: state.type,
+        contactEmail: state.contactEmail.isEmpty ? null : state.contactEmail,
+        contactPhone: state.contactPhone.isEmpty ? null : state.contactPhone,
         socialLinks: state.socialLinks,
         createdAt: state.isEditing 
             ? (_ref.read(organizerProvider(state.id)).value?.createdAt ?? DateTime.now())

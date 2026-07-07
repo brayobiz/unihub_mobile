@@ -221,7 +221,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 32),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
@@ -236,16 +236,36 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSearchBar(controller, filterState),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           const CampusFilterSelector(),
-          const SizedBox(height: 32),
-          Text(
-            'Explore Categories',
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.5,
-            ),
+          const SizedBox(height: 28),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Explore Categories',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              TextButton(
+                onPressed: () => _showAllCategoriesSheet(context),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                ),
+                child: Text(
+                  'View All', 
+                  style: TextStyle(
+                    color: theme.colorScheme.primary, 
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           _buildModernCategoryGrid(),
@@ -258,59 +278,163 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
     final theme = Theme.of(context);
     final categories = MarketplaceCategories.mainFilters.where((c) => c != 'All').toList();
     
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: EdgeInsets.zero,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        mainAxisSpacing: 20,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.8,
-      ),
-      itemCount: categories.length,
-      itemBuilder: (context, index) {
-        final cat = categories[index];
-        return GestureDetector(
-          onTap: () => context.push('/category-discovery/$cat'),
-          child: Column(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+    return SizedBox(
+      height: 180,
+      child: GridView.builder(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.zero,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 12,
+          childAspectRatio: 1.15,
+        ),
+        itemCount: categories.length,
+        itemBuilder: (context, index) {
+          final cat = categories[index];
+          return GestureDetector(
+            onTap: () => context.push('/category-discovery/$cat'),
+            child: Container(
+              margin: const EdgeInsets.only(right: 8),
+              child: Column(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                      border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
                     ),
-                  ],
-                  border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  MarketplaceCategories.getIcon(cat),
-                  style: const TextStyle(fontSize: 24),
-                ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      MarketplaceCategories.getIcon(cat),
+                      style: const TextStyle(fontSize: 22),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: 70,
+                    child: Text(
+                      cat,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.onSurface,
+                        height: 1.1,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                cat,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: theme.colorScheme.onSurface,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showAllCategoriesSheet(BuildContext context) {
+    final theme = Theme.of(context);
+    final categories = MarketplaceCategories.mainFilters.where((c) => c != 'All').toList();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.9,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(color: theme.colorScheme.outlineVariant, borderRadius: BorderRadius.circular(2)),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Row(
+                children: [
+                  Text(
+                    'All Categories',
+                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                  ),
+                  const Spacer(),
+                  IconButton.filledTonal(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                  ),
+                ],
               ),
-            ],
-          ),
-        );
-      },
+            ),
+            Expanded(
+              child: GridView.builder(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 40),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 24,
+                  crossAxisSpacing: 16,
+                  childAspectRatio: 0.85,
+                ),
+                itemCount: categories.length,
+                itemBuilder: (context, index) {
+                  final cat = categories[index];
+                  return InkWell(
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/category-discovery/$cat');
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(MarketplaceCategories.getIcon(cat), style: const TextStyle(fontSize: 32)),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          cat,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                          maxLines: 2,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -406,70 +530,6 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
           );
         },
       ),
-    );
-  }
-
-  Widget _buildPopularCategories() {
-    final theme = Theme.of(context);
-    const categories = MarketplaceCategories.mainFilters;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 24),
-        Text(
-          'Shop by Category',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 80,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            itemCount: categories.length,
-            itemBuilder: (context, index) {
-              final cat = categories[index];
-              return Padding(
-                padding: const EdgeInsets.only(right: 14),
-                child: GestureDetector(
-                  onTap: () => context.push('/category-discovery/$cat'),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: theme.colorScheme.outlineVariant),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          MarketplaceCategories.getIcon(cat),
-                          style: const TextStyle(fontSize: 18),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        cat,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w500,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                        maxLines: 1,
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
     );
   }
 
@@ -680,7 +740,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
               crossAxisCount: 2,
               mainAxisSpacing: 16,
               crossAxisSpacing: 16,
-              childAspectRatio: 0.75,
+              childAspectRatio: 0.7,
             ),
             delegate: SliverChildBuilderDelegate(
               (context, index) => MarketplaceCard(
@@ -902,7 +962,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                 crossAxisCount: 2,
                 mainAxisSpacing: 16,
                 crossAxisSpacing: 16,
-                childAspectRatio: 0.75,
+                childAspectRatio: 0.7,
               ),
               itemCount: listings.length,
               itemBuilder: (context, index) => MarketplaceCard(
@@ -1387,7 +1447,7 @@ class _DiscoverySection extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             SizedBox(
-              height: 220,
+              height: 260,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),

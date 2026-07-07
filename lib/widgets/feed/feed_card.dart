@@ -6,7 +6,9 @@ import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import '../../features/shared/feed_repository.dart';
 import '../../models/feed_type.dart';
+import 'package:go_router/go_router.dart';
 import '../../features/auth/shared/providers.dart';
+import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import '../../core/utils/category_utils.dart';
 
@@ -186,6 +188,14 @@ class FeedCard extends ConsumerWidget {
                   color: theme.colorScheme.onSurfaceVariant,
                   onTap: () => _showComments(context, ref),
                 ),
+                const SizedBox(width: 16),
+                _InteractionButton(
+                  context: context,
+                  icon: Icons.share_outlined,
+                  label: 'Share',
+                  color: theme.colorScheme.onSurfaceVariant,
+                  onTap: () => _shareItem(context, ref),
+                ),
                 const Spacer(),
                 Icon(icon, size: 16, color: color.withValues(alpha: 0.5)),
               ],
@@ -194,6 +204,21 @@ class FeedCard extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  void _shareItem(BuildContext context, WidgetRef ref) {
+    final chatContext = ChatContext(
+      type: item.type == FeedType.gig ? 'gig' : 'feed',
+      id: item.id,
+      title: item.title,
+      thumbnail: item.images.isNotEmpty ? item.images.first : null,
+      metadata: {
+        'subtitle': item.subtitle,
+        'authorName': item.authorName,
+      },
+    );
+    context.push('/share-to-chat', extra: chatContext);
+    ref.read(feedRepositoryProvider).incrementShareCount(item.id);
   }
 
   void _showReportDialog(BuildContext context, WidgetRef ref) {

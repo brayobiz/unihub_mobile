@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../auth/shared/providers.dart';
 import '../../../shared/feed_repository.dart';
 import '../../../../services/history_service.dart';
+import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
 
 class GigDetailsScreen extends ConsumerStatefulWidget {
   final FeedItem? gig;
@@ -34,6 +35,21 @@ class _GigDetailsScreenState extends ConsumerState<GigDetailsScreen> {
       title: gig.title,
       timestamp: DateTime.now(),
     ));
+  }
+
+  void _shareGig(BuildContext context, FeedItem gig) {
+    final chatContext = ChatContext(
+      type: 'gig',
+      id: gig.id,
+      title: gig.title,
+      thumbnail: gig.images.isNotEmpty ? gig.images.first : null,
+      metadata: {
+        'price': gig.price,
+        'authorName': gig.authorName,
+      },
+    );
+    context.push('/share-to-chat', extra: chatContext);
+    ref.read(feedRepositoryProvider).incrementShareCount(gig.id);
   }
 
   @override
@@ -66,6 +82,12 @@ class _GigDetailsScreenState extends ConsumerState<GigDetailsScreen> {
             backgroundColor: theme.colorScheme.surface,
             iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
             elevation: 0,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.share_outlined),
+                onPressed: () => _shareGig(context, currentGig),
+              ),
+            ],
           ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(24),

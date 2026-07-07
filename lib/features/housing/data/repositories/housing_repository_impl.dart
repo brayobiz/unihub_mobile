@@ -473,6 +473,14 @@ class HousingRepositoryImpl implements HousingRepository {
   }
 
   @override
+  Future<void> incrementShareCount(String id) async {
+    if (id.isEmpty) return;
+    await _firestore.collection('housing_listings').doc(id).update({
+      'sharesCount': FieldValue.increment(1),
+    });
+  }
+
+  @override
   Future<void> submitReview(HousingReview review) async {
     await _firestore.runTransaction((transaction) async {
       final reviewRef = _firestore.collection('housing_reviews').doc(review.id);

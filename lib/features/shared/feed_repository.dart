@@ -223,6 +223,12 @@ class FeedRepository {
     }
   }
 
+  Future<void> incrementShareCount(String itemId) async {
+    await _firestore.collection('feed').doc(itemId).update({
+      'sharesCount': FieldValue.increment(1),
+    });
+  }
+
   Future<void> addComment({
     required String itemId,
     required String userId,

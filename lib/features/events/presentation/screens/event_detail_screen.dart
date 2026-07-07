@@ -12,8 +12,8 @@ import '../../domain/models/event.dart';
 import '../../domain/models/event_category.dart';
 import '../../domain/models/organizer.dart';
 import '../../domain/models/attendance.dart';
-
-import 'package:share_plus/share_plus.dart';
+import '../../presentation/controllers/organizer_profile_controller.dart';
+import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
 
 class EventDetailScreen extends ConsumerWidget {
   final String eventId;
@@ -47,7 +47,7 @@ class EventDetailScreen extends ConsumerWidget {
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
       slivers: [
-        _buildSliverAppBar(context, event),
+        _buildSliverAppBar(context, event, ref),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 140),
           sliver: SliverList(
@@ -112,7 +112,7 @@ class EventDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSliverAppBar(BuildContext context, Event event) {
+  Widget _buildSliverAppBar(BuildContext context, Event event, WidgetRef ref) {
     return SliverAppBar(
       expandedHeight: 350,
       pinned: true,
@@ -160,7 +160,15 @@ class EventDetailScreen extends ConsumerWidget {
             child: IconButton(
               icon: const Icon(Icons.share_outlined, color: Colors.white, size: 18),
               onPressed: () {
-                Share.share('Check out ${event.title} on UniHub Campus App: https://unihub.page.link/events/${event.id}');
+                final chatContext = ChatContext(
+                  type: 'event',
+                  id: event.id,
+                  title: event.title,
+                  thumbnail: event.imageUrls.isNotEmpty ? event.imageUrls.first : null,
+                  metadata: {'description': event.description},
+                );
+                context.push('/share-to-chat', extra: chatContext);
+                ref.read(eventRepositoryProvider).incrementShareCount(event.id);
               },
             ),
           ),
@@ -283,7 +291,7 @@ class EventDetailScreen extends ConsumerWidget {
                     CircleAvatar(
                       radius: 25,
                       backgroundImage: organizer.logoUrl != null ? CachedNetworkImageProvider(organizer.logoUrl!) : null,
-                      child: organizer.logoUrl == null ? Text(organizer.name[0]) : null,
+                      child: organizer.logoUrl == null ? Text(organizer.name.isNotEmpty ? organizer.name[0].toUpperCase() : 'O') : null,
                     ),
                     const SizedBox(width: 16),
                     Expanded(

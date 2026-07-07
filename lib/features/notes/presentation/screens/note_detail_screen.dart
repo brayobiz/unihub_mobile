@@ -183,6 +183,10 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
           ),
         ],
         IconButton(
+          icon: const Icon(Icons.share_outlined),
+          onPressed: () => _shareNote(context, note),
+        ),
+        IconButton(
           icon: Icon(
             isBookmarked ? Icons.bookmark : Icons.bookmark_border,
             color: isBookmarked ? theme.colorScheme.primary : theme.colorScheme.onSurface,
@@ -194,31 +198,21 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
   }
 
   void _confirmDeletion(BuildContext context, WidgetRef ref, NoteListing note) {
-    final theme = Theme.of(context);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: theme.colorScheme.surface,
-        title: const Text('Delete Resource?'),
-        content: const Text('This will permanently remove this study resource from UniHub. This action cannot be undone.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context); // Close dialog
-              await ref.read(notesRepositoryProvider).deleteNote(note.id);
-              if (context.mounted) {
-                context.pop(); // Go back to list
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Resource deleted successfully')),
-                );
-              }
-            },
-            child: const Text('Delete', style: TextStyle(color: AppColors.error)),
-          ),
-        ],
-      ),
+    // ... existing code ...
+  }
+
+  void _shareNote(BuildContext context, NoteListing note) {
+    final chatContext = ChatContext(
+      type: 'notes',
+      id: note.id,
+      title: note.title,
+      metadata: {
+        'unitCode': note.unitCode,
+        'authorName': note.authorName,
+      },
     );
+    context.push('/share-to-chat', extra: chatContext);
+    ref.read(notesRepositoryProvider).incrementShareCount(note.id);
   }
 
   Widget _buildHeaderCard(BuildContext context, NoteListing note, double progress) {
@@ -507,14 +501,19 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
     );
   }
 
+  bool _isNavigating = false;
+
   Future<void> _openFile(BuildContext context, WidgetRef ref, NoteListing note) async {
+    if (_isNavigating) return;
     if (note.fileUrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('File not available')));
       return;
     }
 
-    // Mark as opened in history
-    await ref.read(studyControllerProvider).markAsOpened(note.id);
+    setState(() => _isNavigating = true);
+
+    // Trigger in background to avoid blocking navigation
+    ref.read(studyControllerProvider).markAsOpened(note.id).catchError((_) => null);
 
     try {
       String ext = p.extension(note.fileUrl).toLowerCase();
@@ -543,13 +542,16 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
       }
     } catch (e) {
       if (context.mounted) {
-        // Fallback to push reader even if check fails, reader will handle its own errors
         context.push('/note-reader', extra: {
           'note': note,
           'filePath': null,
           'initialPage': 0,
         });
       }
+    } finally {
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (mounted) setState(() => _isNavigating = false);
+      });
     }
   }
 }

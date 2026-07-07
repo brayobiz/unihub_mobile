@@ -277,7 +277,7 @@ class _QuickActions extends StatelessWidget {
                 icon: CategoryUtils.getIcon(FeedType.gig),
                 label: 'Create Gig',
                 color: CategoryUtils.getColor(FeedType.gig),
-                onTap: () => context.push('/community', extra: FeedType.gig), // Adjusting to the community route if it handles gigs
+                onTap: () => context.push('/add-feed-item', extra: FeedType.gig),
               ),
             ],
           ),

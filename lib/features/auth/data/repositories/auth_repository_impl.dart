@@ -278,7 +278,7 @@ class AuthRepositoryImpl implements AuthRepository {
       }
 
       if (data.isNotEmpty) {
-        batch.update(docRef, data);
+        batch.set(docRef, data, SetOptions(merge: true));
         
         final currentUser = _firebaseAuth.currentUser;
         if (currentUser != null && fullName != null && currentUser.displayName != fullName) {
@@ -295,9 +295,9 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<void> updateOnboardingStatus(String uid, bool completed) async {
-    await _firestore.collection('users').doc(uid).update({
+    await _firestore.collection('users').doc(uid).set({
       'isOnboardingCompleted': completed,
-    });
+    }, SetOptions(merge: true));
   }
 
   @override

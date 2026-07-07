@@ -272,6 +272,14 @@ class OrganizerRepositoryImpl implements OrganizerRepository {
   }
 
   @override
+  Future<void> incrementShareCount(String organizerId) async {
+    if (organizerId.isEmpty) return;
+    await _firestore.collection('organizers').doc(organizerId).update({
+      'sharesCount': FieldValue.increment(1),
+    });
+  }
+
+  @override
   Stream<bool> isFollowingOrganizer(String userId, String organizerId) {
     if (userId.isEmpty) return Stream.value(false);
     return _firestore.collection('users').doc(userId).collection('followed_organizers').doc(organizerId)

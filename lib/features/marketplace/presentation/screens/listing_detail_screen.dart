@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
@@ -147,8 +146,14 @@ class _ListingDetailContentState extends ConsumerState<_ListingDetailContent> {
 
   void _shareListing() {
     final listing = widget.listing;
-    final text = 'Check out this ${listing.title} for KES ${NumberFormat("#,###").format(listing.price)} on UniHub Marketplace! \n\nDownload UniHub to view more: https://unihub.app/marketplace/${listing.id}';
-    Share.share(text);
+    final chatContext = ChatContext(
+      type: 'marketplace',
+      id: listing.id,
+      title: listing.title,
+      thumbnail: listing.imageUrls.isNotEmpty ? listing.imageUrls.first : null,
+      metadata: {'price': listing.price},
+    );
+    context.push('/share-to-chat', extra: chatContext);
     ref.read(marketplaceRepositoryProvider).recordShare(listing.id);
   }
 

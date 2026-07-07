@@ -87,10 +87,17 @@ class EventService {
     final isAuthorized = await _validateOrganizerPermission(event.organizerId, userId);
     if (!isAuthorized) throw Exception('Unauthorized');
 
-    // Business Rule: Only verified organizers can submit events for publishing
-    if (organizer.verificationStatus != OrganizerVerificationStatus.verified && 
-        organizer.verificationStatus != OrganizerVerificationStatus.official) {
-      throw Exception('Only verified organizers can submit events for publishing. Please complete your organizer verification.');
+    // Business Rule: Verified or official organizers can publish directly.
+    // However, we allow pending organizers to submit for review so admins can see their planned events.
+    final allowedStatuses = [
+      OrganizerVerificationStatus.submitted,
+      OrganizerVerificationStatus.underReview,
+      OrganizerVerificationStatus.verified,
+      OrganizerVerificationStatus.official,
+    ];
+
+    if (!allowedStatuses.contains(organizer.verificationStatus)) {
+      throw Exception('Your organizer status (${organizer.verificationStatus.name}) does not allow submitting events. Please ensure your organizer application is active.');
     }
 
     if (event.status != EventStatus.draft) throw Exception('Only draft events can be submitted');

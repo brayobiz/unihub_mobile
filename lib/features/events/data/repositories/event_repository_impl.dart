@@ -26,7 +26,7 @@ class EventRepositoryImpl implements EventRepository {
   }
 
   @override
-  Stream<List<Event>> watchEventsByCampus(String campusId, {
+  Stream<List<Event>> watchEventsByCampus(String? campusId, {
     List<EventStatus>? statuses,
     String? categoryId,
     DateTime? after,
@@ -36,8 +36,11 @@ class EventRepositoryImpl implements EventRepository {
     // We simplify the Firestore query to only equality filters to avoid complex composite index requirements.
     // Range filtering (after) and ordering (startAt) are handled in-memory.
     Query query = _firestore.collection('events')
-        .where('campusId', isEqualTo: campusId)
         .where('isDeleted', isEqualTo: false);
+
+    if (campusId != null && campusId.isNotEmpty) {
+      query = query.where('campusId', isEqualTo: campusId);
+    }
     
     final List<String> statusNames = statuses != null && statuses.isNotEmpty
         ? statuses.map((s) => s.name).toList()
@@ -143,6 +146,14 @@ class EventRepositoryImpl implements EventRepository {
   }
 
   @override
+  Future<void> incrementShareCount(String id) async {
+    if (id.isEmpty) return;
+    await _firestore.collection('events').doc(id).update({
+      'sharesCount': FieldValue.increment(1),
+    });
+  }
+
+  @override
   Future<void> reportEvent({
     required String eventId,
     required String reporterId,
@@ -177,7 +188,7 @@ class EventRepositoryImpl implements EventRepository {
   }
 
   @override
-  Stream<List<Event>> watchFeaturedEvents(String campusId) {
+  Stream<List<Event>> watchFeaturedEvents(String? campusId) {
     // Featured events are typically approved/scheduled and marked in metadata or have high engagement
     // For now, let's just use approved/scheduled/live events for the next 7 days
     return watchEventsByCampus(
@@ -188,17 +199,20 @@ class EventRepositoryImpl implements EventRepository {
   }
 
   @override
-  Stream<List<Event>> watchLiveEvents(String campusId) {
-    return _firestore.collection('events')
-        .where('campusId', isEqualTo: campusId)
+  Stream<List<Event>> watchLiveEvents(String? campusId) {
+    Query query = _firestore.collection('events')
         .where('status', isEqualTo: EventStatus.live.name)
-        .where('isDeleted', isEqualTo: false)
-        .snapshots()
-        .map((s) => s.docs.map((d) => Event.fromFirestore(d)).toList());
+        .where('isDeleted', isEqualTo: false);
+    
+    if (campusId != null && campusId.isNotEmpty) {
+      query = query.where('campusId', isEqualTo: campusId);
+    }
+
+    return query.snapshots().map((s) => s.docs.map((d) => Event.fromFirestore(d)).toList());
   }
 
   @override
-  Stream<List<Event>> watchUpcomingEvents(String campusId) {
+  Stream<List<Event>> watchUpcomingEvents(String? campusId) {
     return watchEventsByCampus(
       campusId,
       statuses: [EventStatus.approved, EventStatus.scheduled],

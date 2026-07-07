@@ -7,6 +7,8 @@ import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import '../../domain/models/note.dart';
 import '../../shared/providers.dart';
 
+import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
+
 class NoteCard extends ConsumerWidget {
   final NoteListing note;
   final String? userUniversity;
@@ -108,14 +110,24 @@ class NoteCard extends ConsumerWidget {
                       ],
                     )
                   else
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      icon: Icon(
-                        progressAsync.valueOrNull?.isBookmarked == true ? Icons.bookmark : Icons.bookmark_border,
-                        size: 18,
-                        color: progressAsync.valueOrNull?.isBookmarked == true ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
-                      ),
-                      onPressed: () => ref.read(studyControllerProvider).toggleBookmark(note.id),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.share_outlined, size: 18),
+                          onPressed: () => _shareNote(context, ref),
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          icon: Icon(
+                            progressAsync.valueOrNull?.isBookmarked == true ? Icons.bookmark : Icons.bookmark_border,
+                            size: 18,
+                            color: progressAsync.valueOrNull?.isBookmarked == true ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                          ),
+                          onPressed: () => ref.read(studyControllerProvider).toggleBookmark(note.id),
+                        ),
+                      ],
                     ),
                 ],
               ),
@@ -301,6 +313,20 @@ class NoteCard extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  void _shareNote(BuildContext context, WidgetRef ref) {
+    final chatContext = ChatContext(
+      type: 'notes',
+      id: note.id,
+      title: note.title,
+      metadata: {
+        'unitCode': note.unitCode,
+        'authorName': note.authorName,
+      },
+    );
+    context.push('/share-to-chat', extra: chatContext);
+    ref.read(notesRepositoryProvider).incrementShareCount(note.id);
   }
 
   Widget _buildBadge(String text, Color bgColor, Color textColor, {IconData? icon}) {

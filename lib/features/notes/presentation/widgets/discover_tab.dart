@@ -163,9 +163,14 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
     );
   }
 
-  void _handleNoteTap(NoteListing note) async {
-    await ref.read(studyControllerProvider).markAsOpened(note.id);
-    if (!mounted) return;
+  bool _isNavigating = false;
+
+  void _handleNoteTap(NoteListing note) {
+    if (_isNavigating) return;
+    _isNavigating = true;
+
+    // Trigger in background to avoid UI delay
+    ref.read(studyControllerProvider).markAsOpened(note.id).catchError((_) => null);
     
     if (note.price == 0) {
       context.push('/note-reader', extra: {
@@ -176,6 +181,11 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
     } else {
       context.push('/note-detail/${note.id}', extra: note);
     }
+
+    // Guard against rapid multi-taps during navigation transition
+    Future.delayed(const Duration(milliseconds: 1000), () {
+      if (mounted) _isNavigating = false;
+    });
   }
 
   Widget _buildSearchBar(BuildContext context) {

@@ -3,7 +3,7 @@ import '../../../../core/constants/campus_constants.dart';
 import 'price_history.dart';
 
 enum ListingCondition { newCondition, likeNew, good, fair }
-enum ListingStatus { active, sold, paused, expired, reserved, archived }
+enum ListingStatus { active, sold, paused, expired, reserved, archived, removed }
 enum ModerationStatus { active, flagged, suspended, removed }
 
 class Listing {

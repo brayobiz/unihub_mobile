@@ -10,6 +10,7 @@ import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../domain/models/listing.dart';
 import '../../shared/providers.dart';
+import '../../../chat/domain/models/chat_context.dart';
 
 class MarketplaceCard extends ConsumerWidget {
   final Listing listing;
@@ -141,18 +142,33 @@ class MarketplaceCard extends ConsumerWidget {
                                 ),
                               ],
                             )
-                          : Material(
-                              color: theme.colorScheme.surface.withValues(alpha: 0.9),
-                              shape: const CircleBorder(),
-                              child: IconButton(
-                                icon: const Icon(Icons.favorite_rounded, size: 18),
-                                color: theme.colorScheme.outlineVariant,
-                                onPressed: () {
-                                  if (user != null) {
-                                    ref.read(marketplaceRepositoryProvider).toggleSaveListing(user.uid, listing.id);
-                                  }
-                                },
-                              ),
+                          : Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Material(
+                                  color: theme.colorScheme.surface.withValues(alpha: 0.9),
+                                  shape: const CircleBorder(),
+                                  child: IconButton(
+                                    icon: const Icon(Icons.share_outlined, size: 18),
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                    onPressed: () => _shareListing(context, ref),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Material(
+                                  color: theme.colorScheme.surface.withValues(alpha: 0.9),
+                                  shape: const CircleBorder(),
+                                  child: IconButton(
+                                    icon: const Icon(Icons.favorite_rounded, size: 18),
+                                    color: theme.colorScheme.outlineVariant,
+                                    onPressed: () {
+                                      if (user != null) {
+                                        ref.read(marketplaceRepositoryProvider).toggleSaveListing(user.uid, listing.id);
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ],
                             ),
                       ),
                     ],
@@ -393,5 +409,17 @@ class MarketplaceCard extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  void _shareListing(BuildContext context, WidgetRef ref) {
+    final chatContext = ChatContext(
+      type: 'marketplace',
+      id: listing.id,
+      title: listing.title,
+      thumbnail: listing.imageUrls.isNotEmpty ? listing.imageUrls.first : null,
+      metadata: {'price': listing.price},
+    );
+    context.push('/share-to-chat', extra: chatContext);
+    ref.read(marketplaceRepositoryProvider).recordShare(listing.id);
   }
 }

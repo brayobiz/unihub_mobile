@@ -26,6 +26,7 @@ abstract class OrganizerRepository {
   
   // Engagement
   Future<void> toggleFollowOrganizer(String userId, String organizerId);
+  Future<void> incrementShareCount(String organizerId);
   Stream<bool> isFollowingOrganizer(String userId, String organizerId);
   Stream<List<Organizer>> watchFollowedOrganizers(String userId);
 }

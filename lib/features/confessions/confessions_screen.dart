@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/feed_type.dart';
 import '../shared/feed_repository.dart';
 import '../../widgets/feed/feed_card.dart';
@@ -83,12 +84,7 @@ class ConfessionsScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 32),
                           FilledButton.icon(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => const AddFeedItemScreen(type: FeedType.confession)),
-                              );
-                            },
+                            onPressed: () => context.push('/add-feed-item', extra: FeedType.confession),
                             icon: const Icon(Icons.favorite_outline_rounded),
                             label: const Text('Post Confession'),
                             style: FilledButton.styleFrom(
@@ -135,12 +131,7 @@ class ConfessionsScreen extends ConsumerWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AddFeedItemScreen(type: FeedType.confession)),
-          );
-        },
+        onPressed: () => context.push('/add-feed-item', extra: FeedType.confession),
         label: const Text('Confess'),
         icon: const Icon(Icons.favorite_border),
         backgroundColor: Colors.red.shade400,

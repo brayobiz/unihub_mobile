@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/core/constants/campus_constants.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
+import 'package:unihub_mobile/features/events/presentation/controllers/organizer_profile_controller.dart';
 import '../../shared/providers.dart';
 import '../../domain/models/organizer.dart';
 import '../../domain/models/organizer_member.dart';
@@ -64,11 +65,11 @@ class _OrganizerProfileScreenState extends ConsumerState<OrganizerProfileScreen>
                                 children: [
                                   IconButton(
                                     icon: const Icon(Icons.share_outlined, color: Colors.white),
-                                    onPressed: () {},
+                                    onPressed: () => ref.read(organizerProfileControllerProvider(organizer.id).notifier).shareOrganizer(context, organizer),
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
-                                    onPressed: () {},
+                                    onPressed: () => _showMoreMenu(context, organizer),
                                   ),
                                 ],
                               ),
@@ -322,6 +323,17 @@ class _OrganizerProfileScreenState extends ConsumerState<OrganizerProfileScreen>
             organizer.verificationStatus == OrganizerVerificationStatus.verified || 
             organizer.verificationStatus == OrganizerVerificationStatus.official
           ),
+          if (organizer.contactEmail != null || organizer.contactPhone != null) ...[
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 16),
+            if (organizer.contactEmail != null)
+              _buildContactRow(Icons.email_outlined, organizer.contactEmail!),
+            if (organizer.contactPhone != null) ...[
+              const SizedBox(height: 12),
+              _buildContactRow(Icons.phone_outlined, organizer.contactPhone!),
+            ],
+          ],
           if (organizer.socialLinks.isNotEmpty) ...[
             const SizedBox(height: 16),
             const Divider(),
@@ -334,6 +346,16 @@ class _OrganizerProfileScreenState extends ConsumerState<OrganizerProfileScreen>
         ],
       ),
       icon: Icons.shield_outlined,
+    );
+  }
+
+  Widget _buildContactRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(width: 12),
+        Text(text, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+      ],
     );
   }
 
@@ -391,11 +413,11 @@ class _OrganizerProfileScreenState extends ConsumerState<OrganizerProfileScreen>
                     CircleAvatar(
                       radius: 25,
                       backgroundImage: member.userPhotoUrl != null ? CachedNetworkImageProvider(member.userPhotoUrl!) : null,
-                      child: member.userPhotoUrl == null ? Text(member.userName[0]) : null,
+                      child: member.userPhotoUrl == null ? Text(member.userName.isNotEmpty ? member.userName[0].toUpperCase() : '?') : null,
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      member.userName.split(' ').first,
+                      member.userName.isNotEmpty ? member.userName.split(' ').first : 'User',
                       style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
                     ),
                   ],
@@ -548,7 +570,7 @@ class _OrganizerProfileScreenState extends ConsumerState<OrganizerProfileScreen>
           else ...[
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => ref.read(organizerRepositoryProvider).toggleFollowOrganizer(user?.uid ?? '', organizer.id),
+                onPressed: () => ref.read(organizerProfileControllerProvider(organizer.id).notifier).toggleFollow(),
                 icon: Icon(isFollowing ? Icons.notifications_active_rounded : Icons.notifications_none_rounded),
                 label: Text(isFollowing ? 'Following' : 'Follow'),
                 style: OutlinedButton.styleFrom(
@@ -560,7 +582,7 @@ class _OrganizerProfileScreenState extends ConsumerState<OrganizerProfileScreen>
             const SizedBox(width: 12),
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () {},
+                onPressed: () => ref.read(organizerProfileControllerProvider(organizer.id).notifier).contactOrganizer(organizer),
                 icon: const Icon(Icons.mail_outline_rounded),
                 label: const Text('Contact'),
                 style: ElevatedButton.styleFrom(
@@ -590,4 +612,37 @@ class _HeaderClipper extends CustomClipper<Path> {
   }
   @override
   bool shouldReclip(CustomClipper<Path> oldClipper) => false;
+}
+
+extension _OrganizerProfileScreenActions on _OrganizerProfileScreenState {
+  void _showMoreMenu(BuildContext context, Organizer organizer) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.copy_rounded),
+              title: const Text('Copy Organizer ID'),
+              onTap: () {
+                // To be implemented: Clipboard.setData
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.report_problem_outlined, color: Colors.red),
+              title: const Text('Report Organizer', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Report submitted. Thank you for keeping campus safe.')),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

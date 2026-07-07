@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/campus_filter/presentation/widgets/campus_filter_selector.dart';
 import 'package:unihub_mobile/features/events/shared/providers.dart';
@@ -75,8 +76,8 @@ class EventsBrowseScreen extends ConsumerWidget {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: 5,
-            itemBuilder: (_, __) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+            itemBuilder: (_, __) => const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
               child: SkeletonLoader(width: 80, height: 80, borderRadius: 16),
             ),
           ),
@@ -121,7 +122,7 @@ class EventsBrowseScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [theme.colorScheme.primary, theme.colorScheme.primary.withOpacity(0.8)],
+            colors: [theme.colorScheme.primary, theme.colorScheme.primary.withValues(alpha: 0.8)],
           ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
@@ -188,7 +189,7 @@ class EventsBrowseScreen extends ConsumerWidget {
             ...orgs.map((org) => ListTile(
               leading: CircleAvatar(
                 backgroundImage: org.logoUrl != null ? NetworkImage(org.logoUrl!) : null,
-                child: org.logoUrl == null ? Text(org.name[0]) : null,
+                child: org.logoUrl == null ? Text(org.name.isNotEmpty ? org.name[0].toUpperCase() : 'O') : null,
               ),
               title: Text(org.name, style: const TextStyle(fontWeight: FontWeight.bold)),
               subtitle: Text(org.type.name.toUpperCase()),
@@ -211,23 +212,24 @@ class EventsBrowseScreen extends ConsumerWidget {
                      data.today.isEmpty && 
                      data.thisWeek.isEmpty;
 
-    if (hasNoEvents && data.categories.isEmpty) {
-      return _buildEmptyState(context, orgs);
-    }
-
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 24),
       children: [
         _buildHostEventCTA(context, orgs),
+        
+        // Show pending events to the organizer for immediate feedback
+        if (orgs.isNotEmpty) _buildPendingEventsSection(context, orgs),
+
         if (data.categories.isNotEmpty) ...[
           const SizedBox(height: 32),
           _buildCategorySection(data.categories),
         ],
         
-        if (hasNoEvents) ...[
-          const SizedBox(height: 32),
-          _buildNoEventsCTA(context, orgs),
-        ] else ...[
+        if (hasNoEvents && data.categories.isEmpty)
+           _buildEmptyState(context, orgs)
+        else if (hasNoEvents)
+           _buildNoEventsCTA(context, orgs)
+        else ...[
           if (data.live.isNotEmpty) ...[
             _buildHorizontalSection(context, 'Happening Now ⚡', data.live, EventListFilter.live),
             const SizedBox(height: 32),
@@ -250,6 +252,117 @@ class EventsBrowseScreen extends ConsumerWidget {
         _buildSecondaryHostCTA(context, orgs),
         const SizedBox(height: 48),
       ],
+    );
+  }
+
+  Widget _buildPendingEventsSection(BuildContext context, List<Organizer> orgs) {
+    return Consumer(
+      builder: (context, ref, child) {
+        final List<Event> allPending = [];
+        
+        for (var org in orgs) {
+          final events = ref.watch(organizerEventsProvider(org.id)).valueOrNull ?? [];
+          allPending.addAll(events.where((e) => e.status == EventStatus.submitted));
+        }
+
+        if (allPending.isEmpty) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.orange.withOpacity(0.2)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.hourglass_top_rounded, color: Colors.orange, size: 20),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Pending Review',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.orange),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${allPending.length} event(s)',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Your submitted events are being reviewed by campus admins and will appear in the feed soon.',
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 100,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: allPending.length,
+                    itemBuilder: (context, index) {
+                      final event = allPending[index];
+                      return Container(
+                        width: 200,
+                        margin: const EdgeInsets.only(right: 12),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.withOpacity(0.1)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: event.imageUrls.isNotEmpty
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.network(event.imageUrls.first, fit: BoxFit.cover),
+                                    )
+                                  : const Icon(Icons.event_note, color: Colors.grey, size: 20),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    event.title,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Submitted ${DateFormat('MMM dd').format(event.createdAt)}',
+                                    style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

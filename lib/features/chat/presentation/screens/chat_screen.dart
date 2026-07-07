@@ -594,6 +594,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       case 'notes': return Icons.description_rounded;
       case 'plug': return Icons.electrical_services_rounded;
       case 'roommate': return Icons.people_outline_rounded;
+      case 'organizer': return Icons.business_rounded;
       default: return Icons.info_outline;
     }
   }
@@ -616,6 +617,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         }
       } else if (chatContext.type == 'roommate') {
         context.push('/roommates');
+      } else if (chatContext.type == 'organizer') {
+        context.push('/organizers/${chatContext.id}');
+      } else if (chatContext.type == 'event') {
+        context.push('/events/${chatContext.id}');
+      } else if (chatContext.type == 'map') {
+        context.push('/campus-map?landmarkId=${chatContext.id}');
       }
     } catch (e) {
       if (mounted) {

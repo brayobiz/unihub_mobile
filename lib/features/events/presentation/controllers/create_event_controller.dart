@@ -274,12 +274,14 @@ class CreateEventController extends StateNotifier<CreateEventState> {
       );
 
       if (state.isEditing) {
-        await _ref.read(eventRepositoryProvider).updateEvent(event);
+        await _ref.read(eventServiceProvider).updateEvent(event, user.uid);
       } else {
         await _ref.read(eventServiceProvider).createEvent(event, user.uid);
-        if (status == EventStatus.submitted) {
-          await _ref.read(eventServiceProvider).submitEvent(event.id, user.uid);
-        }
+      }
+
+      if (status == EventStatus.submitted) {
+        // This handles validation and notifying admins
+        await _ref.read(eventServiceProvider).submitEvent(event.id, user.uid);
       }
 
       state = state.copyWith(isLoading: false);

@@ -206,12 +206,7 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'gigs_fab',
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AddFeedItemScreen(type: FeedType.gig)),
-          );
-        },
+        onPressed: () => context.push('/add-feed-item', extra: FeedType.gig),
         label: const Text('Create Gig', style: TextStyle(fontWeight: FontWeight.bold)),
         icon: const Icon(Icons.add_task_rounded),
         backgroundColor: theme.colorScheme.primary,

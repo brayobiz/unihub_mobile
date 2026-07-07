@@ -51,6 +51,19 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
     final state = ref.watch(createEventControllerProvider(args));
     final controller = ref.read(createEventControllerProvider(args).notifier);
 
+    // Listen for errors
+    ref.listen(createEventControllerProvider(args).select((s) => s.error), (previous, next) {
+      if (next != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    });
+
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
@@ -478,7 +491,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
           Expanded(
             flex: 2,
             child: FilledButton(
-              onPressed: () async {
+              onPressed: state.isLoading ? null : () async {
                 if (isLastStep) {
                   final success = await controller.submit();
                   if (success && mounted) {

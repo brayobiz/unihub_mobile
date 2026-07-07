@@ -18,7 +18,8 @@ enum HousingStatus {
   taken,
   pendingReview,
   reported,
-  archived
+  archived,
+  removed
 }
 
 enum PropertySource {

@@ -168,7 +168,7 @@ class EventCard extends ConsumerWidget {
                             CircleAvatar(
                               radius: 10,
                               backgroundImage: organizer?.logoUrl != null ? CachedNetworkImageProvider(organizer!.logoUrl!) : null,
-                              child: organizer?.logoUrl == null ? Text(organizer?.name[0] ?? 'O', style: const TextStyle(fontSize: 8)) : null,
+                              child: organizer?.logoUrl == null ? Text(organizer?.name.isNotEmpty == true ? organizer!.name[0].toUpperCase() : 'O', style: const TextStyle(fontSize: 8)) : null,
                             ),
                             const SizedBox(width: 8),
                             Expanded(

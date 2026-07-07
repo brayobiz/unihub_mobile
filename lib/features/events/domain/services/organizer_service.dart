@@ -258,6 +258,7 @@ class OrganizerService {
     final allowedTransitions = {
       OrganizerVerificationStatus.draft,
       OrganizerVerificationStatus.rejected,
+      OrganizerVerificationStatus.withdrawn,
     };
 
     if (!allowedTransitions.contains(currentStatus)) {
@@ -286,6 +287,31 @@ class OrganizerService {
       oldStatus: currentStatus,
       newStatus: OrganizerVerificationStatus.underReview,
       reason: 'Submitted for verification',
+    );
+  }
+
+  Future<void> withdrawApplication(String organizerId, String userId) async {
+    final organizer = await _repository.getOrganizerById(organizerId);
+    if (organizer == null) throw Exception('Organizer not found');
+    if (organizer.ownerId != userId) throw Exception('Unauthorized');
+
+    final currentStatus = organizer.verificationStatus;
+    if (currentStatus != OrganizerVerificationStatus.submitted && 
+        currentStatus != OrganizerVerificationStatus.underReview) {
+      throw Exception('Only submitted or under-review applications can be withdrawn.');
+    }
+
+    await _firestore.collection('organizers').doc(organizerId).update({
+      'verificationStatus': OrganizerVerificationStatus.withdrawn.name,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    await _logAudit(
+      organizerId: organizerId,
+      actorId: userId,
+      oldStatus: currentStatus,
+      newStatus: OrganizerVerificationStatus.withdrawn,
+      reason: 'Application withdrawn by owner',
     );
   }
 

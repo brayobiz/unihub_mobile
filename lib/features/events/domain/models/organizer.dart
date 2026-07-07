@@ -10,6 +10,8 @@ class Organizer {
   final String bio;
   final String? logoUrl;
   final String? bannerUrl;
+  final String? contactEmail;
+  final String? contactPhone;
   final String campusId;
   final OrganizerType type;
   final OrganizerVerificationStatus verificationStatus;
@@ -18,6 +20,7 @@ class Organizer {
   final Map<String, String> socialLinks;
   final int followerCount;
   final int eventCount;
+  final int sharesCount;
   
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -30,6 +33,8 @@ class Organizer {
     required this.bio,
     this.logoUrl,
     this.bannerUrl,
+    this.contactEmail,
+    this.contactPhone,
     required this.campusId,
     this.type = OrganizerType.student,
     this.verificationStatus = OrganizerVerificationStatus.draft,
@@ -37,6 +42,7 @@ class Organizer {
     this.socialLinks = const {},
     this.followerCount = 0,
     this.eventCount = 0,
+    this.sharesCount = 0,
     required this.createdAt,
     this.updatedAt,
     this.isDeleted = false,
@@ -49,6 +55,8 @@ class Organizer {
       'bio': bio,
       'logoUrl': logoUrl,
       'bannerUrl': bannerUrl,
+      'contactEmail': contactEmail,
+      'contactPhone': contactPhone,
       'campusId': campusId,
       'type': type.name,
       'verificationStatus': verificationStatus.name,
@@ -56,6 +64,7 @@ class Organizer {
       'socialLinks': socialLinks,
       'followerCount': followerCount,
       'eventCount': eventCount,
+      'sharesCount': sharesCount,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : FieldValue.serverTimestamp(),
       'isDeleted': isDeleted,
@@ -72,6 +81,8 @@ class Organizer {
       bio: data['bio'] ?? '',
       logoUrl: data['logoUrl'],
       bannerUrl: data['bannerUrl'],
+      contactEmail: data['contactEmail'],
+      contactPhone: data['contactPhone'],
       campusId: data['campusId'] ?? '',
       type: OrganizerType.values.firstWhere(
         (e) => e.name == data['type'],
@@ -85,6 +96,7 @@ class Organizer {
       socialLinks: Map<String, String>.from(data['socialLinks'] ?? {}),
       followerCount: data['followerCount'] ?? 0,
       eventCount: data['eventCount'] ?? 0,
+      sharesCount: data['sharesCount'] ?? 0,
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
       isDeleted: data['isDeleted'] ?? false,
@@ -96,12 +108,15 @@ class Organizer {
     String? bio,
     String? logoUrl,
     String? bannerUrl,
+    String? contactEmail,
+    String? contactPhone,
     OrganizerType? type,
     OrganizerVerificationStatus? verificationStatus,
     double? trustScore,
     Map<String, String>? socialLinks,
     int? followerCount,
     int? eventCount,
+    int? sharesCount,
     DateTime? updatedAt,
     bool? isDeleted,
   }) {
@@ -112,6 +127,8 @@ class Organizer {
       bio: bio ?? this.bio,
       logoUrl: logoUrl ?? this.logoUrl,
       bannerUrl: bannerUrl ?? this.bannerUrl,
+      contactEmail: contactEmail ?? this.contactEmail,
+      contactPhone: contactPhone ?? this.contactPhone,
       campusId: campusId,
       type: type ?? this.type,
       verificationStatus: verificationStatus ?? this.verificationStatus,
@@ -119,6 +136,7 @@ class Organizer {
       socialLinks: socialLinks ?? this.socialLinks,
       followerCount: followerCount ?? this.followerCount,
       eventCount: eventCount ?? this.eventCount,
+      sharesCount: sharesCount ?? this.sharesCount,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isDeleted: isDeleted ?? this.isDeleted,

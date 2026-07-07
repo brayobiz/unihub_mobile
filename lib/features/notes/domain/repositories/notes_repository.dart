@@ -22,6 +22,7 @@ abstract class NotesRepository {
   Future<void> createNote(NoteListing note);
   Future<void> deleteNote(String noteId);
   Future<NoteListing?> getNoteById(String noteId);
+  Future<void> incrementShareCount(String noteId);
   Stream<List<NoteListing>> watchNotesByAuthor(String authorId);
   
   Future<void> reportNote({

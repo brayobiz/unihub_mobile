@@ -19,33 +19,70 @@ service cloud.firestore {
       );
     }
 
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isIdentityVerified() {
+      return getUserData().get("isIdentityVerified", false) == true;
+    }
+
+    function isStudentVerified() {
+      return getUserData().get("isStudentVerified", false) == true;
+    }
+
+    function canManageOrganizer(orgId) {
+      return isAdmin() || (
+        isAuthenticated() && (
+          get(/databases/$(database)/documents/organizers/$(orgId)).data.ownerId == request.auth.uid ||
+          (exists(/databases/$(database)/documents/organizers/$(orgId)/members/$(orgId + "_" + request.auth.uid)) &&
+           get(/databases/$(database)/documents/organizers/$(orgId)/members/$(orgId + "_" + request.auth.uid)).data.role in ["administrator", "owner"])
+        )
+      );
+    }
+
+    function isMemberOfOrganizer(orgId) {
+      return isAuthenticated() && (
+        (exists(/databases/$(database)/documents/organizers/$(orgId)) &&
+         get(/databases/$(database)/documents/organizers/$(orgId)).data.ownerId == request.auth.uid) ||
+        exists(/databases/$(database)/documents/organizers/$(orgId)/members/$(orgId + "_" + request.auth.uid))
+      );
+    }
+
     // --- Users ---
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) &&
+                      !request.resource.data.keys().hasAny(['isAdmin', 'roles', 'isBanned']) &&
+                      request.resource.data.get('trustScore', 0.0) <= 5.0; // Allow small initial boost but nothing crazy
+
+      allow update: if isAdmin() || (
+        isOwner(userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['isAdmin', 'roles', 'isIdentityVerified', 'isStudentVerified', 'isBanned', 'suspendedUntil'])
+      );
+
       allow delete: if isAdmin();
 
-      // Private sub-collections
-      match /tokens/{tokenId} {
-        allow read, write: if isOwner(userId);
+      // Flexible matching for private user sub-collections (Activities, Saves, etc.)
+      match /{collectionId}/{docId} {
+        allow read, write: if isOwner(userId) && (
+          collectionId in ["tokens", "recently_viewed", "saved_listings", "saved_housing", "saved_searches", "recent_searches", "study_progress", "followed_organizers", "collections", "notifications", "saved_events", "saved_notes"] ||
+          collectionId.matches('^recently_viewed_.*') ||
+          collectionId.matches('^saved_.*') ||
+          collectionId.matches('^recent_searches_.*')
+        );
+
+        // Specific override for notifications to allow others to create them (sending notifications)
+        allow create: if collectionId == "notifications" && isAuthenticated();
       }
-      match /recently_viewed/{docId} {
-        allow read, write: if isOwner(userId);
-      }
-      match /saved_searches/{docId} {
-        allow read, write: if isOwner(userId);
-      }
-      match /collections/{collectionId}/listings/{listingId} {
-        allow read, write: if isOwner(userId);
-      }
-      match /notifications/{notificationId} {
-        allow read: if isOwner(userId) || isAdmin();
-        allow create: if isAuthenticated();
-        allow update, delete: if isOwner(userId) || isAdmin();
-      }
-      match /study_progress/{noteId} {
-        allow read, write: if isOwner(userId);
+
+      // Reviews sub-collection (anyone can read, authenticated can write/update)
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow create: if isAuthenticated() && request.resource.data.reviewerId == request.auth.uid;
+        allow update: if isAuthenticated() && resource.data.reviewerId == request.auth.uid;
+        allow delete: if isAdmin() || (isAuthenticated() && resource.data.reviewerId == request.auth.uid);
       }
     }
 
@@ -53,26 +90,59 @@ service cloud.firestore {
     match /listings/{listingId} {
       allow read: if true;
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (isAdmin() || request.resource.data.get("sellerId", "") == request.auth.uid);
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        // Seller can update everything except restricted admin/status fields
+        (resource.data.get("sellerId", "") == request.auth.uid &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isFeatured', 'isPromoted', 'flagged', 'flagReason', 'flagAdminNotes'])) ||
+        // Public engagement counters
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewsCount', 'savesCount', 'sharesCount', 'chatsStartedCount']))
+      );
       allow delete: if isAdmin() || (isAuthenticated() && resource.data.get("sellerId", "") == request.auth.uid);
     }
 
     match /offers/{offerId} {
       allow read: if isAuthenticated() && (isAdmin() || resource.data.get("buyerId", "") == request.auth.uid || resource.data.get("sellerId", "") == request.auth.uid);
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.get("buyerId", "") == request.auth.uid;
       allow update: if isAuthenticated() && (isAdmin() || resource.data.get("buyerId", "") == request.auth.uid || resource.data.get("sellerId", "") == request.auth.uid);
     }
 
     // --- Events ---
     match /events/{eventId} {
       allow read: if true;
-      allow create: if isAuthenticated();
-      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.get("createdBy", "") == request.auth.uid);
+      allow create: if isMemberOfOrganizer(request.resource.data.organizerId) || isAdmin();
+
+      allow update: if canManageOrganizer(resource.data.organizerId) || (
+        isAuthenticated() && (
+          resource.data.get("createdBy", "") == request.auth.uid
+        ) && (
+          // Prevent non-admins from approving events or changing key metadata
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'isFeatured', 'isPromoted']) ||
+          request.resource.data.status in ['draft', 'submitted', 'cancelled', 'archived']
+        )
+      );
+
+      // Public engagement counters
+      allow update: if isAuthenticated() &&
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewsCount', 'sharesCount', 'savesCount', 'currentAttendeeCount']);
+
+      allow delete: if isAdmin() || (
+        isAuthenticated() &&
+        resource.data.get("createdBy", "") == request.auth.uid &&
+        resource.data.status == "draft" // Only drafts can be hard deleted by users
+      );
     }
 
     match /event_attendance/{docId} {
-      allow read: if isAdmin() || (isAuthenticated() && resource.data.get("userId", "") == request.auth.uid);
-      allow create: if isAuthenticated() && request.resource.data.get("userId", "") == request.auth.uid;
+      allow read: if isAdmin() || (
+        isAuthenticated() && (
+          resource.data.userId == request.auth.uid ||
+          canManageOrganizer(get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.organizerId)
+        )
+      );
+      allow create: if isAuthenticated() &&
+                      request.resource.data.userId == request.auth.uid &&
+                      (request.resource.data.status != "going" || isIdentityVerified());
       allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.get("userId", "") == request.auth.uid);
     }
 
@@ -83,18 +153,30 @@ service cloud.firestore {
 
     match /organizers/{organizerId} {
       allow read: if true;
-      allow create: if isAuthenticated();
-      allow update: if isAdmin() || (isAuthenticated() && resource.data.get("ownerId", "") == request.auth.uid);
+      allow create: if isAuthenticated() && isIdentityVerified();
+
+      allow update: if canManageOrganizer(organizerId) && (
+        // Prevent changing verification status except for specific transitions
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['verificationStatus', 'trustScore']) ||
+        request.resource.data.verificationStatus in ['submitted', 'underReview', 'withdrawn']
+      );
+
+      // Anyone can follow/unfollow (updates followerCount) or share
+      allow update: if isAuthenticated() &&
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followerCount', 'sharesCount']);
 
       match /members/{memberId} {
         allow read: if isAuthenticated();
-        allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid || isAdmin());
-        allow update, delete: if isAdmin() || (isAuthenticated() && get(/databases/$(database)/documents/organizers/$(organizerId)).data.ownerId == request.auth.uid);
+        allow create: if canManageOrganizer(organizerId) ||
+                      (isAuthenticated() && memberId == organizerId + "_" + request.auth.uid);
+        allow update, delete: if canManageOrganizer(organizerId) || (
+          isAuthenticated() && resource.data.userId == request.auth.uid
+        );
       }
 
       match /audit_trail/{auditId} {
-        allow read: if isAdmin() || (isAuthenticated() && get(/databases/$(database)/documents/organizers/$(organizerId)).data.ownerId == request.auth.uid);
-        allow write: if isAdmin();
+        allow read: if canManageOrganizer(organizerId);
+        allow write: if canManageOrganizer(organizerId);
       }
     }
 
@@ -102,14 +184,38 @@ service cloud.firestore {
     match /housing_listings/{listingId} {
       allow read: if true;
       allow create: if isAuthenticated();
-      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.get("plugId", "") == request.auth.uid);
+      allow update: if isAdmin() || (
+        isAuthenticated() &&
+        resource.data.get("plugId", "") == request.auth.uid &&
+        // Allow plug to update status (e.g. to 'taken') but not admin-only fields
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isFeatured', 'moderatorNotes', 'flagged'])
+      ) || (
+        // Public engagement counters
+        isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'saves', 'sharesCount', 'chatCount', 'callCount'])
+      );
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.get("plugId", "") == request.auth.uid);
+    }
+
+    match /roommates/{profileId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.get("userId", "") == request.auth.uid;
+      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.get("userId", "") == request.auth.uid);
     }
 
     // --- Notes ---
     match /notes/{noteId} {
       allow read: if true;
       allow create: if isAuthenticated();
-      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.get("authorId", "") == request.auth.uid);
+      allow update: if isAdmin() || (
+        isAuthenticated() &&
+        resource.data.get("authorId", "") == request.auth.uid &&
+        // Allow author to update status/archiving but not moderation fields
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['flagged', 'flagReason', 'flagAdminNotes'])
+      ) || (
+        // Public engagement counters
+        isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'saves', 'sharesCount', 'downloadsCount'])
+      );
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.get("authorId", "") == request.auth.uid);
     }
 
     // --- Chat & Support ---
@@ -138,25 +244,25 @@ service cloud.firestore {
 
     match /identity_verifications/{docId} {
       allow read: if isOwner(docId) || isAdmin();
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && isOwner(docId);
       allow update: if isAdmin();
     }
 
     match /student_verifications/{docId} {
       allow read: if isOwner(docId) || isAdmin();
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && isOwner(docId);
       allow update: if isAdmin();
     }
 
     match /verification_applications/{docId} {
       allow read: if (isAuthenticated() && resource.data.userId == request.auth.uid) || isAdmin();
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update: if isAdmin();
     }
 
     match /organizer_verification_requests/{docId} {
       allow read: if (isAuthenticated() && resource.data.ownerId == request.auth.uid) || isAdmin();
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
       allow update: if isAdmin();
     }
 
@@ -180,20 +286,21 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // --- Community Feed (Confessions, Gigs, Discussions) ---
+    // --- Community Feed (Posts, Confessions, Gigs) ---
     match /feed/{itemId} {
       allow read: if true;
       allow create: if isAuthenticated();
       allow update: if isAuthenticated() && (
         isAdmin() ||
-        resource.data.get("authorId", "") == request.auth.uid ||
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'likedBy', 'sharesCount']))
+        (resource.data.get("authorId", "") == request.auth.uid &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isPinned', 'status'])) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'likedBy', 'sharesCount', 'viewsCount', 'commentsCount']))
       );
       allow delete: if isAdmin() || (isAuthenticated() && resource.data.get("authorId", "") == request.auth.uid);
 
       match /comments/{commentId} {
         allow read: if true;
-        allow create: if isAuthenticated();
+        allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
         allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
       }
     }
@@ -201,15 +308,28 @@ service cloud.firestore {
     // --- Student Gigs (Applications & Disputes) ---
     match /gig_applications/{appId} {
       allow read: if isAuthenticated() && (resource.data.freelancerId == request.auth.uid || resource.data.employerId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (resource.data.employerId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.freelancerId == request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.employerId == request.auth.uid || resource.data.freelancerId == request.auth.uid || isAdmin());
       allow delete: if isAdmin();
     }
 
     match /gig_disputes/{disputeId} {
-      allow read: if isAdmin() || (isAuthenticated() && resource.data.reporterId == request.auth.uid);
+      allow read: if isAdmin() || (isAuthenticated() && (resource.data.reporterId == request.auth.uid || resource.data.targetUserId == request.auth.uid));
       allow create: if isAuthenticated();
       allow update: if isAdmin();
+    }
+
+    // --- Collection Groups ---
+    match /{path=**}/members/{memberId} {
+      allow read: if isAuthenticated();
+    }
+
+    match /{path=**}/saved_housing/{docId} {
+      allow read: if isAuthenticated();
+    }
+
+    match /{path=**}/saved_listings/{docId} {
+      allow read: if isAuthenticated();
     }
   }
 }

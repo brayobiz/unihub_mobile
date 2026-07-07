@@ -71,6 +71,8 @@ abstract class HousingRepository {
 
   Future<void> incrementCallCount(String id);
 
+  Future<void> incrementShareCount(String id);
+
   Future<void> submitReview(HousingReview review);
 
   Future<void> createRoommateProfile(RoommateProfile profile);

@@ -46,9 +46,7 @@ class ManageEventsScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Error: $err')),
       ),
-      floatingActionButton: organizerAsync.valueOrNull?.verificationStatus == OrganizerVerificationStatus.verified || 
-                           organizerAsync.valueOrNull?.verificationStatus == OrganizerVerificationStatus.official
-          ? FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton.extended(
               onPressed: () {
                 final organizer = organizerAsync.value;
                 if (organizer != null) {
@@ -60,8 +58,7 @@ class ManageEventsScreen extends ConsumerWidget {
               },
               label: const Text('New Event'),
               icon: const Icon(Icons.add),
-            )
-          : null,
+            ),
     );
   }
 
@@ -184,9 +181,7 @@ class ManageEventsScreen extends ConsumerWidget {
               style: TextStyle(color: Colors.grey),
             ),
             const SizedBox(height: 32),
-            if (organizer.verificationStatus == OrganizerVerificationStatus.verified || 
-                organizer.verificationStatus == OrganizerVerificationStatus.official)
-              ElevatedButton.icon(
+            ElevatedButton.icon(
                 onPressed: () => context.push('/organizers/${organizer.id}/events/create'),
                 icon: const Icon(Icons.add),
                 label: const Text('Create Your First Event'),

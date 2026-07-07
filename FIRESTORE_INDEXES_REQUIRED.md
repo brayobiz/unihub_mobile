@@ -84,7 +84,7 @@ To ensure the app functions correctly in production, the following composite ind
 
 | Path | Fields | Query Usage |
 |------|--------|-------------|
-| `users/{uid}/recently_viewed` | `viewedAt` (Desc) | Recents list |
+| `users/{uid}/recently_viewed` | `timestamp` (Desc) | Recents list |
 | `users/{uid}/saved_searches` | `createdAt` (Desc) | Saved searches UI |
 | `users/{uid}/collections/{cid}/listings` | `addedAt` (Desc) | Collection view |
 

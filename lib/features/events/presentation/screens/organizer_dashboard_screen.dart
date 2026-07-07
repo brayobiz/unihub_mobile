@@ -61,8 +61,9 @@ class OrganizerDashboardScreen extends ConsumerWidget {
                   _buildOverviewCard(context, ref, organizer, isManagement),
                   if (organizer.verificationStatus == OrganizerVerificationStatus.submitted || 
                       organizer.verificationStatus == OrganizerVerificationStatus.underReview ||
-                      organizer.verificationStatus == OrganizerVerificationStatus.draft)
-                    _buildStatusNotice(context, organizer.verificationStatus),
+                      organizer.verificationStatus == OrganizerVerificationStatus.draft ||
+                      organizer.verificationStatus == OrganizerVerificationStatus.suspended)
+                    _buildStatusNotice(context, ref, organizer),
                   
                   const SizedBox(height: 32),
                   Row(
@@ -93,7 +94,7 @@ class OrganizerDashboardScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _buildEventsSummary(context, ref, organizerId),
+                  _buildEventsSummary(context, ref, organizerId, isManagement),
                   
                   const SizedBox(height: 32),
                 ],
@@ -104,8 +105,7 @@ class OrganizerDashboardScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Error: $err')),
       ),
-      floatingActionButton: organizerAsync.valueOrNull?.verificationStatus == OrganizerVerificationStatus.verified || 
-                           organizerAsync.valueOrNull?.verificationStatus == OrganizerVerificationStatus.official
+      floatingActionButton: isManagement
           ? FloatingActionButton.extended(
               onPressed: () {
                 final organizer = organizerAsync.value;
@@ -139,7 +139,7 @@ class OrganizerDashboardScreen extends ConsumerWidget {
               CircleAvatar(
                 radius: 30,
                 backgroundImage: organizer.logoUrl != null ? NetworkImage(organizer.logoUrl!) : null,
-                child: organizer.logoUrl == null ? Text(organizer.name[0], style: const TextStyle(fontSize: 24)) : null,
+                child: organizer.logoUrl == null ? Text(organizer.name.isNotEmpty ? organizer.name[0].toUpperCase() : 'O', style: const TextStyle(fontSize: 24)) : null,
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -164,7 +164,8 @@ class OrganizerDashboardScreen extends ConsumerWidget {
             ],
           ),
           if (isManagement && (organizer.verificationStatus == OrganizerVerificationStatus.draft || 
-                              organizer.verificationStatus == OrganizerVerificationStatus.rejected)) ...[
+                              organizer.verificationStatus == OrganizerVerificationStatus.rejected ||
+                              organizer.verificationStatus == OrganizerVerificationStatus.withdrawn)) ...[
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -205,12 +206,14 @@ class OrganizerDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatusNotice(BuildContext context, OrganizerVerificationStatus status) {
+  Widget _buildStatusNotice(BuildContext context, WidgetRef ref, Organizer organizer) {
+    final status = organizer.verificationStatus;
     final isReviewing = status == OrganizerVerificationStatus.underReview || status == OrganizerVerificationStatus.submitted;
     final isRejected = status == OrganizerVerificationStatus.rejected;
     final isDraft = status == OrganizerVerificationStatus.draft;
+    final isSuspended = status == OrganizerVerificationStatus.suspended;
     
-    final color = isRejected ? AppColors.error : (isReviewing ? Theme.of(context).colorScheme.primary : Colors.amber);
+    final color = isRejected || isSuspended ? AppColors.error : (isReviewing ? Theme.of(context).colorScheme.primary : Colors.amber);
     
     return Container(
       margin: const EdgeInsets.only(top: 16),
@@ -220,22 +223,69 @@ class OrganizerDashboardScreen extends ConsumerWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Icon(
-            isRejected ? Icons.error_outline_rounded : (isReviewing ? Icons.fact_check_rounded : Icons.edit_document), 
-            color: color,
+          Row(
+            children: [
+              Icon(
+                isSuspended ? Icons.block_flipped : (isRejected ? Icons.error_outline_rounded : (isReviewing ? Icons.fact_check_rounded : Icons.edit_document)), 
+                color: color,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  isSuspended
+                    ? 'Your organization has been suspended. Please contact support for more information.'
+                    : (isRejected
+                        ? 'Your application was not approved. You can edit and resubmit your details for another review.'
+                        : (isReviewing 
+                            ? 'Your application is currently under review by administrators. You can prepare drafts in the meantime.'
+                            : (isDraft ? 'Your application is in draft mode. Please complete and submit it for review.' : 'Your application is pending verification.'))),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              isRejected
-                ? 'Your application was not approved. You can edit and resubmit your details for another review.'
-                : (isReviewing 
-                    ? 'Your application is currently under review by administrators. You can prepare drafts in the meantime.'
-                    : (isDraft ? 'Your application is in draft mode. Please complete and submit it for review.' : 'Your application is pending verification.')),
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          if (isReviewing && organizer.ownerId == ref.watch(appUserProvider).valueOrNull?.uid) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => _confirmWithdraw(context, ref, organizer.id),
+                style: TextButton.styleFrom(foregroundColor: color),
+                child: const Text('Withdraw Application', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
             ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _confirmWithdraw(BuildContext context, WidgetRef ref, String id) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Withdraw Application?'),
+        content: const Text('Are you sure you want to withdraw your organizer application? You can resubmit it later.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              final userId = ref.read(appUserProvider).valueOrNull?.uid ?? '';
+              Navigator.pop(dialogContext);
+              try {
+                await ref.read(organizerServiceProvider).withdrawApplication(id, userId);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Application withdrawn.')));
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                }
+              }
+            },
+            child: const Text('Withdraw', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -286,7 +336,7 @@ class OrganizerDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildEventsSummary(BuildContext context, WidgetRef ref, String organizerId) {
+  Widget _buildEventsSummary(BuildContext context, WidgetRef ref, String organizerId, bool isManagement) {
     final eventsAsync = ref.watch(organizerEventsProvider(organizerId));
     final theme = Theme.of(context);
     final organizer = ref.watch(organizerProvider(organizerId)).valueOrNull;
@@ -316,8 +366,7 @@ class OrganizerDashboardScreen extends ConsumerWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey, fontSize: 13)
                 ),
-                if (organizer?.verificationStatus == OrganizerVerificationStatus.verified || 
-                    organizer?.verificationStatus == OrganizerVerificationStatus.official) ...[
+                if (isManagement) ...[
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
                     onPressed: () => context.push('/organizers/$organizerId/events/create'),
@@ -500,25 +549,51 @@ class OrganizerDashboardScreen extends ConsumerWidget {
             ListTile(
               leading: const Icon(Icons.admin_panel_settings_outlined),
               title: const Text('Make Administrator'),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                ref.read(organizerServiceProvider).updateMemberRole(organizerId, ref.read(appUserProvider).valueOrNull?.uid ?? '', member.userId, OrganizerRole.administrator);
+                try {
+                  await ref.read(organizerServiceProvider).updateMemberRole(organizerId, ref.read(appUserProvider).valueOrNull?.uid ?? '', member.userId, OrganizerRole.administrator);
+                } catch (e) {
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                }
               },
             ),
             ListTile(
               leading: const Icon(Icons.edit_outlined),
               title: const Text('Set as Editor'),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                ref.read(organizerServiceProvider).updateMemberRole(organizerId, ref.read(appUserProvider).valueOrNull?.uid ?? '', member.userId, OrganizerRole.editor);
+                try {
+                  await ref.read(organizerServiceProvider).updateMemberRole(organizerId, ref.read(appUserProvider).valueOrNull?.uid ?? '', member.userId, OrganizerRole.editor);
+                } catch (e) {
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                }
               },
             ),
             ListTile(
               leading: const Icon(Icons.person_remove_outlined, color: AppColors.error),
               title: const Text('Remove from Team', style: TextStyle(color: AppColors.error)),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                ref.read(organizerServiceProvider).removeMember(organizerId, ref.read(appUserProvider).valueOrNull?.uid ?? '', member.userId);
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Remove Member?'),
+                    content: Text('Are you sure you want to remove ${member.userName} from the team?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                      TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Remove', style: TextStyle(color: Colors.red))),
+                    ],
+                  ),
+                );
+
+                if (confirmed == true) {
+                  try {
+                    await ref.read(organizerServiceProvider).removeMember(organizerId, ref.read(appUserProvider).valueOrNull?.uid ?? '', member.userId);
+                  } catch (e) {
+                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
+                }
               },
             ),
           ],

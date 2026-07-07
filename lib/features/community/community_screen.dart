@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/feed_type.dart';
 import '../shared/feed_repository.dart';
 import '../../widgets/feed/feed_card.dart';
@@ -86,12 +87,7 @@ class CommunityScreen extends ConsumerWidget {
                             ),
                             const SizedBox(height: 32),
                             FilledButton.icon(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => const AddFeedItemScreen(type: FeedType.community)),
-                                );
-                              },
+                              onPressed: () => context.push('/add-feed-item', extra: FeedType.community),
                               icon: const Icon(Icons.add_rounded),
                               label: const Text('Start Discussion'),
                               style: FilledButton.styleFrom(
@@ -147,12 +143,7 @@ class CommunityScreen extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'community_fab',
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AddFeedItemScreen(type: FeedType.community)),
-          );
-        },
+        onPressed: () => context.push('/add-feed-item', extra: FeedType.community),
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: Colors.white,
         child: const Icon(Icons.add),

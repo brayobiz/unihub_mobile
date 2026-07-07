@@ -4,7 +4,6 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import 'package:intl/intl.dart';
@@ -107,8 +106,18 @@ class _HousingDetailContentState extends ConsumerState<_HousingDetailContent> {
 
   void _shareListing() {
     final listing = widget.listing;
-    final text = 'Check out this ${listing.title} at ${listing.location} for KES ${NumberFormat("#,###").format(listing.rent)}! \n\nDownload UniHub to view more: https://unihub.app/housing/${listing.id}';
-    Share.share(text);
+    final chatContext = ChatContext(
+      type: 'housing',
+      id: listing.id,
+      title: listing.title,
+      thumbnail: listing.images.isNotEmpty ? listing.images.first : null,
+      metadata: {
+        'rent': listing.rent,
+        'location': listing.location,
+      },
+    );
+    context.push('/share-to-chat', extra: chatContext);
+    ref.read(housingRepositoryProvider).incrementShareCount(listing.id);
   }
 
   void _showReportDialog() {

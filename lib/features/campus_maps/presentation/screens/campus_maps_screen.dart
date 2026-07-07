@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
 import '../../../../core/location/controllers/campus_maps_controller.dart';
 import '../../../../core/location/models/landmark.dart';
 import '../../../../core/location/models/map_marker.dart';
@@ -477,7 +477,16 @@ class _CampusMapsScreenState extends ConsumerState<CampusMapsScreen> {
                   const SizedBox(height: 32),
                   Row(
                     children: [
-                      _actionButton(Icons.share_outlined, 'Share', () => Share.share('Check out ${landmark.name} on UniHub Campus Map: https://unihub.page.link/map?id=${landmark.id}')),
+                      _actionButton(Icons.share_outlined, 'Share', () {
+                        final chatContext = ChatContext(
+                          type: 'map',
+                          id: landmark.id,
+                          title: landmark.name,
+                          thumbnail: landmark.photos.isNotEmpty ? landmark.photos.first : null,
+                          metadata: {'latitude': landmark.latitude, 'longitude': landmark.longitude},
+                        );
+                        context.push('/share-to-chat', extra: chatContext);
+                      }),
                       const SizedBox(width: 12),
                       _actionButton(Icons.copy_rounded, 'Copy', () {
                         Clipboard.setData(ClipboardData(text: '${landmark.latitude}, ${landmark.longitude}'));
