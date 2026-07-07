@@ -928,6 +928,11 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
             ),
           ),
         ),
+        
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 20),
+          child: BannerAdWidget(),
+        ),
 
         myListingsAsync.when(
           data: (listings) {

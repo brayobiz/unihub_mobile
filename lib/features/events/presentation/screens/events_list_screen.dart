@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../domain/models/event.dart';
 import '../../shared/providers.dart';
 import '../widgets/event_card.dart';
+import 'package:unihub_mobile/features/ads/ads_module.dart';
 
 enum EventListFilter { today, thisWeek, featured, live, category }
 
@@ -57,7 +58,18 @@ class EventsListScreen extends ConsumerWidget {
           return ListView.separated(
             padding: const EdgeInsets.all(24),
             itemCount: events.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 24),
+            separatorBuilder: (context, index) {
+              final bool showAd = (index + 1) % 6 == 0;
+              return Column(
+                children: [
+                  const SizedBox(height: 24),
+                  if (showAd) ...[
+                    const BannerAdWidget(),
+                    const SizedBox(height: 24),
+                  ],
+                ],
+              );
+            },
             itemBuilder: (context, index) {
               final event = events[index];
               return _buildListEventCard(context, event);

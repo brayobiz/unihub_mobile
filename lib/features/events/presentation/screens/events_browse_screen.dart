@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
+import 'package:unihub_mobile/features/ads/widgets/banner_ad_widget.dart';
 import 'package:unihub_mobile/features/campus_filter/presentation/widgets/campus_filter_selector.dart';
 import 'package:unihub_mobile/features/events/shared/providers.dart';
 import 'package:unihub_mobile/features/events/domain/models/event.dart';
@@ -240,6 +241,11 @@ class EventsBrowseScreen extends ConsumerWidget {
           ],
           if (data.today.isNotEmpty) ...[
             _buildHorizontalSection(context, 'Today on Campus', data.today, EventListFilter.today),
+            const SizedBox(height: 32),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: BannerAdWidget(),
+            ),
             const SizedBox(height: 32),
           ],
           if (data.thisWeek.isNotEmpty) ...[

@@ -69,6 +69,7 @@ import '../../features/campus_maps/presentation/screens/campus_maps_screen.dart'
 import '../../features/shared/feed_repository.dart';
 
 import '../../features/shared/add_feed_item_screen.dart';
+import '../../features/shared/about_screen.dart';
 import '../../models/feed_type.dart';
 
 import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
@@ -130,24 +131,30 @@ class RouterNotifier extends ChangeNotifier {
     // DECOUPLING Presence from Navigation:
     // Only notify router if routing-critical properties change.
     // We ignore volatile metadata like lastSeen and isOnline.
-    _ref.listen(appUserProvider.select((asyncUser) {
-      final user = asyncUser.valueOrNull;
-      if (user == null) return null;
-      return (
-        uid: user.uid,
-        university: user.university,
-        course: user.course,
-        isBanned: user.isBanned,
-        suspendedUntil: user.suspendedUntil,
-        isOnboardingCompleted: user.isOnboardingCompleted,
-        isAdmin: user.isAdmin,
-        isEmailVerified: user.isEmailVerified,
-      );
-    }), (_, __) => _safeNotify());
+    _ref.listen(
+      appUserProvider.select((asyncUser) {
+        final user = asyncUser.valueOrNull;
+        if (user == null) return null;
+        return (
+          uid: user.uid,
+          university: user.university,
+          course: user.course,
+          isBanned: user.isBanned,
+          suspendedUntil: user.suspendedUntil,
+          isOnboardingCompleted: user.isOnboardingCompleted,
+          isAdmin: user.isAdmin,
+          isEmailVerified: user.isEmailVerified,
+        );
+      }),
+      (_, __) => _safeNotify(),
+    );
 
-    _ref.listen(systemSettingsProvider.select((asyncSettings) {
-      return asyncSettings.valueOrNull?.maintenanceMode;
-    }), (_, __) => _safeNotify());
+    _ref.listen(
+      systemSettingsProvider.select((asyncSettings) {
+        return asyncSettings.valueOrNull?.maintenanceMode;
+      }),
+      (_, __) => _safeNotify(),
+    );
 
     _ref.listen(deviceOnboardingCompletedProvider, (_, __) => _safeNotify());
     _ref.listen(accountDeletedProvider, (_, __) => _safeNotify());
@@ -175,7 +182,8 @@ class RouterNotifier extends ChangeNotifier {
 
     // 1. Account Deletion State (Highest Priority)
     if (isAccountDeleted) {
-      if (state.matchedLocation != '/account-deleted' && state.matchedLocation != '/login') {
+      if (state.matchedLocation != '/account-deleted' &&
+          state.matchedLocation != '/login') {
         return '/account-deleted';
       }
       return null;
@@ -206,11 +214,12 @@ class RouterNotifier extends ChangeNotifier {
         return null;
       }
 
-      final isAuthRoute = state.matchedLocation == '/login' || 
-                         state.matchedLocation == '/register' || 
-                         state.matchedLocation == '/welcome' ||
-                         state.matchedLocation == '/forgot-password' ||
-                         state.matchedLocation == '/account-deleted';
+      final isAuthRoute =
+          state.matchedLocation == '/login' ||
+          state.matchedLocation == '/register' ||
+          state.matchedLocation == '/welcome' ||
+          state.matchedLocation == '/forgot-password' ||
+          state.matchedLocation == '/account-deleted';
 
       if (isSplash || !isAuthRoute) return '/welcome';
       return null;
@@ -223,7 +232,8 @@ class RouterNotifier extends ChangeNotifier {
 
     // 6. Authenticated - Missing Document
     if (appUser == null) {
-      if (state.matchedLocation != '/complete-profile') return '/complete-profile';
+      if (state.matchedLocation != '/complete-profile')
+        return '/complete-profile';
       return null;
     }
 
@@ -235,16 +245,20 @@ class RouterNotifier extends ChangeNotifier {
 
     // 8. Email Verification Guard (Hardening)
     // Only enforce if the user signed up via email/password (Google is usually pre-verified)
-    final isEmailPasswordUser = firebaseUser.providerData.any((p) => p.providerId == 'password');
+    final isEmailPasswordUser = firebaseUser.providerData.any(
+      (p) => p.providerId == 'password',
+    );
     if (isEmailPasswordUser && !firebaseUser.emailVerified) {
-       if (state.matchedLocation != '/verify-email') return '/verify-email';
-       return null;
+      if (state.matchedLocation != '/verify-email') return '/verify-email';
+      return null;
     }
 
     // 9. Profile Completion Guard
-    final isProfileIncomplete = appUser.university == null || appUser.course == null;
+    final isProfileIncomplete =
+        appUser.university == null || appUser.course == null;
     if (isProfileIncomplete) {
-      if (state.matchedLocation != '/complete-profile') return '/complete-profile';
+      if (state.matchedLocation != '/complete-profile')
+        return '/complete-profile';
       return null;
     }
 
@@ -255,13 +269,14 @@ class RouterNotifier extends ChangeNotifier {
     }
 
     // 11. Already Logged In - Redirect away from Auth routes
-    final isAuthRoute = state.matchedLocation == '/login' || 
-                       state.matchedLocation == '/register' || 
-                       state.matchedLocation == '/welcome' ||
-                       state.matchedLocation == '/complete-profile' ||
-                       state.matchedLocation == '/onboarding' ||
-                       state.matchedLocation == '/verify-email' ||
-                       isSplash;
+    final isAuthRoute =
+        state.matchedLocation == '/login' ||
+        state.matchedLocation == '/register' ||
+        state.matchedLocation == '/welcome' ||
+        state.matchedLocation == '/complete-profile' ||
+        state.matchedLocation == '/onboarding' ||
+        state.matchedLocation == '/verify-email' ||
+        isSplash;
 
     if (isAuthRoute) {
       return '/main';
@@ -303,10 +318,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/welcome',
         builder: (context, state) => const WelcomeScreen(),
       ),
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
@@ -381,11 +393,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           final extra = state.extra;
-          
+
           if (extra is Listing) {
             return ListingDetailScreen(listing: extra, listingId: id);
           }
-          
+
           if (extra is Map<String, dynamic>) {
             if (extra.containsKey('listing') && extra['listing'] is Listing) {
               return ListingDetailScreen(
@@ -395,10 +407,13 @@ final routerProvider = Provider<GoRouter>((ref) {
               );
             }
             try {
-              return ListingDetailScreen(listing: Listing.fromJson(extra), listingId: id);
+              return ListingDetailScreen(
+                listing: Listing.fromJson(extra),
+                listingId: id,
+              );
             } catch (_) {}
           }
-          
+
           return ListingDetailScreen(listingId: id);
         },
       ),
@@ -421,7 +436,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/chat',
         builder: (context, state) {
           final Object? extra = state.extra;
-          
+
           if (extra is! Map) {
             if (kDebugMode) {
               debugPrint('GoRouter: /chat route extra is not a Map');
@@ -430,16 +445,18 @@ final routerProvider = Provider<GoRouter>((ref) {
               body: Center(child: Text('Invalid chat navigation data')),
             );
           }
-          
+
           final extras = extra;
           final dynamic chatContextData = extras['context'];
-          
+
           ChatContext? chatContext;
           try {
             if (chatContextData is ChatContext) {
               chatContext = chatContextData;
             } else if (chatContextData is Map) {
-              chatContext = ChatContext.fromJson(Map<String, dynamic>.from(chatContextData));
+              chatContext = ChatContext.fromJson(
+                Map<String, dynamic>.from(chatContextData),
+              );
             }
           } catch (e) {
             if (kDebugMode) {
@@ -448,7 +465,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           }
 
           final String convId = (extras['conversationId'] ?? '').toString();
-          final String otherName = (extras['otherUserName'] ?? 'Chat').toString();
+          final String otherName = (extras['otherUserName'] ?? 'Chat')
+              .toString();
 
           if (convId.isEmpty) {
             return const Scaffold(
@@ -491,11 +509,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           final extra = state.extra;
-          
+
           if (extra is HousingListing) {
             return HousingDetailsScreen(listing: extra, listingId: id);
           }
-          
+
           return HousingDetailsScreen(listingId: id);
         },
       ),
@@ -540,7 +558,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/notes',
         builder: (context, state) {
-          final tab = int.tryParse(state.uri.queryParameters['tab'] ?? '0') ?? 0;
+          final tab =
+              int.tryParse(state.uri.queryParameters['tab'] ?? '0') ?? 0;
           return NotesScreen(initialTabIndex: tab);
         },
       ),
@@ -580,17 +599,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           final extra = state.extra;
-          
+
           if (extra is NoteListing) {
             return NoteDetailScreen(note: extra, noteId: id);
           }
-          
+
           if (extra is Map<String, dynamic>) {
             try {
-              return NoteDetailScreen(note: NoteListing.fromJson(extra), noteId: id);
+              return NoteDetailScreen(
+                note: NoteListing.fromJson(extra),
+                noteId: id,
+              );
             } catch (_) {}
           }
-          
+
           return NoteDetailScreen(noteId: id);
         },
       ),
@@ -599,7 +621,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final extra = state.extra;
           if (extra is! Map) {
-            return const Scaffold(body: Center(child: Text('Invalid data passed to reader')));
+            return const Scaffold(
+              body: Center(child: Text('Invalid data passed to reader')),
+            );
           }
           final noteData = extra['note'];
           NoteListing? note;
@@ -610,7 +634,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           }
 
           if (note == null) {
-            return const Scaffold(body: Center(child: Text('Note data missing')));
+            return const Scaffold(
+              body: Center(child: Text('Note data missing')),
+            );
           }
           return NoteReaderScreen(
             note: note,
@@ -672,21 +698,25 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/help',
         builder: (context, state) => const HelpCentreScreen(),
       ),
+      GoRoute(path: '/about', builder: (context, state) => const AboutScreen()),
       GoRoute(
         path: '/feed-detail/:id',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           final extra = state.extra;
-          
+
           if (extra is FeedItem) {
             return FeedItemDetailScreen(item: extra, itemId: id);
           }
           if (extra is Map<String, dynamic>) {
             try {
-              return FeedItemDetailScreen(item: FeedItem.fromJson(extra), itemId: id);
+              return FeedItemDetailScreen(
+                item: FeedItem.fromJson(extra),
+                itemId: id,
+              );
             } catch (_) {}
           }
-          
+
           return FeedItemDetailScreen(itemId: id);
         },
       ),
@@ -695,16 +725,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           final extra = state.extra;
-          
+
           if (extra is FeedItem) {
             return FeedItemDetailScreen(item: extra, itemId: id);
           }
           if (extra is Map<String, dynamic>) {
             try {
-              return FeedItemDetailScreen(item: FeedItem.fromJson(extra), itemId: id);
+              return FeedItemDetailScreen(
+                item: FeedItem.fromJson(extra),
+                itemId: id,
+              );
             } catch (_) {}
           }
-          
+
           return FeedItemDetailScreen(itemId: id);
         },
       ),
@@ -712,10 +745,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/community',
         builder: (context, state) => const CommunityScreen(),
       ),
-      GoRoute(
-        path: '/gigs',
-        builder: (context, state) => const GigsScreen(),
-      ),
+      GoRoute(path: '/gigs', builder: (context, state) => const GigsScreen()),
       GoRoute(
         path: '/confessions',
         builder: (context, state) => const ConfessionsScreen(),
@@ -731,7 +761,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           final title = state.uri.queryParameters['title'] ?? 'Events';
           final filterStr = state.uri.queryParameters['filter'] ?? 'today';
           final categoryId = state.uri.queryParameters['categoryId'];
-          
+
           final filter = EventListFilter.values.firstWhere(
             (e) => e.name == filterStr,
             orElse: () => EventListFilter.today,
@@ -781,7 +811,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           // We need campus ID, but for MVP we can grab it from user or organizer
-          // Ideally passed or fetched. 
+          // Ideally passed or fetched.
           // Let's assume we can fetch it or it's provided in extra
           final extra = state.extra as Map<String, dynamic>?;
           return CreateEventScreen(
@@ -830,7 +860,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           final extra = state.extra;
-          
+
           if (extra is FeedItem) {
             return GigDetailsScreen(gig: extra, gigId: id);
           }
@@ -839,7 +869,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               return GigDetailsScreen(gig: FeedItem.fromJson(extra), gigId: id);
             } catch (_) {}
           }
-          
+
           return GigDetailsScreen(gigId: id);
         },
       ),
@@ -853,9 +883,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           if (extra is Map<String, dynamic>) {
             return ApplyGigScreen(gig: FeedItem.fromJson(extra));
           }
-          return const Scaffold(
-            body: Center(child: Text('Invalid gig data')),
-          );
+          return const Scaffold(body: Center(child: Text('Invalid gig data')));
         },
       ),
       GoRoute(

@@ -12,6 +12,8 @@ import '../../shared/providers.dart';
 import '../controllers/create_event_controller.dart';
 import '../widgets/event_card.dart';
 import 'event_detail_screen.dart';
+import 'package:unihub_mobile/features/ads/ads_module.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 class CreateEventScreen extends ConsumerStatefulWidget {
   final Event? event;
@@ -495,10 +497,19 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                 if (isLastStep) {
                   final success = await controller.submit();
                   if (success && mounted) {
-                    CreationSuccessDialog.show(
-                      context,
-                      title: 'Event Submitted!',
-                      message: 'Your event has been sent for review. You\'ll be notified once it is approved and published.',
+                    // Attempt to show interstitial ad before success dialog
+                    ref.read(adServiceProvider).loadInterstitialAd(
+                      onAdLoaded: (ad) {
+                        ref.read(adServiceProvider).showInterstitialAd(
+                          ad,
+                          onAdDismissed: () {
+                            if (mounted) _showEventSuccessDialog(context);
+                          },
+                        );
+                      },
+                      onAdFailedToLoad: (_) {
+                        if (mounted) _showEventSuccessDialog(context);
+                      },
                     );
                   }
                 } else {
@@ -515,6 +526,14 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showEventSuccessDialog(BuildContext context) {
+    CreationSuccessDialog.show(
+      context,
+      title: 'Event Submitted!',
+      message: 'Your event has been sent for review. You\'ll be notified once it is approved and published.',
     );
   }
 }

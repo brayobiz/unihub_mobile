@@ -107,8 +107,43 @@ class AdService {
   // Future expansion points for different ad types
   // These will be implemented in future phases
   
-  // Future<BannerAd?> loadBannerAd(...)
-  // Future<InterstitialAd?> loadInterstitialAd(...)
-  // Future<NativeAd?> loadNativeAd(...)
-  // Future<RewardedAd?> loadRewardedAd(...)
+  /// Loads an interstitial ad.
+  Future<void> loadInterstitialAd({
+    required Function(InterstitialAd ad) onAdLoaded,
+    Function(LoadAdError error)? onAdFailedToLoad,
+  }) async {
+    if (!AdConfig.enabled) return;
+
+    await InterstitialAd.load(
+      adUnitId: AdUnitIds.interstitialAdUnitId,
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          _log('InterstitialAd loaded: ${ad.adUnitId}');
+          onAdLoaded(ad);
+        },
+        onAdFailedToLoad: (error) {
+          _log('InterstitialAd failed to load: $error', isError: true);
+          onAdFailedToLoad?.call(error);
+        },
+      ),
+    );
+  }
+
+  /// Shows a pre-loaded interstitial ad.
+  void showInterstitialAd(InterstitialAd ad, {VoidCallback? onAdDismissed}) {
+    ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        _log('InterstitialAd dismissed');
+        ad.dispose();
+        onAdDismissed?.call();
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        _log('InterstitialAd failed to show: $error', isError: true);
+        ad.dispose();
+        onAdDismissed?.call();
+      },
+    );
+    ad.show();
+  }
 }

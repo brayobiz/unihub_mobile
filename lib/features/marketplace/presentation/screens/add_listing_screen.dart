@@ -7,6 +7,8 @@ import 'package:unihub_mobile/features/marketplace/presentation/controllers/add_
 import 'package:unihub_mobile/features/marketplace/presentation/widgets/marketplace_card.dart';
 import 'package:unihub_mobile/features/marketplace/domain/models/marketplace_categories.dart';
 import 'package:unihub_mobile/core/widgets/creation_success_dialog.dart';
+import 'package:unihub_mobile/features/ads/ads_module.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 class AddListingScreen extends ConsumerStatefulWidget {
   final Listing? listing;
@@ -843,6 +845,23 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   }
 
   void _showSuccessDialog(BuildContext context) {
+    // Attempt to show interstitial ad before the success dialog
+    ref.read(adServiceProvider).loadInterstitialAd(
+      onAdLoaded: (ad) {
+        ref.read(adServiceProvider).showInterstitialAd(
+          ad,
+          onAdDismissed: () {
+             if (mounted) _displaySuccessDialog(context);
+          },
+        );
+      },
+      onAdFailedToLoad: (_) {
+         if (mounted) _displaySuccessDialog(context);
+      },
+    );
+  }
+
+  void _displaySuccessDialog(BuildContext context) {
     CreationSuccessDialog.show(
       context,
       title: widget.listing == null ? 'Item Listed!' : 'Listing Updated!',
