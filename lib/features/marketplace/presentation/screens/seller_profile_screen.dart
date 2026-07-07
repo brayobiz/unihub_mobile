@@ -51,75 +51,86 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                 physics: const BouncingScrollPhysics(),
                 slivers: [
                   // 1. Identity Header Section (Transition)
-                  SliverToBoxAdapter(
-                    child: RepaintBoundary(
-                      child: Semantics(
-                        label: 'Seller profile header for ${seller.fullName}',
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            ClipPath(
-                              clipper: _HeaderClipper(),
-                              child: Container(
-                                height: 220,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      theme.brightness == Brightness.dark ? const Color(0xFF0F172A) : const Color(0xFF1e293b),
-                                      theme.colorScheme.primary,
-                                      const Color(0xFF19D3C5),
-                                    ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
+                  SliverAppBar(
+                    expandedHeight: 220,
+                    pinned: true,
+                    elevation: 0,
+                    automaticallyImplyLeading: false,
+                    backgroundColor: theme.brightness == Brightness.dark ? const Color(0xFF0F172A) : theme.colorScheme.primary,
+                    leading: Center(
+                      child: Container(
+                        margin: const EdgeInsets.only(left: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                          onPressed: () => context.pop(),
+                          tooltip: 'Back',
+                        ),
+                      ),
+                    ),
+                    actions: [
+                      _buildBlockButton(seller),
+                      const SizedBox(width: 8),
+                      Container(
+                        margin: const EdgeInsets.only(right: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.share_outlined, color: Colors.white, size: 18),
+                          onPressed: () {},
+                          tooltip: 'Share Profile',
+                        ),
+                      ),
+                    ],
+                    flexibleSpace: FlexibleSpaceBar(
+                      background: RepaintBoundary(
+                        child: Semantics(
+                          label: 'Seller profile header for ${seller.fullName}',
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              ClipPath(
+                                clipper: _HeaderClipper(),
+                                child: Container(
+                                  height: 220,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        theme.brightness == Brightness.dark ? const Color(0xFF0F172A) : const Color(0xFF1e293b),
+                                        theme.colorScheme.primary,
+                                        const Color(0xFF19D3C5),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            Positioned(
-                              top: MediaQuery.of(context).padding.top + 10,
-                              left: 16,
-                              right: 16,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-                                    onPressed: () => context.pop(),
-                                    tooltip: 'Back',
-                                  ),
-                                  Row(
-                                    children: [
-                                      _buildBlockButton(seller),
-                                      const SizedBox(width: 8),
-                                      IconButton(
-                                        icon: const Icon(Icons.share_outlined, color: Colors.white),
-                                        onPressed: () {},
-                                        tooltip: 'Share Profile',
+                              Positioned(
+                                top: 130,
+                                left: 16,
+                                right: 16,
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    _buildAvatar(seller),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(bottom: 4),
+                                        child: _buildIdentityInfo(context, seller),
                                       ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Positioned(
-                              top: 130,
-                              left: 16,
-                              right: 16,
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  _buildAvatar(seller),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(bottom: 4),
-                                      child: _buildIdentityInfo(context, seller),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),

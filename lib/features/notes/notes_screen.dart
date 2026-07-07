@@ -117,12 +117,19 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
           const SizedBox(width: 16),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'notes_fab',
-        onPressed: () => context.push('/add-note'),
-        backgroundColor: theme.colorScheme.primary,
-        label: const Text('Upload Notes', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-        icon: const Icon(Icons.add, color: Colors.white),
+      floatingActionButton: Consumer(
+        builder: (context, ref, _) {
+          final user = ref.watch(appUserProvider).valueOrNull;
+          if (user == null || !user.isAdmin) return const SizedBox.shrink();
+          
+          return FloatingActionButton.extended(
+            heroTag: 'notes_fab',
+            onPressed: () => context.push('/add-note'),
+            backgroundColor: theme.colorScheme.primary,
+            label: const Text('Upload Notes', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            icon: const Icon(Icons.add, color: Colors.white),
+          );
+        },
       ),
       body: Column(
         children: [

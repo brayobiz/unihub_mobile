@@ -29,6 +29,7 @@ import '../../features/housing/presentation/screens/housing_comparison_screen.da
 import '../../features/housing/presentation/screens/roommate_feed_screen.dart';
 import '../../features/housing/presentation/screens/add_housing_screen.dart';
 import '../../features/housing/presentation/screens/housing_details_screen.dart';
+import '../../features/housing/presentation/screens/housing_video_screen.dart';
 import '../../features/housing/presentation/screens/housing_screen.dart';
 import '../../features/housing/presentation/screens/add_roommate_screen.dart';
 import '../../features/housing/presentation/screens/plug_dashboard_screen.dart';
@@ -470,6 +471,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           }
           
           return HousingDetailsScreen(listingId: id);
+        },
+      ),
+      GoRoute(
+        path: '/housing-video',
+        builder: (context, state) {
+          final videoUrl = state.extra as String;
+          return HousingVideoScreen(videoUrl: videoUrl);
         },
       ),
       GoRoute(

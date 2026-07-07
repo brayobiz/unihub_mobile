@@ -536,6 +536,20 @@ class _HousingDetailContentState extends ConsumerState<_HousingDetailContent> {
       elevation: 0,
       backgroundColor: theme.colorScheme.surface,
       automaticallyImplyLeading: false,
+      leadingWidth: 72,
+      leading: Center(
+        child: _CircleButton(icon: Icons.arrow_back, onTap: () => context.pop(), semanticLabel: 'Back to housing search'),
+      ),
+      actions: [
+        _CompareButton(listing: listing),
+        const SizedBox(width: 12),
+        _CircleButton(icon: Icons.ios_share, onTap: _shareListing, semanticLabel: 'Share property details'),
+        const SizedBox(width: 12),
+        _SaveHousingButton(listing: listing),
+        const SizedBox(width: 12),
+        _CircleButton(icon: Icons.report_gmailerrorred_rounded, onTap: _showReportDialog, semanticLabel: 'Report this property for review'),
+        const SizedBox(width: 16),
+      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           children: [
@@ -607,26 +621,6 @@ class _HousingDetailContentState extends ConsumerState<_HousingDetailContent> {
                     ),
                   ),
               ],
-            ),
-            Positioned(
-              top: topPadding + 8,
-              left: 16,
-              child: _CircleButton(icon: Icons.arrow_back, onTap: () => context.pop(), semanticLabel: 'Back to housing search'),
-            ),
-            Positioned(
-              top: topPadding + 8,
-              right: 16,
-              child: Row(
-                children: [
-                  _CompareButton(listing: listing),
-                  const SizedBox(width: 12),
-                  _CircleButton(icon: Icons.ios_share, onTap: _shareListing, semanticLabel: 'Share property details'),
-                  const SizedBox(width: 12),
-                  _SaveHousingButton(listing: listing),
-                  const SizedBox(width: 12),
-                  _CircleButton(icon: Icons.report_gmailerrorred_rounded, onTap: _showReportDialog, semanticLabel: 'Report this property for review'),
-                ],
-              ),
             ),
             if (images.isNotEmpty)
               Positioned(
@@ -1925,12 +1919,7 @@ class _VideoTourButton extends StatelessWidget {
       bottom: 24,
       right: 24,
       child: GestureDetector(
-        onTap: () async {
-          final url = Uri.parse(videoUrl);
-          if (await canLaunchUrl(url)) {
-            await launchUrl(url, mode: LaunchMode.externalApplication);
-          }
-        },
+        onTap: () => context.push('/housing-video', extra: videoUrl),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(

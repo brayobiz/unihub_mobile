@@ -82,10 +82,16 @@ class _ListingDetailContent extends ConsumerStatefulWidget {
 }
 
 class _ListingDetailContentState extends ConsumerState<_ListingDetailContent> {
-  bool _isDescriptionExpanded = false;
   final PageController _pageController = PageController();
-  int _currentPage = 0;
+  final ValueNotifier<int> _currentPageNotifier = ValueNotifier<int>(0);
   bool _isStartingChat = false;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _currentPageNotifier.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -391,37 +397,17 @@ class _ListingDetailContentState extends ConsumerState<_ListingDetailContent> {
                       ],
                     ),
                     const SizedBox(height: 24),
-                    _ConditionSection(listing: listing),
+                    RepaintBoundary(child: _ConditionSection(listing: listing)),
                     const SizedBox(height: 24),
-                    _SpecsGrid(listing: listing),
+                    RepaintBoundary(child: _SpecsGrid(listing: listing)),
                     const SizedBox(height: 32),
-                    Text(
-                      'Description', 
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 18, 
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      listing.description,
-                      maxLines: _isDescriptionExpanded ? null : 3,
-                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant, height: 1.6, fontSize: 15),
-                    ),
-                    GestureDetector(
-                      onTap: () => setState(() => _isDescriptionExpanded = !_isDescriptionExpanded),
-                      child: Text(
-                        _isDescriptionExpanded ? 'Read Less' : '... Read More',
-                        style: const TextStyle(color: AppColors.marketplaceBlue, fontWeight: FontWeight.bold),
-                      ),
-                    ),
+                    _ExpandableDescription(description: listing.description),
                     const SizedBox(height: 32),
-                    _SellerCard(listing: listing),
-                    _ReviewsSection(listing: listing),
-                    _MoreFromSeller(listing: listing),
-                    const _SafetyBanner(),
-                    _SimilarItems(listing: listing),
+                    RepaintBoundary(child: _SellerCard(listing: listing)),
+                    RepaintBoundary(child: _ReviewsSection(listing: listing)),
+                    RepaintBoundary(child: _MoreFromSeller(listing: listing)),
+                    const RepaintBoundary(child: _SafetyBanner()),
+                    RepaintBoundary(child: _SimilarItems(listing: listing)),
                     const SizedBox(height: 120),
                   ]),
                 ),
@@ -456,122 +442,123 @@ class _ListingDetailContentState extends ConsumerState<_ListingDetailContent> {
       elevation: 0,
       backgroundColor: theme.colorScheme.surface,
       automaticallyImplyLeading: false,
+      leadingWidth: 72,
+      leading: Center(
+        child: _CircleButton(icon: Icons.arrow_back, onTap: () => context.pop()),
+      ),
+      actions: [
+        _CircleButton(icon: Icons.ios_share, onTap: _shareListing),
+        const SizedBox(width: 12),
+        _SaveButton(listing: listing),
+        const SizedBox(width: 12),
+        _CircleButton(icon: Icons.report_gmailerrorred_rounded, onTap: _showReportDialog),
+        const SizedBox(width: 12),
+        _BlockButton(sellerId: listing.sellerId),
+        const SizedBox(width: 16),
+      ],
       flexibleSpace: FlexibleSpaceBar(
-        background: Stack(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(20, topPadding + 64, 4, 12),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
-                      child: GestureDetector(
-                        onTap: () => _openFullScreenGallery(_currentPage, listing),
-                        child: PageView.builder(
-                          controller: _pageController,
-                          onPageChanged: (i) => setState(() => _currentPage = i),
-                          itemCount: images.isEmpty ? 1 : images.length,
-                          itemBuilder: (context, index) {
-                            return Hero(
-                              tag: index == 0 ? (widget.heroTag ?? 'listing_img_${listing.id}') : 'listing_img_${listing.id}_$index',
-                              child: OptimizedImage(
-                                imageUrl: images.isEmpty ? '' : images[index],
-                                fit: BoxFit.cover,
-                              ),
-                            );
-                          },
+        background: RepaintBoundary(
+          child: Stack(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(20, topPadding + 64, 4, 12),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: GestureDetector(
+                          onTap: () => _openFullScreenGallery(_currentPageNotifier.value, listing),
+                          child: PageView.builder(
+                            controller: _pageController,
+                            onPageChanged: (i) => _currentPageNotifier.value = i,
+                            itemCount: images.isEmpty ? 1 : images.length,
+                            itemBuilder: (context, index) {
+                              return Hero(
+                                tag: index == 0 ? (widget.heroTag ?? 'listing_img_${listing.id}') : 'listing_img_${listing.id}_$index',
+                                child: OptimizedImage(
+                                  imageUrl: images.isEmpty ? '' : images[index],
+                                  fit: BoxFit.cover,
+                                ),
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                if (images.length > 1)
-                  Container(
-                    width: MediaQuery.of(context).size.width * 0.28,
-                    padding: EdgeInsets.fromLTRB(4, topPadding + 64, 20, 12),
-                    child: Column(
-                      children: [
-                        ...images.skip(1).take(3).indexed.map((entry) {
-                          final idx = entry.$1 + 1;
-                          final url = entry.$2;
-                          final isLast = idx == 3 && images.length > 4;
-                          
-                          return Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.only(bottom: 6),
-                              child: GestureDetector(
-                                onTap: () {
-                                  _pageController.animateToPage(idx, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
-                                  setState(() => _currentPage = idx);
-                                },
-                                onLongPress: () => _openFullScreenGallery(idx, listing),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(16),
-                                  child: Stack(
-                                    fit: StackFit.expand,
-                                    children: [
-                                      OptimizedImage(imageUrl: url, fit: BoxFit.cover),
-                                      if (isLast)
-                                        Container(
-                                          color: Colors.black.withOpacity(0.6),
-                                          alignment: Alignment.center,
-                                          child: Text('+${images.length - 4}', 
-                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                                        ),
-                                    ],
+                  if (images.length > 1)
+                    Container(
+                      width: MediaQuery.of(context).size.width * 0.28,
+                      padding: EdgeInsets.fromLTRB(4, topPadding + 64, 20, 12),
+                      child: Column(
+                        children: [
+                          ...images.skip(1).take(3).indexed.map((entry) {
+                            final idx = entry.$1 + 1;
+                            final url = entry.$2;
+                            final isLast = idx == 3 && images.length > 4;
+                            
+                            return Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: GestureDetector(
+                                  onTap: () {
+                                    _pageController.animateToPage(idx, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+                                    _currentPageNotifier.value = idx;
+                                  },
+                                  onLongPress: () => _openFullScreenGallery(idx, listing),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: Stack(
+                                      fit: StackFit.expand,
+                                      children: [
+                                        OptimizedImage(imageUrl: url, fit: BoxFit.cover),
+                                        if (isLast)
+                                          Container(
+                                            color: Colors.black.withOpacity(0.6),
+                                            alignment: Alignment.center,
+                                            child: Text('+${images.length - 4}', 
+                                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                                          ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          );
-                        }),
-                      ],
+                            );
+                          }),
+                        ],
+                      ),
                     ),
-                  ),
-              ],
-            ),
-            Positioned(
-              top: topPadding + 8,
-              left: 16,
-              child: _CircleButton(icon: Icons.arrow_back, onTap: () => context.pop()),
-            ),
-            Positioned(
-              top: topPadding + 8,
-              right: 16,
-              child: Row(
-                children: [
-                  _CircleButton(icon: Icons.ios_share, onTap: _shareListing),
-                  const SizedBox(width: 12),
-                  _SaveButton(listing: listing),
-                  const SizedBox(width: 12),
-                  _CircleButton(icon: Icons.report_gmailerrorred_rounded, onTap: _showReportDialog),
-                  const SizedBox(width: 12),
-                  _BlockButton(sellerId: listing.sellerId),
                 ],
               ),
-            ),
-            if (images.isNotEmpty)
-              Positioned(
-                bottom: 24,
-                left: 0,
-                right: images.length > 1 ? MediaQuery.of(context).size.width * 0.26 : 0,
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '${_currentPage + 1} / ${images.length}',
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
-                  ),
+              if (images.isNotEmpty)
+                ValueListenableBuilder<int>(
+                  valueListenable: _currentPageNotifier,
+                  builder: (context, currentPage, _) {
+                    return Positioned(
+                      bottom: 24,
+                      left: 0,
+                      right: images.length > 1 ? MediaQuery.of(context).size.width * 0.26 : 0,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.5),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '${currentPage + 1} / ${images.length}',
+                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -948,6 +935,49 @@ class _SpecsGrid extends StatelessWidget {
   }
 }
 
+class _ExpandableDescription extends StatefulWidget {
+  final String description;
+  const _ExpandableDescription({required this.description});
+
+  @override
+  State<_ExpandableDescription> createState() => _ExpandableDescriptionState();
+}
+
+class _ExpandableDescriptionState extends State<_ExpandableDescription> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Description', 
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 18, 
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          widget.description,
+          maxLines: _isExpanded ? null : 3,
+          style: TextStyle(color: theme.colorScheme.onSurfaceVariant, height: 1.6, fontSize: 15),
+        ),
+        GestureDetector(
+          onTap: () => setState(() => _isExpanded = !_isExpanded),
+          child: Text(
+            _isExpanded ? 'Read Less' : '... Read More',
+            style: const TextStyle(color: AppColors.marketplaceBlue, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _SellerCard extends ConsumerWidget {
   final Listing listing;
   const _SellerCard({required this.listing});
@@ -1210,12 +1240,17 @@ class _ReviewsSection extends ConsumerWidget {
                 ),
               );
             }
-            return ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: reviews.length > 3 ? 3 : reviews.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) => _ReviewItem(review: reviews[index]),
+            return Column(
+              children: [
+                ...reviews.take(3).indexed.map((entry) {
+                  final idx = entry.$1;
+                  final review = reviews[idx];
+                  return Padding(
+                    padding: EdgeInsets.only(bottom: idx == reviews.length - 1 ? 0 : 12),
+                    child: _ReviewItem(review: review),
+                  );
+                }),
+              ],
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),

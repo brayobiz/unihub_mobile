@@ -133,6 +133,7 @@ service cloud.firestore {
     match /event_attendance/{docId} {
       allow read: if isAuthenticated() && (
         docId.matches('^' + request.auth.uid + '_.*') ||
+        (resource != null && resource.data.userId == request.auth.uid) ||
         isAdmin() ||
         (resource != null && exists(/databases/$(database)/documents/events/$(resource.data.eventId)) && canManageOrganizer(get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.get("organizerId", "")))
       );
@@ -198,7 +199,7 @@ service cloud.firestore {
     // --- Notes ---
     match /notes/{noteId} {
       allow read: if true;
-      allow create: if isAuthenticated();
+      allow create: if isAdmin();
       allow update: if isAdmin() || (
         isAuthenticated() &&
         resource.data.get("authorId", "") == request.auth.uid &&

@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:path/path.dart' as p;
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import '../../shared/providers.dart';
+import '../../../auth/shared/providers.dart';
 import '../../domain/models/study_progress.dart';
 import '../../domain/models/note.dart';
 import '../../../../services/download_service.dart';
@@ -57,12 +58,19 @@ class _LibraryTabState extends ConsumerState<LibraryTab> {
           error: (e, _) => const SizedBox.shrink(),
         ),
 
-        uploads.when(
-          data: (data) => data.isEmpty
-            ? const SizedBox.shrink()
-            : _buildHorizontalSection(context, ref, 'My Uploads', data, isUploads: true),
-          loading: () => SizedBox(height: 140, child: Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))),
-          error: (e, _) => const SizedBox.shrink(),
+        ref.watch(appUserProvider).when(
+          data: (user) {
+            if (user == null || !user.isAdmin) return const SizedBox.shrink();
+            return uploads.when(
+              data: (data) => data.isEmpty
+                ? const SizedBox.shrink()
+                : _buildHorizontalSection(context, ref, 'My Contributions', data, isUploads: true),
+              loading: () => SizedBox(height: 140, child: Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))),
+              error: (e, _) => const SizedBox.shrink(),
+            );
+          },
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
         ),
 
         bookmarks.when(

@@ -43,6 +43,7 @@ class FeedItemDetailScreen extends ConsumerWidget {
                   padding: const EdgeInsets.all(16.0),
                   child: FeedCard(
                     item: currentItem,
+                    isFullView: true,
                     isLiked: user != null && currentItem.likedBy.contains(user.uid),
                     showDelete: user != null && currentItem.authorId == user.uid,
                     onLike: () => ref.read(feedRepositoryProvider).toggleLike(currentItem.id, user!.uid),

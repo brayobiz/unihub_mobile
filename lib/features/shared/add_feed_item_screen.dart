@@ -324,7 +324,8 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
                   hint: isGig 
                       ? 'Describe the work, requirements, and what you expect...' 
                       : (isConfession ? 'Share your secret anonymously...' : 'What\'s on your mind?'),
-                  maxLines: 8,
+                  maxLines: 12,
+                  maxLength: 10000,
                   validator: (v) => v!.isEmpty ? 'Content cannot be empty' : null,
                 ),
                 
@@ -569,6 +570,7 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
     required String hint,
     IconData? icon,
     int maxLines = 1,
+    int? maxLength,
     TextInputType? keyboardType,
     String? prefixText,
     String? Function(String?)? validator,
@@ -577,6 +579,7 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
+      maxLength: maxLength,
       keyboardType: keyboardType,
       validator: validator,
       style: TextStyle(color: theme.colorScheme.onSurface),
@@ -589,6 +592,7 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
         filled: true,
         fillColor: theme.colorScheme.surfaceContainerHighest,
         contentPadding: const EdgeInsets.all(16),
+        counterStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: 10),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),

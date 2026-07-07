@@ -19,6 +19,7 @@ class FeedCard extends ConsumerWidget {
   final VoidCallback? onDelete;
   final bool isLiked;
   final bool showDelete;
+  final bool isFullView;
 
   const FeedCard({
     super.key,
@@ -27,6 +28,7 @@ class FeedCard extends ConsumerWidget {
     this.onDelete,
     this.isLiked = false,
     this.showDelete = false,
+    this.isFullView = false,
   });
 
   @override
@@ -135,13 +137,37 @@ class FeedCard extends ConsumerWidget {
                 ),
               ),
             const SizedBox(height: 4),
-            Text(
-              item.subtitle,
-              style: TextStyle(
-                color: theme.colorScheme.onSurfaceVariant, 
-                height: 1.4
+            isFullView 
+              ? SelectableText(
+                  item.subtitle,
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurfaceVariant, 
+                    height: 1.4
+                  ),
+                )
+              : Text(
+                  item.subtitle,
+                  maxLines: 6,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurfaceVariant, 
+                    height: 1.4
+                  ),
+                ),
+            if (!isFullView && item.subtitle.length > 200)
+              GestureDetector(
+                onTap: () => context.push('/feed-detail/${item.id}', extra: item),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Read More...',
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
               ),
-            ),
             if (item.price != null && item.price!.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(

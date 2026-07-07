@@ -45,61 +45,79 @@ class _OrganizerProfileScreenState extends ConsumerState<OrganizerProfileScreen>
                 physics: const BouncingScrollPhysics(),
                 slivers: [
                   // 1. Header Section
-                  SliverToBoxAdapter(
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        _buildBanner(organizer),
-                        Positioned(
-                          top: MediaQuery.of(context).padding.top + 10,
-                          left: 16,
-                          right: 16,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-                                onPressed: () => context.pop(),
-                              ),
-                              Row(
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.share_outlined, color: Colors.white),
-                                    onPressed: () => ref.read(organizerProfileControllerProvider(organizer.id).notifier).shareOrganizer(context, organizer),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
-                                    onPressed: () => _showMoreMenu(context, organizer),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+                  SliverAppBar(
+                    expandedHeight: 220,
+                    pinned: true,
+                    elevation: 0,
+                    automaticallyImplyLeading: false,
+                    backgroundColor: theme.brightness == Brightness.dark ? const Color(0xFF0F172A) : theme.colorScheme.primary,
+                    leading: Center(
+                      child: Container(
+                        margin: const EdgeInsets.only(left: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.2),
+                          shape: BoxShape.circle,
                         ),
-                        Positioned(
-                          top: 130,
-                          left: 16,
-                          right: 16,
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              _buildLogo(organizer),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child: _buildIdentityInfo(context, organizer),
+                        child: IconButton(
+                          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                          onPressed: () => context.pop(),
+                        ),
+                      ),
+                    ),
+                    actions: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.share_outlined, color: Colors.white, size: 18),
+                          onPressed: () => ref.read(organizerProfileControllerProvider(organizer.id).notifier).shareOrganizer(context, organizer),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        margin: const EdgeInsets.only(right: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.more_vert_rounded, color: Colors.white, size: 18),
+                          onPressed: () => _showMoreMenu(context, organizer),
+                        ),
+                      ),
+                    ],
+                    flexibleSpace: FlexibleSpaceBar(
+                      background: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          _buildBanner(organizer),
+                          Positioned(
+                            top: 130,
+                            left: 16,
+                            right: 16,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                _buildLogo(organizer),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(bottom: 4),
+                                    child: _buildIdentityInfo(context, organizer),
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
 
                   // 2. Main Content
-          SliverPadding(
+                  SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 80, 16, 120),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
