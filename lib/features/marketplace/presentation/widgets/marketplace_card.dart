@@ -31,6 +31,10 @@ class MarketplaceCard extends ConsumerWidget {
     final isOwner = currentUserId == listing.sellerId;
     final user = ref.watch(appUserProvider).valueOrNull;
     
+    final isSaved = ref.watch(savedListingsProvider.select((value) => 
+      value.valueOrNull?.any((l) => l.id == listing.id) ?? false
+    ));
+    
     final effectiveHeroTag = heroTag ?? 'listing_img_${listing.id}_$index';
 
     return RepaintBoundary(
@@ -155,15 +159,15 @@ class MarketplaceCard extends ConsumerWidget {
                                 children: [
                                   _buildActionIcon(
                                     context,
-                                    icon: Icons.ios_share_rounded,
+                                    icon: Icons.share_outlined,
                                     color: theme.colorScheme.onSurfaceVariant,
                                     onTap: () => _shareListing(context, ref),
                                   ),
                                   const SizedBox(width: 4),
                                   _buildActionIcon(
                                     context,
-                                    icon: Icons.favorite_rounded,
-                                    color: theme.colorScheme.outlineVariant,
+                                    icon: isSaved ? Icons.favorite_rounded : Icons.favorite_outline_rounded,
+                                    color: isSaved ? AppColors.error : theme.colorScheme.onSurfaceVariant,
                                     onTap: () {
                                       if (user != null) {
                                         ref.read(marketplaceRepositoryProvider).toggleSaveListing(user.uid, listing.id);
@@ -319,8 +323,9 @@ class MarketplaceCard extends ConsumerWidget {
   }
 
   Widget _buildActionIcon(BuildContext context, {required IconData icon, required Color color, required VoidCallback onTap}) {
+    final theme = Theme.of(context);
     return Material(
-      color: Colors.white.withValues(alpha: 0.9),
+      color: theme.colorScheme.surface.withValues(alpha: 0.9),
       borderRadius: BorderRadius.circular(10),
       elevation: 2,
       shadowColor: Colors.black.withValues(alpha: 0.2),

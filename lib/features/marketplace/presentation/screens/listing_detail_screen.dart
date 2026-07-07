@@ -447,7 +447,7 @@ class _ListingDetailContentState extends ConsumerState<_ListingDetailContent> {
         child: _CircleButton(icon: Icons.arrow_back, onTap: () => context.pop()),
       ),
       actions: [
-        _CircleButton(icon: Icons.ios_share, onTap: _shareListing),
+        _CircleButton(icon: Icons.share_outlined, onTap: _shareListing),
         const SizedBox(width: 12),
         _SaveButton(listing: listing),
         const SizedBox(width: 12),

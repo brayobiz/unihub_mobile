@@ -543,7 +543,7 @@ class _HousingDetailContentState extends ConsumerState<_HousingDetailContent> {
       actions: [
         _CompareButton(listing: listing),
         const SizedBox(width: 12),
-        _CircleButton(icon: Icons.ios_share, onTap: _shareListing, semanticLabel: 'Share property details'),
+        _CircleButton(icon: Icons.share_outlined, onTap: _shareListing, semanticLabel: 'Share property details'),
         const SizedBox(width: 12),
         _SaveHousingButton(listing: listing),
         const SizedBox(width: 12),
