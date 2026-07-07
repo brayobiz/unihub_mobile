@@ -21,7 +21,11 @@ abstract class OrganizerRepository {
   Future<void> removeMember(String organizerId, String userId);
   
   // Verification & Trust
-  Future<void> requestVerification(String organizerId, Map<String, dynamic> applicationData);
+  Future<void> requestVerification(
+    String organizerId, 
+    Map<String, dynamic> applicationData, {
+    OrganizerVerificationStatus status = OrganizerVerificationStatus.submitted,
+  });
   Future<void> updateTrustScore(String organizerId, double delta);
   
   // Engagement

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:unihub_mobile/core/constants/campus_constants.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import '../../domain/models/note.dart';
 import '../../shared/providers.dart';
@@ -82,7 +83,7 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
                       const SizedBox(height: 32),
                       _buildSectionTitle(context, 'Academic Details'),
                       const SizedBox(height: 16),
-                      _buildInfoRow(context, 'University', currentNote.university, Icons.school_outlined),
+                      _buildInfoRow(context, 'University', CampusConstants.getDisplayName(currentNote.university), Icons.school_outlined),
                       _buildInfoRow(context, 'Category', currentNote.subjectCategory, Icons.category_outlined),
                       _buildInfoRow(context, 'Type', currentNote.noteType, Icons.label_outline),
                       _buildInfoRow(context, 'Year', 'Year ${currentNote.yearOfStudy}', Icons.calendar_today_outlined),
@@ -315,7 +316,7 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
   Widget _buildContributorInfo(BuildContext context, ThemeData theme, NoteListing note) {
     return Consumer(
       builder: (context, ref, child) {
-        final contributorAsync = ref.watch(userByIdProvider(note.authorId));
+        final contributorAsync = ref.watch(publicUserProvider(note.authorId));
 
         return contributorAsync.when(
           data: (user) {

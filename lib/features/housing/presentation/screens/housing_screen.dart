@@ -1349,6 +1349,8 @@ class HousingSearchDelegate extends SearchDelegate<String?> {
   @override
   Widget buildResults(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!context.mounted) return;
+      
       final campusRepo = ref.read(campusRepositoryProvider);
       final campuses = await campusRepo.getCampuses();
       
@@ -1373,7 +1375,9 @@ class HousingSearchDelegate extends SearchDelegate<String?> {
         ref.read(housingLocationFilterProvider.notifier).state = query;
       }
 
-      close(context, query);
+      if (context.mounted) {
+        close(context, query);
+      }
     });
     return const SizedBox.shrink();
   }

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
+import 'package:unihub_mobile/core/constants/campus_constants.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../auth/shared/providers.dart';
@@ -12,6 +13,8 @@ import 'package:unihub_mobile/features/auth/presentation/controllers/auth_contro
 import '../../domain/models/listing.dart';
 import '../../domain/models/offer.dart';
 import '../../domain/models/review.dart';
+import '../controllers/offer_controller.dart';
+import '../controllers/review_controller.dart';
 import '../../shared/providers.dart';
 import '../../../chat/domain/models/chat_context.dart';
 import '../../../chat/shared/providers.dart';
@@ -82,6 +85,7 @@ class _ListingDetailContentState extends ConsumerState<_ListingDetailContent> {
   bool _isDescriptionExpanded = false;
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  bool _isStartingChat = false;
 
   @override
   void initState() {
@@ -110,37 +114,62 @@ class _ListingDetailContentState extends ConsumerState<_ListingDetailContent> {
   }
 
   void _startChat() async {
+    if (_isStartingChat) return;
+
     final listing = widget.listing;
     final buyer = ref.read(appUserProvider).valueOrNull;
-    if (buyer == null) return;
+    
+    if (buyer == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please log in to start a chat with the seller.'))
+        );
+        context.push('/login');
+      }
+      return;
+    }
     
     if (buyer.uid == listing.sellerId) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This is your own listing.')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This is your own listing.')));
+      }
       return;
     }
 
-    final chatContext = ChatContext(
-      type: 'marketplace',
-      id: listing.id,
-      title: listing.title,
-      thumbnail: listing.imageUrls.isNotEmpty ? listing.imageUrls.first : null,
-      metadata: {
-        'price': listing.price,
-      },
-    );
+    setState(() => _isStartingChat = true);
 
-    final convId = await ref.read(chatRepositoryProvider).getOrCreateConversation(
-      participantIds: [buyer.uid, listing.sellerId],
-      context: chatContext,
-    );
+    try {
+      final chatContext = ChatContext(
+        type: 'marketplace',
+        id: listing.id,
+        title: listing.title,
+        thumbnail: listing.imageUrls.isNotEmpty ? listing.imageUrls.first : null,
+        metadata: {
+          'price': listing.price,
+        },
+      );
 
-    if (mounted) {
-      context.push('/chat', extra: {
-        'conversationId': convId,
-        'otherUserName': listing.sellerName,
-        'context': chatContext,
-      });
-      ref.read(marketplaceRepositoryProvider).recordChatStarted(listing.id);
+      final convId = await ref.read(chatRepositoryProvider).getOrCreateConversation(
+        participantIds: [buyer.uid, listing.sellerId],
+        context: chatContext,
+      );
+
+      if (mounted) {
+        context.push('/chat', extra: {
+          'conversationId': convId,
+          'otherUserName': listing.sellerName,
+          'context': chatContext,
+        });
+        ref.read(marketplaceRepositoryProvider).recordChatStarted(listing.id);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to start chat: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isStartingChat = false);
+      }
     }
   }
 
@@ -153,7 +182,8 @@ class _ListingDetailContentState extends ConsumerState<_ListingDetailContent> {
       thumbnail: listing.imageUrls.isNotEmpty ? listing.imageUrls.first : null,
       metadata: {'price': listing.price},
     );
-    context.push('/share-to-chat', extra: chatContext);
+    // Use root navigator for smoother transition
+    GoRouter.of(context).push('/share-to-chat', extra: chatContext);
     ref.read(marketplaceRepositoryProvider).recordShare(listing.id);
   }
 
@@ -179,13 +209,15 @@ class _ListingDetailContentState extends ConsumerState<_ListingDetailContent> {
             onTap: () async {
               final user = ref.read(appUserProvider).valueOrNull;
               if (user != null) {
+                // Optimization: Close dialog immediately for faster response
+                Navigator.of(context, rootNavigator: true).pop();
+
                 await ref.read(marketplaceRepositoryProvider).reportListing(
                   listingId: listing.id,
                   reporterId: user.uid,
                   reason: reason,
                 );
                 if (mounted) {
-                  Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Report submitted. Thank you for keeping UniHub safe!')),
                   );
@@ -211,72 +243,101 @@ class _ListingDetailContentState extends ConsumerState<_ListingDetailContent> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
       builder: (context) {
         final mTheme = Theme.of(context);
-        return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-          child: Container(
-            padding: const EdgeInsets.all(30),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Make an Offer', 
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 20, 
-                    fontWeight: FontWeight.bold,
-                    color: mTheme.colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Listing Price: KES ${NumberFormat("#,###").format(listing.price)}', 
-                  style: TextStyle(color: mTheme.colorScheme.onSurfaceVariant),
-                ),
-                const SizedBox(height: 24),
-                TextField(
-                  controller: controller,
-                  keyboardType: TextInputType.number,
-                  autofocus: true,
-                  style: TextStyle(color: mTheme.colorScheme.onSurface),
-                  decoration: InputDecoration(
-                    labelText: 'Your Offer',
-                    prefixText: 'KES ',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: FilledButton(
-                    onPressed: () async {
-                      final amount = double.tryParse(controller.text);
-                      if (amount != null) {
-                        final offer = Offer(
-                          id: const Uuid().v4(),
-                          listingId: listing.id,
-                          buyerId: user.uid,
-                          sellerId: listing.sellerId,
-                          amount: amount,
-                          timestamp: DateTime.now(),
-                        );
-                        await ref.read(marketplaceRepositoryProvider).makeOffer(offer);
-                        if (mounted) {
-                           Navigator.pop(context);
-                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Offer sent!')));
-                        }
-                      }
-                    },
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.marketplaceBlue,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        return Consumer(
+          builder: (context, ref, _) {
+            final offerState = ref.watch(offerControllerProvider);
+            final isLoading = offerState.isLoading;
+
+            // Handle success or error from the controller
+            ref.listen<AsyncValue<void>>(offerControllerProvider, (previous, next) {
+              if (next is AsyncData && previous is AsyncLoading) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Offer sent successfully!'), backgroundColor: AppColors.success),
+                );
+              } else if (next is AsyncError) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to send offer: ${next.error}'), backgroundColor: AppColors.error),
+                );
+              }
+            });
+
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+              child: Container(
+                padding: const EdgeInsets.all(30),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Make an Offer', 
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 20, 
+                        fontWeight: FontWeight.bold,
+                        color: mTheme.colorScheme.onSurface,
+                      ),
                     ),
-                    child: const Text('Send Offer', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Listing Price: KES ${NumberFormat("#,###").format(listing.price)}', 
+                      style: TextStyle(color: mTheme.colorScheme.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 24),
+                    TextField(
+                      controller: controller,
+                      keyboardType: TextInputType.number,
+                      autofocus: true,
+                      enabled: !isLoading,
+                      style: TextStyle(color: mTheme.colorScheme.onSurface),
+                      decoration: InputDecoration(
+                        labelText: 'Your Offer',
+                        prefixText: 'KES ',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: FilledButton(
+                        onPressed: isLoading ? null : () async {
+                          final amount = double.tryParse(controller.text);
+                          if (amount != null) {
+                            final offer = Offer(
+                              id: const Uuid().v4(),
+                              listingId: listing.id,
+                              buyerId: user.uid,
+                              sellerId: listing.sellerId,
+                              amount: amount,
+                              timestamp: DateTime.now(),
+                            );
+                            
+                            await ref.read(offerControllerProvider.notifier).makeOffer(offer);
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Please enter a valid amount')),
+                            );
+                          }
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.marketplaceBlue,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: isLoading 
+                          ? const SizedBox(
+                              height: 20, 
+                              width: 20, 
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                            )
+                          : const Text('Send Offer', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -370,6 +431,7 @@ class _ListingDetailContentState extends ConsumerState<_ListingDetailContent> {
           _StickyActionBar(
             listing: listing,
             isOwner: isOwner,
+            isStartingChat: _isStartingChat,
             onStartChat: _startChat,
             onMakeOffer: _showMakeOfferSheet,
           ),
@@ -535,7 +597,7 @@ class _VerifiedBadgeRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final sellerAsync = ref.watch(otherUserProvider(listing.sellerId));
+    final sellerAsync = ref.watch(publicUserProvider(listing.sellerId));
 
     return sellerAsync.when(
       data: (seller) => Row(
@@ -893,7 +955,7 @@ class _SellerCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final sellerAsync = ref.watch(otherUserProvider(listing.sellerId));
+    final sellerAsync = ref.watch(publicUserProvider(listing.sellerId));
 
     return sellerAsync.when(
       data: (seller) => Container(
@@ -996,7 +1058,7 @@ class _SellerCard extends ConsumerWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    seller.university ?? 'UniHub Student', 
+                    CampusConstants.getDisplayName(seller.university),
                     style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -1105,7 +1167,7 @@ class _ReviewsSection extends ConsumerWidget {
               ),
             ),
             if (!isOwner && currentUser != null)
-              reviewsAsync.when(
+              reviewsAsync.maybeWhen(
                 data: (reviewsData) {
                   final reviews = reviewsData.map((json) => Review.fromJson(json)).toList();
                   final myReview = reviews.where((r) => r.reviewerId == currentUser.uid && r.listingId == listing.id).firstOrNull;
@@ -1115,8 +1177,11 @@ class _ReviewsSection extends ConsumerWidget {
                     label: Text(myReview != null ? 'Edit My Review' : 'Rate Seller', style: const TextStyle(fontWeight: FontWeight.bold)),
                   );
                 },
-                loading: () => const SizedBox.shrink(),
-                error: (_, __) => const SizedBox.shrink(),
+                orElse: () => TextButton.icon(
+                  onPressed: null,
+                  icon: const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                  label: const Text('Loading...', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
               ),
           ],
         ),
@@ -1170,104 +1235,131 @@ class _ReviewsSection extends ConsumerWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.outlineVariant,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  existingReview != null ? 'Update Review' : 'Rate Your Experience',
-                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'How was your interaction with ${listing.sellerName}?',
-                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                ),
-                const SizedBox(height: 32),
-                
-                // Star Rating
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(5, (index) {
-                    final isSelected = index < rating;
-                    return IconButton(
-                      onPressed: () => setModalState(() => rating = index + 1.0),
-                      icon: Icon(
-                        isSelected ? Icons.star_rounded : Icons.star_outline_rounded,
-                        color: isSelected ? Colors.amber : theme.colorScheme.outlineVariant,
-                        size: 40,
-                      ),
-                    );
-                  }),
-                ),
-                
-                const SizedBox(height: 32),
-                TextField(
-                  controller: commentController,
-                  maxLines: 4,
-                  decoration: InputDecoration(
-                    labelText: 'Tell us more (Optional)',
-                    hintText: 'Was the item as described? Was the seller responsive?',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                ),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  height: 58,
-                  child: FilledButton(
-                    onPressed: () async {
-                      final user = ref.read(appUserProvider).valueOrNull;
-                      if (user == null) return;
+        builder: (context, setModalState) => Consumer(
+          builder: (context, ref, _) {
+            final reviewState = ref.watch(reviewControllerProvider);
+            final isLoading = reviewState.isLoading;
 
-                      await ref.read(marketplaceRepositoryProvider).submitReview(
-                        sellerId: listing.sellerId,
-                        buyerId: user.uid,
-                        listingId: listing.id,
-                        rating: rating,
-                        comment: commentController.text.trim(),
-                      );
-                      
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Thank you for your feedback!'),
-                            behavior: SnackBarBehavior.floating,
+            ref.listen<AsyncValue<void>>(reviewControllerProvider, (previous, next) {
+              if (next is AsyncData && previous is AsyncLoading) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Thank you for your feedback!'),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: AppColors.success,
+                  ),
+                );
+              } else if (next is AsyncError) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to submit review: ${next.error}'),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              }
+            });
+
+            return Container(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.outlineVariant,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      existingReview != null ? 'Update Review' : 'Rate Your Experience',
+                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'How was your interaction with ${listing.sellerName}?',
+                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 32),
+                    
+                    // Star Rating
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(5, (index) {
+                        final isSelected = index < rating;
+                        return IconButton(
+                          onPressed: isLoading ? null : () => setModalState(() => rating = index + 1.0),
+                          icon: Icon(
+                            isSelected ? Icons.star_rounded : Icons.star_outline_rounded,
+                            color: isSelected ? Colors.amber : theme.colorScheme.outlineVariant,
+                            size: 40,
                           ),
                         );
-                      }
-                    },
-                    style: FilledButton.styleFrom(
-                      backgroundColor: theme.colorScheme.primary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      }),
                     ),
-                    child: const Text('Submit Review', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-                  ),
+                    
+                    const SizedBox(height: 32),
+                    TextField(
+                      controller: commentController,
+                      maxLines: 4,
+                      enabled: !isLoading,
+                      decoration: InputDecoration(
+                        labelText: 'Tell us more (Optional)',
+                        hintText: 'Was the item as described? Was the seller responsive?',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 58,
+                      child: FilledButton(
+                        onPressed: isLoading ? null : () async {
+                          final user = ref.read(appUserProvider).valueOrNull;
+                          if (user == null) return;
+
+                          await ref.read(reviewControllerProvider.notifier).submitReview(
+                            sellerId: listing.sellerId,
+                            buyerId: user.uid,
+                            listingId: listing.id,
+                            rating: rating,
+                            comment: commentController.text.trim(),
+                          );
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: theme.colorScheme.primary,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: isLoading 
+                          ? const SizedBox(
+                              height: 20, 
+                              width: 20, 
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                            )
+                          : Text(
+                              existingReview != null ? 'Update Review' : 'Submit Review',
+                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)
+                            ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                 ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -1498,12 +1590,14 @@ class _SimilarItems extends ConsumerWidget {
 class _StickyActionBar extends StatelessWidget {
   final Listing listing;
   final bool isOwner;
+  final bool isStartingChat;
   final VoidCallback onStartChat;
   final VoidCallback onMakeOffer;
 
   const _StickyActionBar({
     required this.listing,
     required this.isOwner,
+    required this.isStartingChat,
     required this.onStartChat,
     required this.onMakeOffer,
   });
@@ -1540,17 +1634,22 @@ class _StickyActionBar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: theme.colorScheme.outlineVariant),
                 ),
-                child: IconButton(
-                  icon: Icon(Icons.chat_bubble_outline, color: isSold ? AppColors.grey : AppColors.marketplaceBlue),
-                  onPressed: (isOwner || isSold) ? null : onStartChat,
-                ),
+                child: isStartingChat 
+                  ? const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : IconButton(
+                      icon: Icon(Icons.chat_bubble_outline, color: isSold ? AppColors.grey : AppColors.marketplaceBlue),
+                      onPressed: (isOwner || isSold) ? null : onStartChat,
+                    ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: SizedBox(
                   height: 56,
                   child: FilledButton(
-                    onPressed: (isOwner || isSold) ? null : onMakeOffer,
+                    onPressed: (isOwner || isSold || isStartingChat) ? null : onMakeOffer,
                     style: FilledButton.styleFrom(
                       backgroundColor: isSold ? AppColors.grey : AppColors.marketplaceBlue,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -1580,24 +1679,20 @@ class _CircleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      height: 40,
-      width: 40,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: IconButton(
-        icon: Icon(icon, color: iconColor ?? theme.colorScheme.onSurface, size: 20),
-        onPressed: onTap,
-        padding: EdgeInsets.zero,
+    return Material(
+      color: theme.colorScheme.surface,
+      shape: const CircleBorder(),
+      elevation: 2,
+      shadowColor: Colors.black.withOpacity(0.2),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          height: 40,
+          width: 40,
+          alignment: Alignment.center,
+          child: Icon(icon, color: iconColor ?? theme.colorScheme.onSurface, size: 20),
+        ),
       ),
     );
   }

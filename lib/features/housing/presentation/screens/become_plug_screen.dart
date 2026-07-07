@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:unihub_mobile/core/constants/campus_constants.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
@@ -674,7 +675,7 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
               children: [
                 _buildReviewItem('Introduction', state.intro),
                 const SizedBox(height: 16),
-                _buildReviewItem('Campus', state.selectedCampus ?? user.university ?? 'Not set'),
+                _buildReviewItem('Campus', CampusConstants.getDisplayName(state.selectedCampus ?? user.university)),
               ],
             ),
             onEdit: () => _goToStep(1),
@@ -858,28 +859,21 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
 
   Widget _buildCampusDropdown(AppUser user) {
     final appState = ref.watch(plugApplicationControllerProvider);
+    final campuses = CampusConstants.campuses;
     
-    final String currentCampus = appState.selectedCampus ?? user.campus ?? 'Unknown University';
-    
-    final Set<String> itemsSet = {
-      currentCampus,
-      if (user.campus != null && user.campus!.isNotEmpty) user.campus!,
-      if (user.university != null && user.university!.isNotEmpty) user.university!,
-      'Unknown University',
-    };
-    final List<String> items = itemsSet.toList();
+    final String currentCampus = appState.selectedCampus ?? user.university ?? campuses.first.id;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Primary Campus Served', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+        const Text('Primary Campus Served', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: items.contains(currentCampus) ? currentCampus : items.first,
-          items: items
-              .map((String c) => DropdownMenuItem<String>(
-                    value: c, 
-                    child: Text(c, style: const TextStyle(fontSize: 15)),
+          value: campuses.any((c) => c.id == currentCampus) ? currentCampus : campuses.first.id,
+          items: campuses
+              .map((c) => DropdownMenuItem<String>(
+                    value: c.id, 
+                    child: Text(c.name, style: const TextStyle(fontSize: 15)),
                   ))
               .toList(),
           onChanged: (String? v) {

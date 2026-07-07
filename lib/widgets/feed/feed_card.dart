@@ -8,6 +8,7 @@ import '../../features/shared/feed_repository.dart';
 import '../../models/feed_type.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/shared/providers.dart';
+import 'package:unihub_mobile/core/constants/campus_constants.dart';
 import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import '../../core/utils/category_utils.dart';
@@ -79,7 +80,7 @@ class FeedCard extends ConsumerWidget {
                         ),
                       ),
                       Text(
-                        '${DateFormat.jm().format(item.createdAt)} • ${item.university ?? 'UniHub'}',
+                        '${DateFormat.jm().format(item.createdAt)} • ${CampusConstants.getShortDisplayName(item.university)}',
                         style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 12),
                       ),
                     ],

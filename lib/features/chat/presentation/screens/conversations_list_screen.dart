@@ -211,7 +211,7 @@ class _ConversationTile extends ConsumerWidget {
       orElse: () => '',
     );
 
-    final otherUserAsync = ref.watch(userByIdProvider(otherUserId));
+    final otherUserAsync = ref.watch(publicUserProvider(otherUserId));
     final unreadCount = conversation.unreadCounts[currentUserId] ?? 0;
 
     return otherUserAsync.when(

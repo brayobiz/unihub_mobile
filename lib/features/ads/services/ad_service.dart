@@ -7,6 +7,7 @@ import 'ad_config.dart';
 
 class AdService {
   bool _isInitialized = false;
+  bool _isInitializing = false;
 
   bool get isInitialized => _isInitialized;
 
@@ -14,6 +15,11 @@ class AdService {
   Future<void> initialize() async {
     if (_isInitialized) return;
     
+    if (_isInitializing) {
+      _log('Initialization already in progress.');
+      return;
+    }
+
     if (!AdConfig.enabled) {
       _log('Ads are disabled in AdConfig.');
       return;
@@ -25,9 +31,10 @@ class AdService {
       return;
     }
 
+    _isInitializing = true;
+
     try {
       // 1. Initialize the SDK first (non-blocking for UMP)
-      // Note: We use a timeout to ensure native SDK initialization doesn't hang the app
       final status = await MobileAds.instance.initialize().timeout(
         const Duration(seconds: 5),
         onTimeout: () {
@@ -35,6 +42,7 @@ class AdService {
           return InitializationStatus({});
         },
       );
+      
       _isInitialized = true;
       _log('Mobile Ads SDK initialized successfully.');
 
@@ -43,8 +51,12 @@ class AdService {
       ConsentInformation.instance.requestConsentInfoUpdate(
         params,
         () async {
-          if (await ConsentInformation.instance.isConsentFormAvailable()) {
-            _log('Consent form available.');
+          try {
+            if (await ConsentInformation.instance.isConsentFormAvailable()) {
+              _log('Consent form available.');
+            }
+          } catch (e) {
+            _log('Error checking consent form availability: $e', isError: true);
           }
         },
         (error) => _log('Consent update failed: ${error.message}', isError: true),
@@ -58,6 +70,8 @@ class AdService {
       }
     } catch (e, stack) {
       _log('Failed to initialize Mobile Ads SDK: $e', isError: true, error: e, stackTrace: stack);
+    } finally {
+      _isInitializing = false;
     }
   }
 

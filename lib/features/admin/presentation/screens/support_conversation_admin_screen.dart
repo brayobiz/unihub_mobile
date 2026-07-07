@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:unihub_mobile/core/constants/campus_constants.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../auth/shared/providers.dart';
 import '../../../auth/domain/models/app_user.dart';
@@ -589,7 +590,7 @@ class _SupportConversationAdminScreenState extends ConsumerState<SupportConversa
         if (user.university != null)
            Padding(
              padding: const EdgeInsets.only(top: 4),
-             child: Text(user.university!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+             child: Text(CampusConstants.getDisplayName(user.university), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
            ),
         const SizedBox(height: 16),
         Container(

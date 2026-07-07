@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:unihub_mobile/core/constants/campus_constants.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../auth/domain/models/app_user.dart';
 import '../../../auth/shared/providers.dart';
@@ -819,8 +820,8 @@ class _UserDetailAdminScreenState extends ConsumerState<UserDetailAdminScreen> {
       crossAxisSpacing: 12,
       children: [
         _InfoTile(label: 'Username', value: user.username ?? 'N/A'),
-        _InfoTile(label: 'University', value: user.university ?? 'N/A'),
-        _InfoTile(label: 'Campus', value: user.campus ?? 'N/A'),
+        _InfoTile(label: 'University', value: CampusConstants.getDisplayName(user.university)),
+        _InfoTile(label: 'Campus', value: CampusConstants.getDisplayName(user.campus)),
         _InfoTile(label: 'Course', value: user.course ?? 'N/A'),
         _InfoTile(label: 'Year', value: user.yearOfStudy ?? 'N/A'),
         _InfoTile(label: 'Joined', value: user.createdAt != null ? DateFormat('MMM dd, yyyy').format(user.createdAt!) : 'N/A'),

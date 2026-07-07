@@ -78,6 +78,7 @@ class _HousingDetailContentState extends ConsumerState<_HousingDetailContent> {
   bool _isDescriptionExpanded = false;
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  bool _isStartingChat = false;
 
   @override
   void initState() {
@@ -164,7 +165,7 @@ class _HousingDetailContentState extends ConsumerState<_HousingDetailContent> {
   }
 
   void _handleCall(HousingListing listing) async {
-    final plug = ref.read(userByIdProvider(listing.plugId)).valueOrNull;
+    final plug = ref.read(publicUserProvider(listing.plugId)).valueOrNull;
     if (plug == null || (plug.phoneNumber == null && plug.whatsappNumber == null)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Plug contact information not available.')));
       return;
@@ -186,49 +187,68 @@ class _HousingDetailContentState extends ConsumerState<_HousingDetailContent> {
   }
 
   void _handleChat() async {
+    if (_isStartingChat) return;
+
     final listing = widget.listing;
     final currentUser = ref.read(appUserProvider).valueOrNull;
     if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please login to contact the plug')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please login to contact the plug')));
+        context.push('/login');
+      }
       return;
     }
 
     if (currentUser.uid == listing.plugId) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This is your own listing.')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This is your own listing.')));
+      }
       return;
     }
 
-    // Increment Analytics
-    ref.read(housingRepositoryProvider).incrementChatCount(listing.id);
+    setState(() => _isStartingChat = true);
 
-    final chatContext = ChatContext(
-      type: 'housing',
-      id: listing.id,
-      title: listing.title,
-      thumbnail: listing.images.isNotEmpty ? listing.images.first : null,
-      metadata: {
-        'rent': listing.rent,
-        'location': listing.location,
-      },
-    );
+    try {
+      // Increment Analytics
+      ref.read(housingRepositoryProvider).incrementChatCount(listing.id);
 
-    final convId = await ref.read(chatRepositoryProvider).getOrCreateConversation(
-      participantIds: [currentUser.uid, listing.plugId],
-      context: chatContext,
-    );
+      final chatContext = ChatContext(
+        type: 'housing',
+        id: listing.id,
+        title: listing.title,
+        thumbnail: listing.images.isNotEmpty ? listing.images.first : null,
+        metadata: {
+          'rent': listing.rent,
+          'location': listing.location,
+        },
+      );
 
-    if (mounted) {
-      context.push('/chat', extra: {
-        'conversationId': convId,
-        'otherUserName': listing.plugName,
-        'context': chatContext,
-      });
+      final convId = await ref.read(chatRepositoryProvider).getOrCreateConversation(
+        participantIds: [currentUser.uid, listing.plugId],
+        context: chatContext,
+      );
+
+      if (mounted) {
+        context.push('/chat', extra: {
+          'conversationId': convId,
+          'otherUserName': listing.plugName,
+          'context': chatContext,
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to start chat: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isStartingChat = false);
+      }
     }
   }
 
   void _showBookingDialog() {
     final listing = widget.listing;
-    final plug = ref.read(userByIdProvider(listing.plugId)).valueOrNull;
+    final plug = ref.read(publicUserProvider(listing.plugId)).valueOrNull;
     if (plug == null) return;
 
     DateTime? selectedDate;
@@ -490,6 +510,7 @@ class _HousingDetailContentState extends ConsumerState<_HousingDetailContent> {
           ),
           _StickyActionBar(
             listing: listing,
+            isStartingChat: _isStartingChat,
             onCall: () => _handleCall(listing),
             onChat: _handleChat,
             onBook: _showBookingDialog,
@@ -674,7 +695,7 @@ class _VerifiedBadgeRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final plugAsync = ref.watch(userByIdProvider(listing.plugId));
+    final plugAsync = ref.watch(publicUserProvider(listing.plugId));
 
     return plugAsync.when(
       data: (plug) => Row(
@@ -1029,7 +1050,7 @@ class _PlugCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final plugAsync = ref.watch(userByIdProvider(listing.plugId));
+    final plugAsync = ref.watch(publicUserProvider(listing.plugId));
 
     return plugAsync.when(
       data: (plug) {
@@ -1125,7 +1146,7 @@ class _PlugCard extends ConsumerWidget {
               _PlugDetailRow(icon: Icons.calendar_today_rounded, label: 'Member since', 
                 value: plug.createdAt != null ? DateFormat('MMMM yyyy').format(plug.createdAt!) : 'Recent'),
               const SizedBox(height: 12),
-              _PlugDetailRow(icon: Icons.school_outlined, label: 'University', value: plug.university ?? 'UniHub Student'),
+              _PlugDetailRow(icon: Icons.school_outlined, label: 'University', value: CampusConstants.getDisplayName(plug.university)),
             ],
           ),
         );
@@ -1194,7 +1215,7 @@ class _TrustScorecard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final plug = ref.watch(userByIdProvider(listing.plugId)).valueOrNull;
+    final plug = ref.watch(publicUserProvider(listing.plugId)).valueOrNull;
     final diff = DateTime.now().difference(listing.lastVerifiedAt);
     final isFresh = diff.inHours < 24;
     
@@ -1690,12 +1711,14 @@ class _SimilarProperties extends ConsumerWidget {
 
 class _StickyActionBar extends StatelessWidget {
   final HousingListing listing;
+  final bool isStartingChat;
   final VoidCallback onCall;
   final VoidCallback onChat;
   final VoidCallback onBook;
 
   const _StickyActionBar({
     required this.listing,
+    required this.isStartingChat,
     required this.onCall,
     required this.onChat,
     required this.onBook,
@@ -1727,8 +1750,8 @@ class _StickyActionBar extends StatelessWidget {
                   border: Border.all(color: theme.colorScheme.outlineVariant),
                 ),
                 child: IconButton(
-                  icon: Icon(Icons.group_add_outlined, color: theme.colorScheme.primary),
-                  onPressed: () => context.push('/add-roommate', extra: listing),
+                  icon: Icon(Icons.group_add_outlined, color: isStartingChat ? AppColors.grey : theme.colorScheme.primary),
+                  onPressed: isStartingChat ? null : () => context.push('/add-roommate', extra: listing),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1740,8 +1763,8 @@ class _StickyActionBar extends StatelessWidget {
                   border: Border.all(color: theme.colorScheme.outlineVariant),
                 ),
                 child: IconButton(
-                  icon: Icon(Icons.call_outlined, color: theme.colorScheme.primary),
-                  onPressed: onCall,
+                  icon: Icon(Icons.call_outlined, color: isStartingChat ? AppColors.grey : theme.colorScheme.primary),
+                  onPressed: isStartingChat ? null : onCall,
                 ),
               ),
               const SizedBox(width: 8),
@@ -1752,17 +1775,22 @@ class _StickyActionBar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: theme.colorScheme.outlineVariant),
                 ),
-                child: IconButton(
-                  icon: Icon(Icons.chat_bubble_outline, color: theme.colorScheme.primary),
-                  onPressed: onChat,
-                ),
+                child: isStartingChat 
+                  ? const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : IconButton(
+                      icon: Icon(Icons.chat_bubble_outline, color: theme.colorScheme.primary),
+                      onPressed: onChat,
+                    ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: SizedBox(
                   height: 56,
                   child: FilledButton.icon(
-                    onPressed: isTaken ? null : onBook,
+                    onPressed: (isTaken || isStartingChat) ? null : onBook,
                     icon: const Icon(Icons.event_available),
                     style: FilledButton.styleFrom(
                       backgroundColor: theme.colorScheme.primary,

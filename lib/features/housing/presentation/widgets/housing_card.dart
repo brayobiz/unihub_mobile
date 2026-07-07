@@ -36,7 +36,7 @@ class HousingCard extends ConsumerWidget {
     final isTaken = listing.status == HousingStatus.taken;
     
     // Watch relevant data only
-    final plugAsync = ref.watch(userByIdProvider(listing.plugId));
+    final plugAsync = ref.watch(publicUserProvider(listing.plugId));
     final savedHousingAsync = ref.watch(housing_providers.savedHousingProvider);
     
     final plug = plugAsync.valueOrNull;

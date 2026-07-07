@@ -514,24 +514,30 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
 
   @override
   Future<void> makeOffer(Offer offer) async {
-    await _firestore.collection('offers').doc(offer.id).set(offer.toJson());
-    
-    if (_notificationSender != null) {
-      final listing = await getListingById(offer.listingId);
-      await _notificationSender.sendNotification(
-        recipientId: offer.sellerId,
-        actorId: offer.buyerId,
-        title: 'New Offer!',
-        body: 'Someone offered KES ${offer.amount} for "${listing?.title ?? 'your item'}".',
-        type: NotificationType.marketplace,
-        targetId: offer.listingId,
-        targetType: 'marketplace_offer',
-        metadata: {
-          'offerId': offer.id,
-          'amount': offer.amount,
-          'buyerId': offer.buyerId,
-        },
-      );
+    try {
+      await _firestore.collection('offers').doc(offer.id).set(offer.toJson());
+      
+      if (_notificationSender != null) {
+        final listing = await getListingById(offer.listingId);
+        await _notificationSender.sendNotification(
+          recipientId: offer.sellerId,
+          actorId: offer.buyerId,
+          title: 'New Offer!',
+          body: 'Someone offered KES ${offer.amount} for "${listing?.title ?? 'your item'}".',
+          type: NotificationType.marketplace,
+          targetId: offer.listingId,
+          targetType: 'marketplace_offer',
+          metadata: {
+            'offerId': offer.id,
+            'amount': offer.amount,
+            'buyerId': offer.buyerId,
+          },
+        );
+      }
+      AppLogger.info('Offer ${offer.id} created for listing ${offer.listingId}', 'MARKETPLACE');
+    } catch (e, st) {
+      AppLogger.error('Failed to make offer', e, st, 'MARKETPLACE');
+      rethrow;
     }
   }
 
@@ -1181,66 +1187,72 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     required double rating,
     required String comment,
   }) async {
-    final buyerDoc = await _firestore.collection('users').doc(buyerId).get();
-    final buyerName = buyerDoc.data()?['fullName'] ?? 'A Student';
+    try {
+      final buyerDoc = await _firestore.collection('users').doc(buyerId).get();
+      final buyerName = buyerDoc.data()?['fullName'] ?? 'A Student';
 
-    await _firestore.runTransaction((transaction) async {
-      final reviewRef = _firestore.collection('users').doc(sellerId).collection('reviews').doc(listingId);
-      final userRef = _firestore.collection('users').doc(sellerId);
+      await _firestore.runTransaction((transaction) async {
+        final reviewRef = _firestore.collection('users').doc(sellerId).collection('reviews').doc(listingId);
+        final userRef = _firestore.collection('users').doc(sellerId);
 
-      final userDoc = await transaction.get(userRef);
-      final reviewDoc = await transaction.get(reviewRef);
+        final userDoc = await transaction.get(userRef);
+        final reviewDoc = await transaction.get(reviewRef);
 
-      final reviewData = {
-        'id': listingId,
-        'reviewerId': buyerId,
-        'reviewerName': buyerName,
-        'targetUserId': sellerId,
-        'listingId': listingId,
-        'rating': rating,
-        'comment': comment,
-        'createdAt': FieldValue.serverTimestamp(),
-      };
+        final reviewData = {
+          'id': listingId,
+          'reviewerId': buyerId,
+          'reviewerName': buyerName,
+          'targetUserId': sellerId,
+          'listingId': listingId,
+          'rating': rating,
+          'comment': comment,
+          'createdAt': FieldValue.serverTimestamp(),
+        };
 
-      transaction.set(reviewRef, reviewData);
-      
-      if (userDoc.exists) {
-        final data = userDoc.data() as Map<String, dynamic>;
-        final currentAvg = (data['averageRating'] ?? 0.0).toDouble();
-        final currentCount = (data['ratingsCount'] ?? 0).toInt();
+        transaction.set(reviewRef, reviewData);
         
-        double newAvg;
-        int newCount;
+        if (userDoc.exists) {
+          final data = userDoc.data() as Map<String, dynamic>;
+          final currentAvg = (data['averageRating'] ?? 0.0).toDouble();
+          final currentCount = (data['ratingsCount'] ?? 0).toInt();
+          
+          double newAvg;
+          int newCount;
 
-        if (reviewDoc.exists) {
-          final reviewDataMap = reviewDoc.data() as Map<String, dynamic>;
-          final oldRating = (reviewDataMap['rating'] ?? 0.0).toDouble();
-          newCount = currentCount;
-          newAvg = currentCount > 0 
-              ? ((currentAvg * currentCount) - oldRating + rating) / newCount
-              : rating;
-        } else {
-          newCount = currentCount + 1;
-          newAvg = ((currentAvg * currentCount) + rating) / newCount;
+          if (reviewDoc.exists) {
+            final reviewDataMap = reviewDoc.data() as Map<String, dynamic>;
+            final oldRating = (reviewDataMap['rating'] ?? 0.0).toDouble();
+            newCount = currentCount;
+            newAvg = currentCount > 0 
+                ? ((currentAvg * currentCount) - oldRating + rating) / newCount
+                : rating;
+          } else {
+            newCount = currentCount + 1;
+            newAvg = ((currentAvg * currentCount) + rating) / newCount;
+          }
+          
+          transaction.update(userRef, {
+            'averageRating': newAvg,
+            'ratingsCount': newCount,
+            'trustScore': FieldValue.increment(rating >= 4 ? 2.0 : -1.0),
+          });
         }
-        
-        transaction.update(userRef, {
-          'averageRating': newAvg,
-          'ratingsCount': newCount,
-          'trustScore': FieldValue.increment(rating >= 4 ? 2.0 : -1.0),
-        });
-      }
-    });
+      });
 
-    if (_notificationSender != null) {
-      await _notificationSender.sendNotification(
-        recipientId: sellerId,
-        title: 'New Review! ⭐',
-        body: '$buyerName left you a $rating-star review.',
-        type: NotificationType.review,
-        targetId: listingId,
-        targetType: 'marketplace',
-      );
+      if (_notificationSender != null) {
+        await _notificationSender.sendNotification(
+          recipientId: sellerId,
+          title: 'New Review! ⭐',
+          body: '$buyerName left you a $rating-star review.',
+          type: NotificationType.review,
+          targetId: listingId,
+          targetType: 'marketplace',
+        );
+      }
+      AppLogger.info('Review submitted for seller $sellerId on listing $listingId', 'MARKETPLACE');
+    } catch (e, st) {
+      AppLogger.error('Failed to submit review', e, st, 'MARKETPLACE');
+      rethrow;
     }
   }
 

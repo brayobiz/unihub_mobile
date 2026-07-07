@@ -57,7 +57,7 @@ final smartFeedProvider = Provider.autoDispose<AsyncValue<List<SmartFeedItem>>>(
         type: widgets.FeedType.housing,
         title: 'Roommate: ${r.name}',
         subtitle: 'Budget: KES ${r.budget.toInt()} • ${r.preferredLocation}',
-        time: r.campus,
+        time: CampusConstants.getShortDisplayName(r.campus),
       ),
     ));
   }
@@ -95,7 +95,7 @@ final smartFeedProvider = Provider.autoDispose<AsyncValue<List<SmartFeedItem>>>(
         type: widgets.FeedType.housing,
         title: h.title,
         subtitle: 'KES ${h.rent.toInt()}/mo • ${h.type.name}',
-        time: h.university,
+        time: CampusConstants.getShortDisplayName(h.university),
       ),
     ));
   }
@@ -107,7 +107,7 @@ final smartFeedProvider = Provider.autoDispose<AsyncValue<List<SmartFeedItem>>>(
       model: FeedItemModel(
         type: widgets.FeedType.notes,
         title: n.title,
-        subtitle: '${n.unitCode} • ${n.university}',
+        subtitle: '${n.unitCode} • ${CampusConstants.getShortDisplayName(n.university)}',
         time: 'Notes',
       ),
     ));

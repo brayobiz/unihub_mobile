@@ -32,7 +32,7 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final plugAsync = ref.watch(userByIdProvider(widget.plugId));
+    final plugAsync = ref.watch(publicUserProvider(widget.plugId));
     final listingsAsync = ref.watch(plugListingsProvider(widget.plugId));
     final reviewsAsync = ref.watch(plugReviewsProvider(widget.plugId));
 

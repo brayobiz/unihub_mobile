@@ -131,21 +131,25 @@ class NotificationService implements NotificationSender {
   }
 
   Future<void> _updateTokenInFirestore(String token) async {
-    final user = _ref.read(authStateProvider).valueOrNull;
-    if (user != null) {
-      AppLogger.info('Saving FCM token for user (masked): ${token.substring(0, 8)}...', 'NOTIF_SERVICE');
-      await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('tokens')
-          .doc(token)
-          .set({
-        'token': token,
-        'createdAt': FieldValue.serverTimestamp(),
-        'platform': defaultTargetPlatform.name,
-        'lastActive': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      AppLogger.notification('FCM Token registered in Firestore');
+    try {
+      final user = _ref.read(authStateProvider).valueOrNull;
+      if (user != null) {
+        AppLogger.info('Saving FCM token for user (masked): ${token.substring(0, 8)}...', 'NOTIF_SERVICE');
+        await _firestore
+            .collection('users')
+            .doc(user.uid)
+            .collection('tokens')
+            .doc(token)
+            .set({
+          'token': token,
+          'createdAt': FieldValue.serverTimestamp(),
+          'platform': defaultTargetPlatform.name,
+          'lastActive': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        AppLogger.notification('FCM Token registered in Firestore');
+      }
+    } catch (e) {
+      AppLogger.error('Error updating FCM token in Firestore', e, null, 'NOTIF_SERVICE');
     }
   }
 

@@ -112,12 +112,7 @@ class OrganizerService {
       throw Exception('Only rejected or draft applications can be resubmitted.');
     }
 
-    await _firestore.collection('organizers').doc(organizerId).update({
-      'verificationStatus': OrganizerVerificationStatus.submitted.name,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-
-    // Notify moderation queue
+    // Notify moderation queue and update status atomically
     await _repository.requestVerification(organizerId, {
       'status': 'pending', // Reset verification request status for admin to see
       'resubmittedAt': FieldValue.serverTimestamp(),
@@ -136,7 +131,8 @@ class OrganizerService {
     // 2. Find User
     QuerySnapshot userSearch;
     if (emailOrUid.contains('@')) {
-      userSearch = await _firestore.collection('users').where('email', isEqualTo: emailOrUid).limit(1).get();
+      final normalizedEmail = emailOrUid.toLowerCase().trim();
+      userSearch = await _firestore.collection('users').where('email', isEqualTo: normalizedEmail).limit(1).get();
     } else {
       userSearch = await _firestore.collection('users').where(FieldPath.documentId, isEqualTo: emailOrUid).get();
     }
@@ -268,17 +264,17 @@ class OrganizerService {
       );
     }
 
-    await _firestore.collection('organizers').doc(organizerId).update({
-      'verificationStatus': OrganizerVerificationStatus.underReview.name,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-
-    await _repository.requestVerification(organizerId, {
-      'type': 'organizer',
-      'status': 'pending',
-      'submittedAt': FieldValue.serverTimestamp(),
-      'ownerId': userId,
-    });
+    // Atomic update and verification request
+    await _repository.requestVerification(
+      organizerId, 
+      {
+        'type': 'organizer',
+        'status': 'pending',
+        'submittedAt': FieldValue.serverTimestamp(),
+        'ownerId': userId,
+      },
+      status: OrganizerVerificationStatus.underReview,
+    );
 
     // Log to audit trail
     await _logAudit(

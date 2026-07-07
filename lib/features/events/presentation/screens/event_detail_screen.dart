@@ -158,6 +158,16 @@ class EventDetailScreen extends ConsumerWidget {
           child: CircleAvatar(
             backgroundColor: Colors.black26,
             child: IconButton(
+              icon: const Icon(Icons.report_gmailerrorred_rounded, color: Colors.white, size: 18),
+              onPressed: () => _showReportDialog(context, ref, event),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: CircleAvatar(
+            backgroundColor: Colors.black26,
+            child: IconButton(
               icon: const Icon(Icons.share_outlined, color: Colors.white, size: 18),
               onPressed: () {
                 final chatContext = ChatContext(
@@ -476,5 +486,44 @@ class EventDetailScreen extends ConsumerWidget {
     final startTime = DateFormat('h:mm a').format(start);
     final endTime = DateFormat('h:mm a').format(end);
     return '$date\n$startTime - $endTime';
+  }
+
+  void _showReportDialog(BuildContext context, WidgetRef ref, Event event) {
+    final reasons = [
+      'Inappropriate content',
+      'Misleading information',
+      'Spam',
+      'Scam or fraud',
+      'Other'
+    ];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Report Event'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: reasons.map((reason) => ListTile(
+            title: Text(reason),
+            onTap: () async {
+              final user = ref.read(appUserProvider).valueOrNull;
+              if (user != null) {
+                await ref.read(eventRepositoryProvider).reportEvent(
+                  eventId: event.id,
+                  reporterId: user.uid,
+                  reason: reason,
+                );
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Report submitted. Thank you for keeping UniHub safe!')),
+                  );
+                }
+              }
+            },
+          )).toList(),
+        ),
+      ),
+    );
   }
 }

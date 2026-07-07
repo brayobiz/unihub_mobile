@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/paginated_state.dart';
+import '../../../auth/shared/providers.dart';
 import '../../domain/models/listing.dart';
 import '../../domain/models/listing_filter.dart';
 import '../../shared/providers.dart';
@@ -13,6 +14,12 @@ class PaginatedListingsController extends StateNotifier<PaginatedState<Listing>>
 
   PaginatedListingsController(this._ref, this._filter) : super(PaginatedState(items: [])) {
     _init();
+  }
+
+  List<Listing> _filterBlocked(List<Listing> items) {
+    final user = _ref.read(appUserProvider).valueOrNull;
+    if (user == null || user.blockedUids.isEmpty) return items;
+    return items.where((l) => !user.blockedUids.contains(l.sellerId)).toList();
   }
 
   void _init() {
@@ -32,10 +39,11 @@ class PaginatedListingsController extends StateNotifier<PaginatedState<Listing>>
       categoryAttributes: _filter.categoryAttributes,
     ).listen((items) {
       if (mounted) {
+        final filteredItems = _filterBlocked(items);
         // Only update if we are on the first page or it's the initial load
         if (state.items.length <= _pageSize) {
           state = state.copyWith(
-            items: items,
+            items: filteredItems,
             isLoading: false,
             hasMore: items.length >= _pageSize,
             lastCursor: items.isNotEmpty ? items.last : null,
@@ -77,9 +85,10 @@ class PaginatedListingsController extends StateNotifier<PaginatedState<Listing>>
       );
       
       if (mounted) {
+        final filteredNewItems = _filterBlocked(newItems);
         // Avoid adding duplicates if the stream also pushed an item
         final existingIds = state.items.map((i) => i.id).toSet();
-        final uniqueNewItems = newItems.where((i) => !existingIds.contains(i.id)).toList();
+        final uniqueNewItems = filteredNewItems.where((i) => !existingIds.contains(i.id)).toList();
 
         state = state.copyWith(
           items: [...state.items, ...uniqueNewItems],

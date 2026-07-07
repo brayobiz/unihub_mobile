@@ -17,7 +17,7 @@ class RoommateCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final currencyFormat = NumberFormat.currency(symbol: 'KES ', decimalDigits: 0);
-    final userAsync = ref.watch(userByIdProvider(profile.userId));
+    final userAsync = ref.watch(publicUserProvider(profile.userId));
 
     return GestureDetector(
       onTap: onTap,

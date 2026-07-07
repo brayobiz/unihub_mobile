@@ -76,4 +76,11 @@ import '../location/models/campus.dart';
     final campus = getById(id);
     return campus?.name ?? id;
   }
+
+  static String getShortDisplayName(String? id) {
+    if (id == null) return 'Unknown';
+    final campus = getById(id);
+    if (campus == null) return id;
+    return campus.shortName.isNotEmpty ? campus.shortName : campus.name;
+  }
 }

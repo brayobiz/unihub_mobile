@@ -30,6 +30,7 @@ class CreateEventState {
   final String? error;
   final int currentStep;
   final bool isEditing;
+  final DateTime? createdAt;
 
   CreateEventState({
     required this.id,
@@ -52,6 +53,7 @@ class CreateEventState {
     this.error,
     this.currentStep = 0,
     this.isEditing = false,
+    this.createdAt,
   });
 
   CreateEventState copyWith({
@@ -71,6 +73,7 @@ class CreateEventState {
     bool? isLoading,
     String? error,
     int? currentStep,
+    DateTime? createdAt,
   }) {
     return CreateEventState(
       id: id,
@@ -93,6 +96,7 @@ class CreateEventState {
       error: error,
       currentStep: currentStep ?? this.currentStep,
       isEditing: isEditing,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }
@@ -128,6 +132,7 @@ class CreateEventController extends StateNotifier<CreateEventState> {
       registrationUrl: event.registrationUrl,
       maxCapacity: event.maxCapacity,
       isEditing: true,
+      createdAt: event.createdAt,
     );
   }
 
@@ -266,9 +271,7 @@ class CreateEventController extends StateNotifier<CreateEventState> {
         isRegistrationRequired: state.isRegistrationRequired,
         registrationUrl: state.registrationUrl,
         maxCapacity: state.maxCapacity,
-        createdAt: state.isEditing 
-            ? (_ref.read(eventProvider(state.id)).value?.createdAt ?? DateTime.now())
-            : DateTime.now(),
+        createdAt: state.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
         createdBy: user.uid,
       );

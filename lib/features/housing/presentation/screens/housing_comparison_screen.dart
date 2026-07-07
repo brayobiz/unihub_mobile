@@ -167,7 +167,7 @@ class HousingComparisonScreen extends ConsumerWidget {
   }
 
   Widget _trustScoreCell(String plugId, WidgetRef ref) {
-    final plugAsync = ref.watch(userByIdProvider(plugId));
+    final plugAsync = ref.watch(publicUserProvider(plugId));
     return Container(
       height: 60,
       alignment: Alignment.center,

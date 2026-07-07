@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../auth/shared/providers.dart';
 import '../../../shared/feed_repository.dart';
 import '../../../../services/history_service.dart';
+import 'package:unihub_mobile/core/constants/campus_constants.dart';
 import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
 
 class GigDetailsScreen extends ConsumerStatefulWidget {
@@ -163,7 +164,8 @@ class _GigDetailsScreenState extends ConsumerState<GigDetailsScreen> {
                   const SizedBox(height: 16),
                 ],
                 
-                _buildInfoRow(context, Icons.location_on_outlined, 'Campus', currentGig.university ?? 'Global'),
+                _buildInfoRow(context, Icons.location_on_outlined, 'Campus', 
+                    CampusConstants.getDisplayName(currentGig.university)),
                 
                 const SizedBox(height: 40),
 

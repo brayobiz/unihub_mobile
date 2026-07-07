@@ -248,7 +248,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         title: Consumer(
           builder: (context, ref, child) {
             final otherUser = (otherUserId != null && otherUserId!.isNotEmpty) 
-                ? ref.watch(userByIdProvider(otherUserId!)).valueOrNull 
+                ? ref.watch(publicUserProvider(otherUserId!)).valueOrNull
                 : null;
 
             final isOnline = otherUser?.isOnline == true;

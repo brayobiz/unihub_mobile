@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:unihub_mobile/core/constants/campus_constants.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
@@ -304,7 +305,7 @@ class PlugDashboardScreen extends ConsumerWidget {
                   children: [
                     Icon(Icons.school_rounded, size: 12, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7)),
                     const SizedBox(width: 4),
-                    Text('${user.university}', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w600)),
+                    Text(CampusConstants.getDisplayName(user.university), style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ],

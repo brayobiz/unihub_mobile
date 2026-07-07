@@ -9,64 +9,45 @@ class SystemSettingsRepository {
   DocumentReference get _settingsDoc => 
       _firestore.collection('config').doc('system_settings');
 
+  static final SystemSettings _defaultSettings = SystemSettings(
+    supportEmail: 'support.unihub@gmail.com',
+    privacyPolicyUrl: 'https://unihub-3663e.web.app/privacy',
+    termsOfServiceUrl: 'https://unihub-3663e.web.app/terms',
+    websiteUrl: 'https://unihub-3663e.web.app',
+    socialLinks: {
+      'instagram': 'https://instagram.com/unihub_campus',
+      'twitter': 'https://twitter.com/unihub_campus',
+    },
+    maintenanceMode: false,
+    maintenanceMessage: 'UniHub is currently under maintenance. We\'ll be back shortly!',
+    appVersion: '1.0.0',
+    lastUpdated: DateTime.now(),
+    updatedBy: 'system',
+  );
+
   Stream<SystemSettings> watchSettings() {
     return _settingsDoc.snapshots().map((snapshot) {
       if (!snapshot.exists || snapshot.data() == null) {
-        // Return default settings if not found in DB
-        return SystemSettings(
-          supportEmail: 'support.unihub@gmail.com',
-          privacyPolicyUrl: 'https://unihub-3663e.web.app/privacy',
-          termsOfServiceUrl: 'https://unihub-3663e.web.app/terms',
-          websiteUrl: 'https://unihub-3663e.web.app',
-          socialLinks: {
-            'instagram': 'https://instagram.com/unihub_campus',
-            'twitter': 'https://twitter.com/unihub_campus',
-          },
-          maintenanceMode: false,
-          maintenanceMessage: 'UniHub is currently under maintenance. We\'ll be back shortly!',
-          appVersion: '1.0.0',
-          lastUpdated: DateTime.now(),
-          updatedBy: 'system',
-        );
+        return _defaultSettings;
       }
       
       final settings = SystemSettings.fromJson(snapshot.data() as Map<String, dynamic>);
-      
-      // Auto-correction for legacy or placeholder URLs
-      if (settings.privacyPolicyUrl.contains('unihub.com')) {
-        return settings.copyWith(
-          privacyPolicyUrl: 'https://unihub-3663e.web.app/privacy',
-          termsOfServiceUrl: 'https://unihub-3663e.web.app/terms',
-          websiteUrl: 'https://unihub-3663e.web.app',
-        );
-      }
-      
-      return settings;
+      return _applyAutoCorrections(settings);
     });
   }
 
   Future<SystemSettings> getSettings() async {
     final snapshot = await _settingsDoc.get();
     if (!snapshot.exists || snapshot.data() == null) {
-      return SystemSettings(
-        supportEmail: 'support.unihub@gmail.com',
-        privacyPolicyUrl: 'https://unihub-3663e.web.app/privacy',
-        termsOfServiceUrl: 'https://unihub-3663e.web.app/terms',
-        websiteUrl: 'https://unihub-3663e.web.app',
-        socialLinks: {
-          'instagram': 'https://instagram.com/unihub_campus',
-          'twitter': 'https://twitter.com/unihub_campus',
-        },
-        maintenanceMode: false,
-        maintenanceMessage: 'UniHub is currently under maintenance. We\'ll be back shortly!',
-        appVersion: '1.0.0',
-        lastUpdated: DateTime.now(),
-        updatedBy: 'system',
-      );
+      return _defaultSettings;
     }
     
     final settings = SystemSettings.fromJson(snapshot.data() as Map<String, dynamic>);
+    return _applyAutoCorrections(settings);
+  }
 
+  SystemSettings _applyAutoCorrections(SystemSettings settings) {
+    // Auto-correction for legacy or placeholder URLs
     if (settings.privacyPolicyUrl.contains('unihub.com')) {
       return settings.copyWith(
         privacyPolicyUrl: 'https://unihub-3663e.web.app/privacy',
@@ -74,7 +55,6 @@ class SystemSettingsRepository {
         websiteUrl: 'https://unihub-3663e.web.app',
       );
     }
-    
     return settings;
   }
 

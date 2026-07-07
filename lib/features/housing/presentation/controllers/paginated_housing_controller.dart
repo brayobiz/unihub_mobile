@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/paginated_state.dart';
+import '../../../auth/shared/providers.dart';
 import '../../domain/models/housing_listing.dart';
 import '../../domain/repositories/housing_repository.dart';
 import '../../shared/providers.dart';
@@ -62,6 +63,12 @@ class PaginatedHousingController extends StateNotifier<PaginatedState<HousingLis
     _init();
   }
 
+  List<HousingListing> _filterBlocked(List<HousingListing> items) {
+    final user = _ref.read(appUserProvider).valueOrNull;
+    if (user == null || user.blockedUids.isEmpty) return items;
+    return items.where((l) => !user.blockedUids.contains(l.plugId)).toList();
+  }
+
   void _init() {
     _subscription?.cancel();
     state = state.copyWith(isLoading: true, error: null);
@@ -79,11 +86,11 @@ class PaginatedHousingController extends StateNotifier<PaginatedState<HousingLis
       sortBy: _filter.sortBy,
     ).listen((items) {
       if (mounted) {
+        final filteredItems = _filterBlocked(items);
         // Only update if we are on the first page or it's the initial load
-        // This prevents the stream from overwriting paginated results
         if (state.items.length <= _pageSize) {
           state = state.copyWith(
-            items: items,
+            items: filteredItems,
             isLoading: false,
             hasMore: items.length >= _pageSize,
             lastCursor: items.isNotEmpty ? items.last : null,
@@ -125,9 +132,10 @@ class PaginatedHousingController extends StateNotifier<PaginatedState<HousingLis
       );
       
       if (mounted) {
+        final filteredNewItems = _filterBlocked(newItems);
         // Avoid adding duplicates if the stream also pushed an item
         final existingIds = state.items.map((i) => i.id).toSet();
-        final uniqueNewItems = newItems.where((i) => !existingIds.contains(i.id)).toList();
+        final uniqueNewItems = filteredNewItems.where((i) => !existingIds.contains(i.id)).toList();
 
         state = state.copyWith(
           items: [...state.items, ...uniqueNewItems],

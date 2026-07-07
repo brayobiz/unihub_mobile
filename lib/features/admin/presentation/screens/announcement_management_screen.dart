@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+import 'package:unihub_mobile/core/constants/campus_constants.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../announcements/domain/models/announcement.dart';
 import '../../../announcements/shared/providers.dart';
@@ -512,8 +513,10 @@ class _AnnouncementEditDialogState extends ConsumerState<_AnnouncementEditDialog
               DropdownButtonFormField<String>(
                 value: _university,
                 decoration: const InputDecoration(labelText: 'University'),
-                items: ['All', 'University of Nairobi', 'Kenyatta University', 'Strathmore', 'Jkuat', 'USIU']
-                    .map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                items: [
+                  const DropdownMenuItem(value: 'All', child: Text('All Campuses')),
+                  ...CampusConstants.campuses.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))),
+                ],
                 onChanged: (val) => setState(() => _university = val!),
               ),
               const SizedBox(height: 24),

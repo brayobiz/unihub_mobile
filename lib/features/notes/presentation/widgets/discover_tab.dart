@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unihub_mobile/core/constants/campus_constants.dart';
 import '../../../auth/shared/providers.dart';
 import '../../shared/providers.dart';
 import 'note_card.dart';
@@ -85,7 +86,7 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
                             const Spacer(),
                             if (user?.university != null)
                               Text(
-                                'at ${user?.university}',
+                                'at ${CampusConstants.getShortDisplayName(user?.university)}',
                                 style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w600),
                               ),
                           ],

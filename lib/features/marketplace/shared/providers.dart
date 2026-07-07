@@ -44,7 +44,10 @@ final listingsProvider = StreamProvider.autoDispose.family<List<Listing>, Listin
 final recentlyViewedProvider = StreamProvider.autoDispose<List<Listing>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
   if (user == null) return Stream.value([]);
-  return ref.watch(marketplaceRepositoryProvider).watchRecentlyViewed(user.uid);
+  return ref.watch(marketplaceRepositoryProvider).watchRecentlyViewed(user.uid).map((listings) {
+    if (user.blockedUids.isEmpty) return listings;
+    return listings.where((l) => !user.blockedUids.contains(l.sellerId)).toList();
+  });
 });
 
 final trendingListingsProvider = StreamProvider.autoDispose<List<Listing>>((ref) {
@@ -86,7 +89,11 @@ final recentSearchesProvider = StreamProvider.autoDispose<List<String>>((ref) {
 });
 
 final sellerListingsProvider = StreamProvider.autoDispose.family<List<Listing>, String>((ref, sellerId) {
-  return ref.watch(marketplaceRepositoryProvider).watchSellerListings(sellerId);
+  final user = ref.watch(appUserProvider).valueOrNull;
+  return ref.watch(marketplaceRepositoryProvider).watchSellerListings(sellerId).map((listings) {
+    if (user != null && user.blockedUids.contains(sellerId)) return [];
+    return listings;
+  });
 });
 
 final listingProvider = StreamProvider.autoDispose.family<Listing?, String>((ref, id) {
@@ -100,7 +107,10 @@ final topListingsProvider = StreamProvider.autoDispose<List<Listing>>((ref) {
 final savedListingsProvider = StreamProvider.autoDispose<List<Listing>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
   if (user == null) return Stream.value([]);
-  return ref.watch(marketplaceRepositoryProvider).watchSavedListings(user.uid);
+  return ref.watch(marketplaceRepositoryProvider).watchSavedListings(user.uid).map((listings) {
+    if (user.blockedUids.isEmpty) return listings;
+    return listings.where((l) => !user.blockedUids.contains(l.sellerId)).toList();
+  });
 });
 
 final sellerReviewsProvider = StreamProvider.autoDispose.family<List<Map<String, dynamic>>, String>((ref, sellerId) {
@@ -116,75 +126,13 @@ final sellerReviewsProvider = StreamProvider.autoDispose.family<List<Map<String,
 });
 
 final similarListingsProvider = StreamProvider.autoDispose.family<List<Listing>, Listing>((ref, currentListing) {
-  return ref.watch(marketplaceRepositoryProvider).watchSimilarListings(currentListing);
+  final user = ref.watch(appUserProvider).valueOrNull;
+  return ref.watch(marketplaceRepositoryProvider).watchSimilarListings(currentListing).map((listings) {
+    if (user == null || user.blockedUids.isEmpty) return listings;
+    return listings.where((l) => !user.blockedUids.contains(l.sellerId)).toList();
+  });
 });
 
 final moreFromSellerProvider = StreamProvider.autoDispose.family<List<Listing>, String>((ref, sellerId) {
   return ref.watch(marketplaceRepositoryProvider).watchSellerListingsByStatus(sellerId, ListingStatus.active);
-});
-
-final otherUserProvider = StreamProvider.autoDispose.family<AppUser, String>((ref, userId) {
-  if (userId.isEmpty) return Stream.error('Invalid User ID');
-
-  final currentUser = ref.watch(appUserProvider).valueOrNull;
-  final firestore = ref.watch(firestoreProvider);
-
-  return firestore
-      .collection('users')
-      .doc(userId)
-      .snapshots()
-      .map((doc) {
-        if (!doc.exists) throw Exception('User not found');
-        
-        final data = doc.data();
-        if (data == null) throw Exception('User data is empty');
-
-        final targetUser = AppUser.fromJson(data);
-        
-        final Map<String, String> privacy = {};
-        targetUser.privacySettings.forEach((k, v) => privacy[k] = v.toString());
-        
-        final visibility = privacy['profile_visibility'] ?? 'university';
-        final showUni = privacy['show_university'] != 'private';
-        final showSocials = privacy['show_socials'] != 'private';
-
-        final String? currentUni = currentUser?.university;
-        final String? targetUni = targetUser.university;
-
-        bool isSameUni = currentUni != null && 
-                         targetUni != null && 
-                         currentUni.isNotEmpty &&
-                         targetUni.isNotEmpty &&
-                         currentUni == targetUni;
-
-        bool isOwner = currentUser?.uid == targetUser.uid;
-        bool canViewDetails = visibility == 'public' || (visibility == 'university' && isSameUni) || isOwner;
-        
-        if (visibility == 'private' && !isOwner) {
-          return targetUser.stripSensitiveInfo().copyWith(
-            university: 'Private Profile',
-            course: 'Student',
-          );
-        }
-
-        if (!canViewDetails) {
-           return targetUser.stripSensitiveInfo().copyWith(
-             bio: 'This profile is set to University-only visibility.',
-             course: 'Student',
-             university: showUni ? targetUni : 'Hidden Campus',
-           );
-        }
-
-        // Apply secondary flags
-        return targetUser.stripSensitiveInfo().copyWith(
-          university: (showUni || isSameUni || isOwner) ? targetUni : 'Hidden Campus',
-          socialLinks: (showSocials || isSameUni || isOwner)
-              ? targetUser.socialLinks
-              : const <String, String>{},
-          // Keep some public fields if it's the owner
-          email: isOwner ? targetUser.email : 'hidden@unihub.student',
-          phoneNumber: isOwner ? targetUser.phoneNumber : null,
-          whatsappNumber: isOwner ? targetUser.whatsappNumber : null,
-        );
-      });
 });

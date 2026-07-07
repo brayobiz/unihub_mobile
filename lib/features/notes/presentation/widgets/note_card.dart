@@ -7,6 +7,7 @@ import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import '../../domain/models/note.dart';
 import '../../shared/providers.dart';
 
+import 'package:unihub_mobile/core/constants/campus_constants.dart';
 import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
 
 class NoteCard extends ConsumerWidget {
@@ -247,7 +248,7 @@ class NoteCard extends ConsumerWidget {
                           style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
                         ),
                         Text(
-                          note.university,
+                          CampusConstants.getShortDisplayName(note.university),
                           style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

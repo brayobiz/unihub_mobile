@@ -27,13 +27,14 @@ class SellerProfileScreen extends ConsumerStatefulWidget {
 
 class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
   static const double avatarRadius = 55.0;
+  bool _isStartingChat = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
-    final sellerAsync = ref.watch(otherUserProvider(widget.userId));
+    final sellerAsync = ref.watch(publicUserProvider(widget.userId));
     final listingsAsync = ref.watch(sellerListingsProvider(widget.userId));
     final reviewsAsync = ref.watch(sellerReviewsProvider(widget.userId));
 
@@ -796,31 +797,49 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
           Expanded(
             flex: 2,
             child: OutlinedButton(
-              onPressed: () async {
-                final currentUser = ref.read(authStateProvider).valueOrNull;
+              onPressed: _isStartingChat ? null : () async {
+                final currentUser = ref.read(appUserProvider).valueOrNull;
                 if (currentUser == null) {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please login to chat')));
+                  context.push('/login');
                   return;
                 }
                 
-                final chatContext = ChatContext(
-                  type: 'profile',
-                  id: seller.uid,
-                  title: '${seller.fullName}\'s Profile',
-                  thumbnail: seller.photoUrl,
-                );
+                if (currentUser.uid == seller.uid) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This is your own profile.')));
+                  return;
+                }
 
-                final conversationId = await ref.read(chatRepositoryProvider).getOrCreateConversation(
-                  participantIds: [currentUser.uid, seller.uid],
-                  context: chatContext,
-                );
+                setState(() => _isStartingChat = true);
 
-                if (context.mounted) {
-                  context.push('/chat', extra: {
-                    'conversationId': conversationId,
-                    'otherUserName': seller.fullName,
-                    'context': chatContext,
-                  });
+                try {
+                  final chatContext = ChatContext(
+                    type: 'profile',
+                    id: seller.uid,
+                    title: '${seller.fullName}\'s Profile',
+                    thumbnail: seller.photoUrl,
+                  );
+
+                  final conversationId = await ref.read(chatRepositoryProvider).getOrCreateConversation(
+                    participantIds: [currentUser.uid, seller.uid],
+                    context: chatContext,
+                  );
+
+                  if (context.mounted) {
+                    context.push('/chat', extra: {
+                      'conversationId': conversationId,
+                      'otherUserName': seller.fullName,
+                      'context': chatContext,
+                    });
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to start chat: $e')));
+                  }
+                } finally {
+                  if (mounted) {
+                    setState(() => _isStartingChat = false);
+                  }
                 }
               },
               style: OutlinedButton.styleFrom(
@@ -831,9 +850,16 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.chat_bubble_outline, size: 20, color: theme.colorScheme.primary),
+                  if (_isStartingChat)
+                    const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    Icon(Icons.chat_bubble_outline, size: 20, color: theme.colorScheme.primary),
                   const SizedBox(width: 8),
-                  Text('In-App Chat', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+                  Text(_isStartingChat ? 'Connecting...' : 'In-App Chat', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
                 ],
               ),
             ),
@@ -842,7 +868,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
           Expanded(
             flex: 3,
             child: ElevatedButton(
-              onPressed: () => _launchWhatsApp(context, seller.whatsappNumber ?? seller.phoneNumber, seller.fullName),
+              onPressed: _isStartingChat ? null : () => _launchWhatsApp(context, seller.whatsappNumber ?? seller.phoneNumber, seller.fullName),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF25D366),
                 foregroundColor: Colors.white,

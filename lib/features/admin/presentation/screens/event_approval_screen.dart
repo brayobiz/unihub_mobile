@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
+import 'package:unihub_mobile/core/constants/campus_constants.dart';
 import 'package:unihub_mobile/features/admin/shared/providers.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/campus_filter/shared/providers.dart';
@@ -347,7 +348,7 @@ class _EventApprovalCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'By: ${event.organizerId}',
+                          'By: ${event.organizerId} • ${CampusConstants.getDisplayName(event.campusId)}',
                           style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                         ),
                       ],

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
+import 'package:unihub_mobile/core/constants/campus_constants.dart';
 import '../../../auth/shared/providers.dart';
 import '../../../auth/domain/models/app_user.dart';
 import '../../domain/models/conversation.dart';
@@ -253,7 +254,7 @@ class _UserSearchList extends ConsumerWidget {
                 child: user.photoUrl == null ? Text(user.fullName[0].toUpperCase()) : null,
               ),
               title: Text(user.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(user.university ?? ''),
+              subtitle: Text(CampusConstants.getDisplayName(user.university)),
               trailing: ElevatedButton(
                 onPressed: isSharing ? null : () => onShare(user.uid),
                 style: ElevatedButton.styleFrom(
@@ -286,7 +287,7 @@ class _ConversationShareTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final otherUserId = conversation.participants.firstWhere((id) => id != currentUserId, orElse: () => '');
-    final otherUserAsync = ref.watch(userByIdProvider(otherUserId));
+    final otherUserAsync = ref.watch(publicUserProvider(otherUserId));
 
     return otherUserAsync.when(
       data: (user) {
@@ -297,7 +298,7 @@ class _ConversationShareTile extends ConsumerWidget {
             child: user.photoUrl == null ? Text(user.fullName[0].toUpperCase()) : null,
           ),
           title: Text(user.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: Text(user.university ?? ''),
+          subtitle: Text(CampusConstants.getDisplayName(user.university)),
           trailing: ElevatedButton(
             onPressed: isSharing ? null : () => onShare(conversation.id),
             style: ElevatedButton.styleFrom(

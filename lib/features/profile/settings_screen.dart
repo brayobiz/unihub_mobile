@@ -347,7 +347,7 @@ class SettingsScreen extends ConsumerWidget {
                         final blockedUid = user.blockedUids[index];
                         return Consumer(
                           builder: (context, ref, child) {
-                            final userAsync = ref.watch(otherUserProvider(blockedUid));
+                            final userAsync = ref.watch(publicUserProvider(blockedUid));
                             return userAsync.when(
                               data: (u) => ListTile(
                                 leading: CircleAvatar(

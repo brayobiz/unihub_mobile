@@ -229,7 +229,16 @@ class OrganizerRepositoryImpl implements OrganizerRepository {
   }
 
   @override
-  Future<void> requestVerification(String organizerId, Map<String, dynamic> applicationData) async {
+  Future<void> requestVerification(
+    String organizerId, 
+    Map<String, dynamic> applicationData, {
+    OrganizerVerificationStatus status = OrganizerVerificationStatus.submitted,
+  }) async {
+    final batch = _firestore.batch();
+    
+    final requestRef = _firestore.collection('organizer_verification_requests').doc();
+    final organizerRef = _firestore.collection('organizers').doc(organizerId);
+
     final Map<String, dynamic> data = {
       'organizerId': organizerId,
       'status': 'pending',
@@ -237,11 +246,14 @@ class OrganizerRepositoryImpl implements OrganizerRepository {
       ...applicationData,
     };
     
-    await _firestore.collection('organizer_verification_requests').add(data);
+    batch.set(requestRef, data);
     
-    await _firestore.collection('organizers').doc(organizerId).update({
-      'verificationStatus': OrganizerVerificationStatus.submitted.name,
+    batch.update(organizerRef, {
+      'verificationStatus': status.name,
+      'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    await batch.commit();
   }
 
   @override

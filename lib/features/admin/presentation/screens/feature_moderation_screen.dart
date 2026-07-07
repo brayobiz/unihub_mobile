@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:unihub_mobile/core/constants/campus_constants.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../layout/admin_layout.dart';
 import '../../../auth/shared/providers.dart';
@@ -260,7 +261,7 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('By ${item.authorName} • ${item.university ?? "Unknown"}'),
+                      Text('By ${item.authorName} • ${CampusConstants.getDisplayName(item.university)}'),
                       Text(DateFormat('MMM dd, yyyy').format(item.createdAt), 
                         style: TextStyle(
                           fontSize: 12, 

@@ -130,7 +130,11 @@ final featuredHousingProvider = StreamProvider.autoDispose<List<HousingListing>>
 });
 
 final plugListingsProvider = StreamProvider.autoDispose.family<List<HousingListing>, String>((ref, plugId) {
-  return ref.watch(housingRepositoryProvider).watchPlugListings(plugId);
+  final user = ref.watch(appUserProvider).valueOrNull;
+  return ref.watch(housingRepositoryProvider).watchPlugListings(plugId).map((listings) {
+    if (user != null && user.blockedUids.contains(plugId)) return [];
+    return listings;
+  });
 });
 
 final housingListingProvider = StreamProvider.autoDispose.family<HousingListing?, String>((ref, id) {
@@ -148,7 +152,10 @@ final housingListingReviewsProvider = StreamProvider.autoDispose.family<List<Hou
 final savedHousingProvider = StreamProvider.autoDispose<List<HousingListing>>((ref) {
   final user = ref.watch(appUserProvider).valueOrNull;
   if (user == null || user.uid.isEmpty) return Stream.value([]);
-  return ref.watch(housingRepositoryProvider).watchSavedListings(user.uid);
+  return ref.watch(housingRepositoryProvider).watchSavedListings(user.uid).map((listings) {
+    if (user.blockedUids.isEmpty) return listings;
+    return listings.where((l) => !user.blockedUids.contains(l.plugId)).toList();
+  });
 });
 
 final roommateProfilesProvider = StreamProvider.autoDispose<List<RoommateProfile>>((ref) {

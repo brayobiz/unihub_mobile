@@ -293,50 +293,54 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
         itemCount: categories.length,
         itemBuilder: (context, index) {
           final cat = categories[index];
-          return GestureDetector(
-            onTap: () => context.push('/category-discovery/$cat'),
-            child: Container(
-              margin: const EdgeInsets.only(right: 8),
-              child: Column(
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                      border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      MarketplaceCategories.getIcon(cat),
-                      style: const TextStyle(fontSize: 22),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: 70,
-                    child: Text(
-                      cat,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: theme.colorScheme.onSurface,
-                        height: 1.1,
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => context.push('/category-discovery/$cat'),
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                margin: const EdgeInsets.only(right: 8),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
                       ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      alignment: Alignment.center,
+                      child: Text(
+                        MarketplaceCategories.getIcon(cat),
+                        style: const TextStyle(fontSize: 22),
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: 70,
+                      child: Text(
+                        cat,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: theme.colorScheme.onSurface,
+                          height: 1.1,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -443,31 +447,35 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
     return Row(
       children: [
         Expanded(
-          child: GestureDetector(
-            onTap: () => showSearch(
-              context: context,
-              delegate: MarketplaceSearchDelegate(ref: ref, scrollController: _scrollController),
-            ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: theme.colorScheme.outlineVariant),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => showSearch(
+                context: context,
+                delegate: MarketplaceSearchDelegate(ref: ref, scrollController: _scrollController),
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.search_rounded, color: AppColors.secondary),
-                  const SizedBox(width: 12),
-                  Text(
-                    filterState.searchQuery.isEmpty 
-                        ? 'What are you looking for?' 
-                        : filterState.searchQuery,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: filterState.searchQuery.isEmpty ? AppColors.grey : theme.colorScheme.onSurface,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: theme.colorScheme.outlineVariant),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.search_rounded, color: AppColors.secondary),
+                    const SizedBox(width: 12),
+                    Text(
+                      filterState.searchQuery.isEmpty 
+                          ? 'What are you looking for?' 
+                          : filterState.searchQuery,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: filterState.searchQuery.isEmpty ? AppColors.grey : theme.colorScheme.onSurface,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -542,7 +550,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
     
     if (scope.type == BrowsingScopeType.myCampus) {
       final uniName = CampusConstants.getDisplayName(
-        CampusConstants.resolveToId(user?.university)
+        CampusConstants.resolveToId(user?.university) ?? user?.university
       );
       trendingTitle = 'Trending in $uniName';
       recentlyPostedTitle = 'New in $uniName';
@@ -1510,6 +1518,7 @@ class MarketplaceSearchDelegate extends SearchDelegate<String?> {
     }
     
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
       controller.setSearchQuery(query);
       close(context, query);
     });

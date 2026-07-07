@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:unihub_mobile/core/constants/campus_constants.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../auth/domain/models/app_user.dart';
 import '../../../auth/shared/providers.dart';
@@ -302,8 +303,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
   }
 
   Widget _buildUniFilter() {
-    // In a real app, this would be fetched from a collection.
-    const unis = ['All', 'University of Nairobi', 'Kenyatta University', 'Strathmore', 'Jkuat', 'USIU'];
+    final campuses = CampusConstants.campuses;
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -318,7 +318,10 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
           fontSize: 12, 
           color: Theme.of(context).colorScheme.onSurface,
         ),
-        items: unis.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+        items: [
+          const DropdownMenuItem(value: 'All', child: Text('All Campuses')),
+          ...campuses.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))),
+        ],
         onChanged: (val) => setState(() => _selectedUniversity = val == 'All' ? null : val),
       ),
     );

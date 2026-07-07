@@ -109,15 +109,16 @@ class AuthRepositoryImpl implements AuthRepository {
     required String fullName,
   }) async {
     try {
+      final normalizedEmail = email.toLowerCase().trim();
       final credential = await _firebaseAuth.createUserWithEmailAndPassword(
-        email: email,
+        email: normalizedEmail,
         password: password,
       );
 
       if (credential.user != null) {
         final appUser = AppUser(
           uid: credential.user!.uid,
-          email: email,
+          email: normalizedEmail,
           fullName: fullName,
           createdAt: DateTime.now(),
         );
@@ -130,8 +131,6 @@ class AuthRepositoryImpl implements AuthRepository {
           AppLogger.info('Auth: New user registered and verification sent: ${appUser.uid}', 'AUTH');
         } catch (e) {
           AppLogger.warning('Auth: User registered but verification email failed: $e', 'AUTH');
-          // We don't rethrow here to allow the user to see the verification screen
-          // where they can manually trigger a resend.
         }
       }
     } on FirebaseAuthException catch (e) {
@@ -341,7 +340,8 @@ class AuthRepositoryImpl implements AuthRepository {
       // We process collections sequentially to avoid massive memory spikes
       final collections = [
         'listings', 'housing_listings', 'notes', 'feed', 'gig_applications', 
-        'verification_applications', 'student_verifications', 'identity_verifications'
+        'verification_applications', 'student_verifications', 'identity_verifications',
+        'events', 'organizers'
       ];
 
       for (var coll in collections) {
@@ -350,6 +350,8 @@ class AuthRepositoryImpl implements AuthRepository {
         if (coll == 'housing_listings') queryField = 'plugId';
         if (coll == 'gig_applications') queryField = 'freelancerId';
         if (coll == 'verification_applications') queryField = 'userId';
+        if (coll == 'events') queryField = 'createdBy';
+        if (coll == 'organizers') queryField = 'ownerId';
         
         if (coll == 'student_verifications' || coll == 'identity_verifications') {
           await _firestore.collection(coll).doc(uid).delete().catchError((_) => null);

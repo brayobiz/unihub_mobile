@@ -49,7 +49,15 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       if (!eventDoc.exists) throw Exception('Event not found');
       
       final oldStatusStr = attendanceDoc.exists ? (attendanceDoc.data()?['status'] as String?) : null;
-      final oldStatus = oldStatusStr != null ? AttendanceStatus.values.firstWhere((e) => e.name == oldStatusStr) : null;
+      AttendanceStatus? oldStatus;
+      if (oldStatusStr != null) {
+        for (final s in AttendanceStatus.values) {
+          if (s.name == oldStatusStr) {
+            oldStatus = s;
+            break;
+          }
+        }
+      }
 
       if (status == AttendanceStatus.going && oldStatus != AttendanceStatus.going) {
         final data = eventDoc.data() as Map<String, dynamic>;
