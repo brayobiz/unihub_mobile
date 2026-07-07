@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:unihub_mobile/core/utils/app_logger.dart';
 import 'ad_unit_ids.dart';
 import 'ad_config.dart';
 
@@ -30,7 +31,7 @@ class AdService {
       final status = await MobileAds.instance.initialize().timeout(
         const Duration(seconds: 5),
         onTimeout: () {
-          _log('Mobile Ads initialization timed out.');
+          _log('Mobile Ads initialization timed out.', isError: true);
           return InitializationStatus({});
         },
       );
@@ -38,18 +39,15 @@ class AdService {
       _log('Mobile Ads SDK initialized successfully.');
 
       // 2. Request Consent Information (UMP readiness) in background
-      // This is a placeholder for full UMP implementation.
       final params = ConsentRequestParameters();
       ConsentInformation.instance.requestConsentInfoUpdate(
         params,
         () async {
           if (await ConsentInformation.instance.isConsentFormAvailable()) {
-            // We don't automatically show it here if it's interfering with app load.
-            // Future enhancement: showConsentFormIfRequired()
             _log('Consent form available.');
           }
         },
-        (error) => _log('Consent update failed: ${error.message}'),
+        (error) => _log('Consent update failed: ${error.message}', isError: true),
       );
       
       if (kDebugMode) {
@@ -58,13 +56,12 @@ class AdService {
           _log('Adapter: $key, Status: ${value.state}, Latency: ${value.latency}');
         });
       }
-    } catch (e) {
-      _log('Failed to initialize Mobile Ads SDK: $e');
+    } catch (e, stack) {
+      _log('Failed to initialize Mobile Ads SDK: $e', isError: true, error: e, stackTrace: stack);
     }
   }
 
   /// Explicitly show the consent form if required.
-  /// This should be called from a safe place in the UI, not during main().
   Future<void> showConsentFormIfRequired() async {
     if (!AdConfig.enabled) return;
     
@@ -74,20 +71,22 @@ class AdService {
         if (status == ConsentStatus.required) {
           consentForm.show((formError) {
             if (formError != null) {
-              _log('Consent form show error: ${formError.message}');
+              _log('Consent form show error: ${formError.message}', isError: true);
             }
-            // Do not automatically reload to avoid infinite loops
           });
         }
       },
-      (formError) => _log('Form load failed: ${formError.message}'),
+      (formError) => _log('Form load failed: ${formError.message}', isError: true),
     );
   }
 
-  void _log(String message) {
-    if (kDebugMode && AdConfig.enableLogging) {
-      // ignore: avoid_print
-      print('[AdService] $message');
+  void _log(String message, {bool isError = false, Object? error, StackTrace? stackTrace}) {
+    if (!AdConfig.enableLogging) return;
+
+    if (isError) {
+      AppLogger.error(message, error, stackTrace, 'AdService');
+    } else {
+      AppLogger.info(message, 'AdService');
     }
   }
 

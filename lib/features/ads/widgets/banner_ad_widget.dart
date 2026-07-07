@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:unihub_mobile/core/utils/app_logger.dart';
 import '../services/ad_unit_ids.dart';
 import '../providers/ad_provider.dart';
 import '../services/ad_config.dart';
@@ -33,7 +34,8 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> with AutomaticK
   }
 
   Future<void> _prepareAndLoadAd() async {
-    if (_isLoading || !AdConfig.enabled) return;
+    final adsEnabled = ref.read(adsEnabledProvider);
+    if (_isLoading || !adsEnabled) return;
     
     // AdMob only supports Android and iOS
     if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) {
@@ -55,7 +57,7 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> with AutomaticK
         _loadAd();
       }
     } catch (e) {
-      _log('Error calculating AdSize: $e');
+      _log('Error calculating AdSize: $e', isError: true);
       if (mounted) {
         setState(() {
           _failed = true;
@@ -72,7 +74,7 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> with AutomaticK
       try {
         await ref.read(adInitializationProvider.future);
       } catch (e) {
-        _log('Ad initialization failed: $e');
+        _log('Ad initialization failed: $e', isError: true);
         if (mounted) {
           setState(() {
             _failed = true;
@@ -100,7 +102,7 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> with AutomaticK
           }
         },
         onAdFailedToLoad: (ad, error) {
-          _log('BannerAd failed to load: $error');
+          _log('BannerAd failed to load: $error', isError: true);
           ad.dispose();
           if (mounted) {
             setState(() {
@@ -117,10 +119,13 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> with AutomaticK
     await _bannerAd!.load();
   }
 
-  void _log(String message) {
-    if (kDebugMode && AdConfig.enableLogging) {
-      // ignore: avoid_print
-      print('[BannerAdWidget] $message');
+  void _log(String message, {bool isError = false}) {
+    if (!AdConfig.enableLogging) return;
+    
+    if (isError) {
+      AppLogger.error(message, null, null, 'BannerAdWidget');
+    } else {
+      AppLogger.info(message, 'BannerAdWidget');
     }
   }
 
@@ -135,7 +140,8 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> with AutomaticK
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
 
-    if (!AdConfig.enabled || _failed) {
+    final adsEnabled = ref.watch(adsEnabledProvider);
+    if (!adsEnabled || _failed) {
       return const SizedBox.shrink();
     }
 

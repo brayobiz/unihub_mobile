@@ -2,9 +2,10 @@
 /// This module provides centralized management for all advertising-related
 /// functionality, ensuring a clean separation from the rest of the application.
 /// 
-/// Current Phase: Phase 1 (Foundation)
-/// - Infrastructure only
-/// - No UI or ads displayed
+/// Current Phase: Phase 2 (Integration)
+/// - Infrastructure active
+/// - Global toggle enabled
+/// - Banner ads integrated across major feeds
 
 export 'services/ad_service.dart';
 export 'services/ad_unit_ids.dart';
