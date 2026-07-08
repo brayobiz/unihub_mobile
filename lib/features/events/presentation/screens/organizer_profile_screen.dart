@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -609,7 +610,10 @@ class _OrganizerProfileScreenState extends ConsumerState<OrganizerProfileScreen>
           else ...[
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => ref.read(organizerProfileControllerProvider(organizer.id).notifier).toggleFollow(),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  ref.read(organizerProfileControllerProvider(organizer.id).notifier).toggleFollow();
+                },
                 icon: Icon(isFollowing ? Icons.notifications_active_rounded : Icons.notifications_none_rounded),
                 label: Text(isFollowing ? 'Following' : 'Follow'),
                 style: OutlinedButton.styleFrom(
@@ -621,7 +625,10 @@ class _OrganizerProfileScreenState extends ConsumerState<OrganizerProfileScreen>
             const SizedBox(width: 12),
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () => ref.read(organizerProfileControllerProvider(organizer.id).notifier).contactOrganizer(organizer),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  ref.read(organizerProfileControllerProvider(organizer.id).notifier).contactOrganizer(organizer);
+                },
                 icon: const Icon(Icons.mail_outline_rounded),
                 label: const Text('Contact'),
                 style: ElevatedButton.styleFrom(

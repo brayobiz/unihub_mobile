@@ -21,6 +21,7 @@ class AppTheme {
       brightness: Brightness.light,
       primaryColor: primaryColor,
       scaffoldBackgroundColor: backgroundColor,
+      splashFactory: InkRipple.splashFactory, // Snappier splash feedback
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryColor,
         primary: primaryColor,
@@ -46,6 +47,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      splashFactory: InkRipple.splashFactory, // Snappier splash feedback
       colorScheme: ColorScheme.dark(
         primary: primaryColor,
         secondary: secondaryColor,
@@ -114,6 +116,8 @@ class AppTheme {
     style: ElevatedButton.styleFrom(
       backgroundColor: primaryColor,
       foregroundColor: AppColors.white,
+      elevation: 0, // Flat design feels faster/more modern
+      tapTargetSize: MaterialTapTargetSize.padded,
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),

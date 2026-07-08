@@ -1,9 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
@@ -80,7 +82,7 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
                               children: [
                                 IconButton(
                                   icon: const Icon(Icons.share_outlined, color: Colors.white),
-                                  onPressed: () {},
+                                  onPressed: () => _showShareMenu(context, plug),
                                 ),
                               ],
                             ),
@@ -781,6 +783,7 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
             flex: 2,
             child: OutlinedButton(
               onPressed: () async {
+                HapticFeedback.lightImpact();
                 final currentUser = ref.read(authStateProvider).valueOrNull;
                 if (currentUser == null) {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please login to chat')));
@@ -826,7 +829,10 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
           Expanded(
             flex: 3,
             child: ElevatedButton(
-              onPressed: () => _launchWhatsApp(context, plug.whatsappNumber ?? plug.phoneNumber, plug.fullName),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                _launchWhatsApp(context, plug.whatsappNumber ?? plug.phoneNumber, plug.fullName);
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF25D366),
                 foregroundColor: Colors.white,
@@ -879,6 +885,93 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
     if (difference.inHours < 24) return '${difference.inHours}h ago';
     if (difference.inDays < 7) return '${difference.inDays}d ago';
     return DateFormat('MMM d').format(lastSeen);
+  }
+
+  void _showShareMenu(BuildContext context, AppUser plug) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Share Plug Profile',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildShareOption(
+                    context,
+                    Icons.chat_bubble_outline_rounded,
+                    'UniHub Chat',
+                    () {
+                      Navigator.pop(context);
+                      final chatContext = ChatContext(
+                        type: 'plug',
+                        id: plug.uid,
+                        title: plug.fullName,
+                        thumbnail: plug.photoUrl,
+                        metadata: {'bio': plug.bio},
+                      );
+                      context.push('/share-to-chat', extra: chatContext);
+                    },
+                  ),
+                  _buildShareOption(
+                    context,
+                    Icons.share_rounded,
+                    'External Apps',
+                    () {
+                      Navigator.pop(context);
+                      Share.share(
+                        'Check out ${plug.fullName}, a Housing Plug on UniHub!\n\n'
+                        '${plug.bio ?? ''}\n'
+                        'Download UniHub to see their listings.',
+                        subject: '${plug.fullName} on UniHub',
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShareOption(BuildContext context, IconData icon, String label, VoidCallback onTap) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: theme.colorScheme.primary, size: 28),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showAllListings(BuildContext context, String name, List<HousingListing> listings) {

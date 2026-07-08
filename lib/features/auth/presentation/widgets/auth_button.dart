@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class AuthButton extends StatelessWidget {
   final String text;
   final VoidCallback? onPressed;
+  final bool isLoading;
 
   const AuthButton({
     super.key,
     required this.text,
     this.onPressed,
+    this.isLoading = false,
   });
 
   @override
@@ -16,8 +19,19 @@ class AuthButton extends StatelessWidget {
       width: double.infinity,
       height: 55,
       child: FilledButton(
-        onPressed: onPressed,
-        child: Text(text),
+        onPressed: (onPressed == null || isLoading) 
+          ? null 
+          : () {
+              HapticFeedback.lightImpact();
+              onPressed!();
+            },
+        child: isLoading 
+          ? const SizedBox(
+              height: 20, 
+              width: 20, 
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+            )
+          : Text(text),
       ),
     );
   }
