@@ -50,88 +50,82 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
               CustomScrollView(
                 physics: const BouncingScrollPhysics(),
                 slivers: [
-                  // 1. Identity Header Section (Transition)
-                  SliverAppBar(
-                    expandedHeight: 220,
-                    pinned: true,
-                    elevation: 0,
-                    automaticallyImplyLeading: false,
-                    backgroundColor: theme.brightness == Brightness.dark ? const Color(0xFF0F172A) : theme.colorScheme.primary,
-                    leading: Center(
-                      child: Container(
-                        margin: const EdgeInsets.only(left: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
-                          onPressed: () => context.pop(),
-                          tooltip: 'Back',
-                        ),
-                      ),
-                    ),
-                    actions: [
-                      _buildBlockButton(seller),
-                      const SizedBox(width: 8),
-                      Container(
-                        margin: const EdgeInsets.only(right: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          icon: const Icon(Icons.share_outlined, color: Colors.white, size: 18),
-                          onPressed: () {},
-                          tooltip: 'Share Profile',
-                        ),
-                      ),
-                    ],
-                    flexibleSpace: FlexibleSpaceBar(
-                      background: RepaintBoundary(
-                        child: Semantics(
-                          label: 'Seller profile header for ${seller.fullName}',
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              ClipPath(
-                                clipper: _HeaderClipper(),
-                                child: Container(
-                                  height: 220,
+                  // 1. Identity Header Section
+                  SliverToBoxAdapter(
+                    child: RepaintBoundary(
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          ClipPath(
+                            clipper: _HeaderClipper(),
+                            child: Container(
+                              height: 220,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    const Color(0xFF0F172A),
+                                    theme.colorScheme.primary,
+                                    const Color(0xFF19D3C5),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: MediaQuery.of(context).padding.top + 10,
+                            left: 16,
+                            right: 16,
+                            child: Row(
+                              children: [
+                                Container(
                                   decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        theme.brightness == Brightness.dark ? const Color(0xFF0F172A) : const Color(0xFF1e293b),
-                                        theme.colorScheme.primary,
-                                        const Color(0xFF19D3C5),
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
+                                    color: Colors.black.withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: IconButton(
+                                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                                    onPressed: () => context.pop(),
+                                    tooltip: 'Back',
                                   ),
                                 ),
-                              ),
-                              Positioned(
-                                top: 130,
-                                left: 16,
-                                right: 16,
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    _buildAvatar(seller),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Padding(
-                                        padding: const EdgeInsets.only(bottom: 4),
-                                        child: _buildIdentityInfo(context, seller),
-                                      ),
-                                    ),
-                                  ],
+                                const Spacer(),
+                                _buildBlockButton(seller),
+                                const SizedBox(width: 8),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: IconButton(
+                                    icon: const Icon(Icons.share_outlined, color: Colors.white, size: 18),
+                                    onPressed: () {},
+                                    tooltip: 'Share Profile',
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
+                          Positioned(
+                            top: 130,
+                            left: 16,
+                            right: 16,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                _buildAvatar(seller),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(bottom: 4),
+                                    child: _buildIdentityInfo(context, seller),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -179,10 +173,10 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: theme.brightness == Brightness.dark ? theme.colorScheme.outlineVariant : Colors.white, width: 4),
+        border: Border.all(color: Colors.white, width: 4),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: Colors.black.withOpacity(0.1),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -193,7 +187,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
         children: [
           CircleAvatar(
             radius: avatarRadius,
-            backgroundColor: colorScheme.surfaceContainerHighest,
+            backgroundColor: colorScheme.surfaceVariant,
             backgroundImage: seller.photoUrl != null ? CachedNetworkImageProvider(seller.photoUrl!) : null,
             child: seller.photoUrl == null
                 ? Text(
@@ -208,10 +202,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
               bottom: 2,
               child: Container(
                 padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface, 
-                  shape: BoxShape.circle
-                ),
+                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
                 child: const Icon(Icons.verified, color: AppColors.success, size: 24),
               ),
             ),
@@ -380,7 +371,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
         borderRadius: BorderRadius.circular(100),
       ),
       child: Row(
@@ -405,26 +396,18 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: (score > 80 ? AppColors.success : AppColors.warning).withValues(alpha: 0.1),
+        color: AppColors.success.withOpacity(0.08),
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: (score > 80 ? AppColors.success : AppColors.warning).withValues(alpha: 0.2)),
+        border: Border.all(color: AppColors.success.withOpacity(0.1)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.shield_rounded, 
-            size: 14, 
-            color: score > 80 ? AppColors.success : AppColors.warning
-          ),
+          const Icon(Icons.shield_rounded, size: 14, color: AppColors.success),
           const SizedBox(width: 6),
           Text(
-            '$score% Trust',
-            style: TextStyle(
-              fontSize: 12, 
-              fontWeight: FontWeight.w800, 
-              color: score > 80 ? AppColors.success : AppColors.warning
-            ),
+            'Trust Score $score%',
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.success),
           ),
         ],
       ),
@@ -435,9 +418,9 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.warning.withValues(alpha: 0.08),
+        color: AppColors.warning.withOpacity(0.08),
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: AppColors.warning.withValues(alpha: 0.1)),
+        border: Border.all(color: AppColors.warning.withOpacity(0.1)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -460,10 +443,10 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withOpacity(0.03),
             blurRadius: 20,
             offset: const Offset(0, 10),
           )
@@ -518,10 +501,10 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withOpacity(0.02),
             blurRadius: 20,
             offset: const Offset(0, 10),
           )
@@ -591,7 +574,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: (isVerified ? AppColors.success : theme.colorScheme.outlineVariant).withValues(alpha: 0.1),
+            color: (isVerified ? AppColors.success : theme.colorScheme.outlineVariant).withOpacity(0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: isVerified ? AppColors.success : theme.colorScheme.onSurfaceVariant, size: 18),
@@ -601,7 +584,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: theme.colorScheme.onSurface)),
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
               Text(status, style: TextStyle(color: isVerified ? AppColors.success : theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w500)),
             ],
           ),
