@@ -31,6 +31,13 @@ class _OrganizerProfileScreenState extends ConsumerState<OrganizerProfileScreen>
     final organizerAsync = ref.watch(organizerProvider(widget.organizerId));
     final membersAsync = ref.watch(organizerMembersProvider(widget.organizerId));
     final isFollowingAsync = ref.watch(isFollowingOrganizerProvider(widget.organizerId));
+    final currentUser = ref.watch(appUserProvider).valueOrNull;
+
+    final myMember = membersAsync.valueOrNull?.firstWhere(
+      (m) => m.userId == currentUser?.uid,
+      orElse: () => OrganizerMember(id: '', organizerId: '', userId: '', userName: '', role: OrganizerRole.editor, joinedAt: DateTime.now()),
+    );
+    final isManagement = myMember?.role == OrganizerRole.owner || myMember?.role == OrganizerRole.administrator;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -76,7 +83,7 @@ class _OrganizerProfileScreenState extends ConsumerState<OrganizerProfileScreen>
                         ),
                       ),
                       const SizedBox(width: 8),
-                      if (ref.watch(appUserProvider).valueOrNull?.uid == organizer.ownerId) ...[
+                      if (isManagement) ...[
                         Container(
                           decoration: BoxDecoration(
                             color: Colors.black.withOpacity(0.2),
@@ -84,7 +91,8 @@ class _OrganizerProfileScreenState extends ConsumerState<OrganizerProfileScreen>
                           ),
                           child: IconButton(
                             icon: const Icon(Icons.settings_outlined, color: Colors.white, size: 18),
-                            onPressed: () => context.push('/organizers/${organizer.id}/edit', extra: organizer),
+                            tooltip: 'Organizer Dashboard',
+                            onPressed: () => context.push('/organizers/${organizer.id}/dashboard'),
                           ),
                         ),
                         const SizedBox(width: 8),

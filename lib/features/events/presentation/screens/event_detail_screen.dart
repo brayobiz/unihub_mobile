@@ -96,6 +96,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     final isSaved = attendance?.status == AttendanceStatus.saved;
     final currentUserId = ref.watch(appUserProvider).valueOrNull?.uid;
 
+    final membersAsync = ref.watch(organizerMembersProvider(event.organizerId));
+    final isOrganizer = membersAsync.valueOrNull?.any((m) => m.userId == currentUserId) ?? false;
+
     return SliverAppBar(
       expandedHeight: 380,
       pinned: true,
@@ -147,12 +150,27 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   ),
                   Row(
                     children: [
-                      _buildOverlayButton(
-                        context: context,
-                        icon: Icons.report_gmailerrorred_rounded,
-                        iconSize: 20,
-                        onTap: () => _showReportDialog(context, event),
-                      ),
+                      if (isOrganizer) ...[
+                        _buildOverlayButton(
+                          context: context,
+                          icon: Icons.edit_outlined,
+                          iconSize: 20,
+                          onTap: () => context.push('/organizers/${event.organizerId}/events/edit', extra: event),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildOverlayButton(
+                          context: context,
+                          icon: Icons.more_vert_rounded,
+                          onTap: () => _showOrganizerMenu(context, event),
+                        ),
+                      ] else ...[
+                        _buildOverlayButton(
+                          context: context,
+                          icon: Icons.report_gmailerrorred_rounded,
+                          iconSize: 20,
+                          onTap: () => _showReportDialog(context, event),
+                        ),
+                      ],
                       const SizedBox(width: 8),
                       _buildOverlayButton(
                         context: context,
@@ -389,6 +407,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   }
 
   Widget _buildInfoCard(BuildContext context, Event event, ThemeData theme) {
+    final currentUserId = ref.watch(appUserProvider).valueOrNull?.uid;
+    final membersAsync = ref.watch(organizerMembersProvider(event.organizerId));
+    final isOrganizer = membersAsync.valueOrNull?.any((m) => m.userId == currentUserId) ?? false;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -434,6 +456,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             icon: Icons.groups_outlined,
             title: '${event.currentAttendeeCount} Going  ·  ${event.savedCount} Interested',
             subtitle: event.maxCapacity != null ? 'Capacity: ${event.maxCapacity} students' : 'Open attendance',
+            showChevron: isOrganizer,
+            onTap: isOrganizer ? () => context.push('/events/${event.id}/attendees') : null,
           ),
           Padding(
             padding: const EdgeInsets.only(left: 48, top: 4, bottom: 4), 
@@ -570,6 +594,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     final attendanceAsync = ref.watch(eventAttendanceProvider(event.id));
     final attendance = attendanceAsync.valueOrNull;
     final currentUserId = ref.watch(appUserProvider).valueOrNull?.uid;
+
+    final membersAsync = ref.watch(organizerMembersProvider(event.organizerId));
+    final isOrganizer = membersAsync.valueOrNull?.any((m) => m.userId == currentUserId) ?? false;
     
     final isPast = event.endAt.isBefore(DateTime.now());
     final isFull = event.maxCapacity != null && event.currentAttendeeCount >= event.maxCapacity!;
@@ -594,7 +621,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           Expanded(
             flex: 1,
             child: OutlinedButton.icon(
-              onPressed: (currentUserId == null || isPast) ? null : () async {
+              onPressed: (currentUserId == null || isPast || isOrganizer) ? null : () async {
                 try {
                   final newStatus = isSaved ? null : AttendanceStatus.saved;
                   await ref.read(eventServiceProvider).setAttendance(currentUserId, event.id, newStatus);
@@ -605,7 +632,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 }
               },
               icon: Icon(isSaved ? Icons.bookmark : Icons.bookmark_border_rounded, size: 20),
-              label: Text(isPast ? 'Event Ended' : 'Save Event'),
+              label: Text(isPast ? 'Event Ended' : (isOrganizer ? 'Organizer' : 'Save Event')),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -621,31 +648,38 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           Expanded(
             flex: 1,
             child: ElevatedButton.icon(
-              onPressed: (currentUserId == null || isPast || (isFull && !isGoing)) ? null : () async {
-                if (event.isRegistrationRequired && event.registrationUrl != null && event.registrationUrl!.isNotEmpty) {
-                  final uri = Uri.tryParse(event.registrationUrl!);
-                  if (uri != null && await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+              onPressed: (currentUserId == null || isPast || (isFull && !isGoing && !isOrganizer)) 
+                ? null 
+                : () async {
+                  if (isOrganizer) {
+                    context.push('/organizers/${event.organizerId}/dashboard');
+                    return;
                   }
-                }
 
-                try {
-                  final newStatus = isGoing ? null : AttendanceStatus.going;
-                  await ref.read(eventServiceProvider).setAttendance(currentUserId, event.id, newStatus);
-                  
-                  if (context.mounted && newStatus == AttendanceStatus.going) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('You\'re going! This event has been added to your hub.')),
-                    );
+                  if (event.isRegistrationRequired && event.registrationUrl != null && event.registrationUrl!.isNotEmpty) {
+                    final uri = Uri.tryParse(event.registrationUrl!);
+                    if (uri != null && await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
                   }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+
+                  try {
+                    final newStatus = isGoing ? null : AttendanceStatus.going;
+                    await ref.read(eventServiceProvider).setAttendance(currentUserId!, event.id, newStatus);
+                    
+                    if (context.mounted && newStatus == AttendanceStatus.going) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('You\'re going! This event has been added to your hub.')),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                    }
                   }
-                }
-              },
-              icon: Icon(isGoing ? Icons.check_circle_rounded : (isPast ? Icons.event_busy_rounded : Icons.check_circle_outline_rounded), size: 20),
-              label: Text(isPast ? 'Past Event' : (isGoing ? "I'm Going" : (isFull ? 'Event Full' : 'Attend'))),
+                },
+              icon: Icon(isGoing ? Icons.check_circle_rounded : (isPast ? Icons.event_busy_rounded : (isOrganizer ? Icons.admin_panel_settings_outlined : Icons.check_circle_outline_rounded)), size: 20),
+              label: Text(isPast ? 'Past Event' : (isGoing ? "I'm Going" : (isOrganizer ? 'Manage Event' : (isFull ? 'Event Full' : 'Attend')))),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 backgroundColor: isGoing ? AppColors.success : (isPast ? theme.colorScheme.surfaceContainerHighest : theme.colorScheme.primary),
@@ -674,29 +708,209 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: theme.colorScheme.surface,
-        title: Text('Report Event', style: TextStyle(color: theme.colorScheme.onSurface)),
+        title: Text('Report Event', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: reasons.map((reason) => ListTile(
             title: Text(reason, style: TextStyle(color: theme.colorScheme.onSurface)),
+            trailing: const Icon(Icons.chevron_right_rounded, size: 20),
             onTap: () async {
               final user = ref.read(appUserProvider).valueOrNull;
               if (user != null) {
-                await ref.read(eventRepositoryProvider).reportEvent(
-                  eventId: event.id,
-                  reporterId: user.uid,
-                  reason: reason,
-                );
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Report submitted. Thank you for keeping UniHub safe!')),
+                try {
+                  await ref.read(eventRepositoryProvider).reportEvent(
+                    eventId: event.id,
+                    reporterId: user.uid,
+                    reason: reason,
                   );
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Report submitted. Thank you for keeping UniHub safe!'),
+                        backgroundColor: AppColors.success,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
                 }
               }
             },
           )).toList(),
         ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        ],
+      ),
+    );
+  }
+
+  void _showOrganizerMenu(BuildContext context, Event event) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: theme.colorScheme.outlineVariant, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: Icon(Icons.dashboard_outlined, color: theme.colorScheme.primary),
+              title: const Text('Organizer Dashboard', style: TextStyle(fontWeight: FontWeight.bold)),
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/organizers/${event.organizerId}/dashboard');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.people_outline_rounded),
+              title: const Text('View Attendees'),
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/events/${event.id}/attendees');
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.edit_outlined, color: theme.colorScheme.primary),
+              title: const Text('Edit Event'),
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/organizers/${event.organizerId}/events/edit', extra: event);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.copy_rounded),
+              title: const Text('Duplicate Event'),
+              onTap: () {
+                Navigator.pop(context);
+                // Implementation for duplicating an event could go here
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Feature coming soon: Duplicate Event')));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.archive_outlined),
+              title: const Text('Archive Event'),
+              onTap: () {
+                Navigator.pop(context);
+                _confirmArchiveEvent(context, event);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.report_problem_outlined),
+              title: const Text('Report an Issue'),
+              onTap: () {
+                Navigator.pop(context);
+                _showReportDialog(context, event);
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: Icon(Icons.cancel_outlined, color: theme.colorScheme.error),
+              title: Text('Cancel Event', style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold)),
+              subtitle: const Text('This will notify all attendees'),
+              onTap: () {
+                Navigator.pop(context);
+                _showCancelDialog(context, event);
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCancelDialog(BuildContext context, Event event) {
+    final theme = Theme.of(context);
+    final reasonController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Event'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Please provide a reason for cancellation. This will be sent to all registered attendees.'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                hintText: 'e.g. Venue unavailable, bad weather...',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Go Back')),
+          ElevatedButton(
+            onPressed: () async {
+              if (reasonController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reason is required')));
+                return;
+              }
+              
+              final userId = ref.read(appUserProvider).valueOrNull?.uid;
+              if (userId == null) return;
+
+              Navigator.pop(context);
+              try {
+                await ref.read(eventServiceProvider).cancelEvent(event.id, userId, reasonController.text.trim());
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Event cancelled and attendees notified.')));
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+            child: const Text('Confirm Cancellation'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmArchiveEvent(BuildContext context, Event event) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Archive Event?'),
+        content: const Text('Archiving will hide this event from public discovery but keep it in your records. You can still see it in your History.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final userId = ref.read(appUserProvider).valueOrNull?.uid;
+              if (userId == null) return;
+
+              Navigator.pop(context);
+              try {
+                await ref.read(eventServiceProvider).archiveEvent(event.id, userId);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Event archived.')));
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                }
+              }
+            },
+            child: const Text('Archive'),
+          ),
+        ],
       ),
     );
   }

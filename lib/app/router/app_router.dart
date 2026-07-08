@@ -120,6 +120,8 @@ import '../../features/events/presentation/screens/organizer_onboarding_screen.d
 import '../../features/events/presentation/screens/my_events_screen.dart';
 import '../../features/events/presentation/screens/events_list_screen.dart';
 
+import '../../features/events/presentation/screens/event_attendees_screen.dart';
+
 class RouterNotifier extends ChangeNotifier {
   final Ref _ref;
   bool _isDisposed = false;
@@ -830,6 +832,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             campusId: event.campusId,
             event: event,
           );
+        },
+      ),
+      GoRoute(
+        path: '/events/:id/attendees',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return EventAttendeesScreen(eventId: id);
         },
       ),
       GoRoute(

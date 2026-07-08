@@ -168,6 +168,15 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         });
   }
 
+  @override
+  Stream<List<EventAttendance>> watchEventAttendees(String eventId) {
+    return _firestore.collection('event_attendance')
+        .where('eventId', isEqualTo: eventId)
+        .where('status', isEqualTo: AttendanceStatus.going.name)
+        .snapshots()
+        .map((s) => s.docs.map((d) => EventAttendance.fromFirestore(d)).toList());
+  }
+
   Stream<List<Event>> _watchEventsByStatus(String userId, AttendanceStatus status, {required bool isPast}) {
     return _firestore.collection('event_attendance')
         .where('userId', isEqualTo: userId)

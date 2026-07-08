@@ -18,6 +18,7 @@ abstract class EventRepository {
   
   Future<void> createEvent(Event event);
   Future<void> updateEvent(Event event);
+  Future<void> updateEventStatus(String id, EventStatus status);
   Future<void> deleteEvent(String id);
   Future<void> incrementShareCount(String id);
   

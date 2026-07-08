@@ -269,6 +269,34 @@ class EventService {
     AppLogger.info('Event Archived: $eventId by $userId', 'EVENT_SERVICE');
   }
 
+  Future<void> broadcastMessage({
+    required String eventId,
+    required String userId,
+    required String title,
+    required String message,
+  }) async {
+    final event = await _eventRepository.getEventById(eventId);
+    if (event == null) throw Exception('Event not found');
+
+    final isAuthorized = await _validateOrganizerPermission(event.organizerId, userId);
+    if (!isAuthorized) throw Exception('Unauthorized');
+
+    final attendees = await _attendanceRepository.watchEventAttendees(eventId).first;
+    
+    for (final attendee in attendees) {
+      await _notificationSender.sendNotification(
+        recipientId: attendee.userId,
+        title: title,
+        body: message,
+        type: NotificationType.events,
+        targetId: eventId,
+        targetType: 'event',
+      );
+    }
+    
+    AppLogger.info('Broadcast sent for Event $eventId: $title', 'EVENT_SERVICE');
+  }
+
   // --- Attendance Business Logic ---
 
   Future<void> setAttendance(String userId, String eventId, AttendanceStatus? status) async {

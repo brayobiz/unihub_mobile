@@ -138,6 +138,15 @@ class EventRepositoryImpl implements EventRepository {
   }
 
   @override
+  Future<void> updateEventStatus(String id, EventStatus status) async {
+    if (id.isEmpty) return;
+    await _firestore.collection('events').doc(id).update({
+      'status': status.name,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  @override
   Future<void> deleteEvent(String id) async {
     await _firestore.collection('events').doc(id).update({
       'isDeleted': true,

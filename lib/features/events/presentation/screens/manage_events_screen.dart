@@ -234,6 +234,15 @@ class ManageEventsScreen extends ConsumerWidget {
                 ),
               if (event.status == EventStatus.approved || event.status == EventStatus.scheduled || event.status == EventStatus.live)
                 ListTile(
+                  leading: const Icon(Icons.people_outline_rounded),
+                  title: const Text('View Attendees'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/events/${event.id}/attendees');
+                  },
+                ),
+              if (event.status == EventStatus.approved || event.status == EventStatus.scheduled || event.status == EventStatus.live)
+                ListTile(
                   leading: const Icon(Icons.cancel_outlined, color: AppColors.error),
                   title: const Text('Cancel Event', style: TextStyle(color: AppColors.error)),
                   onTap: () {

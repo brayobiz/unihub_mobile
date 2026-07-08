@@ -146,6 +146,10 @@ final eventAttendanceProvider = StreamProvider.autoDispose.family<EventAttendanc
   return ref.watch(attendanceRepositoryProvider).watchAttendance(uid, eventId);
 });
 
+final eventAttendeesProvider = StreamProvider.autoDispose.family<List<EventAttendance>, String>((ref, eventId) {
+  return ref.watch(attendanceRepositoryProvider).watchEventAttendees(eventId);
+});
+
 final userGoingEventsProvider = StreamProvider.autoDispose<List<Event>>((ref) {
   final uid = ref.watch(appUserProvider.select((user) => user.valueOrNull?.uid));
   if (uid == null) return Stream.value([]);

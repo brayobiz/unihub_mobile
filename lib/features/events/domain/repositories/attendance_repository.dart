@@ -13,4 +13,7 @@ abstract class AttendanceRepository {
   Stream<List<Event>> watchGoingEvents(String userId);
   Stream<List<Event>> watchSavedEvents(String userId);
   Stream<List<Event>> watchPastEvents(String userId);
+  
+  // Organizer Queries
+  Stream<List<EventAttendance>> watchEventAttendees(String eventId);
 }

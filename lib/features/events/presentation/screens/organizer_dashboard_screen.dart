@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
@@ -24,7 +25,9 @@ class OrganizerDashboardScreen extends ConsumerWidget {
       (m) => m.userId == currentUser?.uid,
       orElse: () => OrganizerMember(id: '', organizerId: '', userId: '', userName: '', role: OrganizerRole.editor, joinedAt: DateTime.now()),
     );
-    final isManagement = myMember?.role == OrganizerRole.owner || myMember?.role == OrganizerRole.administrator;
+    final isManagement = myMember?.role == OrganizerRole.owner || 
+                        myMember?.role == OrganizerRole.administrator ||
+                        organizerAsync.valueOrNull?.ownerId == currentUser?.uid;
 
     final isApproved = organizerAsync.valueOrNull?.verificationStatus == OrganizerVerificationStatus.verified || 
                       organizerAsync.valueOrNull?.verificationStatus == OrganizerVerificationStatus.official;
@@ -42,7 +45,7 @@ class OrganizerDashboardScreen extends ConsumerWidget {
               onPressed: () {
                 final organizer = organizerAsync.valueOrNull;
                 if (organizer != null) {
-                  context.push('/organizers/$organizerId/edit', extra: organizer);
+                  _showSettingsMenu(context, ref, organizer);
                 }
               },
             ),
@@ -125,6 +128,123 @@ class OrganizerDashboardScreen extends ConsumerWidget {
               icon: const Icon(Icons.add),
             )
           : null,
+    );
+  }
+
+  void _showSettingsMenu(BuildContext context, WidgetRef ref, Organizer organizer) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: theme.colorScheme.outlineVariant, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Edit Profile'),
+              subtitle: const Text('Change name, bio, logo, and social links'),
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/organizers/${organizer.id}/edit', extra: organizer);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.share_outlined),
+              title: const Text('Share Profile'),
+              onTap: () {
+                Navigator.pop(context);
+                final profileUrl = 'https://unihub.edu/organizers/${organizer.id}';
+                Clipboard.setData(ClipboardData(text: profileUrl));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Profile link copied to clipboard!'),
+                    backgroundColor: AppColors.success,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.verified_user_outlined),
+              title: const Text('Verification Details'),
+              onTap: () {
+                Navigator.pop(context);
+                _showVerificationInfo(context, organizer);
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: Icon(Icons.delete_outline, color: theme.colorScheme.error),
+              title: Text('Close Organization', style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold)),
+              subtitle: const Text('Permanently remove this organization'),
+              onTap: () {
+                Navigator.pop(context);
+                _confirmCloseOrganization(context, ref, organizer);
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showVerificationInfo(BuildContext context, Organizer organizer) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Verification Status'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text('Status: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                _buildStatusBadge(organizer),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text('Official organizations gain access to:'),
+            const SizedBox(height: 8),
+            const Text('• Higher visibility in search'),
+            const Text('• Verified badge on all events'),
+            const Text('• Push notification broadcasts'),
+            const Text('• Analytical insights'),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
+  void _confirmCloseOrganization(BuildContext context, WidgetRef ref, Organizer organizer) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Close Organization?'),
+        content: Text('Are you sure you want to permanently close "${organizer.name}"? This will cancel all upcoming events and cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              // Implementation for closing organization
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Feature coming soon: Organization Closure')));
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+            child: const Text('Yes, Close Forever'),
+          ),
+        ],
+      ),
     );
   }
 
