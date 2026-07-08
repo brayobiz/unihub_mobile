@@ -52,16 +52,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       return;
     }
 
-    if (!_isAgreed) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please confirm your age and agree to the terms'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
     await ref.read(authControllerProvider.notifier).signUp(
       email: email, 
       password: password,
@@ -202,7 +192,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             else
               AuthButton(
                 text: 'Create Account',
-                onPressed: _onSignUp,
+                onPressed: _isAgreed ? _onSignUp : null,
               ),
 
             const SizedBox(height: 32),
@@ -213,7 +203,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
             // Google Sign In
             GoogleSignInButton(
-              onPressed: isLoading ? null : () async {
+              onPressed: (isLoading || !_isAgreed) ? null : () async {
                 await ref.read(authControllerProvider.notifier).signInWithGoogle();
                 if (mounted) {
                   final state = ref.read(authControllerProvider);

@@ -64,7 +64,7 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAuthenticated(); // Needed for profile views
       allow create: if isOwner(userId) &&
-                      !request.resource.data.keys().hasAny(['isAdmin', 'roles', 'isBanned']) &&
+                      !request.resource.data.keys().hasAny(['isAdmin', 'roles', 'isBanned', 'isIdentityVerified', 'isStudentVerified', 'isEmailVerified', 'isPhoneVerified']) &&
                       request.resource.data.get('trustScore', 0.0) <= 5.0;
 
       allow update: if isAdmin() || (

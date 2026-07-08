@@ -95,7 +95,22 @@ class AuthRepositoryImpl implements AuthRepository {
           photoUrl: user.photoURL,
           createdAt: DateTime.now(),
         );
-        await docRef.set(appUser.toJson());
+
+        // Security Hardening: Strip restricted fields for initial creation
+        final userData = appUser.toJson();
+        userData.remove('roles');
+        userData.remove('isAdmin');
+        userData.remove('isBanned');
+        userData.remove('suspendedUntil');
+        userData.remove('isDeleted');
+        userData.remove('identityStatus');
+        userData.remove('studentStatus');
+        userData.remove('isIdentityVerified');
+        userData.remove('isStudentVerified');
+        userData.remove('isEmailVerified');
+        userData.remove('isPhoneVerified');
+        
+        await docRef.set(userData);
       } else {
         // Optional: Update last seen or FCM token if needed
         await docRef.update({
@@ -157,7 +172,23 @@ class AuthRepositoryImpl implements AuthRepository {
           createdAt: DateTime.now(),
         );
 
-        await _firestore.collection('users').doc(appUser.uid).set(appUser.toJson());
+        // Security Hardening: Strip restricted fields before initial creation
+        // The security rules prohibit sending sensitive flags during creation.
+        // AppUser.toJson() includes these with defaults, so we remove them here.
+        final userData = appUser.toJson();
+        userData.remove('roles');
+        userData.remove('isAdmin');
+        userData.remove('isBanned');
+        userData.remove('suspendedUntil');
+        userData.remove('isDeleted');
+        userData.remove('identityStatus');
+        userData.remove('studentStatus');
+        userData.remove('isIdentityVerified');
+        userData.remove('isStudentVerified');
+        userData.remove('isEmailVerified');
+        userData.remove('isPhoneVerified');
+
+        await _firestore.collection('users').doc(appUser.uid).set(userData);
         await credential.user!.updateDisplayName(fullName);
         
         try {
@@ -307,6 +338,16 @@ class AuthRepositoryImpl implements AuthRepository {
       
       final docRef = _firestore.collection('users').doc(uid);
       final batch = _firestore.batch();
+
+      // Self-healing: If the document doesn't exist, ensure email and createdAt are set
+      final doc = await docRef.get();
+      if (!doc.exists) {
+        final currentUser = _firebaseAuth.currentUser;
+        if (currentUser != null) {
+          data['email'] = currentUser.email ?? '';
+          data['createdAt'] = FieldValue.serverTimestamp();
+        }
+      }
 
       if (privacySettings != null) {
         privacySettings.forEach((k, v) => data['privacySettings.$k'] = v);
