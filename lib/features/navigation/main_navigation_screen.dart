@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unihub_mobile/features/shared/notification_repository.dart';
+import 'package:unihub_mobile/features/navigation/navigation_providers.dart';
 import '../../services/notification_service.dart';
 import '../../services/presence_service.dart';
 
@@ -23,21 +24,13 @@ class MainNavigationScreen extends ConsumerStatefulWidget {
 }
 
 class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
-  int currentIndex = 0;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(notificationServiceProvider).requestPermission();
-      ref.read(presenceServiceProvider).init();
+      // Presence init is now handled globally in UniHubApp
     });
-  }
-
-  @override
-  void dispose() {
-    ref.read(presenceServiceProvider).dispose();
-    super.dispose();
   }
 
   final List<Widget> pages = const [
@@ -50,6 +43,8 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentIndex = ref.watch(mainNavigationIndexProvider);
+    
     return Stack(
       children: [
         Scaffold(
@@ -73,9 +68,7 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
                 child: NavigationBar(
                   selectedIndex: currentIndex,
                   onDestinationSelected: (index) {
-                    setState(() {
-                      currentIndex = index;
-                    });
+                    ref.read(mainNavigationIndexProvider.notifier).state = index;
                   },
                   destinations: [
                     NavigationDestination(

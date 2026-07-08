@@ -19,6 +19,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:unihub_mobile/core/utils/app_logger.dart';
 import 'dart:ui';
+import 'services/app_lifecycle_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -33,7 +34,7 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Enable offline persistence for better network resilience
+  // Enable offline persistence for better network resilience (Scenario 7)
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true,
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
@@ -49,11 +50,11 @@ Future<void> main() async {
     ],
   );
 
-  // Initialize notifications
+  // Initialize global services
   container.read(notificationServiceProvider).init();
+  container.read(appLifecycleServiceProvider).init();
 
-  // Initialize Ads asynchronously in background (RC-1 FTUE optimization)
-  // We don't await this to ensure app launch is not blocked.
+  // Initialize Ads asynchronously in background
   container.read(adInitializationProvider.future).catchError((e) {
     AppLogger.error('Main: Ad initialization failed in background', e);
   });
@@ -71,11 +72,14 @@ class UniHubApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Initialize presence when user is logged in
-    // Optimization: only listen to UID to avoid redundant init calls on presence updates
+    // Initialize services when user is logged in (Scenario 4 & 5)
     ref.listen(appUserProvider.select((user) => user.valueOrNull?.uid), (previous, next) {
       if (next != null && previous == null) {
+        // First login or session restoration after cold start
         ref.read(presenceServiceProvider).init();
+      } else if (next == null && previous != null) {
+        // User logged out
+        ref.read(presenceServiceProvider).dispose();
       }
     });
 
