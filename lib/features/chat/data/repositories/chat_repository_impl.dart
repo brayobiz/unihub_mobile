@@ -227,6 +227,7 @@ class ChatRepositoryImpl implements ChatRepository {
         
         await _notificationSender.sendNotification(
           recipientId: recipientId,
+          actorId: message.senderId,
           actorName: actorName,
           title: isSupport ? (actorName != null ? 'UniHub Support ($actorName)' : 'UniHub Support') : 'New Message',
           body: message.type == MessageType.text ? message.content : 'Sent an attachment',

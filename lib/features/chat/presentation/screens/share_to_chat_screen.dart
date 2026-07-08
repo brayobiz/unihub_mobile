@@ -28,7 +28,7 @@ class _ShareToChatScreenState extends ConsumerState<ShareToChatScreen> {
   String _searchQuery = '';
   List<AppUser> _searchResults = [];
   bool _isLoadingResults = false;
-  bool _isSharing = false;
+  String? _sharingId;
 
   @override
   void dispose() {
@@ -139,12 +139,16 @@ class _ShareToChatScreenState extends ConsumerState<ShareToChatScreen> {
                     if (conversations.isEmpty) return _buildEmptyState();
                     return ListView.builder(
                       itemCount: conversations.length,
-                      itemBuilder: (context, index) => _ConversationShareTile(
-                        conversation: conversations[index],
-                        currentUserId: user.uid,
-                        onShare: (convId) => _handleShare(convId),
-                        isSharing: _isSharing,
-                      ),
+                      itemBuilder: (context, index) {
+                        final conv = conversations[index];
+                        return _ConversationShareTile(
+                          conversation: conv,
+                          currentUserId: user.uid,
+                          onShare: (convId) => _handleShare(convId),
+                          isSharing: _sharingId == conv.id,
+                          isDisabled: _sharingId != null && _sharingId != conv.id,
+                        );
+                      },
                     );
                   },
                   loading: () => const Center(child: CircularProgressIndicator()),
@@ -168,11 +172,17 @@ class _ShareToChatScreenState extends ConsumerState<ShareToChatScreen> {
                               title: Text(targetUser.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
                               subtitle: Text(CampusConstants.getDisplayName(targetUser.university)),
                               trailing: ElevatedButton(
-                                onPressed: _isSharing ? null : () => _handleShareWithUser(targetUser.uid),
+                                onPressed: _sharingId != null ? null : () => _handleShareWithUser(targetUser.uid),
                                 style: ElevatedButton.styleFrom(
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                                 ),
-                                child: const Text('Send'),
+                                child: _sharingId == targetUser.uid
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      )
+                                    : const Text('Send'),
                               ),
                             );
                           },
@@ -198,12 +208,15 @@ class _ShareToChatScreenState extends ConsumerState<ShareToChatScreen> {
   }
 
   Future<void> _handleShareWithUser(String otherUserId) async {
-    if (_isSharing) return;
-    setState(() => _isSharing = true);
+    if (_sharingId != null) return;
+    setState(() => _sharingId = otherUserId);
 
     try {
       final user = ref.read(authStateProvider).valueOrNull;
-      if (user == null) return;
+      if (user == null) {
+        setState(() => _sharingId = null);
+        return;
+      }
 
       // 1. Get or create conversation
       final conversationId = await ref.read(chatRepositoryProvider).getOrCreateConversation(
@@ -211,19 +224,22 @@ class _ShareToChatScreenState extends ConsumerState<ShareToChatScreen> {
         context: widget.shareContext,
       );
 
-      // 2. Send message - bypass isSharing check because we already set it
-      await _handleShare(conversationId, bypassCheck: true);
+      // 2. Send message - pass fromUserId to maintain the sharing state for the UI
+      await _handleShare(conversationId, fromUserId: otherUserId);
     } catch (e) {
       if (mounted) {
-        setState(() => _isSharing = false);
+        setState(() => _sharingId = null);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to start chat: $e')));
       }
     }
   }
 
-  Future<void> _handleShare(String conversationId, {bool bypassCheck = false}) async {
-    if (!bypassCheck && _isSharing) return;
-    if (!bypassCheck) setState(() => _isSharing = true);
+  Future<void> _handleShare(String conversationId, {String? fromUserId}) async {
+    // If fromUserId is null, we're coming directly from a conversation tile click
+    if (fromUserId == null) {
+      if (_sharingId != null) return;
+      setState(() => _sharingId = conversationId);
+    }
 
     try {
       final user = ref.read(authStateProvider).valueOrNull;
@@ -253,7 +269,7 @@ class _ShareToChatScreenState extends ConsumerState<ShareToChatScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _isSharing = false);
+      if (mounted) setState(() => _sharingId = null);
     }
   }
 }
@@ -263,12 +279,14 @@ class _ConversationShareTile extends ConsumerWidget {
   final String currentUserId;
   final Function(String) onShare;
   final bool isSharing;
+  final bool isDisabled;
 
   const _ConversationShareTile({
     required this.conversation,
     required this.currentUserId,
     required this.onShare,
     required this.isSharing,
+    required this.isDisabled,
   });
 
   @override
@@ -288,11 +306,17 @@ class _ConversationShareTile extends ConsumerWidget {
           title: Text(user.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
           subtitle: Text(CampusConstants.getDisplayName(user.university)),
           trailing: ElevatedButton(
-            onPressed: isSharing ? null : () => onShare(conversation.id),
+            onPressed: (isSharing || isDisabled) ? null : () => onShare(conversation.id),
             style: ElevatedButton.styleFrom(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             ),
-            child: const Text('Send'),
+            child: isSharing
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Send'),
           ),
         );
       },
