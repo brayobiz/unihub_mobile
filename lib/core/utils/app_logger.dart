@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'dart:developer' as developer;
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 class AppLogger {
   static void info(String message, [String? tag]) {
@@ -22,7 +23,16 @@ class AppLogger {
     
     // In production, we send to a crash reporting service
     if (kReleaseMode) {
-      FirebaseCrashlytics.instance.recordError(error, stackTrace, reason: message);
+      try {
+        // Only attempt to use Crashlytics if Firebase is initialized
+        if (Firebase.apps.isNotEmpty) {
+          FirebaseCrashlytics.instance.recordError(error, stackTrace, reason: message);
+        } else {
+          debugPrint('AppLogger: Skipping Crashlytics as Firebase is not initialized');
+        }
+      } catch (e) {
+        debugPrint('AppLogger: Failed to record error to Crashlytics: $e');
+      }
     }
   }
 

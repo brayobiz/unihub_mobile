@@ -9,7 +9,13 @@ import 'package:unihub_mobile/core/utils/app_logger.dart';
 class AuthRepositoryImpl implements AuthRepository {
   final FirebaseAuth _firebaseAuth;
   final FirebaseFirestore _firestore;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  
+  // RC-Investigate: Explicitly providing the serverClientId (Web Client ID from google-services.json)
+  // is required for Firebase to successfully exchange the Google ID token for a credential,
+  // especially in release builds where the default client resolution may fail.
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: '709843516792-ih005los2kr2ne5c58gbfmb0elm2hjqa.apps.googleusercontent.com',
+  );
 
   AuthRepositoryImpl(this._firebaseAuth, this._firestore);
 

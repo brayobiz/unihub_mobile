@@ -32,7 +32,7 @@ if (flutterVersionName == null) {
 
 android {
     namespace "com.unihub.unihub_mobile"
-    compileSdk 36
+    compileSdk 35
     ndkVersion flutter.ndkVersion
 
     compileOptions {
@@ -55,7 +55,7 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
         minSdkVersion flutter.minSdkVersion
-        targetSdk 36
+        targetSdk 35
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
     }
@@ -74,8 +74,8 @@ android {
             signingConfig signingConfigs.release
             
             // Enable R8/Proguard for code shrinking and obfuscation
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled false
+            shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -88,4 +88,16 @@ flutter {
 dependencies {
     implementation "androidx.multidex:multidex:2.0.1"
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.3'
+    
+    // Force specific stable versions to avoid API 36 requirements
+    configurations.all {
+        resolutionStrategy {
+            force 'androidx.browser:browser:1.8.0'
+            force 'androidx.activity:activity:1.9.3'
+            force 'androidx.activity:activity-ktx:1.9.3'
+            force 'androidx.core:core:1.13.1'
+            force 'androidx.core:core-ktx:1.13.1'
+            force 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.6'
+        }
+    }
 }

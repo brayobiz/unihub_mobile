@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,44 +28,69 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  _initProductionDiagnostics();
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    
+    // RC-Investigate: Moving diagnostic initialization AFTER Firebase init.
+    // Accessing FirebaseCrashlytics.instance before Firebase.initializeApp() 
+    // can cause a deadlock/hang in release builds.
+    
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ).timeout(const Duration(seconds: 15));
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+    // Initialize diagnostics only after Firebase is ready
+    _initProductionDiagnostics();
 
-  // Enable offline persistence for better network resilience (Scenario 7)
-  FirebaseFirestore.instance.settings = const Settings(
-    persistenceEnabled: true,
-    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-  );
+    // Enable offline persistence for better network resilience (Scenario 7)
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    );
 
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  final sharedPreferences = await SharedPreferences.getInstance();
+    final sharedPreferences = await SharedPreferences.getInstance();
 
-  final container = ProviderContainer(
-    overrides: [
-      sharedPreferencesProvider.overrideWithValue(sharedPreferences),
-    ],
-  );
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+      ],
+    );
 
-  // Initialize global services
-  container.read(notificationServiceProvider).init();
-  container.read(appLifecycleServiceProvider).init();
+    // Initialize global services IN BACKGROUND to prevent startup hang
+    // Note: unawaited requires 'import dart:async'
+    unawaited(container.read(notificationServiceProvider).init().catchError((e) {
+      AppLogger.error('Main: Notification Service init failed', e);
+    }));
+    
+    container.read(appLifecycleServiceProvider).init();
 
-  // Initialize Ads asynchronously in background
-  container.read(adInitializationProvider.future).catchError((e) {
-    AppLogger.error('Main: Ad initialization failed in background', e);
-  });
+    // Initialize Ads asynchronously in background
+    container.read(adInitializationProvider.future).catchError((e) {
+      AppLogger.error('Main: Ad initialization failed in background', e);
+    });
 
-  runApp(
-    UncontrolledProviderScope(
-      container: container,
-      child: const UniHubApp(),
-    ),
-  );
+    runApp(
+      UncontrolledProviderScope(
+        container: container,
+        child: const UniHubApp(),
+      ),
+    );
+  } catch (e, stack) {
+    AppLogger.error('FATAL Startup Error', e, stack);
+    // Emergency launch to prevent "Launching Forever" screen
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          body: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Center(child: Text('App failed to start: $e\nPlease restart the app.')),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class UniHubApp extends ConsumerWidget {
