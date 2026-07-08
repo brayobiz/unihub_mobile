@@ -214,30 +214,48 @@ class CreateOrganizerController extends StateNotifier<CreateOrganizerState> {
         );
       }
 
-      final organizer = Organizer(
-        id: state.id,
-        ownerId: user.uid,
-        name: state.name,
-        bio: state.bio,
-        logoUrl: logoUrl,
-        bannerUrl: bannerUrl,
-        campusId: state.campusId,
-        type: state.type,
-        contactEmail: state.contactEmail.isEmpty ? null : state.contactEmail,
-        contactPhone: state.contactPhone.isEmpty ? null : state.contactPhone,
-        socialLinks: state.socialLinks,
-        createdAt: state.isEditing 
-            ? (_ref.read(organizerProvider(state.id)).value?.createdAt ?? DateTime.now())
-            : DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
+      Organizer organizer;
+      if (state.isEditing) {
+        final current = _ref.read(organizerProvider(state.id)).value;
+        if (current == null) throw Exception('Organizer not found');
+        
+        organizer = current.copyWith(
+          name: state.name,
+          bio: state.bio,
+          logoUrl: logoUrl,
+          bannerUrl: bannerUrl,
+          type: state.type,
+          contactEmail: state.contactEmail.isEmpty ? null : state.contactEmail,
+          contactPhone: state.contactPhone.isEmpty ? null : state.contactPhone,
+          socialLinks: state.socialLinks,
+          updatedAt: DateTime.now(),
+        );
+      } else {
+        organizer = Organizer(
+          id: state.id,
+          ownerId: user.uid,
+          name: state.name,
+          bio: state.bio,
+          logoUrl: logoUrl,
+          bannerUrl: bannerUrl,
+          campusId: state.campusId,
+          type: state.type,
+          contactEmail: state.contactEmail.isEmpty ? null : state.contactEmail,
+          contactPhone: state.contactPhone.isEmpty ? null : state.contactPhone,
+          socialLinks: state.socialLinks,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+      }
 
       if (state.isEditing) {
         await _ref.read(organizerRepositoryProvider).updateOrganizer(organizer);
         
-        // If it was rejected, move it back to underReview upon edit
-        final current = _ref.read(organizerProvider(state.id)).value;
-        if (current?.verificationStatus == OrganizerVerificationStatus.rejected) {
+        // If it was rejected or in draft, move it back to underReview upon edit
+        final currentStatus = _ref.read(organizerProvider(state.id)).value?.verificationStatus;
+        if (currentStatus == OrganizerVerificationStatus.rejected || 
+            currentStatus == OrganizerVerificationStatus.draft ||
+            currentStatus == OrganizerVerificationStatus.withdrawn) {
           await _ref.read(organizerServiceProvider).submitForReview(organizer.id, user.uid);
         }
       } else {

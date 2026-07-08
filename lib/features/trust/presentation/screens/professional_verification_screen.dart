@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/trust/domain/models/professional_role.dart';
 import 'package:unihub_mobile/features/trust/domain/models/verification_application.dart';
@@ -28,19 +29,15 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
   File? _idDocumentFile;
   File? _selfieFile;
   bool _isSubmitting = false;
+  bool _isInitialized = false;
   final _picker = ImagePicker();
 
-  @override
-  void initState() {
-    super.initState();
-    // Pre-fill name from user profile
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final user = ref.read(appUserProvider).valueOrNull;
-      if (user != null) {
-        _nameController.text = user.fullName;
-        _phoneController.text = user.phoneNumber ?? '';
-      }
-    });
+  void _initializeData(AppUser? user) {
+    if (user != null && !_isInitialized) {
+      _nameController.text = user.fullName;
+      _phoneController.text = user.phoneNumber ?? user.whatsappNumber ?? '';
+      _isInitialized = true;
+    }
   }
 
   @override
@@ -72,17 +69,18 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
     
     // Capture context before async gap
     final messenger = ScaffoldMessenger.of(context);
-    final router = GoRouter.of(context);
+    final router = Navigator.of(context);
     
     final user = ref.read(appUserProvider).valueOrNull;
     if (user == null) return;
     
-    final bool needsIdentity = !user.isVerified;
+    // Only require identity uploads if they haven't been submitted yet or were rejected
+    final bool needsIdentitySubmission = user.identityStatus == 'none' || user.identityStatus == 'rejected' || user.identityStatus == 'resubmissionRequested';
 
-    if (needsIdentity && (_idDocumentFile == null || _selfieFile == null)) {
+    if (needsIdentitySubmission && (_idDocumentFile == null || _selfieFile == null)) {
       messenger.showSnackBar(
         const SnackBar(
-          content: Text('Please upload both ID and selfie'),
+          content: Text('Please upload both ID and selfie for identity verification'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -96,18 +94,20 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
       String? idUrl;
       String? selfieUrl;
       
-      if (needsIdentity) {
+      if (needsIdentitySubmission) {
         // Upload images using Platform Storage Repository
         idUrl = await storage.uploadFile(
-          path: 'verifications/${widget.role.name}/docs',
+          path: 'verifications/identity/ids',
           id: 'id_${user.uid}_${DateTime.now().millisecondsSinceEpoch}',
           file: _idDocumentFile!,
+          isPrivate: true,
         );
 
         selfieUrl = await storage.uploadFile(
-          path: 'verifications/${widget.role.name}/selfies',
+          path: 'verifications/identity/selfies',
           id: 'selfie_${user.uid}_${DateTime.now().millisecondsSinceEpoch}',
           file: _selfieFile!,
+          isPrivate: true,
         );
       }
 
@@ -127,9 +127,9 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
       
       // Invalidate to refresh UI
       ref.invalidate(userApplicationsProvider);
+      ref.invalidate(appUserProvider); // Important to update the global user state
 
       if (mounted) {
-        // Pop first
         router.pop();
         messenger.showSnackBar(
           const SnackBar(
@@ -160,127 +160,182 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primaryColor = theme.colorScheme.primary;
-    final user = ref.watch(appUserProvider).valueOrNull;
-    final bool isVerified = user?.isVerified ?? false;
-
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: theme.colorScheme.surface,
-        elevation: 0,
-        title: Text('Role Application', 
-          style: GoogleFonts.plusJakartaSans(
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.onSurface,
-          )),
-        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildExplanationHeader(context),
-            Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Personal Details',
-                      style: TextStyle(
-                        fontSize: 18, 
-                        fontWeight: FontWeight.w900, 
-                        color: theme.colorScheme.onSurface
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      context,
-                      controller: _nameController,
-                      label: 'Full Name (as on ID)',
-                      hint: 'Enter your legal name',
-                      icon: Icons.person_outline_rounded,
-                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      context,
-                      controller: _phoneController,
-                      label: 'Phone Number',
-                      hint: 'Enter your WhatsApp/Phone number',
-                      icon: Icons.phone_android_rounded,
-                      keyboardType: TextInputType.phone,
-                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                    ),
-                    
-                    if (!isVerified) ...[
-                      const SizedBox(height: 32),
-                      Text(
-                        'Identity Verification',
-                        style: TextStyle(
-                          fontSize: 18, 
-                          fontWeight: FontWeight.w900, 
-                          color: theme.colorScheme.onSurface
+    final userAsync = ref.watch(appUserProvider);
+    
+    return userAsync.when(
+      data: (user) {
+        _initializeData(user);
+        
+        // Hide identity section if it's already approved, pending, or under review
+        final bool showIdentitySection = user?.identityStatus == 'none' || 
+                                         user?.identityStatus == 'rejected' || 
+                                         user?.identityStatus == 'resubmissionRequested';
+        
+        return Scaffold(
+          backgroundColor: theme.scaffoldBackgroundColor,
+          appBar: AppBar(
+            backgroundColor: theme.colorScheme.surface,
+            elevation: 0,
+            title: Text('Role Application', 
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface,
+              )),
+            iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
+          ),
+          body: SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildExplanationHeader(context),
+                Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Personal Details',
+                          style: TextStyle(
+                            fontSize: 18, 
+                            fontWeight: FontWeight.w900, 
+                            color: theme.colorScheme.onSurface
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'We need to verify your identity to grant you the ${widget.role.label} badge.',
-                        style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14),
-                      ),
-                      const SizedBox(height: 20),
-                      
-                      _buildUploadTile(
-                        context,
-                        title: 'National ID / Driver\'s License',
-                        subtitle: 'Upload a clear photo of your official ID',
-                        file: _idDocumentFile,
-                        onTap: () => _pickImage(false),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildUploadTile(
-                        context,
-                        title: 'Live Selfie',
-                        subtitle: 'Take a clear photo of your face',
-                        file: _selfieFile,
-                        onTap: () => _pickImage(true),
-                        isCamera: true,
-                      ),
-                    ],
-                    
-                    const SizedBox(height: 48),
-                    
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        onPressed: _isSubmitting ? null : _submit,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          elevation: 0,
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          context,
+                          controller: _nameController,
+                          label: 'Full Name (as on ID)',
+                          hint: 'Enter your legal name',
+                          icon: Icons.person_outline_rounded,
+                          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                         ),
-                        child: _isSubmitting
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                              )
-                            : const Text(
-                                'Submit Application',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                              ),
-                      ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          context,
+                          controller: _phoneController,
+                          label: 'Phone Number',
+                          hint: 'Enter your WhatsApp/Phone number',
+                          icon: Icons.phone_android_rounded,
+                          keyboardType: TextInputType.phone,
+                          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                        ),
+                        
+                        if (showIdentitySection) ...[
+                          const SizedBox(height: 32),
+                          Text(
+                            'Identity Verification',
+                            style: TextStyle(
+                              fontSize: 18, 
+                              fontWeight: FontWeight.w900, 
+                              color: theme.colorScheme.onSurface
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            user?.identityStatus == 'resubmissionRequested' 
+                              ? 'Your previous identity documents need to be resubmitted. Please upload them again below.'
+                              : 'We need to verify your identity to grant you the ${widget.role.label} badge. This will also verify your platform identity.',
+                            style: TextStyle(color: user?.identityStatus == 'resubmissionRequested' ? Colors.orange : theme.colorScheme.onSurfaceVariant, fontSize: 14),
+                          ),
+                          const SizedBox(height: 20),
+                          
+                          _buildUploadTile(
+                            context,
+                            title: 'National ID / Driver\'s License',
+                            subtitle: 'Upload a clear photo of your official ID',
+                            file: _idDocumentFile,
+                            onTap: () => _pickImage(false),
+                          ),
+                          const SizedBox(height: 16),
+                          _buildUploadTile(
+                            context,
+                            title: 'Live Selfie',
+                            subtitle: 'Take a clear photo of your face',
+                            file: _selfieFile,
+                            onTap: () => _pickImage(true),
+                            isCamera: true,
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 32),
+                          _buildIdentityStatusBanner(context, user!),
+                        ],
+                        
+                        const SizedBox(height: 48),
+                        
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: ElevatedButton(
+                            onPressed: _isSubmitting ? null : _submit,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryColor,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              elevation: 0,
+                            ),
+                            child: _isSubmitting
+                                ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                  )
+                                : const Text(
+                                    'Submit Application',
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+                      ],
                     ),
-                    const SizedBox(height: 40),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+        );
+      },
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
+    );
+  }
+
+  Widget _buildIdentityStatusBanner(BuildContext context, AppUser user) {
+    final theme = Theme.of(context);
+    final bool isApproved = user.identityStatus == 'approved';
+    final Color color = isApproved ? const Color(0xFF10B981) : Colors.orange;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(isApproved ? Icons.verified_user_rounded : Icons.pending_actions_rounded, color: color),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isApproved ? 'Identity Verified' : 'Identity Verification Pending',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: color),
+                ),
+                Text(
+                  isApproved 
+                    ? 'Your platform identity is already confirmed.' 
+                    : 'Your identity is currently being reviewed. You don\'t need to re-upload documents.',
+                  style: TextStyle(fontSize: 12, color: color.withValues(alpha: 0.8)),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
+import 'package:unihub_mobile/features/trust/domain/models/identity_verification.dart';
 import 'package:unihub_mobile/features/trust/presentation/providers/trust_providers.dart';
 import 'package:unihub_mobile/features/shared/storage_repository.dart';
 
@@ -41,7 +43,7 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
 
     // Capture services before async gap
     final messenger = ScaffoldMessenger.of(context);
-    final router = GoRouter.of(context);
+    final router = Navigator.of(context);
 
     setState(() {
       _isSubmitting = true;
@@ -89,6 +91,7 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
 
       // 4. Invalidate provider to force a fresh fetch
       ref.invalidate(identityVerificationProvider);
+      ref.invalidate(appUserProvider);
 
       if (mounted) {
         // Pop first, then show snackbar
@@ -119,6 +122,9 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final identityAsync = ref.watch(identityVerificationProvider);
+    final user = ref.watch(appUserProvider).valueOrNull;
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
@@ -136,22 +142,41 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Identity Verification',
-              style: TextStyle(
-                fontSize: 24, 
-                fontWeight: FontWeight.w900, 
-                color: theme.colorScheme.onSurface
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Verify your legal identity once to unlock professional roles across the entire UniHub platform.',
-              style: TextStyle(
-                fontSize: 15, 
-                color: theme.colorScheme.onSurfaceVariant, 
-                height: 1.5
-              ),
+            identityAsync.when(
+              data: (v) {
+                final isResubmit = v?.status == IdentityVerificationStatus.resubmissionRequested || user?.identityStatus == 'resubmissionRequested';
+                final isRejected = v?.status == IdentityVerificationStatus.rejected || user?.identityStatus == 'rejected';
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isResubmit || isRejected ? 'Update Identity' : 'Identity Verification',
+                      style: TextStyle(
+                        fontSize: 24, 
+                        fontWeight: FontWeight.w900, 
+                        color: theme.colorScheme.onSurface
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (isResubmit && v?.rejectionReason != null)
+                      _buildAlert(context, 'Correction Needed', v!.rejectionReason!, Colors.orange)
+                    else if (isRejected && v?.rejectionReason != null)
+                      _buildAlert(context, 'Previously Rejected', v!.rejectionReason!, theme.colorScheme.error)
+                    else
+                      Text(
+                        'Verify your legal identity once to unlock professional roles across the entire UniHub platform.',
+                        style: TextStyle(
+                          fontSize: 15, 
+                          color: theme.colorScheme.onSurfaceVariant, 
+                          height: 1.5
+                        ),
+                      ),
+                  ],
+                );
+              },
+              loading: () => const SizedBox(height: 80),
+              error: (_, __) => const SizedBox.shrink(),
             ),
             const SizedBox(height: 32),
             
@@ -213,6 +238,32 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildAlert(BuildContext context, String title, String message, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: color, size: 20),
+              const SizedBox(width: 8),
+              Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(message, style: TextStyle(fontSize: 13, color: color.withValues(alpha: 0.9), height: 1.4)),
+        ],
       ),
     );
   }

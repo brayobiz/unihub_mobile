@@ -15,9 +15,33 @@ class TrustRepositoryImpl implements TrustRepository {
 
   @override
   Future<void> submitProfessionalApplication(VerificationApplication application) async {
-    await _firestore.collection('verification_applications').doc(application.id).set(
-      application.toFirestore(),
-    );
+    final batch = _firestore.batch();
+    
+    // 1. Create the professional application
+    final appRef = _firestore.collection('verification_applications').doc(application.id);
+    batch.set(appRef, application.toFirestore());
+
+    // 2. If identity documents are provided, also create an identity verification record
+    // this ensures the identity journey is also tracked.
+    if (application.idDocumentUrl != null && application.selfieUrl != null) {
+      final identityRef = _firestore.collection('identity_verifications').doc(application.userId);
+      batch.set(identityRef, {
+        'userId': application.userId,
+        'idDocumentUrl': application.idDocumentUrl,
+        'selfieUrl': application.selfieUrl,
+        'status': 'pending',
+        'submittedAt': FieldValue.serverTimestamp(),
+        'source': 'professional_application',
+        'roleType': application.role.name,
+      });
+
+      // Update user status for immediate UI feedback
+      batch.update(_firestore.collection('users').doc(application.userId), {
+        'identityStatus': 'pending',
+      });
+    }
+
+    await batch.commit();
 
     if (_notificationSender != null) {
       await _notificationSender!.notifyAdmins(

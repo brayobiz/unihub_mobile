@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
+import 'package:unihub_mobile/features/trust/domain/models/student_verification.dart';
 import 'package:unihub_mobile/features/trust/presentation/providers/trust_providers.dart';
 import 'package:unihub_mobile/features/shared/storage_repository.dart';
 
@@ -39,7 +41,7 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
 
     // Capture context-dependent services BEFORE any async gaps
     final messenger = ScaffoldMessenger.of(context);
-    final router = GoRouter.of(context);
+    final router = Navigator.of(context);
 
     setState(() {
       _isSubmitting = true;
@@ -70,6 +72,10 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
 
       // 3. Invalidate provider to force a fresh fetch of the verification status
       ref.invalidate(studentVerificationProvider);
+      
+      // Also update the appUserProvider to reflect the 'pending' status immediately if needed
+      // (The repository already updates the user doc, but triggering a refresh helps)
+      ref.invalidate(appUserProvider);
 
       if (mounted) {
         // Pop first, then show snackbar so it appears on the parent screen
@@ -105,6 +111,8 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primaryColor = theme.colorScheme.primary;
+    final verificationAsync = ref.watch(studentVerificationProvider);
+    final user = ref.watch(appUserProvider).valueOrNull;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -123,23 +131,45 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Confirm your enrollment',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w900,
-                color: theme.colorScheme.onSurface,
-                letterSpacing: -0.5,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Upload a clear photo of your Student ID card. This helps us ensure that UniHub remains a safe community for verified students.',
-              style: TextStyle(
-                fontSize: 15,
-                color: theme.colorScheme.onSurfaceVariant,
-                height: 1.5,
-              ),
+            verificationAsync.when(
+              data: (v) {
+                final isResubmit = v?.status == StudentVerificationStatus.resubmissionRequested || user?.studentStatus == 'resubmissionRequested';
+                final isExpired = v?.status == StudentVerificationStatus.expired || user?.studentStatus == 'expired';
+                final isRejected = v?.status == StudentVerificationStatus.rejected || user?.studentStatus == 'rejected';
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isResubmit || isExpired || isRejected ? 'Update Enrollment' : 'Confirm your enrollment',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: theme.colorScheme.onSurface,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (isResubmit && v?.rejectionReason != null) 
+                      _buildAlert(context, 'Correction Needed', v!.rejectionReason!, Colors.orange)
+                    else if (isExpired)
+                      _buildAlert(context, 'ID Expired', 'Your previous student verification has expired. Please upload a current Student ID.', Colors.orange)
+                    else if (isRejected && v?.rejectionReason != null)
+                      _buildAlert(context, 'Previously Rejected', v!.rejectionReason!, theme.colorScheme.error)
+                    else
+                      Text(
+                        'Upload a clear photo of your Student ID card. This helps us ensure that UniHub remains a safe community for verified students.',
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: theme.colorScheme.onSurfaceVariant,
+                          height: 1.5,
+                        ),
+                      ),
+                  ],
+                );
+              },
+              loading: () => const SizedBox(height: 80),
+              error: (_, __) => const SizedBox.shrink(),
             ),
             const SizedBox(height: 32),
             
@@ -153,7 +183,7 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
                   color: theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
-                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+                    color: _imageFile != null ? const Color(0xFF10B981) : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
                     width: 2,
                     style: _imageFile == null ? BorderStyle.solid : BorderStyle.none,
                   ),
@@ -258,6 +288,32 @@ class _StudentVerificationScreenState extends ConsumerState<StudentVerificationS
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildAlert(BuildContext context, String title, String message, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: color, size: 20),
+              const SizedBox(width: 8),
+              Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(message, style: TextStyle(fontSize: 13, color: color.withValues(alpha: 0.9), height: 1.4)),
+        ],
       ),
     );
   }

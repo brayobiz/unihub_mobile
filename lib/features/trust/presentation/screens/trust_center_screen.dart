@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
+import 'package:unihub_mobile/features/trust/domain/models/professional_role.dart';
+import 'package:unihub_mobile/features/trust/domain/models/verification_application.dart';
 import 'package:unihub_mobile/features/trust/presentation/providers/trust_providers.dart';
 import 'package:unihub_mobile/features/trust/domain/models/student_verification.dart';
 import 'package:unihub_mobile/features/trust/domain/models/identity_verification.dart';
@@ -17,6 +19,7 @@ class TrustCenterScreen extends ConsumerWidget {
     final appUserAsync = ref.watch(appUserProvider);
     final studentVerificationAsync = ref.watch(studentVerificationProvider);
     final identityVerificationAsync = ref.watch(identityVerificationProvider);
+    final userApplicationsAsync = ref.watch(userApplicationsProvider);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -62,7 +65,7 @@ class TrustCenterScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Platform Verification',
+                        'Trust Milestones',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
@@ -72,7 +75,7 @@ class TrustCenterScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'These verifications establish your identity across all of UniHub.',
+                        'These verifications establish your standing across all of UniHub.',
                         style: TextStyle(
                           fontSize: 14,
                           color: theme.colorScheme.onSurfaceVariant,
@@ -106,6 +109,57 @@ class TrustCenterScreen extends ConsumerWidget {
                         error: (e, _) => _buildErrorCard(context, 'Identity Verification Error: $e'),
                       ),
                     ],
+                  ),
+                ),
+              ),
+
+              // 3.5 Professional Roles
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 32, 16, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Professional Status',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: theme.colorScheme.onSurface,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Roles you can apply for to unlock specialized features.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: userApplicationsAsync.when(
+                    data: (apps) => Column(
+                      children: ProfessionalRole.values.map((role) {
+                        final app = apps.where((a) => a.role == role).firstOrNull;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _buildRoleCard(context, user, role, app),
+                        );
+                      }).toList(),
+                    ),
+                    loading: () => const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    error: (e, _) => _buildErrorCard(context, 'Roles Error: $e'),
                   ),
                 ),
               ),
@@ -480,6 +534,7 @@ class TrustCenterScreen extends ConsumerWidget {
     final bool isRejected = v?.status == StudentVerificationStatus.rejected || user.studentStatus == 'rejected';
     final bool isUnderReview = v?.status == StudentVerificationStatus.underReview || user.studentStatus == 'underReview';
     final bool isResubmit = v?.status == StudentVerificationStatus.resubmissionRequested || user.studentStatus == 'resubmissionRequested';
+    final bool isExpired = v?.status == StudentVerificationStatus.expired || user.studentStatus == 'expired';
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -487,7 +542,7 @@ class TrustCenterScreen extends ConsumerWidget {
         color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isVerified ? const Color(0xFF10B981) : (isRejected ? theme.colorScheme.error : (isResubmit ? Colors.orange : theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
+          color: isVerified ? const Color(0xFF10B981) : (isRejected ? theme.colorScheme.error : (isResubmit || isExpired ? Colors.orange : theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
           width: 1,
         ),
         boxShadow: [
@@ -506,12 +561,12 @@ class TrustCenterScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: (isVerified ? const Color(0xFF10B981) : (isRejected ? theme.colorScheme.error : (isResubmit ? Colors.orange : theme.colorScheme.primary))).withValues(alpha: 0.1),
+                  color: (isVerified ? const Color(0xFF10B981) : (isRejected ? theme.colorScheme.error : (isResubmit || isExpired ? Colors.orange : theme.colorScheme.primary))).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  isVerified ? Icons.school_rounded : (isRejected ? Icons.error_outline_rounded : (isResubmit ? Icons.refresh_rounded : Icons.school_outlined)),
-                  color: isVerified ? const Color(0xFF10B981) : (isRejected ? theme.colorScheme.error : (isResubmit ? Colors.orange : theme.colorScheme.primary)),
+                  isVerified ? Icons.school_rounded : (isRejected ? Icons.error_outline_rounded : (isResubmit || isExpired ? Icons.refresh_rounded : Icons.school_outlined)),
+                  color: isVerified ? const Color(0xFF10B981) : (isRejected ? theme.colorScheme.error : (isResubmit || isExpired ? Colors.orange : theme.colorScheme.primary)),
                   size: 24,
                 ),
               ),
@@ -537,12 +592,14 @@ class TrustCenterScreen extends ConsumerWidget {
                             ? 'Actively being reviewed'
                             : isResubmit
                               ? 'Action required: Resubmit ID'
-                              : isRejected 
-                                ? 'Verification rejected'
-                                : 'Verify your campus enrollment',
+                              : isExpired
+                                ? 'Verification expired'
+                                : isRejected 
+                                  ? 'Verification rejected'
+                                  : 'Verify your campus enrollment',
                       style: TextStyle(
                         fontSize: 13,
-                        color: isRejected ? theme.colorScheme.error : (isResubmit ? Colors.orange : theme.colorScheme.onSurfaceVariant),
+                        color: isRejected ? theme.colorScheme.error : (isResubmit || isExpired ? Colors.orange : theme.colorScheme.onSurfaceVariant),
                       ),
                     ),
                   ],
@@ -554,6 +611,8 @@ class TrustCenterScreen extends ConsumerWidget {
                 _buildStatusBadge(context, isUnderReview ? 'Reviewing' : 'Pending', Colors.orange)
               else if (isResubmit)
                 _buildStatusBadge(context, 'Resubmit', Colors.orange)
+              else if (isExpired)
+                _buildStatusBadge(context, 'Expired', Colors.orange)
               else if (isRejected)
                 _buildStatusBadge(context, 'Rejected', theme.colorScheme.error)
             ],
@@ -568,6 +627,10 @@ class TrustCenterScreen extends ConsumerWidget {
             const SizedBox(height: 12),
             _buildWarningBox(context, 'Resubmission Needed: ${v!.rejectionReason}'),
           ],
+          if (isExpired) ...[
+            const SizedBox(height: 12),
+            _buildWarningBox(context, 'Your student verification has expired. Please upload a current ID.'),
+          ],
           if (isRejected && v?.rejectionReason != null) ...[
             const SizedBox(height: 12),
             _buildErrorBox(context, 'Reason: ${v!.rejectionReason}'),
@@ -579,13 +642,13 @@ class TrustCenterScreen extends ConsumerWidget {
               child: ElevatedButton(
                 onPressed: () => context.push('/verify-student'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isRejected ? theme.colorScheme.error : (isResubmit ? Colors.orange : theme.colorScheme.primary),
+                  backgroundColor: isRejected ? theme.colorScheme.error : (isResubmit || isExpired ? Colors.orange : theme.colorScheme.primary),
                   foregroundColor: Colors.white,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: Text(isResubmit ? 'Resubmit Student ID' : 'Verify Student Status', style: const TextStyle(fontWeight: FontWeight.w700)),
+                child: Text(isResubmit || isExpired ? 'Resubmit Student ID' : 'Verify Student Status', style: const TextStyle(fontWeight: FontWeight.w700)),
               ),
             ),
           ],
@@ -734,6 +797,107 @@ class TrustCenterScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildRoleCard(BuildContext context, AppUser user, ProfessionalRole role, VerificationApplication? app) {
+    final theme = Theme.of(context);
+    final bool isVerified = user.verifiedRoles.contains(role.name);
+    final bool isPending = app?.status == VerificationStatus.pending;
+    final bool isRejected = app?.status == VerificationStatus.rejected;
+    
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isVerified ? const Color(0xFF10B981) : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: (isVerified ? const Color(0xFF10B981) : theme.colorScheme.primary).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  _getRoleIcon(role),
+                  color: isVerified ? const Color(0xFF10B981) : theme.colorScheme.primary,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      role.label,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    Text(
+                      isVerified 
+                        ? 'Professional status active' 
+                        : isPending 
+                          ? 'Application under review' 
+                          : isRejected 
+                            ? 'Application rejected'
+                            : 'Click to apply for this role',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isRejected ? theme.colorScheme.error : theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isVerified)
+                const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981))
+              else if (isPending)
+                _buildStatusBadge(context, 'Pending', Colors.orange)
+              else if (isRejected)
+                _buildStatusBadge(context, 'Rejected', theme.colorScheme.error)
+            ],
+          ),
+          if (!isVerified && !isPending) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => context.push('/verify-professional/${role.name}'),
+                style: OutlinedButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: Text(isRejected ? 'Re-apply as ${role.label}' : 'Apply as ${role.label}', 
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  IconData _getRoleIcon(ProfessionalRole role) {
+    switch (role) {
+      case ProfessionalRole.seller: return Icons.shopping_bag_rounded;
+      case ProfessionalRole.housePlug: return Icons.home_work_rounded;
+      case ProfessionalRole.tutor: return Icons.menu_book_rounded;
+      case ProfessionalRole.serviceProvider: return Icons.handyman_rounded;
+      case ProfessionalRole.technician: return Icons.memory_rounded;
+      case ProfessionalRole.business: return Icons.business_center_rounded;
+    }
   }
 
   Widget _buildBreakdownItem(BuildContext context, IconData icon, String title, String subtitle, bool isPositive) {
