@@ -1537,39 +1537,118 @@ class _SafetyBanner extends StatelessWidget {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(top: 24),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.shield_outlined, color: AppColors.success),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Buy safely on UniHub', 
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold, 
-                      fontSize: 14,
-                      color: theme.colorScheme.onSurface,
+      child: InkWell(
+        onTap: () => _showSafetyChecklist(context),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.success.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.success.withOpacity(0.2)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.security_rounded, color: AppColors.success),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Buy safely on UniHub', 
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900, 
+                        fontSize: 14,
+                        color: theme.colorScheme.onSurface,
+                      ),
                     ),
-                  ),
-                  Text(
-                    'Meet in a public place and inspect before you pay.', 
-                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
-                  ),
-                ],
+                    Text(
+                      '5 essential tips for a secure transaction.', 
+                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.success, size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSafetyChecklist(BuildContext context) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: theme.colorScheme.outlineVariant, borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 24),
+            Text('Safety First', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
+            const SizedBox(height: 8),
+            Text('Always follow these rules to avoid fraud:', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 32),
+            _safetyItem(context, Icons.location_on_rounded, 'Public Meetings', 'Always meet the seller in a busy, public location on campus (e.g., Student Centre).'),
+            _safetyItem(context, Icons.visibility_rounded, 'Inspect First', 'Never pay before you have physically inspected and tested the item.'),
+            _safetyItem(context, Icons.bolt_rounded, 'Test Gadgets', 'For electronics, ensure you test all functions (camera, charging, sound) before leaving.'),
+            _safetyItem(context, Icons.payments_rounded, 'Traceable Payments', 'Use M-PESA or Bank transfers for a digital record. Avoid cash payments.'),
+            _safetyItem(context, Icons.report_problem_rounded, 'No Advance Fees', 'Refuse any requests for "delivery fees" or "commitment fees" before seeing the item.'),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              height: 58,
+              child: FilledButton(
+                onPressed: () => Navigator.pop(context),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.marketplaceBlue,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                child: const Text('I Understand', style: TextStyle(fontWeight: FontWeight.w900)),
               ),
             ),
-            Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+            const SizedBox(height: 16),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _safetyItem(BuildContext context, IconData icon, String title, String body) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: AppColors.marketplaceBlue.withOpacity(0.1), shape: BoxShape.circle),
+            child: Icon(icon, color: AppColors.marketplaceBlue, size: 20),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const SizedBox(height: 4),
+                Text(body, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, height: 1.4)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
