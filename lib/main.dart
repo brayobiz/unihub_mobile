@@ -52,6 +52,12 @@ Future<void> main() async {
   // Initialize notifications
   container.read(notificationServiceProvider).init();
 
+  // Initialize Ads asynchronously in background (RC-1 FTUE optimization)
+  // We don't await this to ensure app launch is not blocked.
+  container.read(adInitializationProvider.future).catchError((e) {
+    AppLogger.error('Main: Ad initialization failed in background', e);
+  });
+
   runApp(
     UncontrolledProviderScope(
       container: container,

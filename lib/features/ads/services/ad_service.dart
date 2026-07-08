@@ -11,6 +11,9 @@ class AdService {
 
   bool get isInitialized => _isInitialized;
 
+  InterstitialAd? _preloadedInterstitialAd;
+  bool _isPreloadingInterstitial = false;
+
   /// Initializes the Mobile Ads SDK and requests consent if necessary.
   Future<void> initialize() async {
     if (_isInitialized) return;
@@ -62,6 +65,9 @@ class AdService {
         (error) => _log('Consent update failed: ${error.message}', isError: true),
       );
       
+      // 3. Start pre-loading ads in the background to avoid interfering with user journey
+      preloadInterstitialAd();
+
       if (kDebugMode) {
         final adapterStatuses = status.adapterStatuses;
         adapterStatuses.forEach((key, value) {
@@ -75,56 +81,83 @@ class AdService {
     }
   }
 
-  /// Explicitly show the consent form if required.
-  Future<void> showConsentFormIfRequired() async {
-    if (!AdConfig.enabled) return;
+  /// Pre-loads an interstitial ad to be ready when needed.
+  Future<void> preloadInterstitialAd() async {
+    if (!AdConfig.enabled || _isPreloadingInterstitial || _preloadedInterstitialAd != null) return;
     
-    ConsentForm.loadConsentForm(
-      (consentForm) async {
-        final status = await ConsentInformation.instance.getConsentStatus();
-        if (status == ConsentStatus.required) {
-          consentForm.show((formError) {
-            if (formError != null) {
-              _log('Consent form show error: ${formError.message}', isError: true);
-            }
-          });
-        }
-      },
-      (formError) => _log('Form load failed: ${formError.message}', isError: true),
-    );
-  }
-
-  void _log(String message, {bool isError = false, Object? error, StackTrace? stackTrace}) {
-    if (!AdConfig.enableLogging) return;
-
-    if (isError) {
-      AppLogger.error(message, error, stackTrace, 'AdService');
-    } else {
-      AppLogger.info(message, 'AdService');
-    }
-  }
-
-  // Future expansion points for different ad types
-  // These will be implemented in future phases
-  
-  /// Loads an interstitial ad.
-  Future<void> loadInterstitialAd({
-    required Function(InterstitialAd ad) onAdLoaded,
-    Function(LoadAdError error)? onAdFailedToLoad,
-  }) async {
-    if (!AdConfig.enabled) return;
+    _isPreloadingInterstitial = true;
+    _log('Pre-loading InterstitialAd in background...');
 
     await InterstitialAd.load(
       adUnitId: AdUnitIds.interstitialAdUnitId,
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (ad) {
-          _log('InterstitialAd loaded: ${ad.adUnitId}');
-          onAdLoaded(ad);
+          _log('Pre-loaded InterstitialAd ready.');
+          _preloadedInterstitialAd = ad;
+          _isPreloadingInterstitial = false;
         },
         onAdFailedToLoad: (error) {
-          _log('InterstitialAd failed to load: $error', isError: true);
-          onAdFailedToLoad?.call(error);
+          _log('Failed to pre-load InterstitialAd: $error', isError: true);
+          _isPreloadingInterstitial = false;
+        },
+      ),
+    );
+  }
+
+  /// Loads an interstitial ad or uses a pre-loaded one.
+  Future<void> loadInterstitialAd({
+    required Function(InterstitialAd ad) onAdLoaded,
+    Function(LoadAdError error)? onAdFailedToLoad,
+    Duration timeout = const Duration(seconds: 2), // Short timeout to avoid blocking user
+  }) async {
+    if (!AdConfig.enabled) {
+      onAdFailedToLoad?.call(LoadAdError(0, 'Ads disabled', 'AdConfig', null));
+      return;
+    }
+
+    // Use pre-loaded ad if available
+    if (_preloadedInterstitialAd != null) {
+      _log('Using pre-loaded InterstitialAd.');
+      final ad = _preloadedInterstitialAd!;
+      _preloadedInterstitialAd = null;
+      onAdLoaded(ad);
+      preloadInterstitialAd(); // Start pre-loading the next one
+      return;
+    }
+
+    // If not ready, attempt to load with a strict timeout
+    bool callbackTriggered = false;
+
+    Future.delayed(timeout).then((_) {
+      if (!callbackTriggered) {
+        _log('InterstitialAd load timed out. Continuing without ad.', isError: true);
+        callbackTriggered = true;
+        onAdFailedToLoad?.call(LoadAdError(0, 'Load Timeout', 'AdService', null));
+      }
+    });
+
+    await InterstitialAd.load(
+      adUnitId: AdUnitIds.interstitialAdUnitId,
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          if (!callbackTriggered) {
+            callbackTriggered = true;
+            _log('InterstitialAd loaded: ${ad.adUnitId}');
+            onAdLoaded(ad);
+          } else {
+            // Ad loaded after timeout, store it for next time
+            _log('InterstitialAd loaded after timeout, storing for next use.');
+            _preloadedInterstitialAd = ad;
+          }
+        },
+        onAdFailedToLoad: (error) {
+          if (!callbackTriggered) {
+            callbackTriggered = true;
+            _log('InterstitialAd failed to load: $error', isError: true);
+            onAdFailedToLoad?.call(error);
+          }
         },
       ),
     );
@@ -137,13 +170,25 @@ class AdService {
         _log('InterstitialAd dismissed');
         ad.dispose();
         onAdDismissed?.call();
+        preloadInterstitialAd(); // Load next one after use
       },
       onAdFailedToShowFullScreenContent: (ad, error) {
         _log('InterstitialAd failed to show: $error', isError: true);
         ad.dispose();
         onAdDismissed?.call();
+        preloadInterstitialAd();
       },
     );
     ad.show();
+  }
+
+  void _log(String message, {bool isError = false, Object? error, StackTrace? stackTrace}) {
+    if (!AdConfig.enableLogging) return;
+
+    if (isError) {
+      AppLogger.error(message, error, stackTrace, 'AdService');
+    } else {
+      AppLogger.info(message, 'AdService');
+    }
   }
 }
