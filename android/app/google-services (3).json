@@ -1,0 +1,62 @@
+{
+  "project_info": {
+    "project_number": "709843516792",
+    "project_id": "unihub-3663e",
+    "storage_bucket": "unihub-3663e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:709843516792:android:b7e84b4e24eef9ad51dc8d",
+        "android_client_info": {
+          "package_name": "com.unihub.unihub_mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "709843516792-c9bspvd11uak7mlo5a1jpiaohrq26k2r.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.unihub.unihub_mobile",
+            "certificate_hash": "ce344aa139925e27dce8e16f9c6d0b54cf0ce4d3"
+          }
+        },
+        {
+          "client_id": "709843516792-ikqjhoqajaiju2k2n4oaqjr0etkabnd7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.unihub.unihub_mobile",
+            "certificate_hash": "06963ba02d8f7161f31531efb5a86e0624816256"
+          }
+        },
+        {
+          "client_id": "709843516792-ih005los2kr2ne5c58gbfmb0elm2hjqa.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBwantHlDJW5HxVoUGtGt1o1qDXjyjLkXo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "709843516792-ih005los2kr2ne5c58gbfmb0elm2hjqa.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "709843516792-4k4ott1p51rifdm5fcsdiai1drm338a3.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.unihub.unihubMobile"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
