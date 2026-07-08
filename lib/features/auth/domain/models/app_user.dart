@@ -64,10 +64,11 @@ class AppUser {
   final DateTime? lastSeen;
   final DateTime? createdAt;
 
-  // Moderation
+  // Moderation & Status
   final bool isBanned;
   final String? banReason;
   final DateTime? suspendedUntil;
+  final bool isDeleted;
 
   AppUser({
     required this.uid,
@@ -137,6 +138,7 @@ class AppUser {
     this.isBanned = false,
     this.banReason,
     this.suspendedUntil,
+    this.isDeleted = false,
   }) : _reputationPoints = reputationPoints ?? 0.0,
        _isAdmin = isAdmin;
 
@@ -324,6 +326,7 @@ class AppUser {
     bool? isBanned,
     String? banReason,
     DateTime? suspendedUntil,
+    bool? isDeleted,
   }) {
     return AppUser(
       uid: uid ?? this.uid,
@@ -378,6 +381,7 @@ class AppUser {
       isBanned: isBanned ?? this.isBanned,
       banReason: banReason ?? this.banReason,
       suspendedUntil: suspendedUntil ?? this.suspendedUntil,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 
@@ -437,6 +441,7 @@ class AppUser {
       'isBanned': isBanned,
       'banReason': banReason,
       'suspendedUntil': suspendedUntil != null ? Timestamp.fromDate(suspendedUntil!) : null,
+      'isDeleted': isDeleted,
     };
   }
 
@@ -550,6 +555,7 @@ class AppUser {
       suspendedUntil: json['suspendedUntil'] != null 
           ? (json['suspendedUntil'] as Timestamp).toDate()
           : null,
+      isDeleted: safeBool(json['isDeleted'], false),
     );
   }
 }

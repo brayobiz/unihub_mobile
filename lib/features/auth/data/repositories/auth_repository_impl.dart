@@ -355,17 +355,20 @@ class AuthRepositoryImpl implements AuthRepository {
         'deletedAt': FieldValue.serverTimestamp(),
       }).catchError((_) => null);
 
-      // 1. Try to delete Auth user first to catch 'requires-recent-login'
+      // 1. Proceed with Firestore cleanup while STILL authenticated
+      // This is critical because client-side deletion requires active auth session.
+      await _performCleanup(uid);
+      
+      // 2. Delete Auth user last
+      // If this fails with 'requires-recent-login', the data is already gone,
+      // and the user must sign in again to finalize the deletion of their Auth record.
       await user.delete();
       AppLogger.info('Auth: Firebase Auth user deleted successfully', 'AUTH');
-      
-      // 2. Proceed with Firestore cleanup (Best effort on client)
-      await _performCleanup(uid);
       
     } on FirebaseAuthException catch (e) {
       if (e.code == 'requires-recent-login') {
         AppLogger.warning('Auth: Delete account failed: Requires recent login', 'AUTH');
-        throw Exception('This operation is sensitive and requires recent authentication. Please sign in again.');
+        throw Exception('This operation is sensitive and requires recent authentication. Please sign in again to complete the deletion.');
       }
       AppLogger.error('Auth: Delete account FirebaseAuthException', e, null, 'AUTH');
       throw _handleAuthException(e);
@@ -378,10 +381,13 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> _performCleanup(String uid) async {
     try {
       // We process collections sequentially to avoid massive memory spikes
+      // Audited list of all user-related content across the platform
       final collections = [
-        'listings', 'housing_listings', 'notes', 'feed', 'gig_applications', 
-        'verification_applications', 'student_verifications', 'identity_verifications',
-        'events', 'organizers'
+        'listings', 'housing_listings', 'notes', 'feed', 'gigs', 'gig_applications', 
+        'gig_disputes', 'verification_applications', 'student_verifications', 
+        'identity_verifications', 'events', 'organizers', 'offers', 'reports',
+        'housing_reports', 'housing_vacancy_requests', 'housing_saved_searches',
+        'housing_viewing_requests', 'event_attendance'
       ];
 
       for (var coll in collections) {
@@ -392,6 +398,14 @@ class AuthRepositoryImpl implements AuthRepository {
         if (coll == 'verification_applications') queryField = 'userId';
         if (coll == 'events') queryField = 'createdBy';
         if (coll == 'organizers') queryField = 'ownerId';
+        if (coll == 'gigs') queryField = 'employerId';
+        if (coll == 'gig_disputes') queryField = 'reporterId';
+        if (coll == 'offers') queryField = 'buyerId'; // Best effort, buyer-side
+        if (coll == 'reports' || coll == 'housing_reports') queryField = 'reporterId';
+        if (coll == 'housing_vacancy_requests') queryField = 'userId';
+        if (coll == 'housing_saved_searches') queryField = 'userId';
+        if (coll == 'housing_viewing_requests') queryField = 'studentId';
+        if (coll == 'event_attendance') queryField = 'userId';
         
         if (coll == 'student_verifications' || coll == 'identity_verifications') {
           await _firestore.collection(coll).doc(uid).delete().catchError((_) => null);
@@ -400,7 +414,7 @@ class AuthRepositoryImpl implements AuthRepository {
 
         final snapshots = await _firestore.collection(coll)
             .where(queryField, isEqualTo: uid)
-            .limit(100) // Process in chunks to avoid batch limits
+            .limit(100) // Process in chunks
             .get();
 
         if (snapshots.docs.isNotEmpty) {
@@ -412,14 +426,23 @@ class AuthRepositoryImpl implements AuthRepository {
         }
       }
 
-      // Delete user notifications subcollection and user document
-      final notifications = await _firestore.collection('users').doc(uid).collection('notifications').limit(50).get();
-      if (notifications.docs.isNotEmpty) {
-        final batch = _firestore.batch();
-        for (var doc in notifications.docs) {
-          batch.delete(doc.reference);
+      // Delete user subcollections and the user document itself
+      // We do this last to ensure we don't trigger app-wide redirects 
+      // until most data is gone.
+      final subcollections = [
+        'notifications', 'tokens', 'saved_listings', 'saved_housing', 
+        'saved_searches', 'recent_searches', 'followed_organizers',
+        'saved_events', 'saved_notes', 'study_progress'
+      ];
+      for (var sub in subcollections) {
+        final snap = await _firestore.collection('users').doc(uid).collection(sub).limit(50).get();
+        if (snap.docs.isNotEmpty) {
+          final batch = _firestore.batch();
+          for (var doc in snap.docs) {
+            batch.delete(doc.reference);
+          }
+          await batch.commit().catchError((_) => null);
         }
-        await batch.commit().catchError((_) => null);
       }
 
       await _firestore.collection('users').doc(uid).delete().catchError((_) => null);

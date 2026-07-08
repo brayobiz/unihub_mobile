@@ -146,6 +146,7 @@ class RouterNotifier extends ChangeNotifier {
           isOnboardingCompleted: user.isOnboardingCompleted,
           isAdmin: user.isAdmin,
           isEmailVerified: user.isEmailVerified,
+          isDeleted: user.isDeleted,
         );
       }),
       (_, __) => _safeNotify(),
@@ -182,8 +183,12 @@ class RouterNotifier extends ChangeNotifier {
 
     final isSplash = state.matchedLocation == '/splash';
 
+    final firebaseUser = authState.valueOrNull;
+    final appUser = appUserAsync.valueOrNull;
+    final isDeleted = appUser?.isDeleted ?? false;
+
     // 1. Account Deletion State (Highest Priority)
-    if (isAccountDeleted) {
+    if (isAccountDeleted || isDeleted) {
       if (state.matchedLocation != '/account-deleted' &&
           state.matchedLocation != '/login') {
         return '/account-deleted';
@@ -196,8 +201,6 @@ class RouterNotifier extends ChangeNotifier {
       return isSplash ? null : '/splash';
     }
 
-    final firebaseUser = authState.valueOrNull;
-    final appUser = appUserAsync.valueOrNull;
     final isAdmin = appUser?.isAdmin ?? false;
     final settings = settingsAsync.valueOrNull;
 

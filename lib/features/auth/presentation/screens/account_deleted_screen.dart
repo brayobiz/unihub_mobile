@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../controllers/auth_controller.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../shared/providers.dart';
 
@@ -55,6 +56,8 @@ class AccountDeletedScreen extends ConsumerWidget {
                 height: 56,
                 child: FilledButton(
                   onPressed: () {
+                    // Important: Ensure the local session is cleared if deletion partially failed
+                    ref.read(authControllerProvider.notifier).signOut();
                     ref.read(accountDeletedProvider.notifier).state = false;
                     context.go('/login');
                   },
