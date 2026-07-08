@@ -12,29 +12,44 @@ import '../../domain/models/event.dart';
 import '../../domain/models/event_category.dart';
 import '../../domain/models/organizer.dart';
 import '../../domain/models/attendance.dart';
-import '../../presentation/controllers/organizer_profile_controller.dart';
 import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
-import 'package:unihub_mobile/features/chat/shared/providers.dart';
 
-class EventDetailScreen extends ConsumerWidget {
+class EventDetailScreen extends ConsumerStatefulWidget {
   final String eventId;
 
   const EventDetailScreen({super.key, required this.eventId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<EventDetailScreen> createState() => _EventDetailScreenState();
+}
+
+class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
+  final PageController _pageController = PageController();
+  final ValueNotifier<int> _currentPageNotifier = ValueNotifier<int>(0);
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _currentPageNotifier.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final eventAsync = ref.watch(eventProvider(eventId));
+    final eventAsync = ref.watch(eventProvider(widget.eventId));
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: eventAsync.when(
         data: (event) {
           if (event == null) return const Center(child: Text('Event not found'));
-          return Stack(
+          return Column(
             children: [
-              _buildContent(context, event, theme, ref),
-              _buildRegistrationBar(context, event, theme, ref),
+              Expanded(
+                child: _buildContent(context, event, theme),
+              ),
+              _buildRegistrationBar(context, event, theme),
             ],
           );
         },
@@ -44,68 +59,31 @@ class EventDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildContent(BuildContext context, Event event, ThemeData theme, WidgetRef ref) {
+  Widget _buildContent(BuildContext context, Event event, ThemeData theme) {
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
       slivers: [
-        _buildSliverAppBar(context, event, ref),
+        _buildSliverAppBar(context, event, theme),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 140),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
-              _buildHeader(event, theme, ref),
-              const SizedBox(height: 32),
-              
-              _buildSectionHeader(context, 'When & Where', Icons.calendar_today_rounded),
-              const SizedBox(height: 16),
-              _buildInfoRow(Icons.access_time_filled_rounded, _formatDateTime(event.startAt, event.endAt)),
-              const SizedBox(height: 16),
-              _buildInfoRow(Icons.location_on_rounded, event.venue.address ?? 'TBA'),
-              if (event.venueRoom.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(left: 40, top: 4),
-                  child: Text(event.venueRoom, style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey, fontWeight: FontWeight.w500)),
-                ),
-              const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.only(left: 40),
-                child: TextButton.icon(
-                  onPressed: () {
-                    // Navigate to Map and center on event
-                    context.push('/campus-map?eventId=${event.id}');
-                  },
-                  icon: const Icon(Icons.map_outlined, size: 18),
-                  label: const Text('View on Campus Map', style: TextStyle(fontWeight: FontWeight.bold)),
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 32),
-              const Divider(),
-              const SizedBox(height: 32),
-              
-              _buildOrganizerSection(context, event.organizerId, ref),
-              
-              const SizedBox(height: 32),
-              const Divider(),
-              const SizedBox(height: 32),
-              
-              _buildSectionHeader(context, 'About Event', Icons.description_rounded),
-              const SizedBox(height: 16),
-              Text(
-                event.description, 
-                style: theme.textTheme.bodyLarge?.copyWith(height: 1.7, color: theme.colorScheme.onSurface.withValues(alpha: 0.8)),
-              ),
-              
-              const SizedBox(height: 32),
-              _buildTags(event.tags, theme),
-              
+              _buildHeader(event, theme),
+              const SizedBox(height: 24),
+              _buildOrganizerCard(context, event.organizerId, theme),
+              const SizedBox(height: 24),
+              _buildInfoCard(context, event, theme),
+              if (event.description.isNotEmpty) ...[
+                const SizedBox(height: 32),
+                _buildAboutSection(event, theme),
+              ],
+              if (event.tags.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                _buildTags(event.tags, theme),
+              ],
               const SizedBox(height: 32),
               _buildMetaInfo(event, theme),
+              const SizedBox(height: 40),
             ]),
           ),
         ),
@@ -113,125 +91,231 @@ class EventDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSliverAppBar(BuildContext context, Event event, WidgetRef ref) {
+  Widget _buildSliverAppBar(BuildContext context, Event event, ThemeData theme) {
+    final attendance = ref.watch(eventAttendanceProvider(event.id)).valueOrNull;
+    final isSaved = attendance?.status == AttendanceStatus.saved;
+    final currentUserId = ref.watch(appUserProvider).valueOrNull?.uid;
+
     return SliverAppBar(
-      expandedHeight: 350,
+      expandedHeight: 380,
       pinned: true,
       elevation: 0,
       stretch: true,
-      backgroundColor: Theme.of(context).colorScheme.primary,
+      automaticallyImplyLeading: false,
+      backgroundColor: Colors.transparent,
       flexibleSpace: FlexibleSpaceBar(
         stretchModes: const [StretchMode.zoomBackground],
         background: Stack(
           fit: StackFit.expand,
           children: [
-            event.imageUrls.isNotEmpty
-                ? CachedNetworkImage(imageUrl: event.imageUrls.first, fit: BoxFit.cover)
-                : Container(
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1), 
-                    child: const Icon(Icons.event, size: 100, color: Colors.white)
+            // Hero Image Gallery
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
+              child: event.imageUrls.isNotEmpty
+                  ? PageView.builder(
+                      controller: _pageController,
+                      onPageChanged: (idx) => _currentPageNotifier.value = idx,
+                      itemCount: event.imageUrls.length,
+                      itemBuilder: (context, index) => CachedNetworkImage(
+                        imageUrl: event.imageUrls[index], 
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(color: theme.colorScheme.surfaceContainerHighest),
+                        errorWidget: (context, url, error) => Container(
+                          color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                          child: Icon(Icons.broken_image, size: 50, color: theme.colorScheme.primary),
+                        ),
+                      ),
+                    )
+                  : Container(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.1), 
+                      child: Icon(Icons.event, size: 100, color: theme.colorScheme.primary.withValues(alpha: 0.3))
+                    ),
+            ),
+            
+            // Buttons Overlay
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 10,
+              left: 20,
+              right: 20,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildOverlayButton(
+                    context: context,
+                    icon: Icons.arrow_back,
+                    onTap: () => context.pop(),
                   ),
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.black26, Colors.transparent, Colors.black54],
-                ),
+                  Row(
+                    children: [
+                      _buildOverlayButton(
+                        context: context,
+                        icon: Icons.report_gmailerrorred_rounded,
+                        iconSize: 20,
+                        onTap: () => _showReportDialog(context, event),
+                      ),
+                      const SizedBox(width: 8),
+                      _buildOverlayButton(
+                        context: context,
+                        icon: Icons.share_outlined,
+                        onTap: () {
+                          final chatContext = ChatContext(
+                            type: 'event',
+                            id: event.id,
+                            title: event.title,
+                            thumbnail: event.imageUrls.isNotEmpty ? event.imageUrls.first : null,
+                            metadata: {'description': event.description},
+                          );
+                          context.push('/share-to-chat', extra: chatContext);
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _buildOverlayButton(
+                        context: context,
+                        icon: isSaved ? Icons.favorite : Icons.favorite_border,
+                        iconColor: isSaved ? AppColors.error : theme.colorScheme.onSurface,
+                        onTap: (currentUserId == null || event.endAt.isBefore(DateTime.now())) ? null : () async {
+                          try {
+                            final newStatus = isSaved ? null : AttendanceStatus.saved;
+                            await ref.read(eventServiceProvider).setAttendance(currentUserId, event.id, newStatus);
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                            }
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
+
+            // Image Counter
+            if (event.imageUrls.length > 1)
+              Positioned(
+                bottom: 24,
+                right: 24,
+                child: ValueListenableBuilder<int>(
+                  valueListenable: _currentPageNotifier,
+                  builder: (context, currentPage, _) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.image_outlined, color: Colors.white, size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${currentPage + 1}/${event.imageUrls.length}',
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                ),
+              ),
           ],
         ),
       ),
-      leading: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: CircleAvatar(
-          backgroundColor: Colors.black26,
-          child: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
-            onPressed: () => context.pop(),
-          ),
-        ),
-      ),
-      actions: [
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: CircleAvatar(
-            backgroundColor: Colors.black26,
-            child: IconButton(
-              icon: const Icon(Icons.report_gmailerrorred_rounded, color: Colors.white, size: 18),
-              onPressed: () => _showReportDialog(context, ref, event),
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: CircleAvatar(
-            backgroundColor: Colors.black26,
-            child: IconButton(
-              icon: const Icon(Icons.share_outlined, color: Colors.white, size: 18),
-              onPressed: () {
-                final chatContext = ChatContext(
-                  type: 'event',
-                  id: event.id,
-                  title: event.title,
-                  thumbnail: event.imageUrls.isNotEmpty ? event.imageUrls.first : null,
-                  metadata: {'description': event.description},
-                );
-                context.push('/share-to-chat', extra: chatContext);
-                ref.read(eventRepositoryProvider).incrementShareCount(event.id);
-              },
-            ),
-          ),
-        ),
-      ],
     );
   }
 
-  Widget _buildHeader(Event event, ThemeData theme, WidgetRef ref) {
+  Widget _buildOverlayButton({
+    required BuildContext context,
+    required IconData icon,
+    required VoidCallback? onTap,
+    Color? iconColor,
+    double iconSize = 20,
+  }) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surface,
+      shape: const CircleBorder(),
+      elevation: 2,
+      shadowColor: theme.brightness == Brightness.light 
+        ? Colors.black.withValues(alpha: 0.2)
+        : Colors.black.withValues(alpha: 0.5),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          height: 40,
+          width: 40,
+          alignment: Alignment.center,
+          child: Icon(
+            icon, 
+            color: onTap == null 
+              ? theme.colorScheme.onSurface.withValues(alpha: 0.3) 
+              : (iconColor ?? theme.colorScheme.onSurface), 
+            size: iconSize,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(Event event, ThemeData theme) {
+    final organizerAsync = ref.watch(organizerProvider(event.organizerId));
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                event.status.name.toUpperCase(),
-                style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.0),
-              ),
+            _buildCategoryChip(event.categoryId, theme),
+            organizerAsync.maybeWhen(
+              data: (org) {
+                if (org != null && (org.verificationStatus == OrganizerVerificationStatus.verified || org.verificationStatus == OrganizerVerificationStatus.official)) {
+                  return Row(
+                    children: [
+                      Icon(Icons.check_circle, color: theme.brightness == Brightness.light ? Colors.green[600] : AppColors.success, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Verified',
+                        style: TextStyle(
+                          color: theme.brightness == Brightness.light ? Colors.green[600] : AppColors.success, 
+                          fontWeight: FontWeight.bold, 
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+              orElse: () => const SizedBox.shrink(),
             ),
-            const SizedBox(width: 12),
-            _buildCategoryPill(event.categoryId, theme, ref),
           ],
         ),
         const SizedBox(height: 16),
         Text(
           event.title, 
-          style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900, fontSize: 30, letterSpacing: -1.0),
+          style: theme.textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w800, color: theme.colorScheme.onSurface),
         ),
       ],
     );
   }
 
-  Widget _buildCategoryPill(String categoryId, ThemeData theme, WidgetRef ref) {
+  Widget _buildCategoryChip(String categoryId, ThemeData theme) {
     final categoriesAsync = ref.watch(eventCategoriesProvider);
     return categoriesAsync.when(
       data: (cats) {
         final cat = cats.firstWhere((c) => c.id == categoryId, orElse: () => EventCategory(id: '', label: 'General', icon: '📅'));
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: theme.colorScheme.secondary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
+            color: theme.colorScheme.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
-            '${cat.icon} ${cat.label}'.toUpperCase(),
-            style: TextStyle(color: theme.colorScheme.secondary, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.0),
+            cat.label,
+            style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13),
           ),
         );
       },
@@ -240,112 +324,60 @@ class EventDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
-    final theme = Theme.of(context);
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: theme.colorScheme.primary),
-        const SizedBox(width: 12),
-        Text(
-          title, 
-          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -0.5),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String text) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Colors.grey.withValues(alpha: 0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, size: 18, color: Colors.grey[700]),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Text(
-            text, 
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, height: 1.4),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOrganizerSection(BuildContext context, String organizerId, WidgetRef ref) {
-    final theme = Theme.of(context);
+  Widget _buildOrganizerCard(BuildContext context, String organizerId, ThemeData theme) {
     final organizerAsync = ref.watch(organizerProvider(organizerId));
     
     return organizerAsync.when(
       data: (organizer) {
         if (organizer == null) return const SizedBox.shrink();
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        return Row(
           children: [
-            _buildSectionHeader(context, 'Hosted by', Icons.groups_rounded),
-            const SizedBox(height: 16),
-            InkWell(
-              onTap: () => context.push('/organizers/$organizerId'),
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 25,
-                      backgroundImage: organizer.logoUrl != null ? CachedNetworkImageProvider(organizer.logoUrl!) : null,
-                      child: organizer.logoUrl == null ? Text(organizer.name.isNotEmpty ? organizer.name[0].toUpperCase() : 'O') : null,
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  organizer.name, 
-                                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              if (organizer.verificationStatus == OrganizerVerificationStatus.verified || 
-                                  organizer.verificationStatus == OrganizerVerificationStatus.official)
-                                const Padding(
-                                  padding: EdgeInsets.only(left: 6),
-                                  child: Icon(Icons.verified_rounded, color: AppColors.success, size: 16),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${organizer.followerCount} Followers', 
-                            style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold),
-                          ),
-                        ],
+            CircleAvatar(
+              radius: 28,
+              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+              backgroundImage: organizer.logoUrl != null ? CachedNetworkImageProvider(organizer.logoUrl!) : null,
+              child: organizer.logoUrl == null ? Text(organizer.name[0], style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)) : null,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          organizer.name,
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: theme.colorScheme.onSurface),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                    IconButton(
-                      onPressed: () => _handleOrganizerChat(context, ref, organizer),
-                      icon: Icon(Icons.chat_bubble_outline_rounded, color: theme.colorScheme.primary),
-                      tooltip: 'Message Organizer',
-                    ),
-                    TextButton(
-                      onPressed: () => context.push('/organizers/$organizerId'),
-                      child: const Text('View Profile'),
-                    ),
-                  ],
-                ),
+                      const SizedBox(width: 4),
+                      if (organizer.verificationStatus == OrganizerVerificationStatus.verified || 
+                          organizer.verificationStatus == OrganizerVerificationStatus.official)
+                        Icon(Icons.verified, color: theme.colorScheme.primary, size: 16),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    organizer.type == OrganizerType.officialClub || organizer.type == OrganizerType.department 
+                        ? 'Official Organizer' 
+                        : 'Verified Organizer',
+                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+            OutlinedButton(
+              onPressed: () => context.push('/organizers/$organizerId'),
+              style: OutlinedButton.styleFrom(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.5)),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+              ),
+              child: Text(
+                'View Organizer', 
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
               ),
             ),
           ],
@@ -356,59 +388,152 @@ class EventDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _handleOrganizerChat(BuildContext context, WidgetRef ref, Organizer organizer) async {
-    final currentUser = ref.read(appUserProvider).valueOrNull;
-    if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please login to message organizers')));
-      return;
-    }
+  Widget _buildInfoCard(BuildContext context, Event event, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: theme.brightness == Brightness.light
+                ? Colors.black.withValues(alpha: 0.02)
+                : Colors.black.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _buildInfoRow(
+            theme: theme,
+            icon: Icons.calendar_today_outlined,
+            title: DateFormat('EEE, MMM d, yyyy').format(event.startAt),
+            subtitle: '${DateFormat('h:mm a').format(event.startAt)} – ${DateFormat('h:mm a').format(event.endAt)}',
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 48, top: 4, bottom: 4), 
+            child: Divider(height: 1, color: theme.colorScheme.outlineVariant),
+          ),
+          _buildInfoRow(
+            theme: theme,
+            icon: Icons.location_on_outlined,
+            title: event.venue.address ?? 'TBA',
+            subtitle: event.venueRoom.isNotEmpty ? event.venueRoom : 'On Campus',
+            showChevron: true,
+            onTap: () => context.push('/campus-map?eventId=${event.id}'),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 48, top: 4, bottom: 4), 
+            child: Divider(height: 1, color: theme.colorScheme.outlineVariant),
+          ),
+          _buildInfoRow(
+            theme: theme,
+            icon: Icons.groups_outlined,
+            title: '${event.currentAttendeeCount} Going  ·  ${event.savedCount} Interested',
+            subtitle: event.maxCapacity != null ? 'Capacity: ${event.maxCapacity} students' : 'Open attendance',
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 48, top: 4, bottom: 4), 
+            child: Divider(height: 1, color: theme.colorScheme.outlineVariant),
+          ),
+          _buildInfoRow(
+            theme: theme,
+            icon: Icons.confirmation_number_outlined,
+            title: event.isRegistrationRequired ? 'Registration Required' : 'Open to all students',
+            subtitle: event.isRegistrationRequired ? 'Register via link below' : 'Bring your ID',
+          ),
+        ],
+      ),
+    );
+  }
 
-    if (currentUser.uid == organizer.ownerId) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You are the owner of this organizer.')));
-      return;
-    }
+  Widget _buildInfoRow({
+    required ThemeData theme,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    bool showChevron = false,
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              height: 40,
+              width: 40,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: theme.colorScheme.primary, size: 20),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface)),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
+                ],
+              ),
+            ),
+            if (trailing != null) trailing,
+            if (showChevron) Icon(Icons.chevron_right_rounded, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4), size: 20),
+          ],
+        ),
+      ),
+    );
+  }
 
-    try {
-      final chatContext = ChatContext(
-        type: 'event_organizer',
-        id: organizer.id,
-        title: organizer.name,
-        thumbnail: organizer.logoUrl,
-      );
-
-      final convId = await ref.read(chatRepositoryProvider).getOrCreateConversation(
-        participantIds: [currentUser.uid, organizer.ownerId],
-        context: chatContext,
-      );
-
-      if (context.mounted) {
-        context.push('/chat', extra: {
-          'conversationId': convId,
-          'otherUserName': organizer.name,
-          'context': chatContext,
-        });
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error starting chat: $e')));
-      }
-    }
+  Widget _buildAboutSection(Event event, ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'About This Event',
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: theme.colorScheme.onSurface),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          event.description,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+            height: 1.6,
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildTags(List<String> tags, ThemeData theme) {
-    if (tags.isEmpty) return const SizedBox.shrink();
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: 10,
+      runSpacing: 10,
       children: tags.map((tag) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          border: Border.all(color: theme.colorScheme.outlineVariant),
-          borderRadius: BorderRadius.circular(100),
+          color: theme.colorScheme.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: Text(
-          '#$tag', 
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.tag_rounded, size: 14, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            Text(
+              tag,
+              style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+          ],
         ),
       )).toList(),
     );
@@ -420,120 +545,123 @@ class EventDetailScreen extends ConsumerWidget {
       children: [
         Text(
           'CAMPUS: ${CampusConstants.getDisplayName(event.campusId)}',
-          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.grey.withValues(alpha: 0.6), letterSpacing: 1.0),
+          style: TextStyle(
+            fontSize: 11, 
+            fontWeight: FontWeight.w900, 
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), 
+            letterSpacing: 1.0,
+          ),
         ),
         const SizedBox(height: 8),
         Text(
           'LAST UPDATED: ${DateFormat('MMM dd, yyyy').format(event.updatedAt ?? event.createdAt)}',
-          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.grey.withValues(alpha: 0.6), letterSpacing: 1.0),
+          style: TextStyle(
+            fontSize: 11, 
+            fontWeight: FontWeight.w900, 
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), 
+            letterSpacing: 1.0,
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildRegistrationBar(BuildContext context, Event event, ThemeData theme, WidgetRef ref) {
+  Widget _buildRegistrationBar(BuildContext context, Event event, ThemeData theme) {
     final attendanceAsync = ref.watch(eventAttendanceProvider(event.id));
     final attendance = attendanceAsync.valueOrNull;
     final currentUserId = ref.watch(appUserProvider).valueOrNull?.uid;
     
+    final isPast = event.endAt.isBefore(DateTime.now());
     final isFull = event.maxCapacity != null && event.currentAttendeeCount >= event.maxCapacity!;
     final isGoing = attendance?.status == AttendanceStatus.going;
     final isSaved = attendance?.status == AttendanceStatus.saved;
 
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(context).padding.bottom + 16),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  onPressed: currentUserId == null ? null : () async {
-                    try {
-                      final newStatus = isSaved ? null : AttendanceStatus.saved;
-                      await ref.read(eventServiceProvider).setAttendance(currentUserId, event.id, newStatus);
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))));
-                      }
-                    }
-                  },
-                  icon: Icon(
-                    isSaved ? Icons.bookmark : Icons.bookmark_border_rounded,
-                    color: isSaved ? theme.colorScheme.primary : Colors.grey,
-                  ),
-                  tooltip: isSaved ? 'Remove from Saved' : 'Save Event',
-                ),
-                const Text('Save', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
-              ],
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: currentUserId == null || (isFull && !isGoing) ? null : () async {
-                  if (event.isRegistrationRequired && event.registrationUrl != null && event.registrationUrl!.isNotEmpty) {
-                    final uri = Uri.tryParse(event.registrationUrl!);
-                    if (uri != null && await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    }
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).padding.bottom + 16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 1,
+            child: OutlinedButton.icon(
+              onPressed: (currentUserId == null || isPast) ? null : () async {
+                try {
+                  final newStatus = isSaved ? null : AttendanceStatus.saved;
+                  await ref.read(eventServiceProvider).setAttendance(currentUserId, event.id, newStatus);
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
                   }
-
-                  try {
-                    final newStatus = isGoing ? null : AttendanceStatus.going;
-                    await ref.read(eventServiceProvider).setAttendance(currentUserId, event.id, newStatus);
-                    
-                    if (context.mounted && newStatus == AttendanceStatus.going) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('You\'re going! This event has been added to your hub.')),
-                      );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))));
-                    }
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  backgroundColor: isGoing ? AppColors.success : theme.colorScheme.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 0,
-                ),
-                child: Text(
-                  isGoing ? 'I\'M GOING' : (isFull ? 'EVENT FULL' : (event.isRegistrationRequired && event.registrationUrl != null ? 'REGISTER' : 'RESERVE A SPOT')),
-                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                }
+              },
+              icon: Icon(isSaved ? Icons.bookmark : Icons.bookmark_border_rounded, size: 20),
+              label: Text(isPast ? 'Event Ended' : 'Save Event'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                foregroundColor: isSaved ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                side: BorderSide(
+                  color: isSaved ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
+                  width: 1.5,
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            flex: 1,
+            child: ElevatedButton.icon(
+              onPressed: (currentUserId == null || isPast || (isFull && !isGoing)) ? null : () async {
+                if (event.isRegistrationRequired && event.registrationUrl != null && event.registrationUrl!.isNotEmpty) {
+                  final uri = Uri.tryParse(event.registrationUrl!);
+                  if (uri != null && await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                }
+
+                try {
+                  final newStatus = isGoing ? null : AttendanceStatus.going;
+                  await ref.read(eventServiceProvider).setAttendance(currentUserId, event.id, newStatus);
+                  
+                  if (context.mounted && newStatus == AttendanceStatus.going) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('You\'re going! This event has been added to your hub.')),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                  }
+                }
+              },
+              icon: Icon(isGoing ? Icons.check_circle_rounded : (isPast ? Icons.event_busy_rounded : Icons.check_circle_outline_rounded), size: 20),
+              label: Text(isPast ? 'Past Event' : (isGoing ? "I'm Going" : (isFull ? 'Event Full' : 'Attend'))),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: isGoing ? AppColors.success : (isPast ? theme.colorScheme.surfaceContainerHighest : theme.colorScheme.primary),
+                foregroundColor: isPast ? theme.colorScheme.onSurfaceVariant : Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                elevation: 0,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  String _formatDateTime(DateTime start, DateTime end) {
-    final date = DateFormat('EEEE, MMM d').format(start);
-    final startTime = DateFormat('h:mm a').format(start);
-    final endTime = DateFormat('h:mm a').format(end);
-    return '$date\n$startTime - $endTime';
-  }
-
-  void _showReportDialog(BuildContext context, WidgetRef ref, Event event) {
+  void _showReportDialog(BuildContext context, Event event) {
+    final theme = Theme.of(context);
     final reasons = [
       'Inappropriate content',
       'Misleading information',
@@ -545,11 +673,12 @@ class EventDetailScreen extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Report Event'),
+        backgroundColor: theme.colorScheme.surface,
+        title: Text('Report Event', style: TextStyle(color: theme.colorScheme.onSurface)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: reasons.map((reason) => ListTile(
-            title: Text(reason),
+            title: Text(reason, style: TextStyle(color: theme.colorScheme.onSurface)),
             onTap: () async {
               final user = ref.read(appUserProvider).valueOrNull;
               if (user != null) {

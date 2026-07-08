@@ -76,6 +76,19 @@ class _OrganizerProfileScreenState extends ConsumerState<OrganizerProfileScreen>
                         ),
                       ),
                       const SizedBox(width: 8),
+                      if (ref.watch(appUserProvider).valueOrNull?.uid == organizer.ownerId) ...[
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: IconButton(
+                            icon: const Icon(Icons.settings_outlined, color: Colors.white, size: 18),
+                            onPressed: () => context.push('/organizers/${organizer.id}/edit', extra: organizer),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
                       Container(
                         margin: const EdgeInsets.only(right: 16),
                         decoration: BoxDecoration(

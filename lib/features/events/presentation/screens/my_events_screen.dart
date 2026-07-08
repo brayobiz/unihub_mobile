@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:intl/intl.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import '../../shared/providers.dart';
-import '../widgets/event_card.dart';
 import '../../domain/models/event.dart';
 
 class MyEventsScreen extends ConsumerStatefulWidget {
@@ -33,41 +34,53 @@ class _MyEventsScreenState extends ConsumerState<MyEventsScreen> with SingleTick
     final theme = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('My Events', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('My Events', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24)),
+        centerTitle: false,
+        backgroundColor: theme.scaffoldBackgroundColor,
+        elevation: 0,
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: theme.colorScheme.primary,
+          indicatorSize: TabBarIndicatorSize.label,
+          indicatorWeight: 3,
           labelColor: theme.colorScheme.primary,
-          unselectedLabelColor: Colors.grey,
+          unselectedLabelColor: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
           isScrollable: true,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+          tabAlignment: TabAlignment.start,
+          labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          dividerColor: Colors.transparent,
           tabs: const [
-            Tab(text: 'Upcoming'),
+            Tab(text: 'Timeline'),
             Tab(text: 'Going'),
             Tab(text: 'Saved'),
-            Tab(text: 'Past'),
+            Tab(text: 'History'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildUpcomingTimeline(),
+          _buildTimelineTab(),
           _buildEventList(ref.watch(userGoingEventsProvider), 'Going'),
           _buildEventList(ref.watch(userSavedEventsProvider), 'Saved'),
-          _buildEventList(ref.watch(userPastEventsProvider), 'Past'),
+          _buildEventList(ref.watch(userPastEventsProvider), 'History'),
         ],
       ),
     );
   }
 
-  Widget _buildUpcomingTimeline() {
+  Widget _buildTimelineTab() {
     final going = ref.watch(userGoingEventsProvider).valueOrNull ?? [];
     final saved = ref.watch(userSavedEventsProvider).valueOrNull ?? [];
     
-    // Combine and sort
+    final now = DateTime.now();
+    // Combine and sort future events
     final allUpcoming = [...going, ...saved]
+      .where((e) => e.endAt.isAfter(now))
+      .toList()
       ..sort((a, b) => a.startAt.compareTo(b.startAt));
     
     // Remove duplicates
@@ -75,15 +88,61 @@ class _MyEventsScreenState extends ConsumerState<MyEventsScreen> with SingleTick
     final uniqueUpcoming = allUpcoming.where((e) => seenIds.add(e.id)).toList();
 
     if (uniqueUpcoming.isEmpty) {
-      return _buildEmptyState('Upcoming');
+      return _buildEmptyState('Timeline');
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(24),
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      physics: const BouncingScrollPhysics(),
       itemCount: uniqueUpcoming.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 16),
-      itemBuilder: (context, index) => _MyEventListTile(event: uniqueUpcoming[index]),
+      itemBuilder: (context, index) {
+        final event = uniqueUpcoming[index];
+        bool showDateHeader = true;
+        
+        if (index > 0) {
+          final prevEvent = uniqueUpcoming[index - 1];
+          if (prevEvent.startAt.day == event.startAt.day && 
+              prevEvent.startAt.month == event.startAt.month) {
+            showDateHeader = false;
+          }
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (showDateHeader) ...[
+              if (index > 0) const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16, left: 4),
+                child: Text(
+                  _formatDateHeader(event.startAt),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900, 
+                    fontSize: 14, 
+                    color: Theme.of(context).colorScheme.primary,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+              ),
+            ],
+            _MyEventListTile(event: event),
+            const SizedBox(height: 16),
+          ],
+        );
+      },
     );
+  }
+
+  String _formatDateHeader(DateTime date) {
+    final now = DateTime.now();
+    if (date.day == now.day && date.month == now.month && date.year == now.year) {
+      return 'TODAY';
+    }
+    final tomorrow = now.add(const Duration(days: 1));
+    if (date.day == tomorrow.day && date.month == tomorrow.month && date.year == tomorrow.year) {
+      return 'TOMORROW';
+    }
+    return DateFormat('EEEE, MMM d').format(date).toUpperCase();
   }
 
   Widget _buildEventList(AsyncValue<List<Event>> eventsAsync, String type) {
@@ -93,15 +152,11 @@ class _MyEventsScreenState extends ConsumerState<MyEventsScreen> with SingleTick
           return _buildEmptyState(type);
         }
         return ListView.separated(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          physics: const BouncingScrollPhysics(),
           itemCount: events.length,
           separatorBuilder: (_, __) => const SizedBox(height: 16),
-          itemBuilder: (context, index) {
-            // Reusing EventCard but maybe need a different layout for vertical list
-            // For now, let's use a vertical variant or simple list tile
-            final event = events[index];
-            return _MyEventListTile(event: event);
-          },
+          itemBuilder: (context, index) => _MyEventListTile(event: events[index]),
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -113,8 +168,8 @@ class _MyEventsScreenState extends ConsumerState<MyEventsScreen> with SingleTick
     String message = '';
     IconData icon = Icons.event_available_outlined;
     
-    if (type == 'Upcoming') {
-      message = 'You have no events scheduled. Browse your campus feed to find activities!';
+    if (type == 'Timeline') {
+      message = 'Your schedule is clear. Browse your campus feed to find activities!';
     } else if (type == 'Going') {
       message = 'You haven\'t marked yourself as "Going" to any events yet.';
     } else if (type == 'Saved') {
@@ -130,17 +185,24 @@ class _MyEventsScreenState extends ConsumerState<MyEventsScreen> with SingleTick
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 80, color: Colors.grey[300]),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 60, color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)),
+            ),
             const SizedBox(height: 24),
             Text(
               'No $type Events',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 12),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.6), height: 1.5),
             ),
           ],
         ),
@@ -156,63 +218,111 @@ class _MyEventListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+    final isPast = event.endAt.isBefore(DateTime.now());
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: InkWell(
         onTap: () => context.push('/events/${event.id}'),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  color: theme.colorScheme.primaryContainer.withOpacity(0.3),
-                  child: event.imageUrls.isNotEmpty
-                      ? Image.network(event.imageUrls.first, fit: BoxFit.cover)
-                      : const Icon(Icons.event, color: Colors.grey),
-                ),
+              Stack(
+                children: [
+                  Hero(
+                    tag: 'event_img_${event.id}_mine',
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        width: 90,
+                        height: 90,
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        child: event.imageUrls.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: event.imageUrls.first, 
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => const SizedBox.shrink(),
+                              )
+                            : const Icon(Icons.event, color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                  if (isPast)
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(Icons.history_rounded, color: Colors.white, size: 24),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      event.title,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            event.title,
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${event.venue.address}',
-                      style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
+                      '${event.venue.address ?? 'On Campus'}',
+                      style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(Icons.calendar_today_outlined, size: 12, color: theme.colorScheme.primary),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${event.startAt.day}/${event.startAt.month} @ ${event.startAt.hour}:${event.startAt.minute.toString().padLeft(2, '0')}',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
-                        ),
-                      ],
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.access_time_rounded, size: 14, color: theme.colorScheme.primary),
+                          const SizedBox(width: 6),
+                          Text(
+                            DateFormat('h:mm a').format(event.startAt),
+                            style: TextStyle(
+                              fontSize: 12, 
+                              fontWeight: FontWeight.w900, 
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Colors.grey),
+              Icon(Icons.chevron_right_rounded, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
             ],
           ),
         ),

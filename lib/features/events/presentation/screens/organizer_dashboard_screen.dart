@@ -39,7 +39,12 @@ class OrganizerDashboardScreen extends ConsumerWidget {
           if (isManagement)
             IconButton(
               icon: const Icon(Icons.settings_outlined),
-              onPressed: () => context.push('/organizers/$organizerId/edit'),
+              onPressed: () {
+                final organizer = organizerAsync.valueOrNull;
+                if (organizer != null) {
+                  context.push('/organizers/$organizerId/edit', extra: organizer);
+                }
+              },
             ),
         ],
       ),
