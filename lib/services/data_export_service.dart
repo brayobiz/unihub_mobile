@@ -38,7 +38,7 @@ class DataExportService {
       exportData['marketplace_listings'] = listings.docs.map((doc) => doc.data()).toList();
 
       // 3. Housing Listings
-      final housing = await _firestore.collection('housing')
+      final housing = await _firestore.collection('housing_listings')
           .where('plugId', isEqualTo: uid)
           .get();
       exportData['housing_listings'] = housing.docs.map((doc) => doc.data()).toList();
@@ -74,14 +74,27 @@ class DataExportService {
       exportData['gig_applications_received'] = employerApps.docs.map((doc) => doc.data()).toList();
 
       // 9. Chats
-      final chats = await _firestore.collection('chats')
+      final chats = await _firestore.collection('conversations')
           .where('participants', arrayContains: uid)
           .get();
-      exportData['chats'] = chats.docs.map((doc) => doc.data()).toList();
+      
+      final List<Map<String, dynamic>> chatExports = [];
+      for (var convDoc in chats.docs) {
+        final convData = convDoc.data();
+        final messages = await convDoc.reference.collection('messages')
+            .orderBy('timestamp')
+            .get();
+        convData['messages'] = messages.docs.map((doc) => doc.data()).toList();
+        chatExports.add(convData);
+      }
+      exportData['chats'] = chatExports;
       
       // 10. Saved Items
       final savedMarketplace = await _firestore.collection('users').doc(uid).collection('saved_listings').get();
       exportData['saved_marketplace_ids'] = savedMarketplace.docs.map((doc) => doc.id).toList();
+
+      final savedHousing = await _firestore.collection('users').doc(uid).collection('saved_housing').get();
+      exportData['saved_housing_ids'] = savedHousing.docs.map((doc) => doc.id).toList();
 
       // Convert to JSON string
       // Note: We need a way to handle Timestamp objects in JSON. 

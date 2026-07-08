@@ -22,6 +22,24 @@ header {
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
+header a {
+    display: inline-block;
+    margin-top: 1rem;
+    padding: 0.5rem 1rem;
+    background: #f0f0f0;
+    color: #666;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+header a:hover {
+    background: #e0e0e0;
+    text-decoration: none;
+    color: var(--primary-color);
+}
+
 .container {
     max-width: var(--max-width);
     margin: 2rem auto;
@@ -52,24 +70,45 @@ a:hover {
     display: inline-block;
     background: var(--primary-color);
     color: white;
-    padding: 0.8rem 1.5rem;
-    border-radius: 4px;
-    margin: 0.5rem 0;
+    padding: 1rem 2rem;
+    border-radius: 12px;
     font-weight: bold;
     text-align: center;
+    transition: transform 0.2s, background-color 0.2s;
+    min-width: 220px;
+    box-sizing: border-box;
+    border: none;
+    cursor: pointer;
 }
 
 .btn:hover {
     background: #1976D2;
     text-decoration: none;
+    transform: translateY(-2px);
+}
+
+.btn-secondary {
+    background-color: #555 !important;
+}
+
+.btn-secondary:hover {
+    background-color: #333 !important;
 }
 
 .nav-links {
-    margin-top: 1rem;
+    margin-top: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.2rem;
 }
 
-.nav-links a {
-    margin: 0 10px;
+@media (min-width: 600px) {
+    .nav-links {
+        flex-direction: row;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
 }
 
 footer {

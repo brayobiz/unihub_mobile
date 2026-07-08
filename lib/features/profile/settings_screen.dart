@@ -217,11 +217,21 @@ class SettingsScreen extends ConsumerWidget {
         _buildSectionHeader(context, 'Support & Legal'),
         _buildSettingsCard(context, [
           _buildSettingTile(
+            context,
+            icon: Icons.help_outline_rounded,
+            title: 'Contact Support',
+            subtitle: 'Help center & data requests',
+            onTap: () => _launchUrl('https://forms.gle/j7kBiP3w7Dvc2EuVA'),
+          ),
+          const Divider(height: 1, indent: 50),
+          _buildSettingTile(
             context, 
             icon: Icons.policy_outlined, 
             title: 'Privacy Policy', 
             onTap: () {
-              final url = settingsAsync.valueOrNull?.privacyPolicyUrl ?? 'https://unihub-3663e.web.app/privacy';
+              final url = settingsAsync.valueOrNull?.privacyPolicyUrl.isNotEmpty == true 
+                  ? settingsAsync.valueOrNull!.privacyPolicyUrl 
+                  : 'https://unihub-3663e.web.app/privacy';
               _launchUrl(url);
             },
           ),
@@ -231,7 +241,9 @@ class SettingsScreen extends ConsumerWidget {
             icon: Icons.gavel_outlined, 
             title: 'Terms of Service', 
             onTap: () {
-              final url = settingsAsync.valueOrNull?.termsOfServiceUrl ?? 'https://unihub-3663e.web.app/terms';
+              final url = settingsAsync.valueOrNull?.termsOfServiceUrl.isNotEmpty == true 
+                  ? settingsAsync.valueOrNull!.termsOfServiceUrl 
+                  : 'https://unihub-3663e.web.app/terms';
               _launchUrl(url);
             },
           ),

@@ -143,7 +143,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
           const SizedBox(height: 32),
           _buildTextField(
             label: 'Event Title',
-            hint: 'e.g. Annual Tech Symposium 2024',
+            hint: 'e.g. Annual Tech Symposium 2026',
             initialValue: state.title,
             onChanged: controller.updateTitle,
           ),

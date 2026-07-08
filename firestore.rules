@@ -51,7 +51,7 @@ service cloud.firestore {
 
     // --- Users ---
     match /users/{userId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated(); // Needed for profile views
       allow create: if isOwner(userId) &&
                       !request.resource.data.keys().hasAny(['isAdmin', 'roles', 'isBanned']) &&
                       request.resource.data.get('trustScore', 0.0) <= 5.0;
@@ -69,7 +69,8 @@ service cloud.firestore {
       allow delete: if isAdmin();
 
       match /{collectionId}/{docId} {
-        allow read, write: if isOwner(userId) && (
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if isOwner(userId) && (
           collectionId in ["tokens", "recently_viewed", "saved_listings", "saved_housing", "saved_searches", "recent_searches", "study_progress", "followed_organizers", "collections", "notifications", "saved_events", "saved_notes"] ||
           collectionId.matches('^recently_viewed_.*') ||
           collectionId.matches('^saved_.*') ||
