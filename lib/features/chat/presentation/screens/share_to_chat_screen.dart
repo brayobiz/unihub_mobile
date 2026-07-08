@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unihub_mobile/core/constants/campus_constants.dart';
+import 'package:unihub_mobile/core/utils/debouncer.dart';
 import '../../../auth/shared/providers.dart';
 import '../../../auth/domain/models/app_user.dart';
 import '../../domain/models/conversation.dart';
@@ -23,13 +24,48 @@ class ShareToChatScreen extends ConsumerStatefulWidget {
 
 class _ShareToChatScreenState extends ConsumerState<ShareToChatScreen> {
   final _searchController = TextEditingController();
+  final _debouncer = Debouncer(milliseconds: 300);
   String _searchQuery = '';
+  List<AppUser> _searchResults = [];
+  bool _isLoadingResults = false;
   bool _isSharing = false;
 
   @override
   void dispose() {
     _searchController.dispose();
+    _debouncer.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String val) {
+    setState(() {
+      _searchQuery = val;
+    });
+
+    if (val.isEmpty) {
+      setState(() {
+        _searchResults = [];
+        _isLoadingResults = false;
+      });
+      return;
+    }
+
+    setState(() => _isLoadingResults = true);
+    _debouncer.run(() async {
+      try {
+        final results = await ref.read(authRepositoryProvider).searchUsers(val);
+        if (mounted) {
+          setState(() {
+            _searchResults = results;
+            _isLoadingResults = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isLoadingResults = false);
+        }
+      }
+    });
   }
 
   @override
@@ -85,7 +121,7 @@ class _ShareToChatScreenState extends ConsumerState<ShareToChatScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TextField(
               controller: _searchController,
-              onChanged: (val) => setState(() => _searchQuery = val),
+              onChanged: _onSearchChanged,
               decoration: InputDecoration(
                 hintText: 'Search people or chats...',
                 prefixIcon: const Icon(Icons.search),
@@ -114,12 +150,33 @@ class _ShareToChatScreenState extends ConsumerState<ShareToChatScreen> {
                   loading: () => const Center(child: CircularProgressIndicator()),
                   error: (err, _) => Center(child: Text('Error: $err')),
                 )
-              : _UserSearchList(
-                  query: _searchQuery,
-                  currentUserId: user.uid,
-                  onShare: (userId) => _handleShareWithUser(userId),
-                  isSharing: _isSharing,
-                ),
+              : _isLoadingResults
+                  ? const Center(child: CircularProgressIndicator())
+                  : _searchResults.isEmpty
+                      ? Center(child: Text('No users found matching "$_searchQuery"', style: const TextStyle(color: Colors.grey)))
+                      : ListView.builder(
+                          itemCount: _searchResults.length,
+                          itemBuilder: (context, index) {
+                            final targetUser = _searchResults[index];
+                            if (targetUser.uid == user.uid) return const SizedBox.shrink();
+                            
+                            return ListTile(
+                              leading: CircleAvatar(
+                                backgroundImage: targetUser.photoUrl != null ? NetworkImage(targetUser.photoUrl!) : null,
+                                child: targetUser.photoUrl == null ? Text(targetUser.fullName[0].toUpperCase()) : null,
+                              ),
+                              title: Text(targetUser.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text(CampusConstants.getDisplayName(targetUser.university)),
+                              trailing: ElevatedButton(
+                                onPressed: _isSharing ? null : () => _handleShareWithUser(targetUser.uid),
+                                style: ElevatedButton.styleFrom(
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                ),
+                                child: const Text('Send'),
+                              ),
+                            );
+                          },
+                        ),
           ),
         ],
       ),
@@ -198,75 +255,6 @@ class _ShareToChatScreenState extends ConsumerState<ShareToChatScreen> {
     } finally {
       if (mounted) setState(() => _isSharing = false);
     }
-  }
-}
-
-class _UserSearchList extends ConsumerWidget {
-  final String query;
-  final String currentUserId;
-  final Function(String) onShare;
-  final bool isSharing;
-
-  const _UserSearchList({
-    required this.query,
-    required this.currentUserId,
-    required this.onShare,
-    required this.isSharing,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final firestore = ref.watch(firestoreProvider);
-    final q = query.toLowerCase().trim();
-    
-    return StreamBuilder<QuerySnapshot>(
-      stream: firestore.collection('users')
-          .where('fullNameLower', isGreaterThanOrEqualTo: q)
-          .where('fullNameLower', isLessThanOrEqualTo: '$q\uf8ff')
-          .limit(10)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Center(
-            child: Text('No users found matching "$query"', style: const TextStyle(color: Colors.grey)),
-          );
-        }
-
-        final users = snapshot.data!.docs
-            .where((doc) => doc.id != currentUserId)
-            .map((doc) => AppUser.fromJson(doc.data() as Map<String, dynamic>).stripSensitiveInfo())
-            .toList();
-
-        if (users.isEmpty) return const SizedBox.shrink();
-
-        return ListView.builder(
-          itemCount: users.length,
-          itemBuilder: (context, index) {
-            final user = users[index];
-            return ListTile(
-              leading: CircleAvatar(
-                backgroundImage: user.photoUrl != null ? NetworkImage(user.photoUrl!) : null,
-                child: user.photoUrl == null ? Text(user.fullName[0].toUpperCase()) : null,
-              ),
-              title: Text(user.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(CampusConstants.getDisplayName(user.university)),
-              trailing: ElevatedButton(
-                onPressed: isSharing ? null : () => onShare(user.uid),
-                style: ElevatedButton.styleFrom(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                ),
-                child: const Text('Send'),
-              ),
-            );
-          },
-        );
-      },
-    );
   }
 }
 
