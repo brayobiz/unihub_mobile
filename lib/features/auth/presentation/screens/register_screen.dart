@@ -21,6 +21,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
+  bool _isAgreed = false;
 
   @override
   void dispose() {
@@ -47,6 +48,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (password != confirmPassword) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Passwords do not match')),
+      );
+      return;
+    }
+
+    if (!_isAgreed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please confirm your age and agree to the terms'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
@@ -150,6 +161,37 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               controller: confirmPasswordController,
               hintText: 'Confirm Password',
               enabled: !isLoading,
+            ),
+
+            const SizedBox(height: 24),
+
+            // Age & Terms Agreement
+            Row(
+              children: [
+                SizedBox(
+                  height: 24,
+                  width: 24,
+                  child: Checkbox(
+                    value: _isAgreed,
+                    onChanged: isLoading ? null : (val) => setState(() => _isAgreed = val ?? false),
+                    activeColor: theme.colorScheme.primary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _isAgreed = !_isAgreed),
+                    child: Text(
+                      'I confirm I am 18 years or older and agree to the Terms and Privacy Policy',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
 
             const SizedBox(height: 32),

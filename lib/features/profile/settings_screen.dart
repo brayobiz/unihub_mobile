@@ -11,6 +11,7 @@ import 'package:unihub_mobile/features/auth/presentation/controllers/auth_contro
 import 'package:unihub_mobile/features/auth/presentation/widgets/logout_dialog.dart';
 import 'package:unihub_mobile/features/marketplace/shared/providers.dart';
 import 'package:unihub_mobile/app/theme/theme_provider.dart';
+import 'package:unihub_mobile/services/data_export_service.dart';
 import '../admin/shared/providers.dart';
 import '../admin/domain/models/system_settings.dart';
 
@@ -184,6 +185,27 @@ class SettingsScreen extends ConsumerWidget {
         _buildSectionHeader(context, 'Account & Security'),
         _buildSettingsCard(context, [
           _buildSettingTile(context, icon: Icons.verified_user_outlined, title: 'Trust & Verification', onTap: () => context.push('/trust-center')),
+          const Divider(height: 1, indent: 50),
+          _buildSettingTile(
+            context,
+            icon: Icons.download_outlined,
+            title: 'Export My Data',
+            subtitle: 'Download all your personal information',
+            onTap: () async {
+              final user = ref.read(appUserProvider).valueOrNull;
+              if (user != null) {
+                try {
+                  await ref.read(dataExportServiceProvider).exportUserData(user.uid);
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Export failed: $e'), backgroundColor: AppColors.error),
+                    );
+                  }
+                }
+              }
+            },
+          ),
           const Divider(height: 1, indent: 50),
           _buildSettingTile(context, icon: Icons.lock_outline_rounded, title: 'Change Password', onTap: () => _showChangePasswordDialog(context, ref)),
           const Divider(height: 1, indent: 50),
