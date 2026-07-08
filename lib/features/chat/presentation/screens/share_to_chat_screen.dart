@@ -218,12 +218,12 @@ class _UserSearchList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final firestore = ref.watch(firestoreProvider);
+    final q = query.toLowerCase().trim();
     
-    // We can use a simple StreamProvider or FutureProvider for searching users
     return StreamBuilder<QuerySnapshot>(
       stream: firestore.collection('users')
-          .where('fullName', isGreaterThanOrEqualTo: query)
-          .where('fullName', isLessThanOrEqualTo: '$query\uf8ff')
+          .where('fullNameLower', isGreaterThanOrEqualTo: q)
+          .where('fullNameLower', isLessThanOrEqualTo: '$q\uf8ff')
           .limit(10)
           .snapshots(),
       builder: (context, snapshot) {
@@ -239,7 +239,7 @@ class _UserSearchList extends ConsumerWidget {
 
         final users = snapshot.data!.docs
             .where((doc) => doc.id != currentUserId)
-            .map((doc) => AppUser.fromJson(doc.data() as Map<String, dynamic>))
+            .map((doc) => AppUser.fromJson(doc.data() as Map<String, dynamic>).stripSensitiveInfo())
             .toList();
 
         if (users.isEmpty) return const SizedBox.shrink();

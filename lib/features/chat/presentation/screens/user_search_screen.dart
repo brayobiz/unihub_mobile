@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/constants/campus_constants.dart';
 import '../../../auth/shared/providers.dart';
 import '../../../auth/domain/models/app_user.dart';
 import '../../domain/models/chat_context.dart';
@@ -99,7 +100,7 @@ class _UserSearchScreenState extends ConsumerState<UserSearchScreen> {
                       ),
                       title: Text(user.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: Text(
-                        '${user.username != null ? '@${user.username} • ' : ''}${user.university ?? 'UniHub Student'}',
+                        '${user.username != null ? '@${user.username} • ' : ''}${CampusConstants.getDisplayName(user.university)}',
                       ),
                       trailing: const Icon(Icons.chat_bubble_outline, size: 20),
                     );

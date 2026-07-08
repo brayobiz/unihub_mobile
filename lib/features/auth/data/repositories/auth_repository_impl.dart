@@ -523,7 +523,8 @@ class AuthRepositoryImpl implements AuthRepository {
       for (var snap in results) {
         for (var doc in snap.docs) {
           final user = AppUser.fromJson(doc.data());
-          uniqueUsers[user.uid] = user;
+          // Security: strip sensitive PII from search results before they reach UI
+          uniqueUsers[user.uid] = user.stripSensitiveInfo();
         }
       }
       
