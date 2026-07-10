@@ -41,10 +41,10 @@ class AppBadge {
 
   static AppBadge studentVerified() => const AppBadge(
     id: 'student_verified',
-    label: 'Student',
+    label: 'Verified Student',
     description: 'Confirmed enrollment at a university',
-    icon: Icons.school_rounded,
-    color: Colors.green,
+    icon: Icons.account_balance_rounded, // Changed from school_rounded to differentiate
+    color: Color(0xFF10B981), // Keeping green but consistent label
     type: BadgeType.verification,
   );
 }

@@ -73,9 +73,10 @@ android {
         release {
             signingConfig signingConfigs.release
             
-            // Enable R8/Proguard for code shrinking and obfuscation
-            minifyEnabled false
-            shrinkResources false
+            // RC-3 Size Optimization: Enable R8/Proguard
+            // This strips unused code and resources, significantly reducing APK size.
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }

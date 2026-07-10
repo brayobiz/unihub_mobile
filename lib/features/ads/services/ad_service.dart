@@ -37,19 +37,27 @@ class AdService {
     _isInitializing = true;
 
     try {
-      // 1. Initialize the SDK first (non-blocking for UMP)
+      // 1. Initialize the SDK (Reduced timeout and handled asynchronously)
+      // We don't await this if we want to be truly non-blocking, but we want 
+      // to know when it's done. 
+      _log('Starting Mobile Ads SDK initialization...');
+      
+      // We use unawaited to let it run in background without blocking the initialize() call
+      // if we decide to call initialize from a place that awaits it.
+      // However, we'll keep the await here but ensure the caller doesn't wait.
       final status = await MobileAds.instance.initialize().timeout(
-        const Duration(seconds: 5),
+        const Duration(seconds: 3), // Reduced from 5s
         onTimeout: () {
-          _log('Mobile Ads initialization timed out.', isError: true);
+          _log('Mobile Ads initialization timed out after 3s. Continuing in background.', isError: true);
           return InitializationStatus({});
         },
       );
       
       _isInitialized = true;
-      _log('Mobile Ads SDK initialized successfully.');
+      _log('Mobile Ads SDK initialization call completed.');
 
-      // 2. Request Consent Information (UMP readiness) in background
+      // 2. Request Consent Information (UMP readiness) in background - NEVER await this
+      _log('Requesting Consent Information update...');
       final params = ConsentRequestParameters();
       ConsentInformation.instance.requestConsentInfoUpdate(
         params,
@@ -65,7 +73,8 @@ class AdService {
         (error) => _log('Consent update failed: ${error.message}', isError: true),
       );
       
-      // 3. Start pre-loading ads in the background to avoid interfering with user journey
+      // 3. Start pre-loading ads in the background
+      // Note: We don't await this either
       preloadInterstitialAd();
 
       if (kDebugMode) {
@@ -88,7 +97,9 @@ class AdService {
     _isPreloadingInterstitial = true;
     _log('Pre-loading InterstitialAd in background...');
 
-    await InterstitialAd.load(
+    // Note: InterstitialAd.load returns a Future, but we DON'T await it here
+    // as we want to handle the results in the callback and not block the service.
+    InterstitialAd.load(
       adUnitId: AdUnitIds.interstitialAdUnitId,
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
@@ -102,7 +113,10 @@ class AdService {
           _isPreloadingInterstitial = false;
         },
       ),
-    );
+    ).catchError((e) {
+       _log('Error starting InterstitialAd load: $e', isError: true);
+       _isPreloadingInterstitial = false;
+    });
   }
 
   /// Loads an interstitial ad or uses a pre-loaded one.
@@ -137,7 +151,9 @@ class AdService {
       }
     });
 
-    await InterstitialAd.load(
+    // We don't await InterstitialAd.load to ensure we don't block the caller.
+    // The strict timeout logic below will handle the UI state.
+    InterstitialAd.load(
       adUnitId: AdUnitIds.interstitialAdUnitId,
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
@@ -160,7 +176,13 @@ class AdService {
           }
         },
       ),
-    );
+    ).catchError((e) {
+      if (!callbackTriggered) {
+        callbackTriggered = true;
+        _log('Error starting InterstitialAd load: $e', isError: true);
+        onAdFailedToLoad?.call(LoadAdError(0, e.toString(), 'AdService', null));
+      }
+    });
   }
 
   /// Shows a pre-loaded interstitial ad.

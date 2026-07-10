@@ -68,21 +68,14 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> with AutomaticK
   }
 
   Future<void> _loadAd() async {
-    // Ensure AdService is initialized
+    // Ensure AdService is initialized - but NEVER await it in a blocking way
     final adService = ref.read(adServiceProvider);
     if (!adService.isInitialized) {
-      try {
-        await ref.read(adInitializationProvider.future);
-      } catch (e) {
-        _log('Ad initialization failed: $e', isError: true);
-        if (mounted) {
-          setState(() {
-            _failed = true;
-            _isLoading = false;
-          });
-        }
-        return;
-      }
+      // If not initialized, we just return. 
+      // The ad will not show this time, which is better than blocking the UI.
+      // Next time the widget is built/dependencies change, it will try again.
+      _log('AdService not yet initialized. Skipping ad load for now.');
+      return;
     }
 
     if (!mounted || _adSize == null) return;
@@ -116,7 +109,16 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> with AutomaticK
       ),
     );
 
-    await _bannerAd!.load();
+    // Do NOT await the load call. The listener will handle the state updates.
+    _bannerAd!.load().catchError((e) {
+      _log('Error starting BannerAd load: $e', isError: true);
+      if (mounted) {
+        setState(() {
+          _failed = true;
+          _isLoading = false;
+        });
+      }
+    });
   }
 
   void _log(String message, {bool isError = false}) {

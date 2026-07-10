@@ -17,12 +17,16 @@ final adInitializationProvider = FutureProvider<void>((ref) async {
   final adService = ref.watch(adServiceProvider);
   
   try {
-    AppLogger.info('🎬 Initializing Ads Module...', 'Ads');
-    await adService.initialize();
-    AppLogger.info('🎬 Ads Module Initialized', 'Ads');
+    AppLogger.info('🎬 Starting Ads Module background initialization...', 'Ads');
+    // We do NOT await here. This allows the provider to complete immediately,
+    // ensuring no UI component (like a router or splash screen) blocks on it.
+    // The AdService handles its own internal 'isInitialized' state.
+    adService.initialize().catchError((e, stack) {
+      AppLogger.error('Failed to initialize ads in background', e, stack, 'Ads');
+    });
+    AppLogger.info('🎬 Ads Module initialization triggered', 'Ads');
   } catch (e, stack) {
-    AppLogger.error('Failed to initialize ads', e, stack, 'Ads');
-    rethrow;
+    AppLogger.error('Failed to trigger ads initialization', e, stack, 'Ads');
   }
 });
 

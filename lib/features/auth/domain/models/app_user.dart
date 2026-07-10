@@ -146,7 +146,10 @@ class AppUser {
   bool get isVerifiedPlug => verifiedRoles.contains('housePlug');
   bool get isVerifiedSeller => verifiedRoles.contains('seller');
   bool get isAnyRoleVerified => verifiedRoles.isNotEmpty;
-  bool get isVerified => isIdentityVerified == true || isAnyRoleVerified == true;
+  
+  /// Determines if the user gets the primary "Verification Tick" (Primary Identity).
+  /// Per design recommendation: This is reserved for Government/Official Identity verification only.
+  bool get isVerified => isIdentityVerified == true;
   
   bool get isCurrentlySuspended {
     if (suspendedUntil == null) return false;
@@ -208,12 +211,9 @@ class AppUser {
     final List<AppBadge> badges = [];
     
     // 1. Verification Badges
-    if (isIdentityVerified) {
-      badges.add(AppBadge.identityVerified());
-    }
-    if (isStudentVerified) {
-      badges.add(AppBadge.studentVerified());
-    }
+    // NOTE: Identity and Student verifications are handled by primary UI indicators 
+    // (Ticks and Info Pills) to avoid badge clutter.
+    // We only add them to the badges list if they are unique professional milestones.
 
     // 2. Professional Role Badges
     for (final roleName in verifiedRoles) {

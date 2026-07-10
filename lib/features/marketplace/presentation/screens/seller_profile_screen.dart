@@ -350,7 +350,12 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              _buildSmallInfoPill(context, Icons.school_rounded, CampusConstants.getDisplayName(seller.university)),
+              _buildSmallInfoPill(
+                context, 
+                Icons.school_rounded, 
+                CampusConstants.getDisplayName(seller.university),
+                isVerified: seller.isStudentVerified,
+              ),
               const SizedBox(width: 8),
               _buildSmallInfoPill(context, Icons.calendar_today_rounded, seller.yearOfStudy ?? 'Year'),
             ],
@@ -368,27 +373,40 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
     );
   }
 
-  Widget _buildSmallInfoPill(BuildContext context, IconData icon, String label) {
+  Widget _buildSmallInfoPill(BuildContext context, IconData icon, String label, {bool isVerified = false}) {
     final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+        color: isVerified 
+            ? AppColors.success.withOpacity(0.1)
+            : theme.colorScheme.surfaceVariant.withOpacity(0.5),
         borderRadius: BorderRadius.circular(100),
+        border: isVerified 
+            ? Border.all(color: AppColors.success.withOpacity(0.2))
+            : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: theme.colorScheme.onSurfaceVariant),
+          Icon(
+            icon, 
+            size: 12, 
+            color: isVerified ? AppColors.success : theme.colorScheme.onSurfaceVariant
+          ),
           const SizedBox(width: 6),
           Text(
             label,
             style: TextStyle(
               fontSize: 12, 
-              color: theme.colorScheme.onSurface, 
+              color: isVerified ? AppColors.success : theme.colorScheme.onSurface, 
               fontWeight: FontWeight.w700
             ),
           ),
+          if (isVerified) ...[
+            const SizedBox(width: 4),
+            const Icon(Icons.verified_rounded, size: 10, color: AppColors.success),
+          ],
         ],
       ),
     );
