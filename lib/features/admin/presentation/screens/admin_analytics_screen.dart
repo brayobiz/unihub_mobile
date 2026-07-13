@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../layout/admin_layout.dart';
@@ -151,6 +152,7 @@ class _OverviewTab extends ConsumerWidget {
           icon: Icons.people_outline,
           color: AppColors.primary,
           subtitle: 'Registered accounts',
+          onTap: () => context.push('/admin/users'),
         ),
         _AnalyticsCard(
           title: 'Growth',
@@ -158,6 +160,7 @@ class _OverviewTab extends ConsumerWidget {
           icon: Icons.trending_up,
           color: Colors.green,
           subtitle: 'Joined today',
+          onTap: () => context.push('/admin/users'),
         ),
         _AnalyticsCard(
           title: 'Active Users',
@@ -191,6 +194,7 @@ class _OverviewTab extends ConsumerWidget {
               icon: Icons.shopping_bag_outlined,
               color: AppColors.marketplace,
               subtitle: 'Active listings',
+              onTap: () => context.push('/admin/marketplace'),
             ),
             _AnalyticsCard(
               title: 'Housing',
@@ -198,6 +202,7 @@ class _OverviewTab extends ConsumerWidget {
               icon: Icons.home_outlined,
               color: AppColors.housing,
               subtitle: 'Available rooms',
+              onTap: () => context.push('/admin/housing'),
             ),
             _AnalyticsCard(
               title: 'Study Notes',
@@ -205,6 +210,7 @@ class _OverviewTab extends ConsumerWidget {
               icon: Icons.description_outlined,
               color: AppColors.notes,
               subtitle: 'Uploaded resources',
+              onTap: () => context.push('/admin/notes'),
             ),
             _AnalyticsCard(
               title: 'Events',
@@ -212,6 +218,7 @@ class _OverviewTab extends ConsumerWidget {
               icon: Icons.event_outlined,
               color: Colors.deepPurple,
               subtitle: 'Upcoming & past',
+              onTap: () => context.push('/admin/events'),
             ),
           ],
         ),
@@ -233,6 +240,7 @@ class _OverviewTab extends ConsumerWidget {
               icon: Icons.report_problem_outlined,
               color: AppColors.error,
               subtitle: 'Awaiting review',
+              onTap: () => context.push('/admin/reports'),
             ),
             _AnalyticsCard(
               title: 'Verifications',
@@ -240,6 +248,7 @@ class _OverviewTab extends ConsumerWidget {
               icon: Icons.how_to_reg_outlined,
               color: AppColors.warning,
               subtitle: 'Pending requests',
+              onTap: () => context.push('/admin/verifications'),
             ),
             _AnalyticsCard(
               title: 'Support',
@@ -247,6 +256,7 @@ class _OverviewTab extends ConsumerWidget {
               icon: Icons.support_agent,
               color: AppColors.secondary,
               subtitle: 'Active tickets',
+              onTap: () => context.push('/admin/support'),
             ),
             _AnalyticsCard(
               title: 'Announcements',
@@ -254,6 +264,7 @@ class _OverviewTab extends ConsumerWidget {
               icon: Icons.campaign_outlined,
               color: AppColors.secondaryDark,
               subtitle: 'Currently live',
+              onTap: () => context.push('/admin/announcements'),
             ),
           ],
         ),
@@ -345,6 +356,7 @@ class _UserAnalyticsTab extends ConsumerWidget {
           icon: Icons.person_add_outlined,
           color: Colors.green,
           subtitle: 'Past 24 hours',
+          onTap: () => context.push('/admin/users'),
         ),
         _AnalyticsCard(
           title: 'This Week',
@@ -415,6 +427,7 @@ class _UserAnalyticsTab extends ConsumerWidget {
           icon: Icons.verified_user_outlined,
           color: AppColors.success,
           subtitle: 'Approved users',
+          onTap: () => context.push('/admin/verifications'),
         ),
         _AnalyticsCard(
           title: 'Rejected',
@@ -422,6 +435,7 @@ class _UserAnalyticsTab extends ConsumerWidget {
           icon: Icons.cancel_outlined,
           color: AppColors.error,
           subtitle: 'Failed applications',
+          onTap: () => context.push('/admin/verifications'),
         ),
         _AnalyticsCard(
           title: 'Approval Rate',
@@ -436,6 +450,7 @@ class _UserAnalyticsTab extends ConsumerWidget {
           icon: Icons.pending_actions,
           color: AppColors.warning,
           subtitle: 'Awaiting review',
+          onTap: () => context.push('/admin/verifications'),
         ),
       ],
     );
@@ -681,6 +696,7 @@ class _FeatureAnalyticsTab extends ConsumerWidget {
               subtitle: '${stats.newListingsToday} new today',
               icon: Icons.store_outlined,
               color: AppColors.marketplace,
+              onTap: () => context.push('/admin/marketplace'),
             ),
             _AnalyticsCard(
               title: 'Sold Items',
@@ -723,6 +739,7 @@ class _FeatureAnalyticsTab extends ConsumerWidget {
               subtitle: '${stats.newListingsToday} listed today',
               icon: Icons.hotel_outlined,
               color: AppColors.housing,
+              onTap: () => context.push('/admin/housing'),
             ),
             _AnalyticsCard(
               title: 'Total Occupied',
@@ -765,6 +782,7 @@ class _FeatureAnalyticsTab extends ConsumerWidget {
               subtitle: '${stats.newNotesToday} uploaded today',
               icon: Icons.menu_book_outlined,
               color: AppColors.notes,
+              onTap: () => context.push('/admin/notes'),
             ),
             _AnalyticsCard(
               title: 'Total Downloads',
@@ -807,6 +825,7 @@ class _FeatureAnalyticsTab extends ConsumerWidget {
               subtitle: 'Scheduled soon',
               icon: Icons.calendar_month_outlined,
               color: Colors.deepPurple,
+              onTap: () => context.push('/admin/events'),
             ),
             _AnalyticsCard(
               title: 'Live Now',
@@ -814,6 +833,7 @@ class _FeatureAnalyticsTab extends ConsumerWidget {
               subtitle: 'Active gatherings',
               icon: Icons.bolt,
               color: Colors.amber,
+              onTap: () => context.push('/admin/events'),
             ),
             _AnalyticsCard(
               title: 'Pending Approval',
@@ -821,6 +841,7 @@ class _FeatureAnalyticsTab extends ConsumerWidget {
               subtitle: 'Moderation queue',
               icon: Icons.hourglass_empty_outlined,
               color: Colors.orange,
+              onTap: () => context.push('/admin/events'),
             ),
             _AnalyticsCard(
               title: 'Total Events',
@@ -828,6 +849,7 @@ class _FeatureAnalyticsTab extends ConsumerWidget {
               subtitle: 'Platform historical',
               icon: Icons.history_outlined,
               color: Colors.blue,
+              onTap: () => context.push('/admin/events'),
             ),
           ],
         ),
@@ -849,6 +871,7 @@ class _FeatureAnalyticsTab extends ConsumerWidget {
               subtitle: 'Urgent support',
               icon: Icons.support_agent,
               color: AppColors.error,
+              onTap: () => context.push('/admin/support'),
             ),
             _AnalyticsCard(
               title: 'Resolved Today',
@@ -856,6 +879,7 @@ class _FeatureAnalyticsTab extends ConsumerWidget {
               subtitle: 'Support throughput',
               icon: Icons.done_all,
               color: Colors.green,
+              onTap: () => context.push('/admin/support'),
             ),
             _AnalyticsCard(
               title: 'Open Reports',
@@ -863,6 +887,7 @@ class _FeatureAnalyticsTab extends ConsumerWidget {
               subtitle: 'Content violations',
               icon: Icons.report_outlined,
               color: Colors.red,
+              onTap: () => context.push('/admin/reports'),
             ),
             _AnalyticsCard(
               title: 'Verification Queue',
@@ -870,6 +895,7 @@ class _FeatureAnalyticsTab extends ConsumerWidget {
               subtitle: 'New applications',
               icon: Icons.verified_user_outlined,
               color: AppColors.warning,
+              onTap: () => context.push('/admin/verifications'),
             ),
           ],
         ),
@@ -891,6 +917,7 @@ class _FeatureAnalyticsTab extends ConsumerWidget {
               subtitle: 'Live broadcast',
               icon: Icons.notifications_active_outlined,
               color: AppColors.secondaryDark,
+              onTap: () => context.push('/admin/announcements'),
             ),
             _AnalyticsCard(
               title: 'Scheduled',
@@ -898,6 +925,7 @@ class _FeatureAnalyticsTab extends ConsumerWidget {
               subtitle: 'Future visibility',
               icon: Icons.schedule_outlined,
               color: Colors.blue,
+              onTap: () => context.push('/admin/announcements'),
             ),
             _AnalyticsCard(
               title: 'Expired',
@@ -905,6 +933,7 @@ class _FeatureAnalyticsTab extends ConsumerWidget {
               subtitle: 'Past broadcasts',
               icon: Icons.history_outlined,
               color: Colors.grey,
+              onTap: () => context.push('/admin/announcements'),
             ),
           ],
         ),
@@ -948,6 +977,7 @@ class _AnalyticsCard extends StatelessWidget {
   final String subtitle;
   final IconData icon;
   final Color color;
+  final VoidCallback? onTap;
 
   const _AnalyticsCard({
     required this.title,
@@ -955,58 +985,65 @@ class _AnalyticsCard extends StatelessWidget {
     required this.subtitle,
     required this.icon,
     required this.color,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return Card(
       elevation: 0,
+      clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: Theme.of(context).dividerColor),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, color: color, size: 20),
                   ),
-                  child: Icon(icon, color: color, size: 20),
+                  if (onTap != null)
+                    Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5)),
+                ],
+              ),
+              const Spacer(),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
                 ),
-              ],
-            ),
-            const Spacer(),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+              const SizedBox(height: 4),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -228,12 +228,18 @@ class _SupportConversationAdminScreenState extends ConsumerState<SupportConversa
     final navigator = Navigator.of(context);
     try {
       _sendMessage('Thank you for using UniHub Support. This ticket is now marked as Resolved.');
+      
+      // Mark as read and update status
       await ref.read(adminRepositoryProvider).updateSupportConversationStatus(
         widget.conversationId, 
         'resolved',
         adminId: admin.uid,
         adminName: admin.fullName,
       );
+
+      // Force refresh the support conversations list
+      ref.invalidate(supportConversationsProvider);
+
       if (mounted) navigator.pop();
     } finally {
       if (mounted) setState(() => _isProcessing = false);

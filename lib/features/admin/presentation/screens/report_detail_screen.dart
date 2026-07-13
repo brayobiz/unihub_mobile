@@ -84,6 +84,9 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
         // Small delay to ensure database reflects change
         await Future.delayed(const Duration(milliseconds: 500));
         
+        // Refresh the reports provider before leaving
+        ref.invalidate(adminReportsProvider);
+        
         // Safety check again before popping
         if (mounted && router.canPop()) {
           router.pop(true);

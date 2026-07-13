@@ -133,10 +133,7 @@ class AdminRepository {
     AdminVerificationType? type,
     int limit = 100,
   }) {
-    // Combine multiple streams from different collections
-    // Using a higher limit to ensure we find matching items after in-memory filtering if needed, 
-    // though we try to filter at Firestore level for status.
-    
+    // PHASE 4 Hardening: Removing OrderBy on filtered fields to avoid Index requirements
     Query identityQuery = _firestore.collection('identity_verifications');
     Query studentQuery = _firestore.collection('student_verifications');
     Query professionalQuery = _firestore.collection('verification_applications');
@@ -148,15 +145,6 @@ class AdminRepository {
       studentQuery = studentQuery.where('status', isEqualTo: statusStr);
       professionalQuery = professionalQuery.where('status', isEqualTo: statusStr);
       organizerQuery = organizerQuery.where('status', isEqualTo: statusStr);
-    }
-
-    // We only use orderBy if status is NOT filtered, or if composite indexes are likely to exist.
-    // To be safe for MVP and avoid "Query requires index" errors, we only orderBy on the 'All' view.
-    if (status == null) {
-      identityQuery = identityQuery.orderBy('submittedAt', descending: true);
-      studentQuery = studentQuery.orderBy('submittedAt', descending: true);
-      professionalQuery = professionalQuery.orderBy('createdAt', descending: true);
-      organizerQuery = organizerQuery.orderBy('submittedAt', descending: true);
     }
 
     final identityStream = identityQuery.limit(limit).snapshots();
@@ -646,25 +634,31 @@ class AdminRepository {
   // --- Moderation Methods ---
 
   Stream<List<AdminReport>> watchReports({ReportType? type, ReportStatus? status, int limit = 100}) {
-    final reportsStream = _firestore.collection('reports').orderBy('createdAt', descending: true).limit(limit).snapshots();
-    final housingReportsStream = _firestore.collection('housing_reports').orderBy('createdAt', descending: true).limit(limit).snapshots();
+    // PHASE 4 Hardening: Removing OrderBy on filtered fields to avoid Index requirements
+    Query reportsQuery = _firestore.collection('reports');
+    Query housingReportsQuery = _firestore.collection('housing_reports');
+
+    if (status != null) {
+      final statusStr = status.name == 'pending' ? 'pending' : (status.name == 'underReview' ? 'under_review' : status.name);
+      reportsQuery = reportsQuery.where('status', isEqualTo: statusStr);
+      housingReportsQuery = housingReportsQuery.where('status', isEqualTo: statusStr);
+    }
+
+    final reportsStream = reportsQuery.limit(limit * 2).snapshots();
+    final housingReportsStream = housingReportsQuery.limit(limit * 2).snapshots();
 
     return Rx.combineLatest2<QuerySnapshot, QuerySnapshot, List<AdminReport>>(
       reportsStream,
       housingReportsStream,
       (reportsSnap, housingSnap) {
         final List<AdminReport> reports = [];
+        // ... (rest of mapping logic)
 
         for (var doc in reportsSnap.docs) {
           final data = doc.data() as Map<String, dynamic>;
           final typeStr = data['type']?.toString() ?? 'listing';
-          final reporterId = data['reporterId']?.toString() ?? '';
+          final reporterId = data['reporterId']?.toString() ?? 'unknown_reporter';
           
-          if (reporterId.isEmpty) {
-            AppLogger.warning('Report ${doc.id} missing reporterId', 'AdminRepository');
-            continue;
-          }
-
           ReportType rType = ReportType.marketplace;
           if (typeStr == 'feed_item') rType = ReportType.feedItem;
           if (typeStr == 'user') rType = ReportType.user;
@@ -687,12 +681,7 @@ class AdminRepository {
 
         for (var doc in housingSnap.docs) {
           final data = doc.data() as Map<String, dynamic>;
-          final reporterId = data['reporterId']?.toString() ?? '';
-          
-          if (reporterId.isEmpty) {
-            AppLogger.warning('Housing report ${doc.id} missing reporterId', 'AdminRepository');
-            continue;
-          }
+          final reporterId = data['reporterId']?.toString() ?? 'unknown_reporter';
           
           reports.add(AdminReport(
             id: doc.id,
@@ -702,13 +691,15 @@ class AdminRepository {
             type: ReportType.housing,
             reason: data['reason'] ?? data['category'] ?? 'Housing Violation',
             status: _mapReportStatus(data['status']),
-            createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+            createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
             history: (data['history'] as List?)?.map((h) => ModerationHistoryItem.fromJson(h)).toList() ?? [],
           ));
         }
 
         var filtered = reports;
         if (type != null) filtered = filtered.where((r) => r.type == type).toList();
+        // Status filter is now primarily handled by Firestore, but we keep it here for safety 
+        // in case of race conditions or local cache inconsistencies.
         if (status != null) filtered = filtered.where((r) => r.status == status).toList();
 
         filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));

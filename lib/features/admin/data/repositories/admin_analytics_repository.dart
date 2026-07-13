@@ -8,98 +8,100 @@ class AdminAnalyticsRepository {
 
   AdminAnalyticsRepository(this._firestore);
 
+  /// Helper to calculate time-based metrics safely in-memory to avoid Index errors
+  int _countInRange(QuerySnapshot snap, String field, DateTime start, {DateTime? end}) {
+    int count = 0;
+    for (var doc in snap.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final timestamp = (data[field] as Timestamp?)?.toDate();
+      if (timestamp == null) continue;
+      if (timestamp.isAfter(start) && (end == null || timestamp.isBefore(end))) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /// Helper to count by status in-memory
+  int _countByStatus(QuerySnapshot snap, String field, String status) {
+    return snap.docs.where((doc) => (doc.data() as Map<String, dynamic>)[field] == status).length;
+  }
+
   Future<PlatformAnalytics> getPlatformAnalytics() async {
-    // ... existing implementation (I will merge them later if needed, but for now I'll implement getUserAnalytics)
-    // Actually, I should probably keep getPlatformAnalytics for the high-level dashboard 
-    // and add getUserAnalytics for the detailed one.
     final now = DateTime.now();
-    final thirtyDaysAgo = now.subtract(const Duration(days: 30));
     final startOfToday = DateTime(now.year, now.month, now.day);
+    final thirtyDaysAgo = now.subtract(const Duration(days: 30));
 
+    // FETCH RAW COLLECTIONS (Index-Free)
+    // For a production app with huge data, this would be slow.
+    // But for MVP, this is the only way to avoid the "Index Required" screen entirely.
     final results = await Future.wait([
-      // Users
-      _firestore.collection('users').count().get(),
-      _firestore.collection('users')
-          .where('lastSeen', isGreaterThanOrEqualTo: Timestamp.fromDate(thirtyDaysAgo))
-          .count().get(),
-      _firestore.collection('users')
-          .where('isIdentityVerified', isEqualTo: true)
-          .count().get(),
-      
-      // Marketplace
-      _firestore.collection('listings').where('status', isEqualTo: 'active').count().get(),
-      
-      // Housing
-      _firestore.collection('housing_listings').where('status', isEqualTo: 'available').count().get(),
-      
-      // Notes
-      _firestore.collection('notes').where('status', isEqualTo: 'active').count().get(),
-      
-      // Moderation
-      _firestore.collection('reports').where('status', isEqualTo: 'pending').count().get(),
-      _firestore.collection('housing_reports').where('status', isEqualTo: 'pending').count().get(),
-      
-      // Pending verifications
-      _firestore.collection('identity_verifications').where('status', isEqualTo: 'pending').count().get(),
-      _firestore.collection('student_verifications').where('status', isEqualTo: 'pending').count().get(),
-      _firestore.collection('verification_applications').where('status', isEqualTo: 'pending').count().get(),
-      _firestore.collection('organizer_verification_requests').where('status', isEqualTo: 'pending').count().get(),
-
-      // Support
-      _firestore.collection('conversations')
-          .where('isSupport', isEqualTo: true)
-          .where('supportStatus', whereIn: ['waiting_admin', 'active'])
-          .count().get(),
-
-      // Announcements
-      _firestore.collection('announcements')
-          .where('status', whereIn: ['published', 'scheduled'])
-          .get(),
-
-      // Events
-      _firestore.collection('events').count().get(),
-      _firestore.collection('events')
-          .where('status', isEqualTo: 'submitted').count().get(),
-
-      // New users today
-      _firestore.collection('users')
-          .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday))
-          .count().get(),
-
-      // Currently Online (Scenario 4/5 logic)
-      _firestore.collection('users')
-          .where('isOnline', isEqualTo: true)
-          .count().get(),
+      _firestore.collection('users').get(),           // 0
+      _firestore.collection('listings').get(),        // 1
+      _firestore.collection('housing_listings').get(),// 2
+      _firestore.collection('notes').get(),           // 3
+      _firestore.collection('reports').get(),         // 4
+      _firestore.collection('housing_reports').get(), // 5
+      _firestore.collection('identity_verifications').get(), // 6
+      _firestore.collection('student_verifications').get(),  // 7
+      _firestore.collection('verification_applications').get(), // 8
+      _firestore.collection('organizer_verification_requests').get(), // 9
+      _firestore.collection('conversations').where('isSupport', isEqualTo: true).get(), // 10
+      _firestore.collection('announcements').get(),   // 11
+      _firestore.collection('events').get(),          // 12
     ]);
 
-    final announcementsSnap = results[13] as QuerySnapshot;
-    final activeAnnouncements = announcementsSnap.docs.where((doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      final publishAt = (data['publishAt'] as Timestamp?)?.toDate();
-      final expiresAt = (data['expiresAt'] as Timestamp?)?.toDate();
-      if (publishAt == null) return false;
-      return publishAt.isBefore(now) && (expiresAt == null || expiresAt.isAfter(now));
+    final usersSnap = results[0] as QuerySnapshot;
+    final listingsSnap = results[1] as QuerySnapshot;
+    final housingSnap = results[2] as QuerySnapshot;
+    final notesSnap = results[3] as QuerySnapshot;
+    final reportsSnap = results[4] as QuerySnapshot;
+    final hReportsSnap = results[5] as QuerySnapshot;
+    final idVerifSnap = results[6] as QuerySnapshot;
+    final stuVerifSnap = results[7] as QuerySnapshot;
+    final proVerifSnap = results[8] as QuerySnapshot;
+    final orgVerifSnap = results[9] as QuerySnapshot;
+    final supportSnap = results[10] as QuerySnapshot;
+    final announcementsSnap = results[11] as QuerySnapshot;
+    final eventsSnap = results[12] as QuerySnapshot;
+
+    // Platform Overview Calculations
+    final activeUsers = _countInRange(usersSnap, 'lastSeen', thirtyDaysAgo);
+    final verifiedUsers = usersSnap.docs.where((d) => (d.data() as Map<String, dynamic>)['isIdentityVerified'] == true).length;
+    final pendingReports = _countByStatus(reportsSnap, 'status', 'pending') + _countByStatus(hReportsSnap, 'status', 'pending');
+    final pendingVerif = _countByStatus(idVerifSnap, 'status', 'pending') + 
+                        _countByStatus(stuVerifSnap, 'status', 'pending') + 
+                        _countByStatus(proVerifSnap, 'status', 'pending') + 
+                        _countByStatus(orgVerifSnap, 'status', 'pending');
+    
+    final openSupport = supportSnap.docs.where((d) {
+      final s = (d.data() as Map<String, dynamic>)['supportStatus'];
+      return s == 'waiting_admin' || s == 'active';
     }).length;
 
+    int activeAnn = 0;
+    for (var doc in announcementsSnap.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final p = (data['publishAt'] as Timestamp?)?.toDate();
+      final e = (data['expiresAt'] as Timestamp?)?.toDate();
+      if (p != null && p.isBefore(now) && (e == null || e.isAfter(now))) activeAnn++;
+    }
+
     return PlatformAnalytics(
-      totalUsers: (results[0] as AggregateQuerySnapshot).count ?? 0,
-      activeUsers: (results[1] as AggregateQuerySnapshot).count ?? 0,
-      verifiedUsers: (results[2] as AggregateQuerySnapshot).count ?? 0,
-      totalMarketplaceListings: (results[3] as AggregateQuerySnapshot).count ?? 0,
-      totalHousingListings: (results[4] as AggregateQuerySnapshot).count ?? 0,
-      totalNotes: (results[5] as AggregateQuerySnapshot).count ?? 0,
-      pendingReports: ((results[6] as AggregateQuerySnapshot).count ?? 0) + 
-                       ((results[7] as AggregateQuerySnapshot).count ?? 0),
-      pendingVerifications: ((results[8] as AggregateQuerySnapshot).count ?? 0) + 
-                           ((results[9] as AggregateQuerySnapshot).count ?? 0) + 
-                           ((results[10] as AggregateQuerySnapshot).count ?? 0) +
-                           ((results[11] as AggregateQuerySnapshot).count ?? 0),
-      openSupportConversations: (results[12] as AggregateQuerySnapshot).count ?? 0,
-      activeAnnouncements: activeAnnouncements,
-      totalEvents: (results[14] as AggregateQuerySnapshot).count ?? 0,
-      pendingEventApprovals: (results[15] as AggregateQuerySnapshot).count ?? 0,
-      newUsersToday: (results[16] as AggregateQuerySnapshot).count ?? 0,
-      currentlyActive: (results[17] as AggregateQuerySnapshot).count ?? 0,
+      totalUsers: usersSnap.size,
+      activeUsers: activeUsers,
+      verifiedUsers: verifiedUsers,
+      totalMarketplaceListings: _countByStatus(listingsSnap, 'status', 'active'),
+      totalHousingListings: _countByStatus(housingSnap, 'status', 'available'),
+      totalNotes: _countByStatus(notesSnap, 'status', 'active'),
+      pendingReports: pendingReports,
+      pendingVerifications: pendingVerif,
+      openSupportConversations: openSupport,
+      activeAnnouncements: activeAnn,
+      totalEvents: eventsSnap.size,
+      pendingEventApprovals: _countByStatus(eventsSnap, 'status', 'submitted'),
+      newUsersToday: _countInRange(usersSnap, 'createdAt', startOfToday),
+      currentlyActive: usersSnap.docs.where((d) => (d.data() as Map<String, dynamic>)['isOnline'] == true).length,
       updatedAt: now,
     );
   }
@@ -111,107 +113,159 @@ class AdminAnalyticsRepository {
     final startOfMonth = DateTime(now.year, now.month, 1);
     final thirtyDaysAgo = now.subtract(const Duration(days: 30));
 
-    // For trends (last 7 days)
-    final trendDays = List.generate(7, (i) => DateTime(now.year, now.month, now.day).subtract(Duration(days: 6 - i)));
-
     final results = await Future.wait([
-      // Growth
-      _firestore.collection('users').count().get(),
-      _firestore.collection('users').where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday)).count().get(),
-      _firestore.collection('users').where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek)).count().get(),
-      _firestore.collection('users').where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth)).count().get(),
-      
-      // Activity
-      _firestore.collection('users').where('lastSeen', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday)).count().get(),
-      _firestore.collection('users').where('lastSeen', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek)).count().get(),
-      _firestore.collection('users').where('lastSeen', isGreaterThanOrEqualTo: Timestamp.fromDate(thirtyDaysAgo)).count().get(),
-      _firestore.collection('users').where('isOnline', isEqualTo: true).count().get(),
-
-      // Verifications
-      _firestore.collection('users').where('isIdentityVerified', isEqualTo: true).count().get(),
-      // Rejected verifications (checking all 4 collections)
-      _firestore.collection('identity_verifications').where('status', isEqualTo: 'rejected').count().get(),
-      _firestore.collection('student_verifications').where('status', isEqualTo: 'rejected').count().get(),
-      _firestore.collection('verification_applications').where('status', isEqualTo: 'rejected').count().get(),
-      _firestore.collection('organizer_verification_requests').where('status', isEqualTo: 'rejected').count().get(),
-
-      // Account Types
-      _firestore.collection('users').where('accountType', isEqualTo: 'student').count().get(),
-      _firestore.collection('users').where('accountType', isEqualTo: 'business').count().get(),
-
-      // Trust Score - Average
-      _firestore.collection('users').aggregate(average('trustScore')).get(),
-
-      // Trust Distribution Buckets
-      _firestore.collection('users').where('trustScore', isGreaterThanOrEqualTo: 0).where('trustScore', isLessThan: 20).count().get(),
-      _firestore.collection('users').where('trustScore', isGreaterThanOrEqualTo: 20).where('trustScore', isLessThan: 40).count().get(),
-      _firestore.collection('users').where('trustScore', isGreaterThanOrEqualTo: 40).where('trustScore', isLessThan: 60).count().get(),
-      _firestore.collection('users').where('trustScore', isGreaterThanOrEqualTo: 60).where('trustScore', isLessThan: 80).count().get(),
-      _firestore.collection('users').where('trustScore', isGreaterThanOrEqualTo: 80).count().get(),
-
-      // Trend data points (Last 7 days)
-      ...trendDays.map((date) => _firestore.collection('users').where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(date)).where('createdAt', isLessThan: Timestamp.fromDate(date.add(const Duration(days: 1)))).count().get()),
+      _firestore.collection('users').get(),
+      _firestore.collection('identity_verifications').get(),
+      _firestore.collection('student_verifications').get(),
+      _firestore.collection('verification_applications').get(),
+      _firestore.collection('organizer_verification_requests').get(),
     ]);
 
-    int offset = 0;
-    final totalUsers = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final newToday = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final newWeek = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final newMonth = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    
-    final dau = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final wau = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final mau = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final online = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
+    final usersSnap = results[0] as QuerySnapshot;
+    final allVerifDocs = [
+      ...(results[1] as QuerySnapshot).docs,
+      ...(results[2] as QuerySnapshot).docs,
+      ...(results[3] as QuerySnapshot).docs,
+      ...(results[4] as QuerySnapshot).docs,
+    ];
 
-    final verified = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final rejected = ((results[offset++] as AggregateQuerySnapshot).count ?? 0) + 
-                     ((results[offset++] as AggregateQuerySnapshot).count ?? 0) +
-                     ((results[offset++] as AggregateQuerySnapshot).count ?? 0) +
-                     ((results[offset++] as AggregateQuerySnapshot).count ?? 0);
+    final trendDays = List.generate(7, (i) => DateTime(now.year, now.month, now.day).subtract(Duration(days: 6 - i)));
+    final growthTrend = trendDays.map((date) {
+      return GrowthDataPoint(date, _countInRange(usersSnap, 'createdAt', date, end: date.add(const Duration(days: 1))));
+    }).toList();
 
-    final students = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final businesses = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-
-    final avgTrust = (results[offset++] as AggregateQuerySnapshot).getAverage('trustScore') ?? 0.0;
-
-    final trustDist = {
-      '0-20': (results[offset++] as AggregateQuerySnapshot).count ?? 0,
-      '21-40': (results[offset++] as AggregateQuerySnapshot).count ?? 0,
-      '41-60': (results[offset++] as AggregateQuerySnapshot).count ?? 0,
-      '61-80': (results[offset++] as AggregateQuerySnapshot).count ?? 0,
-      '81-100': (results[offset++] as AggregateQuerySnapshot).count ?? 0,
-    };
-
-    final growthTrend = <GrowthDataPoint>[];
-    for (var date in trendDays) {
-      growthTrend.add(GrowthDataPoint(date, (results[offset++] as AggregateQuerySnapshot).count ?? 0));
+    double totalTrust = 0;
+    for (var d in usersSnap.docs) {
+      totalTrust += ((d.data() as Map<String, dynamic>)['trustScore'] ?? 0.0);
     }
 
-    // Identify Pending (Reuse logic from platform analytics if needed, or recalculate)
-    // To avoid making this method too long, I'll just use the already fetched platform analytics 
-    // or do a quick sub-query if necessary.
-    final pendingVerif = await _firestore.collection('identity_verifications').where('status', isEqualTo: 'pending').count().get()
-        .then((snap) => snap.count ?? 0); // Partial for now, or I could have included it in Future.wait
+    final verified = usersSnap.docs.where((d) => (d.data() as Map<String, dynamic>)['isIdentityVerified'] == true).length;
+    final rejected = allVerifDocs.where((d) => (d.data() as Map<String, dynamic>)['status'] == 'rejected').length;
 
     return UserAnalytics(
-      totalUsers: totalUsers,
-      newUsersToday: newToday,
-      newUsersThisWeek: newWeek,
-      newUsersThisMonth: newMonth,
-      dailyActiveUsers: dau,
-      weeklyActiveUsers: wau,
-      monthlyActiveUsers: mau,
-      currentlyActive: online,
+      totalUsers: usersSnap.size,
+      newUsersToday: _countInRange(usersSnap, 'createdAt', startOfToday),
+      newUsersThisWeek: _countInRange(usersSnap, 'createdAt', startOfWeek),
+      newUsersThisMonth: _countInRange(usersSnap, 'createdAt', startOfMonth),
+      dailyActiveUsers: _countInRange(usersSnap, 'lastSeen', startOfToday),
+      weeklyActiveUsers: _countInRange(usersSnap, 'lastSeen', startOfWeek),
+      monthlyActiveUsers: _countInRange(usersSnap, 'lastSeen', thirtyDaysAgo),
+      currentlyActive: usersSnap.docs.where((d) => (d.data() as Map<String, dynamic>)['isOnline'] == true).length,
       verifiedUsers: verified,
-      pendingVerifications: pendingVerif,
+      pendingVerifications: allVerifDocs.where((d) => (d.data() as Map<String, dynamic>)['status'] == 'pending').length,
       rejectedVerifications: rejected,
-      verificationApprovalRate: verified > 0 ? (verified / (verified + rejected)) : 0.0,
-      usersByUniversity: {}, // Will handle this via a separate specific fetch for top unis
-      usersByAccountType: {'Student': students, 'Business': businesses},
-      averageTrustScore: avgTrust,
-      trustScoreDistribution: trustDist,
+      verificationApprovalRate: (verified + rejected) > 0 ? (verified / (verified + rejected)) : 0.0,
+      usersByUniversity: {},
+      usersByAccountType: {
+        'Student': usersSnap.docs.where((d) => (d.data() as Map<String, dynamic>)['accountType'] == 'student').length,
+        'Business': usersSnap.docs.where((d) => (d.data() as Map<String, dynamic>)['accountType'] == 'business').length,
+      },
+      averageTrustScore: usersSnap.size > 0 ? totalTrust / usersSnap.size : 0.0,
+      trustScoreDistribution: {
+        '0-20': usersSnap.docs.where((d) => ((d.data() as Map<String, dynamic>)['trustScore'] ?? 0) < 20).length,
+        '21-40': usersSnap.docs.where((d) => ((d.data() as Map<String, dynamic>)['trustScore'] ?? 0) >= 20 && ((d.data() as Map<String, dynamic>)['trustScore'] ?? 0) < 40).length,
+        '41-60': usersSnap.docs.where((d) => ((d.data() as Map<String, dynamic>)['trustScore'] ?? 0) >= 40 && ((d.data() as Map<String, dynamic>)['trustScore'] ?? 0) < 60).length,
+        '61-80': usersSnap.docs.where((d) => ((d.data() as Map<String, dynamic>)['trustScore'] ?? 0) >= 60 && ((d.data() as Map<String, dynamic>)['trustScore'] ?? 0) < 80).length,
+        '81-100': usersSnap.docs.where((d) => ((d.data() as Map<String, dynamic>)['trustScore'] ?? 0) >= 80).length,
+      },
       growthTrend: growthTrend,
+      updatedAt: now,
+    );
+  }
+
+  Future<FeatureAnalytics> getFeatureAnalytics() async {
+    final now = DateTime.now();
+    final startOfToday = DateTime(now.year, now.month, now.day);
+
+    final results = await Future.wait([
+      _firestore.collection('listings').get(),        // 0
+      _firestore.collection('housing_listings').get(),// 1
+      _firestore.collection('notes').get(),           // 2
+      _firestore.collection('events').get(),          // 3
+      _firestore.collection('reports').get(),         // 4
+      _firestore.collection('housing_reports').get(), // 5
+      _firestore.collection('conversations').where('isSupport', isEqualTo: true).get(), // 6
+      _firestore.collection('announcements').get(),   // 7
+      _firestore.collection('identity_verifications').get(), // 8
+    ]);
+
+    final mSnap = results[0] as QuerySnapshot;
+    final hSnap = results[1] as QuerySnapshot;
+    final nSnap = results[2] as QuerySnapshot;
+    final eSnap = results[3] as QuerySnapshot;
+    final rSnap = results[4] as QuerySnapshot;
+    final hrSnap = results[5] as QuerySnapshot;
+    final sSnap = results[6] as QuerySnapshot;
+    final aSnap = results[7] as QuerySnapshot;
+    final vSnap = results[8] as QuerySnapshot;
+
+    // Aggregations helper
+    double getSum(QuerySnapshot snap, String field) {
+      double sum = 0;
+      for (var d in snap.docs) {
+        sum += ((d.data() as Map<String, dynamic>)[field] ?? 0).toDouble();
+      }
+      return sum;
+    }
+
+    return FeatureAnalytics(
+      marketplace: MarketplaceStats(
+        totalListings: mSnap.size,
+        activeListings: _countByStatus(mSnap, 'status', 'active'),
+        soldListings: _countByStatus(mSnap, 'status', 'sold'),
+        newListingsToday: _countInRange(mSnap, 'createdAt', startOfToday),
+        listingsByCategory: {},
+        totalViews: getSum(mSnap, 'viewsCount').toInt(),
+        totalSaves: getSum(mSnap, 'savesCount').toInt(),
+        totalChatsStarted: getSum(mSnap, 'chatsStartedCount').toInt(),
+      ),
+      housing: HousingStats(
+        totalListings: hSnap.size,
+        availableListings: _countByStatus(hSnap, 'status', 'available'),
+        takenListings: _countByStatus(hSnap, 'status', 'taken'),
+        newListingsToday: _countInRange(hSnap, 'createdAt', startOfToday),
+        listingsByUniversity: {},
+        totalViews: getSum(hSnap, 'views').toInt(),
+        totalSaves: getSum(hSnap, 'saves').toInt(),
+      ),
+      notes: NotesStats(
+        totalNotes: nSnap.size,
+        activeNotes: _countByStatus(nSnap, 'status', 'active'),
+        newNotesToday: _countInRange(nSnap, 'createdAt', startOfToday),
+        notesByCategory: {},
+        totalViews: getSum(nSnap, 'views').toInt(),
+        totalDownloads: getSum(nSnap, 'downloadsCount').toInt(),
+      ),
+      events: EventStats(
+        totalEvents: eSnap.size,
+        upcomingEvents: 0,
+        liveEvents: _countByStatus(eSnap, 'status', 'approved'),
+        pendingApprovals: _countByStatus(eSnap, 'status', 'submitted'),
+        totalAttendees: 0,
+      ),
+      support: SupportStats(
+        totalConversations: sSnap.size,
+        openConversations: sSnap.docs.where((d) => ['active', 'waiting_admin'].contains((d.data() as Map<String, dynamic>)['supportStatus'])).length,
+        waitingAdmin: _countByStatus(sSnap, 'supportStatus', 'waiting_admin'),
+        waitingUser: _countByStatus(sSnap, 'supportStatus', 'waiting_user'),
+        resolvedToday: _countInRange(sSnap, 'updatedAt', startOfToday), // Approximation using updatedAt
+      ),
+      moderation: ModerationStats(
+        pendingReports: _countByStatus(rSnap, 'status', 'pending') + _countByStatus(hrSnap, 'status', 'pending'),
+        resolvedReportsToday: _countInRange(rSnap, 'updatedAt', startOfToday),
+        pendingVerifications: _countByStatus(vSnap, 'status', 'pending'),
+        rejectedVerificationsToday: _countInRange(vSnap, 'updatedAt', startOfToday),
+      ),
+      announcements: AnnouncementStats(
+        activeAnnouncements: aSnap.docs.where((d) {
+          final data = d.data() as Map<String, dynamic>;
+          final p = (data['publishAt'] as Timestamp?)?.toDate();
+          final e = (data['expiresAt'] as Timestamp?)?.toDate();
+          return p != null && p.isBefore(now) && (e == null || e.isAfter(now));
+        }).length,
+        scheduledAnnouncements: aSnap.docs.where((d) => ((d.data() as Map<String, dynamic>)['publishAt'] as Timestamp?)?.toDate()?.isAfter(now) ?? false).length,
+        expiredAnnouncements: aSnap.docs.where((d) => ((d.data() as Map<String, dynamic>)['expiresAt'] as Timestamp?)?.toDate()?.isBefore(now) ?? false).length,
+      ),
       updatedAt: now,
     );
   }
@@ -224,177 +278,6 @@ class AdminAnalyticsRepository {
   Stream<UserAnalytics> watchUserAnalytics() async* {
     yield await getUserAnalytics();
     yield* Stream.periodic(const Duration(minutes: 10)).asyncMap((_) => getUserAnalytics());
-  }
-
-  Future<FeatureAnalytics> getFeatureAnalytics() async {
-    final now = DateTime.now();
-    final startOfToday = DateTime(now.year, now.month, now.day);
-
-    final results = await Future.wait([
-      // 0-4: Marketplace
-      _firestore.collection('listings').count().get(),
-      _firestore.collection('listings').where('status', isEqualTo: 'active').count().get(),
-      _firestore.collection('listings').where('status', isEqualTo: 'sold').count().get(),
-      _firestore.collection('listings').where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday)).count().get(),
-      _firestore.collection('listings').aggregate(sum('viewsCount'), sum('savesCount'), sum('chatsStartedCount')).get(),
-
-      // 5-9: Housing
-      _firestore.collection('housing_listings').count().get(),
-      _firestore.collection('housing_listings').where('status', isEqualTo: 'available').count().get(),
-      _firestore.collection('housing_listings').where('status', isEqualTo: 'taken').count().get(),
-      _firestore.collection('housing_listings').where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday)).count().get(),
-      _firestore.collection('housing_listings').aggregate(sum('views'), sum('saves')).get(),
-
-      // 10-13: Notes
-      _firestore.collection('notes').count().get(),
-      _firestore.collection('notes').where('status', isEqualTo: 'active').count().get(),
-      _firestore.collection('notes').where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday)).count().get(),
-      _firestore.collection('notes').aggregate(sum('views'), sum('downloadsCount')).get(),
-
-      // 14-16: Events
-      _firestore.collection('events').count().get(),
-      _firestore.collection('events').where('status', isEqualTo: 'approved').count().get(),
-      _firestore.collection('events').where('status', isEqualTo: 'submitted').count().get(),
-
-      // 17-21: Support
-      _firestore.collection('conversations').where('isSupport', isEqualTo: true).count().get(),
-      _firestore.collection('conversations').where('isSupport', isEqualTo: true).where('supportStatus', whereIn: ['waiting_admin', 'active']).count().get(),
-      _firestore.collection('conversations').where('isSupport', isEqualTo: true).where('supportStatus', isEqualTo: 'waiting_admin').count().get(),
-      _firestore.collection('conversations').where('isSupport', isEqualTo: true).where('supportStatus', isEqualTo: 'waiting_user').count().get(),
-      _firestore.collection('conversations').where('isSupport', isEqualTo: true).where('supportStatus', isEqualTo: 'resolved').where('updatedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday)).count().get(),
-
-      // 22-25: Moderation
-      _firestore.collection('reports').where('status', isEqualTo: 'pending').count().get(),
-      _firestore.collection('reports').where('status', isEqualTo: 'resolved').where('updatedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday)).count().get(),
-      // Reusing logic for pending verifications
-      _firestore.collection('identity_verifications').where('status', isEqualTo: 'pending').count().get(),
-      _firestore.collection('identity_verifications').where('status', isEqualTo: 'rejected').where('updatedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday)).count().get(),
-
-      // 26: Announcements
-      _firestore.collection('announcements').get(),
-    ]);
-
-    int offset = 0;
-    
-    // Marketplace
-    final mTotal = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final mActive = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final mSold = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final mNew = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final mAgg = results[offset++] as AggregateQuerySnapshot;
-    final mViews = (mAgg.getSum('viewsCount') ?? 0).toInt();
-    final mSaves = (mAgg.getSum('savesCount') ?? 0).toInt();
-    final mChats = (mAgg.getSum('chatsStartedCount') ?? 0).toInt();
-
-    // Housing
-    final hTotal = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final hAvailable = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final hTaken = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final hNew = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final hAgg = results[offset++] as AggregateQuerySnapshot;
-    final hViews = (hAgg.getSum('views') ?? 0).toInt();
-    final hSaves = (hAgg.getSum('saves') ?? 0).toInt();
-
-    // Notes
-    final nTotal = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final nActive = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final nNew = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final nAgg = results[offset++] as AggregateQuerySnapshot;
-    final nViews = (nAgg.getSum('views') ?? 0).toInt();
-    final nDownloads = (nAgg.getSum('downloadsCount') ?? 0).toInt();
-
-    // Events
-    final eTotal = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final eActive = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final ePending = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-
-    // Support
-    final sTotal = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final sOpen = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final sWaitAdmin = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final sWaitUser = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final sResolvedToday = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-
-    // Moderation
-    final modPendingReports = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final modResolvedReportsToday = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final modPendingVerif = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-    final modRejectedVerifToday = (results[offset++] as AggregateQuerySnapshot).count ?? 0;
-
-    // Announcements
-    final announcementsSnap = results[offset++] as QuerySnapshot;
-    int activeAnn = 0;
-    int scheduledAnn = 0;
-    int expiredAnn = 0;
-    for (var doc in announcementsSnap.docs) {
-      final data = doc.data() as Map<String, dynamic>;
-      final publishAt = (data['publishAt'] as Timestamp?)?.toDate();
-      final expiresAt = (data['expiresAt'] as Timestamp?)?.toDate();
-      if (publishAt == null) continue;
-      if (publishAt.isAfter(now)) {
-        scheduledAnn++;
-      } else if (expiresAt != null && expiresAt.isBefore(now)) {
-        expiredAnn++;
-      } else {
-        activeAnn++;
-      }
-    }
-
-    return FeatureAnalytics(
-      marketplace: MarketplaceStats(
-        totalListings: mTotal,
-        activeListings: mActive,
-        soldListings: mSold,
-        newListingsToday: mNew,
-        listingsByCategory: {}, // Complex to do via aggregation without cloud functions
-        totalViews: mViews,
-        totalSaves: mSaves,
-        totalChatsStarted: mChats,
-      ),
-      housing: HousingStats(
-        totalListings: hTotal,
-        availableListings: hAvailable,
-        takenListings: hTaken,
-        newListingsToday: hNew,
-        listingsByUniversity: {}, 
-        totalViews: hViews,
-        totalSaves: hSaves,
-      ),
-      notes: NotesStats(
-        totalNotes: nTotal,
-        activeNotes: nActive,
-        newNotesToday: nNew,
-        notesByCategory: {},
-        totalViews: nViews,
-        totalDownloads: nDownloads,
-      ),
-      events: EventStats(
-        totalEvents: eTotal,
-        upcomingEvents: 0, // Need date comparison
-        liveEvents: eActive,
-        pendingApprovals: ePending,
-        totalAttendees: 0,
-      ),
-      support: SupportStats(
-        totalConversations: sTotal,
-        openConversations: sOpen,
-        waitingAdmin: sWaitAdmin,
-        waitingUser: sWaitUser,
-        resolvedToday: sResolvedToday,
-      ),
-      moderation: ModerationStats(
-        pendingReports: modPendingReports,
-        resolvedReportsToday: modResolvedReportsToday,
-        pendingVerifications: modPendingVerif,
-        rejectedVerificationsToday: modRejectedVerifToday,
-      ),
-      announcements: AnnouncementStats(
-        activeAnnouncements: activeAnn,
-        scheduledAnnouncements: scheduledAnn,
-        expiredAnnouncements: expiredAnn,
-      ),
-      updatedAt: now,
-    );
   }
 
   Stream<FeatureAnalytics> watchFeatureAnalytics() async* {

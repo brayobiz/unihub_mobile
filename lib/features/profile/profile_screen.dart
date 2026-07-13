@@ -526,10 +526,12 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
           ),
         ),
         const SizedBox(height: 12),
-        Row(
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             _buildTrustBadge(user.displayTrustScore.toInt()),
-            const SizedBox(width: 10),
             _buildRatingBadge(user.averageRating, user.ratingsCount),
           ],
         ),
