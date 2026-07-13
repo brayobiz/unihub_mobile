@@ -55,6 +55,11 @@ final userAnalyticsProvider = StreamProvider.autoDispose<UserAnalytics>((ref) {
   return service.watchUserAnalytics();
 });
 
+final featureAnalyticsProvider = StreamProvider.autoDispose<FeatureAnalytics>((ref) {
+  final service = ref.watch(analyticsServiceProvider);
+  return service.watchFeatureAnalytics();
+});
+
 final adminServiceProvider = Provider<AdminService>((ref) {
   final repository = ref.watch(adminRepositoryProvider);
   final settingsRepo = ref.watch(systemSettingsRepositoryProvider);

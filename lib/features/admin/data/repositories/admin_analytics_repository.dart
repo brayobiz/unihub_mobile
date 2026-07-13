@@ -65,6 +65,11 @@ class AdminAnalyticsRepository {
       _firestore.collection('users')
           .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday))
           .count().get(),
+
+      // Currently Online (Scenario 4/5 logic)
+      _firestore.collection('users')
+          .where('isOnline', isEqualTo: true)
+          .count().get(),
     ]);
 
     final announcementsSnap = results[13] as QuerySnapshot;
@@ -94,6 +99,7 @@ class AdminAnalyticsRepository {
       totalEvents: (results[14] as AggregateQuerySnapshot).count ?? 0,
       pendingEventApprovals: (results[15] as AggregateQuerySnapshot).count ?? 0,
       newUsersToday: (results[16] as AggregateQuerySnapshot).count ?? 0,
+      currentlyActive: (results[17] as AggregateQuerySnapshot).count ?? 0,
       updatedAt: now,
     );
   }

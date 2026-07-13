@@ -6,6 +6,7 @@ import '../layout/admin_layout.dart';
 import '../../shared/providers.dart';
 import '../../domain/models/platform_analytics.dart';
 import '../../domain/models/user_analytics.dart';
+import '../../domain/models/feature_analytics.dart';
 
 class AdminAnalyticsScreen extends ConsumerStatefulWidget {
   const AdminAnalyticsScreen({super.key});
@@ -20,7 +21,7 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> wit
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -44,6 +45,7 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> wit
               tabs: const [
                 Tab(text: 'Overview'),
                 Tab(text: 'User Analytics'),
+                Tab(text: 'Feature Analytics'),
               ],
             ),
           ),
@@ -53,6 +55,7 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> wit
               children: [
                 const _OverviewTab(),
                 const _UserAnalyticsTab(),
+                const _FeatureAnalyticsTab(),
               ],
             ),
           ),
@@ -519,8 +522,14 @@ class _UserAnalyticsTab extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text(entry.key, style: const TextStyle(fontWeight: FontWeight.w500)),
-                  const Spacer(),
+                  Expanded(
+                    child: Text(
+                      entry.key, 
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Text(entry.value.toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(width: 8),
                   Text('(${(percent * 100).toStringAsFixed(1)}%)', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
@@ -548,7 +557,14 @@ class _UserAnalyticsTab extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Average Platform Score', style: TextStyle(fontSize: 14)),
+                const Expanded(
+                  child: Text(
+                    'Average Platform Score', 
+                    style: TextStyle(fontSize: 14),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Text(
                   analytics.averageTrustScore.toStringAsFixed(1),
                   style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primary),
@@ -597,6 +613,303 @@ class _UserAnalyticsTab extends ConsumerWidget {
     if (bucket.startsWith('4')) return Colors.yellow.shade700;
     if (bucket.startsWith('6')) return Colors.lightGreen;
     return Colors.green;
+  }
+}
+
+class _FeatureAnalyticsTab extends ConsumerWidget {
+  const _FeatureAnalyticsTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final analyticsAsync = ref.watch(featureAnalyticsProvider);
+
+    return analyticsAsync.when(
+      data: (analytics) => RefreshIndicator(
+        onRefresh: () => ref.refresh(featureAnalyticsProvider.future),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildMarketplaceSection(context, analytics.marketplace),
+              const SizedBox(height: 40),
+              _buildHousingSection(context, analytics.housing),
+              const SizedBox(height: 40),
+              _buildNotesSection(context, analytics.notes),
+              const SizedBox(height: 40),
+              _buildEventsSection(context, analytics.events),
+              const SizedBox(height: 40),
+              _buildSupportModerationSection(context, analytics),
+              const SizedBox(height: 40),
+              _buildAnnouncementSection(context, analytics.announcements),
+            ],
+          ),
+        ),
+      ),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, stack) => Center(child: Text('Error: $err')),
+    );
+  }
+
+  Widget _buildSectionTitle(BuildContext context, String title, IconData icon, Color color) {
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 24),
+        const SizedBox(width: 12),
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMarketplaceSection(BuildContext context, MarketplaceStats stats) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle(context, 'Marketplace Analytics', Icons.shopping_bag, AppColors.marketplace),
+        const SizedBox(height: 16),
+        _AnalyticsGrid(
+          children: [
+            _AnalyticsCard(
+              title: 'Active Listings',
+              value: stats.activeListings.toString(),
+              subtitle: '${stats.newListingsToday} new today',
+              icon: Icons.store_outlined,
+              color: AppColors.marketplace,
+            ),
+            _AnalyticsCard(
+              title: 'Sold Items',
+              value: stats.soldListings.toString(),
+              subtitle: 'Total completions',
+              icon: Icons.check_circle_outline,
+              color: Colors.green,
+            ),
+            _AnalyticsCard(
+              title: 'Total Engagement',
+              value: NumberFormat.compact().format(stats.totalViews),
+              subtitle: '${NumberFormat.compact().format(stats.totalSaves)} saves recorded',
+              icon: Icons.visibility_outlined,
+              color: Colors.blue,
+            ),
+            _AnalyticsCard(
+              title: 'Chats Started',
+              value: stats.totalChatsStarted.toString(),
+              subtitle: 'Purchase intent',
+              icon: Icons.chat_bubble_outline,
+              color: Colors.orange,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHousingSection(BuildContext context, HousingStats stats) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle(context, 'Housing Analytics', Icons.home, AppColors.housing),
+        const SizedBox(height: 16),
+        _AnalyticsGrid(
+          children: [
+            _AnalyticsCard(
+              title: 'Available Rooms',
+              value: stats.availableListings.toString(),
+              subtitle: '${stats.newListingsToday} listed today',
+              icon: Icons.hotel_outlined,
+              color: AppColors.housing,
+            ),
+            _AnalyticsCard(
+              title: 'Total Occupied',
+              value: stats.takenListings.toString(),
+              subtitle: 'Market throughput',
+              icon: Icons.house_outlined,
+              color: Colors.brown,
+            ),
+            _AnalyticsCard(
+              title: 'Housing Views',
+              value: NumberFormat.compact().format(stats.totalViews),
+              subtitle: 'Unique searches',
+              icon: Icons.remove_red_eye_outlined,
+              color: Colors.indigo,
+            ),
+            _AnalyticsCard(
+              title: 'Saved Listings',
+              value: stats.totalSaves.toString(),
+              subtitle: 'High interest items',
+              icon: Icons.favorite_border,
+              color: Colors.pink,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNotesSection(BuildContext context, NotesStats stats) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle(context, 'Study Notes Analytics', Icons.description, AppColors.notes),
+        const SizedBox(height: 16),
+        _AnalyticsGrid(
+          children: [
+            _AnalyticsCard(
+              title: 'Active Resources',
+              value: stats.activeNotes.toString(),
+              subtitle: '${stats.newNotesToday} uploaded today',
+              icon: Icons.menu_book_outlined,
+              color: AppColors.notes,
+            ),
+            _AnalyticsCard(
+              title: 'Total Downloads',
+              value: NumberFormat.compact().format(stats.totalDownloads),
+              subtitle: 'Direct study impact',
+              icon: Icons.download_outlined,
+              color: Colors.green,
+            ),
+            _AnalyticsCard(
+              title: 'Library Views',
+              value: NumberFormat.compact().format(stats.totalViews),
+              subtitle: 'Resource discovery',
+              icon: Icons.auto_stories_outlined,
+              color: Colors.orange,
+            ),
+            _AnalyticsCard(
+              title: 'Note Volume',
+              value: stats.totalNotes.toString(),
+              subtitle: 'All-time library size',
+              icon: Icons.library_books_outlined,
+              color: Colors.blueGrey,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEventsSection(BuildContext context, EventStats stats) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle(context, 'Campus Events', Icons.event, Colors.deepPurple),
+        const SizedBox(height: 16),
+        _AnalyticsGrid(
+          children: [
+            _AnalyticsCard(
+              title: 'Upcoming Events',
+              value: stats.upcomingEvents.toString(),
+              subtitle: 'Scheduled soon',
+              icon: Icons.calendar_month_outlined,
+              color: Colors.deepPurple,
+            ),
+            _AnalyticsCard(
+              title: 'Live Now',
+              value: stats.liveEvents.toString(),
+              subtitle: 'Active gatherings',
+              icon: Icons.bolt,
+              color: Colors.amber,
+            ),
+            _AnalyticsCard(
+              title: 'Pending Approval',
+              value: stats.pendingApprovals.toString(),
+              subtitle: 'Moderation queue',
+              icon: Icons.hourglass_empty_outlined,
+              color: Colors.orange,
+            ),
+            _AnalyticsCard(
+              title: 'Total Events',
+              value: stats.totalEvents.toString(),
+              subtitle: 'Platform historical',
+              icon: Icons.history_outlined,
+              color: Colors.blue,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSupportModerationSection(BuildContext context, FeatureAnalytics analytics) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle(context, 'Support & Moderation', Icons.gavel, AppColors.error),
+        const SizedBox(height: 16),
+        _AnalyticsGrid(
+          children: [
+            _AnalyticsCard(
+              title: 'Awaiting Admin',
+              value: analytics.support.waitingAdmin.toString(),
+              subtitle: 'Urgent support',
+              icon: Icons.support_agent,
+              color: AppColors.error,
+            ),
+            _AnalyticsCard(
+              title: 'Resolved Today',
+              value: analytics.support.resolvedToday.toString(),
+              subtitle: 'Support throughput',
+              icon: Icons.done_all,
+              color: Colors.green,
+            ),
+            _AnalyticsCard(
+              title: 'Open Reports',
+              value: analytics.moderation.pendingReports.toString(),
+              subtitle: 'Content violations',
+              icon: Icons.report_outlined,
+              color: Colors.red,
+            ),
+            _AnalyticsCard(
+              title: 'Verification Queue',
+              value: analytics.moderation.pendingVerifications.toString(),
+              subtitle: 'New applications',
+              icon: Icons.verified_user_outlined,
+              color: AppColors.warning,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAnnouncementSection(BuildContext context, AnnouncementStats stats) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle(context, 'Announcements', Icons.campaign, AppColors.secondaryDark),
+        const SizedBox(height: 16),
+        _AnalyticsGrid(
+          children: [
+            _AnalyticsCard(
+              title: 'Active Now',
+              value: stats.activeAnnouncements.toString(),
+              subtitle: 'Live broadcast',
+              icon: Icons.notifications_active_outlined,
+              color: AppColors.secondaryDark,
+            ),
+            _AnalyticsCard(
+              title: 'Scheduled',
+              value: stats.scheduledAnnouncements.toString(),
+              subtitle: 'Future visibility',
+              icon: Icons.schedule_outlined,
+              color: Colors.blue,
+            ),
+            _AnalyticsCard(
+              title: 'Expired',
+              value: stats.expiredAnnouncements.toString(),
+              subtitle: 'Past broadcasts',
+              icon: Icons.history_outlined,
+              color: Colors.grey,
+            ),
+          ],
+        ),
+      ],
+    );
   }
 }
 

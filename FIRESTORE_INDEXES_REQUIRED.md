@@ -125,6 +125,21 @@ The following indexes must be created for **All Collections** with the specified
 |--------------|-------------|
 | `type` (Asc), `createdAt` (Desc) | Community, Confessions, and Gigs feeds |
 
+---
+
+## Admin Analytics (New)
+
+The following composite indexes are required for the **Feature Analytics** dashboard.
+
+| Collection | Fields | Query Usage |
+|------------|--------|-------------|
+| `conversations` | `isSupport` (Asc), `supportStatus` (Asc) | Total open support conversations |
+| `conversations` | `isSupport` (Asc), `supportStatus` (Asc), `updatedAt` (Desc) | Support resolved today analytics |
+| `reports` | `status` (Asc), `updatedAt` (Desc) | Reports resolved today analytics |
+| `identity_verifications` | `status` (Asc), `updatedAt` (Desc) | Verifications rejected today analytics |
+
+---
+
 ## Instructions
 1. Open [Firebase Console](https://console.firebase.google.com/).
 2. Navigate to **Firestore Database**.

@@ -14,6 +14,7 @@ class PlatformAnalytics {
   final int totalEvents;
   final int pendingEventApprovals;
   final int newUsersToday;
+  final int currentlyActive;
   final DateTime updatedAt;
 
   PlatformAnalytics({
@@ -30,6 +31,7 @@ class PlatformAnalytics {
     required this.totalEvents,
     required this.pendingEventApprovals,
     required this.newUsersToday,
+    required this.currentlyActive,
     required this.updatedAt,
   });
 
@@ -47,6 +49,7 @@ class PlatformAnalytics {
     totalEvents: 0,
     pendingEventApprovals: 0,
     newUsersToday: 0,
+    currentlyActive: 0,
     updatedAt: DateTime.now(),
   );
 
@@ -64,6 +67,7 @@ class PlatformAnalytics {
     int? totalEvents,
     int? pendingEventApprovals,
     int? newUsersToday,
+    int? currentlyActive,
     DateTime? updatedAt,
   }) {
     return PlatformAnalytics(
@@ -80,6 +84,7 @@ class PlatformAnalytics {
       totalEvents: totalEvents ?? this.totalEvents,
       pendingEventApprovals: pendingEventApprovals ?? this.pendingEventApprovals,
       newUsersToday: newUsersToday ?? this.newUsersToday,
+      currentlyActive: currentlyActive ?? this.currentlyActive,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
