@@ -358,8 +358,9 @@ service cloud.firestore {
            request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.get("participants", []))
         );
         allow create: if isAuthenticated() && (
-          exists(/databases/$(database)/documents/conversations/$(convId)) &&
-          request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.get("participants", [])
+          isAdmin() ||
+          (exists(/databases/$(database)/documents/conversations/$(convId)) &&
+           request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.get("participants", []))
         );
       }
     }
