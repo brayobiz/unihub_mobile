@@ -27,6 +27,26 @@ class RelevantAnnouncementsWidget extends ConsumerWidget {
           return b.publishAt.compareTo(a.publishAt);
         });
 
+        // Modal Logic: Find first modal announcement that hasn't been dismissed yet
+        final dismissed = ref.watch(dismissedAnnouncementsProvider);
+        final sessionShown = ref.watch(sessionShownModalsProvider);
+        
+        final pendingModals = sorted.where((a) => 
+          a.displayStyle == AnnouncementDisplayStyle.modal && 
+          !dismissed.contains(a.id) &&
+          !sessionShown.contains(a.id)
+        ).toList();
+
+        if (pendingModals.isNotEmpty) {
+          final targetModal = pendingModals.first;
+          
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            // Mark as shown in session immediately to avoid duplicate triggers
+            ref.read(sessionShownModalsProvider.notifier).update((s) => {...s, targetModal.id});
+            _showFullModal(context, ref, targetModal);
+          });
+        }
+
         return Padding(
           padding: const EdgeInsets.only(top: 12),
           child: Column(
@@ -44,6 +64,33 @@ class RelevantAnnouncementsWidget extends ConsumerWidget {
       },
     );
   }
+
+  void _showFullModal(BuildContext context, WidgetRef ref, Announcement a) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Row(
+          children: [
+            const Icon(Icons.campaign_rounded, color: Colors.orange, size: 28),
+            const SizedBox(width: 12),
+            Expanded(child: Text(a.title, style: const TextStyle(fontWeight: FontWeight.w900))),
+          ],
+        ),
+        content: Text(a.content, style: const TextStyle(fontSize: 15, height: 1.5)),
+        actions: [
+          TextButton(
+            onPressed: () {
+              ref.read(dismissedAnnouncementsProvider.notifier).dismiss(a.id);
+              Navigator.pop(context);
+            },
+            child: const Text('Close & Don\'t show again', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _AnnouncementItem extends StatefulWidget {
@@ -58,13 +105,11 @@ class _AnnouncementItem extends StatefulWidget {
 class _AnnouncementItemState extends State<_AnnouncementItem> with TickerProviderStateMixin {
   bool _dismissed = false;
   
-  // Entry animations
   late AnimationController _entryController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
-  // Continuous "attention" animations
   late AnimationController _attentionController;
   late Animation<double> _shimmerAnimation;
   late Animation<double> _floatAnimation;
@@ -73,7 +118,6 @@ class _AnnouncementItemState extends State<_AnnouncementItem> with TickerProvide
   void initState() {
     super.initState();
     
-    // Setup Entry
     _entryController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -97,7 +141,6 @@ class _AnnouncementItemState extends State<_AnnouncementItem> with TickerProvide
       curve: const Interval(0.0, 0.8, curve: Curves.easeOutCubic),
     ));
 
-    // Setup Continuous Attention
     _attentionController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 3),
@@ -112,12 +155,6 @@ class _AnnouncementItemState extends State<_AnnouncementItem> with TickerProvide
     );
 
     _entryController.forward();
-
-    if (widget.announcement.displayStyle == AnnouncementDisplayStyle.modal) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showFullModal(context, widget.announcement);
-      });
-    }
   }
 
   @override
@@ -137,7 +174,7 @@ class _AnnouncementItemState extends State<_AnnouncementItem> with TickerProvide
     Widget child;
     switch (a.displayStyle) {
       case AnnouncementDisplayStyle.modal:
-        child = _buildCard(context, a, isCritical: a.priority == AnnouncementPriority.critical);
+        child = _buildBanner(context, a);
         break;
       case AnnouncementDisplayStyle.card:
         child = _buildCard(context, a);
@@ -212,7 +249,6 @@ class _AnnouncementItemState extends State<_AnnouncementItem> with TickerProvide
         borderRadius: BorderRadius.circular(16),
         child: Stack(
           children: [
-            // Decorative background circles
             Positioned(
               right: -20,
               top: -20,
@@ -226,7 +262,6 @@ class _AnnouncementItemState extends State<_AnnouncementItem> with TickerProvide
               ),
             ),
             
-            // Continuous Shimmer/Sheen Effect
             AnimatedBuilder(
               animation: _attentionController,
               builder: (context, child) {
@@ -373,35 +408,6 @@ class _AnnouncementItemState extends State<_AnnouncementItem> with TickerProvide
           Text(
             a.content,
             style: theme.textTheme.bodyMedium,
-          ),
-          if (a.displayStyle == AnnouncementDisplayStyle.modal) ...[
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => _showFullModal(context, a),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isCritical ? AppColors.error : null,
-                ),
-                child: const Text('Read More'),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  void _showFullModal(BuildContext context, Announcement a) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(a.title),
-        content: Text(a.content),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
           ),
         ],
       ),

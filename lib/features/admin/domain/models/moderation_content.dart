@@ -39,7 +39,7 @@ class ModeratedContent {
       authorName: listing.sellerName,
       university: listing.sellerUniversity,
       createdAt: listing.createdAt,
-      status: listing.status.name,
+      status: listing.flagged ? 'flagged' : listing.status.name,
       imageUrls: listing.imageUrls,
       originalData: listing,
     );

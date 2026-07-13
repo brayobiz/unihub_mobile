@@ -41,6 +41,9 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
 
     if (isFeatured == true) {
       query = query.where('isFeatured', isEqualTo: true);
+      // Fallback: If filtering by campus AND featured, we need a composite index.
+      // If we suspect it's missing, we could remove the campus filter for featured items 
+      // but let's keep it strict for now and ensure indexes are documented.
     }
 
     if (minPrice != null) {
@@ -279,14 +282,24 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
           items.sort((a, b) {
             double aScore = a.viewsCount.toDouble();
             aScore += a.savesCount * 2.0;
-            if (a.isFeatured) aScore += 50.0;
+            if (a.isFeatured) aScore += 100.0;
+            if (a.isSponsored) aScore += 150.0;
+            if (a.lastBoostedAt != null) {
+              final hoursSinceBoost = DateTime.now().difference(a.lastBoostedAt!).inHours;
+              if (hoursSinceBoost < 24) aScore += (24 - hoursSinceBoost) * 2.0;
+            }
             
             final aAgeDays = DateTime.now().difference(a.createdAt).inDays;
             if (aAgeDays <= 3) aScore += (3 - aAgeDays) * 10.0;
 
             double bScore = b.viewsCount.toDouble();
             bScore += b.savesCount * 2.0;
-            if (b.isFeatured) bScore += 50.0;
+            if (b.isFeatured) bScore += 100.0;
+            if (b.isSponsored) bScore += 150.0;
+            if (b.lastBoostedAt != null) {
+              final hoursSinceBoost = DateTime.now().difference(b.lastBoostedAt!).inHours;
+              if (hoursSinceBoost < 24) bScore += (24 - hoursSinceBoost) * 2.0;
+            }
             
             final bAgeDays = DateTime.now().difference(b.createdAt).inDays;
             if (bAgeDays <= 3) bScore += (3 - bAgeDays) * 10.0;
@@ -353,8 +366,20 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
         if (university != null && a.sellerUniversity == university) aScore += 12;
         if (university != null && b.sellerUniversity == university) bScore += 12;
 
-        if (a.isFeatured) aScore += 10;
-        if (b.isFeatured) bScore += 10;
+        if (a.isFeatured) aScore += 20;
+        if (b.isFeatured) bScore += 20;
+        
+        if (a.isSponsored) aScore += 30;
+        if (b.isSponsored) bScore += 30;
+
+        if (a.lastBoostedAt != null) {
+          final hoursSinceBoost = DateTime.now().difference(a.lastBoostedAt!).inHours;
+          if (hoursSinceBoost < 24) aScore += (24 - hoursSinceBoost) / 2;
+        }
+        if (b.lastBoostedAt != null) {
+          final hoursSinceBoost = DateTime.now().difference(b.lastBoostedAt!).inHours;
+          if (hoursSinceBoost < 24) bScore += (24 - hoursSinceBoost) / 2;
+        }
 
         aScore += (a.viewsCount / 100).clamp(0.0, 5.0);
         bScore += (b.viewsCount / 100).clamp(0.0, 5.0);
@@ -630,6 +655,16 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     return _firestore
         .collection('offers')
         .where('buyerId', isEqualTo: userId)
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map((d) => Offer.fromJson(d.data() as Map<String, dynamic>)).toList());
+  }
+
+  @override
+  Stream<List<Offer>> watchReceivedOffers(String sellerId) {
+    return _firestore
+        .collection('offers')
+        .where('sellerId', isEqualTo: sellerId)
         .orderBy('timestamp', descending: true)
         .snapshots()
         .map((s) => s.docs.map((d) => Offer.fromJson(d.data() as Map<String, dynamic>)).toList());
@@ -1011,10 +1046,52 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
   @override
   Future<void> boostListing(String listingId) async {
     if (listingId.isEmpty) return;
+    
+    // Growth Phase: Allow verified users to boost for free
+    // In the future, this will be handled by the MonetizationRepository/Service
+    final doc = await _firestore.collection('listings').doc(listingId).get();
+    if (!doc.exists) return;
+    
+    final sellerId = doc.data()?['sellerId'];
+    if (sellerId == null) return;
+
+    // Check if user is verified (Optional: can be enforced here too)
+    
+    await _firestore.collection('listings').doc(listingId).update({
+      'lastBoostedAt': FieldValue.serverTimestamp(),
+      'boostCount': FieldValue.increment(1),
+    });
+    
+    AppLogger.info('Listing $listingId boosted (Free Growth Phase)', 'MARKETPLACE');
+  }
+
+  @override
+  Future<void> featureListing(String listingId, String packageId, Duration duration) async {
+    if (listingId.isEmpty) return;
+    final now = DateTime.now();
+    
+    // Growth Phase: Free for verified
     await _firestore.collection('listings').doc(listingId).update({
       'isFeatured': true,
-      'createdAt': FieldValue.serverTimestamp(),
+      'featuredAt': FieldValue.serverTimestamp(),
+      'featuredUntil': Timestamp.fromDate(now.add(duration)),
+      'featuredPackage': packageId,
     });
+    
+    AppLogger.info('Listing $listingId featured for ${duration.inDays} days', 'MARKETPLACE');
+  }
+
+  @override
+  Future<void> setSponsored(String listingId, Duration duration) async {
+    if (listingId.isEmpty) return;
+    final now = DateTime.now();
+    
+    await _firestore.collection('listings').doc(listingId).update({
+      'isSponsored': true,
+      'sponsoredUntil': Timestamp.fromDate(now.add(duration)),
+    });
+    
+    AppLogger.info('Listing $listingId set as sponsored for ${duration.inDays} days', 'MARKETPLACE');
   }
 
   // In-memory throttle for the current app session to prevent "running rising" views bug

@@ -20,6 +20,7 @@ class CompleteProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
+  final nameController = TextEditingController();
   final universityController = TextEditingController();
   final courseController = TextEditingController();
   final yearController = TextEditingController();
@@ -30,7 +31,28 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
   double _uploadProgress = 0;
 
   @override
+  void initState() {
+    super.initState();
+    // Initialize name if already present, but allow editing if it's a default/invalid one
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = ref.read(appUserProvider).valueOrNull;
+      if (user != null) {
+        final name = user.fullName.trim().toLowerCase();
+        final isDefault = name == 'unihub user' || name == 'unihubuser' || name == 'a student' || user.fullName.length < 3;
+        
+        if (!isDefault) {
+          nameController.text = user.fullName;
+        } else {
+          // If it's a default name, keep field empty to force entry
+          nameController.clear();
+        }
+      }
+    });
+  }
+
+  @override
   void dispose() {
+    nameController.dispose();
     universityController.dispose();
     courseController.dispose();
     yearController.dispose();
@@ -250,18 +272,28 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
   }
 
   void _onContinue() async {
+    final fullName = nameController.text.trim();
     final university = _selectedCampus?.id ?? universityController.text.trim();
     final course = courseController.text.trim();
     final year = yearController.text.trim();
 
-    if (university.isEmpty || course.isEmpty || year.isEmpty) {
+    if (fullName.isEmpty || university.isEmpty || course.isEmpty || year.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields')),
       );
       return;
     }
 
+    final lowerName = fullName.toLowerCase();
+    if (lowerName == 'unihub user' || lowerName == 'unihubuser' || lowerName == 'a student' || fullName.length < 3) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your real full name')),
+      );
+      return;
+    }
+
     await ref.read(authControllerProvider.notifier).updateProfile(
+      fullName: fullName,
       university: university,
       course: course,
       yearOfStudy: year,
@@ -393,6 +425,13 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
               ),
             const SizedBox(height: 50),
             
+            AuthTextField(
+              controller: nameController,
+              hintText: 'Your Full Name',
+              icon: Icons.badge_outlined,
+              enabled: !isProcessing,
+            ),
+            const SizedBox(height: 18),
             GestureDetector(
               onTap: isProcessing ? null : _showCampusPicker,
               child: AbsorbPointer(

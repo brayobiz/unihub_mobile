@@ -103,6 +103,8 @@ class UniHubApp extends ConsumerWidget {
       if (next != null && previous == null) {
         // First login or session restoration after cold start
         ref.read(presenceServiceProvider).init();
+        // Spark Plan Workaround: Self-heal restriction status if it has expired
+        ref.read(authRepositoryProvider).checkAndRestoreRestrictedContent(next);
       } else if (next == null && previous != null) {
         // User logged out
         ref.read(presenceServiceProvider).dispose();

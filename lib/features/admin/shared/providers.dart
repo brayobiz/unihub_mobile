@@ -18,6 +18,11 @@ import '../domain/services/admin_service.dart';
 import '../../trust/domain/services/trust_engine.dart';
 import '../../announcements/shared/providers.dart';
 import '../../events/domain/models/event.dart';
+import '../data/repositories/admin_analytics_repository.dart';
+import '../domain/models/platform_analytics.dart';
+import '../domain/models/user_analytics.dart';
+import '../domain/models/feature_analytics.dart';
+import '../domain/services/analytics_service.dart';
 
 final platformEventServiceProvider = Provider<PlatformEventService>((ref) {
   final firestore = ref.watch(firestoreProvider);
@@ -28,6 +33,26 @@ final platformEventServiceProvider = Provider<PlatformEventService>((ref) {
 final adminRepositoryProvider = Provider<AdminRepository>((ref) {
   final firestore = ref.watch(firestoreProvider);
   return AdminRepository(firestore);
+});
+
+final adminAnalyticsRepositoryProvider = Provider<AdminAnalyticsRepository>((ref) {
+  final firestore = ref.watch(firestoreProvider);
+  return AdminAnalyticsRepository(firestore);
+});
+
+final analyticsServiceProvider = Provider<AnalyticsService>((ref) {
+  final repository = ref.watch(adminAnalyticsRepositoryProvider);
+  return AnalyticsService(repository);
+});
+
+final platformAnalyticsProvider = StreamProvider.autoDispose<PlatformAnalytics>((ref) {
+  final service = ref.watch(analyticsServiceProvider);
+  return service.watchPlatformAnalytics();
+});
+
+final userAnalyticsProvider = StreamProvider.autoDispose<UserAnalytics>((ref) {
+  final service = ref.watch(analyticsServiceProvider);
+  return service.watchUserAnalytics();
 });
 
 final adminServiceProvider = Provider<AdminService>((ref) {

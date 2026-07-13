@@ -39,6 +39,7 @@ abstract class AuthRepository {
   });
   Future<void> updateOnboardingStatus(String uid, bool completed);
   Future<void> deleteAccount();
+  Future<void> checkAndRestoreRestrictedContent(String uid);
 
   // Search
   Future<List<AppUser>> searchUsers(String query);

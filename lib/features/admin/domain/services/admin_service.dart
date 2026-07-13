@@ -147,6 +147,23 @@ class AdminService {
     // Fetch content to find authorId (simplified)
   }
 
+  Future<void> marketplacePromotionAction({
+    required String listingId,
+    required String action,
+    required String adminId,
+    required String adminName,
+    Map<String, dynamic>? metadata,
+  }) async {
+    await _verifyAdmin(adminId);
+    await _repository.marketplacePromotionAction(
+      listingId: listingId,
+      action: action,
+      adminId: adminId,
+      adminName: adminName,
+      metadata: metadata,
+    );
+  }
+
   Future<void> updateUserTrustScore(String userId, double score, {required String adminId, required String adminName}) async {
     await _verifyAdmin(adminId);
     await _repository.updateUserTrustScore(userId, score, adminId: adminId, adminName: adminName);

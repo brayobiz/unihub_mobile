@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 
 /// Centralized color palette for UniHub.
-/// 
-/// These colors are used to build the [ColorScheme] and can be accessed
-/// directly for specific cases, though theme-based access is preferred.
 class AppColors {
   AppColors._();
 
@@ -41,6 +38,10 @@ class AppColors {
   static const Color success = Color(0xFF10B981);
   static const Color warning = Color(0xFFF59E0B);
   static const Color info = Color(0xFF3B82F6);
+
+  // Business Branding
+  static const Color business = Color(0xFF4F46E5);    // Indigo 600
+  static const Color businessGold = Color(0xFFFFD700); // Gold for premium feel
 
   // Category & Brand Shades
   static const Color notes = Color(0xFF388E3C);       // Green 700

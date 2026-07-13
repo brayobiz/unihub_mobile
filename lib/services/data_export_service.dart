@@ -96,6 +96,18 @@ class DataExportService {
       final savedHousing = await _firestore.collection('users').doc(uid).collection('saved_housing').get();
       exportData['saved_housing_ids'] = savedHousing.docs.map((doc) => doc.id).toList();
 
+      // 11. Payment & Transaction History
+      final payments = await _firestore.collection('payments')
+          .where('userId', isEqualTo: uid)
+          .get();
+      exportData['payment_history'] = payments.docs.map((doc) => doc.data()).toList();
+
+      // 12. Subscriptions
+      final subDoc = await _firestore.collection('subscriptions').doc(uid).get();
+      if (subDoc.exists) {
+        exportData['subscription'] = subDoc.data();
+      }
+
       // Convert to JSON string
       // Note: We need a way to handle Timestamp objects in JSON. 
       // Firestore data often contains Timestamps which aren't JSON serializable by default.

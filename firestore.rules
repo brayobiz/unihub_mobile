@@ -30,6 +30,15 @@ service cloud.firestore {
              getUserData(request.auth.uid).get("isIdentityVerified", false) == true;
     }
 
+    function isVerified() {
+      return isAuthenticated() &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+               getUserData(request.auth.uid).get("isIdentityVerified", false) == true ||
+               getUserData(request.auth.uid).get("isStudentVerified", false) == true ||
+               getUserData(request.auth.uid).get("accountType", "student") == "business"
+             );
+    }
+
     function canManageOrganizer(orgId) {
       return isAdmin() || (
         isAuthenticated() &&
@@ -55,6 +64,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /campuses/{campusId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
     match /mail/{mailId} {
       allow create: if isAuthenticated();
       allow read, update, delete: if isAdmin();
@@ -65,16 +80,39 @@ service cloud.firestore {
       allow read: if isAuthenticated(); // Needed for profile views
       allow create: if isOwner(userId) &&
                       !request.resource.data.keys().hasAny(['isAdmin', 'roles', 'isBanned', 'isIdentityVerified', 'isStudentVerified', 'isEmailVerified', 'isPhoneVerified']) &&
+                      request.resource.data.get('accountType', 'student') == 'student' &&
+                      (request.resource.data.get('businessSubscriptionStatus', 'none') == 'none' || request.resource.data.get('businessSubscriptionStatus', null) == null) &&
                       request.resource.data.get('trustScore', 0.0) <= 5.0;
 
       allow update: if isAdmin() || (
-        isOwner(userId) &&
-        !request.resource.data.diff(resource.data).affectedKeys()
-          .hasAny(['isAdmin', 'roles', 'isIdentityVerified', 'isStudentVerified', 'isBanned', 'suspendedUntil'])
+        isOwner(userId) && (
+          // Case 1: Standard profile update (No protected keys)
+          (!request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['isAdmin', 'roles', 'isIdentityVerified', 'isStudentVerified', 'isEmailVerified', 'isPhoneVerified', 'isBanned', 'suspendedUntil', 'accountType', 'businessSubscriptionStatus', 'subscriptionExpiry', 'hasActiveWarning', 'warningReason', 'lastWarningAt', 'isDeleted'])) ||
+
+          // Case 2: Spark Plan Self-Healing (Owner clears restriction AFTER expiry)
+          (resource.data.get('suspendedUntil', request.time) <= request.time &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['suspendedUntil', 'isDeleted', 'updatedAt']) &&
+           !request.resource.data.keys().hasAny(['suspendedUntil']) &&
+           request.resource.data.get('isDeleted', false) == false
+          ) ||
+
+          // Case 3: Verified user upgrading to business account (Growth Phase)
+          ((resource.data.get("isIdentityVerified", false) == true || resource.data.get("isStudentVerified", false) == true) &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['accountType', 'businessName', 'businessCategory', 'tier']) &&
+           request.resource.data.get("accountType", "student") == 'business'
+          ) ||
+
+          // Case 4: Self-deletion (Setting isDeleted to true)
+          (request.resource.data.diff(resource.data).affectedKeys().hasAny(['isDeleted']) &&
+           request.resource.data.get('isDeleted', false) == true &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isDeleted', 'deletedAt', 'updatedAt'])
+          )
+        )
       ) || (
         isAuthenticated() &&
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['averageRating', 'ratingsCount', 'trustScore', 'completedSalesCount', 'activeListingsCount', 'lastSeen', 'isOnline'])
+          .hasOnly(['averageRating', 'ratingsCount', 'trustScore', 'completedSalesCount', 'activeListingsCount'])
       );
 
       allow delete: if isAdmin() || isOwner(userId);
@@ -85,6 +123,10 @@ service cloud.firestore {
         allow create: if isAuthenticated();
         allow update: if isOwner(userId) || isAdmin() || (isAuthenticated() && resource.data.actorId == request.auth.uid);
         allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /collections/{collectionName}/listings/{listingId} {
+        allow read, write, delete: if isOwner(userId) || isAdmin();
       }
 
       match /{collectionId}/{docId} {
@@ -110,13 +152,36 @@ service cloud.firestore {
     // --- Marketplace ---
     match /listings/{listingId} {
       allow read: if true;
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (
-        isAdmin() ||
-        (resource.data.get("sellerId", "") == request.auth.uid &&
-         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isFeatured', 'isPromoted', 'flagged', 'flagReason', 'flagAdminNotes'])) ||
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewsCount', 'savesCount', 'sharesCount', 'chatsStartedCount']))
-      );
+      allow create: if isAuthenticated() && request.resource.data.sellerId == request.auth.uid;
+      allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewsCount', 'savesCount', 'sharesCount', 'chatsStartedCount'])) ||
+                    (isAuthenticated() && (
+                      isAdmin() ||
+                      (resource.data.get("sellerId", "") == request.auth.uid && (
+                        // Case A: Spark Plan Self-Healing Restoration
+                        (getUserData(request.auth.uid).get('suspendedUntil', request.time) <= request.time &&
+                         getUserData(request.auth.uid).get('isBanned', false) == false &&
+                         resource.data.status == 'userSuspended' &&
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'originalStatus'])
+                        ) ||
+
+                        // Case B: Basic update (No moderation/premium fields modified)
+                        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['isFeatured', 'isPromoted', 'isSponsored', 'featuredUntil', 'featuredPackage', 'featuredAt', 'sponsoredUntil', 'lastBoostedAt', 'boostCount', 'flagged', 'flagReason', 'flagAdminNotes', 'originalStatus', 'moderationReason', 'suspendedBy', 'suspendedAt', 'suspensionReason', 'approvedAt']) &&
+                         // Security: If item was suspended by admin, owner can't manually un-suspend it
+                         (resource.data.status != 'userSuspended' || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']))
+                        ) ||
+
+                        // Case C: Verified user using "Early Bird" free premium features
+                        (isVerified() &&
+                         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['flagged', 'flagReason', 'flagAdminNotes', 'originalStatus', 'moderationReason', 'suspendedBy', 'suspendedAt', 'suspensionReason', 'approvedAt']) &&
+                         (resource.data.status != 'userSuspended' || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status'])) &&
+                         // Basic sanity: only enforce limits if the fields are actually being changed
+                         (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['featuredUntil']) ||
+                          request.resource.data.get('featuredUntil', request.time) <= request.time + duration.value(40, 'd')) &&
+                         (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['sponsoredUntil']) ||
+                          request.resource.data.get('sponsoredUntil', request.time) <= request.time + duration.value(40, 'd'))
+                        )
+                      ))
+                    ));
       allow delete: if isAdmin() || (isAuthenticated() && resource.data.get("sellerId", "") == request.auth.uid);
     }
 
@@ -131,15 +196,13 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isMemberOfOrganizer(request.resource.data.organizerId) || isAdmin();
 
-      allow update: if isAdmin() || (
-        canManageOrganizer(resource.data.organizerId) && (
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'isFeatured', 'isPromoted']) ||
-          request.resource.data.status in ['draft', 'submitted', 'cancelled', 'archived']
-        )
-      );
-
-      allow update: if isAuthenticated() &&
-                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewsCount', 'sharesCount', 'savesCount', 'currentAttendeeCount']);
+      allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewsCount', 'sharesCount', 'savesCount', 'currentAttendeeCount'])) ||
+                    (isAdmin() || (
+                      canManageOrganizer(resource.data.organizerId) && (
+                        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'isFeatured', 'isPromoted']) ||
+                        request.resource.data.status in ['draft', 'submitted', 'cancelled', 'archived']
+                      )
+                    ));
 
       allow delete: if isAdmin() || (
         isAuthenticated() &&
@@ -174,15 +237,13 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isAuthenticated() && isIdentityVerified();
 
-      allow update: if isAdmin() || (
-        canManageOrganizer(organizerId) && (
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['verificationStatus', 'trustScore']) ||
-          request.resource.data.verificationStatus in ['submitted', 'underReview', 'withdrawn']
-        )
-      );
-
-      allow update: if isAuthenticated() &&
-                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followerCount', 'sharesCount']);
+      allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followerCount', 'sharesCount'])) ||
+                    (isAdmin() || (
+                      canManageOrganizer(organizerId) && (
+                        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['verificationStatus', 'trustScore']) ||
+                        request.resource.data.verificationStatus in ['submitted', 'underReview', 'withdrawn']
+                      )
+                    ));
 
       allow delete: if isAdmin() || (isAuthenticated() && resource.data.ownerId == request.auth.uid);
 
@@ -204,15 +265,29 @@ service cloud.firestore {
     // --- Housing ---
     match /housing_listings/{listingId} {
       allow read: if true;
-      allow create: if isAuthenticated();
-      allow update: if isAdmin() || (
-        isAuthenticated() &&
-        resource.data.get("plugId", "") == request.auth.uid &&
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isFeatured', 'moderatorNotes', 'flagged'])
-      ) || (
-        isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'saves', 'sharesCount', 'chatCount', 'callCount'])
-      );
+      allow create: if isAuthenticated() && request.resource.data.plugId == request.auth.uid;
+      allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'saves', 'sharesCount', 'chatCount', 'callCount'])) ||
+                    (isAdmin() || (
+                      isAuthenticated() &&
+                      resource.data.get("plugId", "") == request.auth.uid && (
+                        // Case A: Spark Plan Self-Healing Restoration
+                        (getUserData(request.auth.uid).get('suspendedUntil', request.time) <= request.time &&
+                         getUserData(request.auth.uid).get('isBanned', false) == false &&
+                         resource.data.status == 'userSuspended' &&
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'originalStatus'])
+                        ) ||
+                        // Case B: Basic update
+                        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['isFeatured', 'moderatorNotes', 'flagged', 'originalStatus']) &&
+                         (resource.data.status != 'userSuspended' || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']))
+                        )
+                      )
+                    ));
       allow delete: if isAdmin() || (isAuthenticated() && resource.data.get("plugId", "") == request.auth.uid);
+
+      match /history/{historyId} {
+        allow read: if isAdmin() || (isAuthenticated() && resource.data.plugId == request.auth.uid);
+        allow create: if isAuthenticated() && (isAdmin() || get(/databases/$(database)/documents/housing_listings/$(listingId)).data.plugId == request.auth.uid);
+      }
     }
 
     match /roommates/{profileId} {
@@ -253,13 +328,12 @@ service cloud.firestore {
     match /notes/{noteId} {
       allow read: if true;
       allow create: if isAdmin();
-      allow update: if isAdmin() || (
-        isAuthenticated() &&
-        resource.data.get("authorId", "") == request.auth.uid &&
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['flagged', 'flagReason', 'flagAdminNotes'])
-      ) || (
-        isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'saves', 'sharesCount', 'downloadsCount'])
-      );
+      allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'saves', 'sharesCount', 'downloadsCount'])) ||
+                    (isAdmin() || (
+                      isAuthenticated() &&
+                      resource.data.get("authorId", "") == request.auth.uid &&
+                      !request.resource.data.diff(resource.data).affectedKeys().hasAny(['flagged', 'flagReason', 'flagAdminNotes'])
+                    ));
       allow delete: if isAdmin() || (isAuthenticated() && resource.data.get("authorId", "") == request.auth.uid);
     }
 
@@ -344,6 +418,22 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // --- Monetization ---
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && (
+        request.resource.data.status == 'pending' ||
+        (request.resource.data.status == 'completed' && (request.resource.data.amount == 0 || request.resource.data.amount == 0.0) && isVerified())
+      );
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /subscriptions/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || (isOwner(userId) && isVerified());
+    }
+
     // --- Background Tasks ---
     match /notifications_queue/{queueId} {
       allow read: if isAdmin();
@@ -354,13 +444,13 @@ service cloud.firestore {
     // --- Community Feed & Gigs ---
     match /feed/{itemId} {
       allow read: if true;
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (
-        isAdmin() ||
-        (resource.data.get("authorId", "") == request.auth.uid &&
-         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isPinned', 'status'])) ||
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'likedBy', 'sharesCount', 'viewsCount', 'commentsCount']))
-      );
+      allow create: if isAuthenticated() && request.resource.data.authorId == request.auth.uid;
+      allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'likedBy', 'sharesCount', 'viewsCount', 'commentsCount'])) ||
+                    (isAuthenticated() && (
+                      isAdmin() ||
+                      (resource.data.get("authorId", "") == request.auth.uid &&
+                       !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isPinned', 'status']))
+                    ));
       allow delete: if isAdmin() || (isAuthenticated() && resource.data.get("authorId", "") == request.auth.uid);
 
       match /comments/{commentId} {

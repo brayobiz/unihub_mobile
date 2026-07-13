@@ -357,6 +357,11 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
         const SizedBox(height: 8),
         _buildActionButton(Icons.history_rounded, 'Activity History', () => context.push('/activity-history')),
         
+        if (widget.user.accountType != 'business') ...[
+          const SizedBox(height: 24),
+          _buildBusinessUpgradeBanner(context),
+        ],
+
         const SizedBox(height: 32),
         Text(
           'Preferences',
@@ -398,13 +403,18 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
   Widget _buildAvatar() {
     final user = widget.user;
     final theme = Theme.of(context);
+    final isBusiness = user.accountType == 'business';
+    
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 4),
+        border: Border.all(
+          color: isBusiness ? AppColors.businessGold : Colors.white, 
+          width: 4
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: (isBusiness ? AppColors.business : Colors.black).withValues(alpha: 0.1),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -424,14 +434,18 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
                   )
                 : null,
           ),
-          if (user.isVerified)
+          if (user.isVerified || isBusiness)
             Positioned(
               right: 2,
               bottom: 2,
               child: Container(
                 padding: const EdgeInsets.all(2),
                 decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                child: const Icon(Icons.verified, color: AppColors.success, size: 24),
+                child: Icon(
+                  Icons.verified, 
+                  color: isBusiness ? AppColors.business : AppColors.success, 
+                  size: 24
+                ),
               ),
             ),
         ],
@@ -456,6 +470,8 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
 
   Widget _buildIdentityInfo(BuildContext context) {
     final user = widget.user;
+    final isBusiness = user.accountType == 'business';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -464,21 +480,25 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
           children: [
             Flexible(
               child: Text(
-                user.fullName,
+                isBusiness ? (user.businessName ?? user.fullName) : user.fullName,
                 style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.8),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            if (user.isVerified)
-              const Padding(
-                padding: EdgeInsets.only(left: 6),
-                child: Icon(Icons.verified_rounded, color: Colors.white, size: 22),
+            if (user.isVerified || isBusiness)
+              Padding(
+                padding: const EdgeInsets.only(left: 6),
+                child: Icon(
+                  Icons.verified_rounded, 
+                  color: isBusiness ? AppColors.businessGold : Colors.white, 
+                  size: 22
+                ),
               ),
           ],
         ),
         Text(
-          '@${user.username ?? 'unihub_user'}',
+          isBusiness ? '${user.businessCategory ?? 'Business'} • @${user.username}' : '@${user.username ?? 'unihub_user'}',
           style: TextStyle(fontSize: 15, color: Colors.white.withValues(alpha: 0.8), fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 12),
@@ -486,12 +506,20 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              _buildSmallInfoPill(
-                Icons.school_rounded, 
-                CampusConstants.getDisplayName(user.university),
-                isVerified: user.isStudentVerified,
-                verifiedColor: AppColors.success,
-              ),
+              if (isBusiness)
+                _buildSmallInfoPill(
+                  Icons.business_center_rounded, 
+                  'Business Pro',
+                  isVerified: true,
+                  verifiedColor: AppColors.businessGold,
+                )
+              else
+                _buildSmallInfoPill(
+                  Icons.school_rounded, 
+                  CampusConstants.getDisplayName(user.university),
+                  isVerified: user.isStudentVerified,
+                  verifiedColor: AppColors.success,
+                ),
               const SizedBox(width: 8),
               _buildSmallInfoPill(Icons.calendar_today_rounded, user.yearOfStudy ?? 'Year'),
             ],
@@ -737,6 +765,67 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
     }).toList()), icon: Icons.connect_without_contact_rounded);
   }
 
+
+  Widget _buildBusinessUpgradeBanner(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [theme.colorScheme.primary, const Color(0xFF19D3C5)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.primary.withValues(alpha: 0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
+                child: const Icon(Icons.business_center_rounded, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Business Account',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Sell like a pro with dedicated tools and free premium visibility.',
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13, height: 1.4),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => context.push('/business-upgrade'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: theme.colorScheme.primary,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Upgrade for Free', style: TextStyle(fontWeight: FontWeight.w900)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildActionButton(IconData icon, String title, VoidCallback onTap, {bool isDestructive = false, String? subtitle}) {
     final theme = Theme.of(context);

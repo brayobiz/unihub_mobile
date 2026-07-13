@@ -43,6 +43,7 @@ abstract class MarketplaceRepository {
   Future<void> respondToOffer(String offerId, OfferStatus status, {double? counterAmount, String? sellerMessage});
   Stream<List<Offer>> watchListingOffers(String listingId);
   Stream<List<Offer>> watchUserOffers(String userId);
+  Stream<List<Offer>> watchReceivedOffers(String sellerId);
 
   // Search enhancements
   Future<List<String>> getSearchSuggestions(String query);
@@ -82,6 +83,8 @@ abstract class MarketplaceRepository {
   Future<void> deleteListing(String id, String userId);
   Future<void> toggleSaveListing(String userId, String listingId);
   Future<void> boostListing(String listingId);
+  Future<void> featureListing(String listingId, String packageId, Duration duration);
+  Future<void> setSponsored(String listingId, Duration duration);
   Future<void> recordView(String listingId, {String? userId});
   Future<void> recordSave(String listingId, bool isSaved);
   Future<void> recordChatStarted(String listingId);

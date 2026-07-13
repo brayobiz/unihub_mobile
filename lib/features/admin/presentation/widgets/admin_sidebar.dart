@@ -47,6 +47,12 @@ class AdminSidebar extends StatelessWidget {
                   currentPath: currentPath,
                 ),
                 _SidebarItem(
+                  icon: Icons.analytics_outlined,
+                  title: 'Analytics',
+                  path: '/admin/analytics',
+                  currentPath: currentPath,
+                ),
+                _SidebarItem(
                   icon: Icons.verified_user,
                   title: 'Verifications',
                   path: '/admin/verifications',

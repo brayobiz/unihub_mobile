@@ -19,6 +19,7 @@ import '../../features/navigation/main_navigation_screen.dart';
 import '../../features/marketplace/presentation/screens/add_listing_screen.dart';
 import '../../features/marketplace/presentation/screens/listing_detail_screen.dart';
 import '../../features/marketplace/presentation/screens/my_listings_screen.dart';
+import '../../features/marketplace/presentation/screens/seller_offers_screen.dart';
 import '../../features/marketplace/presentation/screens/seller_dashboard_screen.dart';
 import '../../features/marketplace/presentation/screens/seller_profile_screen.dart';
 import '../../features/marketplace/domain/models/listing.dart';
@@ -73,6 +74,7 @@ import '../../features/shared/about_screen.dart';
 import '../../models/feed_type.dart';
 
 import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
+import '../../features/admin/presentation/screens/admin_analytics_screen.dart';
 import '../../features/admin/presentation/screens/verification_queue_screen.dart';
 import '../../features/admin/presentation/screens/verification_detail_screen.dart';
 import '../../features/admin/presentation/screens/report_queue_screen.dart';
@@ -94,6 +96,7 @@ import '../../features/chat/domain/models/conversation.dart';
 import '../../features/chat/presentation/screens/share_to_chat_screen.dart';
 import '../../features/auth/domain/models/app_user.dart';
 
+import '../../features/monetization/presentation/screens/business_upgrade_screen.dart';
 import '../../features/gigs/presentation/screens/gig_details_screen.dart';
 import '../../features/gigs/presentation/screens/apply_gig_screen.dart';
 import '../../features/gigs/presentation/screens/employer_dashboard_screen.dart';
@@ -201,18 +204,9 @@ class RouterNotifier extends ChangeNotifier {
       return isSplash ? null : '/splash';
     }
 
-    final isAdmin = appUser?.isAdmin ?? false;
-    final settings = settingsAsync.valueOrNull;
-
-    // 3. Maintenance Mode Check
-    if (settings?.maintenanceMode == true && !isAdmin) {
-      if (state.matchedLocation != '/maintenance') return '/maintenance';
-      return null;
-    }
-
     final isLoggedIn = firebaseUser != null;
 
-    // 4. Unauthenticated Flow
+    // 3. Unauthenticated Flow
     if (!isLoggedIn) {
       if (!isDeviceOnboardingDone) {
         if (state.matchedLocation != '/onboarding') return '/onboarding';
@@ -230,25 +224,7 @@ class RouterNotifier extends ChangeNotifier {
       return null;
     }
 
-    // 5. Authenticated - Profile Data Loading
-    if (appUserAsync.isLoading || appUserAsync.isRefreshing) {
-      return isSplash ? null : '/splash';
-    }
-
-    // 6. Authenticated - Missing Document
-    if (appUser == null) {
-      if (state.matchedLocation != '/complete-profile')
-        return '/complete-profile';
-      return null;
-    }
-
-    // 7. Restriction Check (Banned/Suspended)
-    if (appUser.isRestricted) {
-      if (state.matchedLocation != '/banned') return '/banned';
-      return null;
-    }
-
-    // 8. Email Verification Guard (Hardening)
+    // 4. Email Verification Guard (Hardening) - MUST BE FIRST AFTER AUTH
     // Only enforce if the user signed up via email/password (Google is usually pre-verified)
     final isEmailPasswordUser = firebaseUser.providerData.any(
       (p) => p.providerId == 'password',
@@ -258,12 +234,48 @@ class RouterNotifier extends ChangeNotifier {
       return null;
     }
 
-    // 9. Profile Completion Guard
-    final isProfileIncomplete =
-        appUser.university == null || appUser.course == null;
-    if (isProfileIncomplete) {
+    // 5. Authenticated - Profile Data Loading
+    if (appUserAsync.isLoading || appUserAsync.isRefreshing) {
+      return isSplash ? null : '/splash';
+    }
+
+    final isAdmin = appUser?.isAdmin ?? false;
+    final settings = settingsAsync.valueOrNull;
+
+    // 6. Maintenance Mode Check
+    if (settings?.maintenanceMode == true && !isAdmin) {
+      if (state.matchedLocation != '/maintenance') return '/maintenance';
+      return null;
+    }
+
+    // 7. Authenticated - Missing Document
+    if (appUser == null) {
       if (state.matchedLocation != '/complete-profile')
         return '/complete-profile';
+      return null;
+    }
+
+    // 8. Restriction Check (Banned/Suspended)
+    if (appUser.isRestricted) {
+      if (state.matchedLocation != '/banned') return '/banned';
+      return null;
+    }
+
+    // 9. Profile Completion Guard (Identity & Data)
+    // Forced check: Even old users must have a real name and campus data.
+    final name = appUser.fullName.trim().toLowerCase();
+    final isDefaultName = name == 'unihub user' || name == 'unihubuser' || name == 'a student';
+    
+    final isProfileIncomplete =
+        appUser.university == null || 
+        appUser.course == null || 
+        isDefaultName ||
+        appUser.fullName.length < 3;
+
+    if (isProfileIncomplete) {
+      if (state.matchedLocation != '/complete-profile') {
+        return '/complete-profile';
+      }
       return null;
     }
 
@@ -388,6 +400,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/my-listings',
         builder: (context, state) => const MyListingsScreen(),
+      ),
+      GoRoute(
+        path: '/seller-offers',
+        builder: (context, state) => const SellerOffersScreen(),
       ),
       GoRoute(
         path: '/seller-dashboard',
@@ -666,6 +682,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const EditProfileScreen(),
       ),
       GoRoute(
+        path: '/business-upgrade',
+        builder: (context, state) => const BusinessUpgradeScreen(),
+      ),
+      GoRoute(
         path: '/settings',
         builder: (context, state) => const SettingsScreen(),
       ),
@@ -933,6 +953,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/dashboard',
         builder: (context, state) => const AdminDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/admin/analytics',
+        builder: (context, state) => const AdminAnalyticsScreen(),
       ),
       GoRoute(
         path: '/admin/verifications',

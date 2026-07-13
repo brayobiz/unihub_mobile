@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:uuid/uuid.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
@@ -47,20 +48,77 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
     super.dispose();
   }
 
-  Future<void> _pickImage(bool isSelfie) async {
-    final XFile? pickedFile = await _picker.pickImage(
-      source: isSelfie ? ImageSource.camera : ImageSource.gallery,
-      imageQuality: 80,
-    );
+  @override
+  void initState() {
+    super.initState();
+    _checkLostData();
+  }
 
-    if (pickedFile != null) {
-      setState(() {
-        if (isSelfie) {
-          _selfieFile = File(pickedFile.path);
-        } else {
-          _idDocumentFile = File(pickedFile.path);
+  Future<void> _checkLostData() async {
+    if (Platform.isAndroid) {
+      final LostDataResponse response = await _picker.retrieveLostData();
+      if (response.isEmpty) return;
+      if (response.file != null) {
+        setState(() {
+          if (_idDocumentFile == null) {
+            _idDocumentFile = File(response.file!.path);
+          } else if (_selfieFile == null) {
+            _selfieFile = File(response.file!.path);
+          }
+        });
+      }
+    }
+  }
+
+  Future<void> _pickImage(bool isSelfie) async {
+    if (isSelfie) {
+      final status = await Permission.camera.request();
+      if (status.isPermanentlyDenied) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Camera Permission'),
+              content: const Text('Camera access is required for selfies. Please enable it in settings.'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                TextButton(onPressed: () {
+                  openAppSettings();
+                  Navigator.pop(ctx);
+                }, child: const Text('Settings')),
+              ],
+            ),
+          );
         }
-      });
+        return;
+      }
+      if (!status.isGranted) return;
+    }
+
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: isSelfie ? ImageSource.camera : ImageSource.gallery,
+        imageQuality: 70,
+        maxWidth: 1800,
+        maxHeight: 1800,
+        preferredCameraDevice: isSelfie ? CameraDevice.front : CameraDevice.rear,
+      );
+
+      if (pickedFile != null) {
+        setState(() {
+          if (isSelfie) {
+            _selfieFile = File(pickedFile.path);
+          } else {
+            _idDocumentFile = File(pickedFile.path);
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error capturing image: $e')),
+        );
+      }
     }
   }
 

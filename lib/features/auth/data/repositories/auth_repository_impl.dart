@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import 'package:unihub_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:unihub_mobile/core/utils/app_logger.dart';
@@ -387,6 +388,63 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<void> checkAndRestoreRestrictedContent(String uid) async {
+    try {
+      final userDoc = await _firestore.collection('users').doc(uid).get();
+      if (!userDoc.exists) return;
+      
+      final data = userDoc.data() as Map<String, dynamic>;
+      final isBanned = data['isBanned'] == true;
+      final suspendedUntil = (data['suspendedUntil'] as Timestamp?)?.toDate();
+      final isCurrentlySuspended = suspendedUntil != null && suspendedUntil.isAfter(DateTime.now());
+
+      if (!isBanned && !isCurrentlySuspended && (suspendedUntil != null || data['isDeleted'] == true)) {
+        AppLogger.info('Self-Healing: User $uid restriction expired. Restoring content...', 'AUTH');
+        
+        final batch = _firestore.batch();
+        
+        // 1. Clean up user doc flags
+        batch.update(userDoc.reference, {
+          'suspendedUntil': FieldValue.delete(),
+          'isDeleted': false, // Self-heal if they managed to log in
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        // 2. Restore Marketplace
+        final listings = await _firestore.collection('listings')
+            .where('sellerId', isEqualTo: uid)
+            .where('status', isEqualTo: 'userSuspended')
+            .get();
+        
+        for (var doc in listings.docs) {
+          batch.update(doc.reference, {
+            'status': doc.data()['originalStatus'] ?? 'active',
+            'originalStatus': FieldValue.delete(),
+          });
+        }
+
+        // 3. Restore Housing
+        final housing = await _firestore.collection('housing_listings')
+            .where('plugId', isEqualTo: uid)
+            .where('status', isEqualTo: 'userSuspended')
+            .get();
+            
+        for (var doc in housing.docs) {
+          batch.update(doc.reference, {
+            'status': doc.data()['originalStatus'] ?? 'available',
+            'originalStatus': FieldValue.delete(),
+          });
+        }
+
+        await batch.commit();
+        AppLogger.info('Self-Healing: Restoration complete for $uid', 'AUTH');
+      }
+    } catch (e) {
+      AppLogger.warning('Self-Healing: Failed to check/restore content: $e', 'AUTH');
+    }
+  }
+
+  @override
   Future<void> deleteAccount() async {
     final user = _firebaseAuth.currentUser;
     if (user == null) return;
@@ -427,6 +485,15 @@ class AuthRepositoryImpl implements AuthRepository {
 
   Future<void> _performCleanup(String uid) async {
     try {
+      // 0. Reset local device onboarding so the next user starts fresh
+      // This helps with the "brand new user" requirement
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('device_onboarding_completed');
+      } catch (e) {
+        AppLogger.warning('Cleanup: Failed to reset local onboarding flag: $e');
+      }
+
       // We process collections sequentially to avoid massive memory spikes
       // Audited list of all user-related content across the platform
       final collections = [
@@ -434,7 +501,8 @@ class AuthRepositoryImpl implements AuthRepository {
         'gig_disputes', 'verification_applications', 'student_verifications', 
         'identity_verifications', 'events', 'organizers', 'offers', 'reports',
         'housing_reports', 'housing_vacancy_requests', 'housing_saved_searches',
-        'housing_viewing_requests', 'event_attendance'
+        'housing_viewing_requests', 'event_attendance', 'payments', 'subscriptions',
+        'roommates'
       ];
 
       for (var coll in collections) {
@@ -447,21 +515,23 @@ class AuthRepositoryImpl implements AuthRepository {
         if (coll == 'organizers') queryField = 'ownerId';
         if (coll == 'gigs') queryField = 'employerId';
         if (coll == 'gig_disputes') queryField = 'reporterId';
-        if (coll == 'offers') queryField = 'buyerId'; // Best effort, buyer-side
+        if (coll == 'offers') queryField = 'buyerId'; 
         if (coll == 'reports' || coll == 'housing_reports') queryField = 'reporterId';
         if (coll == 'housing_vacancy_requests') queryField = 'userId';
         if (coll == 'housing_saved_searches') queryField = 'userId';
         if (coll == 'housing_viewing_requests') queryField = 'studentId';
         if (coll == 'event_attendance') queryField = 'userId';
+        if (coll == 'payments') queryField = 'userId';
+        if (coll == 'roommates') queryField = 'userId';
         
-        if (coll == 'student_verifications' || coll == 'identity_verifications') {
+        if (coll == 'student_verifications' || coll == 'identity_verifications' || coll == 'subscriptions') {
           await _firestore.collection(coll).doc(uid).delete().catchError((_) => null);
           continue;
         }
 
         final snapshots = await _firestore.collection(coll)
             .where(queryField, isEqualTo: uid)
-            .limit(100) // Process in chunks
+            .limit(100) 
             .get();
 
         if (snapshots.docs.isNotEmpty) {
@@ -474,15 +544,13 @@ class AuthRepositoryImpl implements AuthRepository {
       }
 
       // Delete user subcollections and the user document itself
-      // We do this last to ensure we don't trigger app-wide redirects 
-      // until most data is gone.
       final subcollections = [
         'notifications', 'tokens', 'saved_listings', 'saved_housing', 
         'saved_searches', 'recent_searches', 'followed_organizers',
-        'saved_events', 'saved_notes', 'study_progress'
+        'saved_events', 'saved_notes', 'study_progress', 'collections', 'reviews'
       ];
       for (var sub in subcollections) {
-        final snap = await _firestore.collection('users').doc(uid).collection(sub).limit(50).get();
+        final snap = await _firestore.collection('users').doc(uid).collection(sub).limit(100).get();
         if (snap.docs.isNotEmpty) {
           final batch = _firestore.batch();
           for (var doc in snap.docs) {
@@ -492,7 +560,11 @@ class AuthRepositoryImpl implements AuthRepository {
         }
       }
 
+      // Explicitly check for organizer memberships (where user ID is in document ID)
+      // This is harder to query, so we rely on the Cloud Function for deep cleanup
+      // but we try to delete the primary user doc last.
       await _firestore.collection('users').doc(uid).delete().catchError((_) => null);
+
       AppLogger.info('Auth: Best-effort Firestore cleanup completed for $uid', 'AUTH');
     } catch (e) {
       AppLogger.warning('Auth: Firestore cleanup encountered errors: $e', 'AUTH');
@@ -528,7 +600,11 @@ class AuthRepositoryImpl implements AuthRepository {
       final Map<String, AppUser> uniqueUsers = {};
       for (var snap in results) {
         for (var doc in snap.docs) {
-          final user = AppUser.fromJson(doc.data());
+          final data = doc.data();
+          // Filter out deleted or banned users from search results
+          if (data['isDeleted'] == true || data['isBanned'] == true) continue;
+          
+          final user = AppUser.fromJson(data);
           // Security: strip sensitive PII from search results before they reach UI
           uniqueUsers[user.uid] = user.stripSensitiveInfo();
         }

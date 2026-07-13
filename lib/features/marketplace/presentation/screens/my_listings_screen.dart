@@ -6,6 +6,9 @@ import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import '../../../auth/shared/providers.dart';
 import '../../domain/models/listing.dart';
 import '../../shared/providers.dart';
+import '../widgets/promotion_dialog.dart';
+import 'package:unihub_mobile/features/ads/ads_module.dart';
+import '../../../monetization/domain/models/payment_record.dart';
 
 class MyListingsScreen extends ConsumerWidget {
   const MyListingsScreen({super.key});
@@ -50,9 +53,15 @@ class MyListingsScreen extends ConsumerWidget {
 
           return ListView.builder(
             padding: const EdgeInsets.all(20),
-            itemCount: listings.length,
+            itemCount: listings.length + 1,
             itemBuilder: (context, index) {
-              final listing = listings[index];
+              if (index == 0) {
+                return const Padding(
+                  padding: EdgeInsets.only(bottom: 24),
+                  child: BannerAdWidget(),
+                );
+              }
+              final listing = listings[index - 1];
               return _MyListingCard(listing: listing);
             },
           );
@@ -212,58 +221,76 @@ class _MyListingCard extends ConsumerWidget {
                     Text('${listing.viewsCount} views', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
                   ],
                 ),
-                if (!listing.isFeatured)
-                  FilledButton.icon(
-                    onPressed: () async {
-                      final confirmed = await showDialog<bool>(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          backgroundColor: theme.colorScheme.surface,
-                          title: Text('Boost Listing', style: TextStyle(color: theme.colorScheme.onSurface)),
-                          content: Text('Would you like to boost this listing to the top of the feed for better visibility?', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
-                          actions: [
-                            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                            TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Boost Now')),
-                          ],
+                if (!listing.isFeatured && !listing.isSponsored)
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final user = ref.watch(appUserProvider).valueOrNull;
+                      final isVerified = user?.isIdentityVerified == true || user?.isStudentVerified == true || user?.accountType == 'business';
+                      
+                      return FilledButton.icon(
+                        onPressed: () async {
+                          await showDialog(
+                            context: context,
+                            builder: (context) => PromotionDialog(listing: listing),
+                          );
+                        },
+                        icon: Icon(isVerified ? Icons.rocket_launch : Icons.lock_outline_rounded, size: 18),
+                        label: Text(isVerified ? 'Promote' : 'Unlock Promotion'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: isVerified ? Colors.orange : theme.colorScheme.surfaceVariant,
+                          foregroundColor: isVerified ? Colors.white : theme.colorScheme.onSurfaceVariant,
+                          minimumSize: const Size(0, 36),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                       );
-
-                      if (confirmed == true) {
-                        await ref.read(marketplaceRepositoryProvider).boostListing(listing.id);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Listing boosted successfully!')),
-                          );
-                        }
-                      }
-                    },
-                    icon: const Icon(Icons.bolt, size: 18),
-                    label: const Text('Boost Listing'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(0, 36),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
+                    }
                   )
                 else
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.1), 
-                      borderRadius: BorderRadius.circular(8)
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.bolt, color: Colors.orange, size: 16),
-                        SizedBox(width: 4),
-                        Text('BOOSTED', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 11)),
-                      ],
-                    ),
+                  Row(
+                    children: [
+                      if (listing.isFeatured)
+                        _buildBadge('FEATURED', Colors.blue),
+                      if (listing.isSponsored)
+                        const SizedBox(width: 8),
+                      if (listing.isSponsored)
+                        _buildBadge('SPONSORED', Colors.purple),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () => showDialog(
+                          context: context,
+                          builder: (context) => PromotionDialog(listing: listing),
+                        ),
+                        icon: const Icon(Icons.settings, size: 18, color: Colors.grey),
+                        style: IconButton.styleFrom(
+                          backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(32, 32),
+                        ),
+                      ),
+                    ],
                   ),
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBadge(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.bold,
+          fontSize: 10,
         ),
       ),
     );

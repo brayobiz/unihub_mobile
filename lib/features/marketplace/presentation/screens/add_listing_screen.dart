@@ -6,6 +6,7 @@ import 'package:unihub_mobile/features/marketplace/domain/models/listing.dart';
 import 'package:unihub_mobile/features/marketplace/presentation/controllers/add_listing_controller.dart';
 import 'package:unihub_mobile/features/marketplace/presentation/widgets/marketplace_card.dart';
 import 'package:unihub_mobile/features/marketplace/domain/models/marketplace_categories.dart';
+import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/core/widgets/creation_success_dialog.dart';
 import 'package:unihub_mobile/features/ads/ads_module.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -37,6 +38,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final user = ref.watch(appUserProvider).valueOrNull;
     final state = ref.watch(addListingControllerProvider(widget.listing));
     final controller = ref.read(addListingControllerProvider(widget.listing).notifier);
 
@@ -211,7 +213,12 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
 
   Widget _buildStep3(AddListingState state, AddListingController controller) {
     final theme = Theme.of(context);
+    final user = ref.watch(appUserProvider).valueOrNull;
+    final bool isVerified = user?.isIdentityVerified == true || 
+                           user?.isStudentVerified == true || 
+                           user?.accountType == 'business';
     final int quantity = state.quantity;
+    
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -248,6 +255,82 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
             subtitle: Text('Allow buyers to make offers', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
             contentPadding: EdgeInsets.zero,
             activeTrackColor: theme.colorScheme.primary,
+          ),
+          const SizedBox(height: 24),
+          _buildSectionHeader(context, 'Growth Phase: Free Promotions', Icons.rocket_launch_outlined),
+          const SizedBox(height: 8),
+          if (isVerified)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 20, color: theme.colorScheme.primary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'As a verified user, you get premium visibility for free during our Early Bird phase!',
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimaryContainer, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            InkWell(
+              onTap: () => context.push('/trust-center'),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.lock_outline_rounded, size: 20, color: theme.colorScheme.primary),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Premium Visibility Locked',
+                            style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+                          ),
+                          Text(
+                            'Verify your identity to unlock Boost, Feature, and Sponsored slots for free!',
+                            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.chevron_right_rounded, color: theme.colorScheme.primary),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: 16),
+          _buildPromotionToggle(
+            title: 'Feature Listing',
+            subtitle: 'Place your item in the "Featured" section for 7 days.',
+            value: state.promoteAsFeatured,
+            onChanged: isVerified ? (val) => controller.togglePromoteFeatured(val) : null,
+          ),
+          _buildPromotionToggle(
+            title: 'Sponsored Slot',
+            subtitle: 'Keep your item at the top of search results for 3 days.',
+            value: state.promoteAsSponsored,
+            onChanged: isVerified ? (val) => controller.togglePromoteSponsored(val) : null,
+          ),
+          _buildPromotionToggle(
+            title: 'Instant Boost',
+            subtitle: 'Push your listing to the top of the "Recently Added" feed.',
+            value: state.applyBoost,
+            onChanged: isVerified ? (val) => controller.toggleApplyBoost(val) : null,
           ),
           const SizedBox(height: 24),
           _buildTextField(
@@ -656,6 +739,37 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
           }).toList(),
         ),
       ],
+    );
+  }
+
+  Widget _buildPromotionToggle({
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool>? onChanged,
+  }) {
+    final theme = Theme.of(context);
+    final bool isEnabled = onChanged != null;
+
+    return SwitchListTile(
+      value: isEnabled ? value : false,
+      onChanged: onChanged,
+      title: Text(
+        title, 
+        style: TextStyle(
+          fontWeight: FontWeight.bold, 
+          color: isEnabled ? theme.colorScheme.onSurface : theme.colorScheme.onSurface.withValues(alpha: 0.4), 
+          fontSize: 14,
+        ),
+      ),
+      subtitle: Text(
+        subtitle, 
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: isEnabled ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+        ),
+      ),
+      contentPadding: EdgeInsets.zero,
+      activeTrackColor: theme.colorScheme.primary,
     );
   }
 

@@ -533,7 +533,11 @@ class AdminRepository {
     final collection = _getCollectionForType(type);
     var query = _firestore.collection(collection).orderBy('createdAt', descending: true).limit(limit);
     
-    if (status != null) query = query.where('status', isEqualTo: status);
+    if (status != null && status != 'flagged') {
+      query = query.where('status', isEqualTo: status);
+    } else if (status == 'flagged') {
+      query = query.where('flagged', isEqualTo: true);
+    }
     
     return query.snapshots().map((snap) {
       return snap.docs.map((doc) {
@@ -582,6 +586,51 @@ class AdminRepository {
       timestamp: DateTime.now(),
       reason: reason,
       metadata: {'status': newStatus},
+    ));
+  }
+
+  Future<void> marketplacePromotionAction({
+    required String listingId,
+    required String action, // 'feature', 'boost', 'sponsor'
+    required String adminId,
+    required String adminName,
+    Map<String, dynamic>? metadata,
+  }) async {
+    if (!await _isUserAdmin(adminId)) {
+      throw Exception('Unauthorized: Administrative privileges required.');
+    }
+
+    final docRef = _firestore.collection('listings').doc(listingId);
+    final now = DateTime.now();
+    final Map<String, dynamic> updateData = {'updatedAt': FieldValue.serverTimestamp()};
+
+    if (action == 'feature') {
+      final days = metadata?['days'] ?? 7;
+      updateData['isFeatured'] = true;
+      updateData['featuredAt'] = FieldValue.serverTimestamp();
+      updateData['featuredUntil'] = Timestamp.fromDate(now.add(Duration(days: days)));
+      updateData['featuredPackage'] = 'admin_promo';
+    } else if (action == 'boost') {
+      updateData['lastBoostedAt'] = FieldValue.serverTimestamp();
+      updateData['boostCount'] = FieldValue.increment(1);
+    } else if (action == 'sponsor') {
+      final days = metadata?['days'] ?? 3;
+      updateData['isSponsored'] = true;
+      updateData['sponsoredUntil'] = Timestamp.fromDate(now.add(Duration(days: days)));
+    }
+
+    await docRef.update(updateData);
+
+    await logAction(AdminAuditLog(
+      id: '',
+      adminId: adminId,
+      adminName: adminName,
+      actionType: AdminActionType.bulkAction, // Or add MarketplacePromotion action type
+      targetId: listingId,
+      targetType: 'marketplace',
+      timestamp: DateTime.now(),
+      reason: 'Admin $action applied',
+      metadata: {'action': action, ...?metadata},
     ));
   }
 
@@ -722,7 +771,11 @@ class AdminRepository {
     if (action == 'remove' && report.targetId != null && report.targetId!.isNotEmpty) {
       await _removeContent(batch, report.type, report.targetId!);
     } else if (action == 'warn' && report.reportedUserId != null && report.reportedUserId!.isNotEmpty) {
-      // Notification handled in service
+      batch.update(_firestore.collection('users').doc(report.reportedUserId!), {
+        'hasActiveWarning': true,
+        'warningReason': notes ?? report.reason,
+        'lastWarningAt': FieldValue.serverTimestamp(),
+      });
     } else if (action == 'suspend' && report.reportedUserId != null && report.reportedUserId!.isNotEmpty) {
       final until = timestamp.add(Duration(days: suspensionDays ?? 7));
       batch.update(_firestore.collection('users').doc(report.reportedUserId!), {
@@ -880,11 +933,55 @@ class AdminRepository {
       throw Exception('Unauthorized: Administrative privileges required.');
     }
 
-    await _firestore.collection('users').doc(userId).update({
+    final batch = _firestore.batch();
+    final userRef = _firestore.collection('users').doc(userId);
+    
+    batch.update(userRef, {
       'isBanned': isBanned,
       'banReason': isBanned ? reason : null,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    // Spark Plan Workaround: Manually update listings since Cloud Functions are disabled
+    final listings = await _firestore.collection('listings')
+        .where('sellerId', isEqualTo: userId)
+        .get();
+        
+    for (var doc in listings.docs) {
+      if (isBanned) {
+        if (doc.data()['status'] == 'active') {
+          batch.update(doc.reference, {
+            'status': 'userSuspended',
+            'originalStatus': 'active',
+          });
+        }
+      } else {
+        if (doc.data()['status'] == 'userSuspended') {
+          batch.update(doc.reference, {
+            'status': doc.data()['originalStatus'] ?? 'active',
+            'originalStatus': FieldValue.delete(),
+          });
+        }
+      }
+    }
+
+    // Also handle housing
+    final housing = await _firestore.collection('housing_listings')
+        .where('plugId', isEqualTo: userId)
+        .get();
+    for (var doc in housing.docs) {
+      if (isBanned) {
+        if (doc.data()['status'] == 'available') {
+          batch.update(doc.reference, {'status': 'userSuspended', 'originalStatus': 'available'});
+        }
+      } else {
+        if (doc.data()['status'] == 'userSuspended') {
+          batch.update(doc.reference, {'status': doc.data()['originalStatus'] ?? 'available', 'originalStatus': FieldValue.delete()});
+        }
+      }
+    }
+
+    await batch.commit();
 
     await logAction(AdminAuditLog(
       id: '',
@@ -904,10 +1001,40 @@ class AdminRepository {
     if (!await _isUserAdmin(adminId)) {
       throw Exception('Unauthorized: Administrative privileges required.');
     }
-    await _firestore.collection('users').doc(userId).update({
+    final batch = _firestore.batch();
+    final userRef = _firestore.collection('users').doc(userId);
+    
+    batch.update(userRef, {
       'suspendedUntil': Timestamp.fromDate(until),
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    // Spark Plan Workaround: Manually update listings since Cloud Functions are disabled
+    final listings = await _firestore.collection('listings')
+        .where('sellerId', isEqualTo: userId)
+        .where('status', isEqualTo: 'active')
+        .get();
+        
+    for (var doc in listings.docs) {
+      batch.update(doc.reference, {
+        'status': 'userSuspended',
+        'originalStatus': 'active',
+      });
+    }
+
+    final housing = await _firestore.collection('housing_listings')
+        .where('plugId', isEqualTo: userId)
+        .where('status', isEqualTo: 'available')
+        .get();
+
+    for (var doc in housing.docs) {
+      batch.update(doc.reference, {
+        'status': 'userSuspended',
+        'originalStatus': 'available',
+      });
+    }
+
+    await batch.commit();
 
     await logAction(AdminAuditLog(
       id: '',

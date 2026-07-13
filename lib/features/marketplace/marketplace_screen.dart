@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/trust/domain/models/professional_role.dart';
 import 'package:unihub_mobile/features/trust/domain/models/verification_application.dart';
@@ -25,7 +24,6 @@ import '../../models/feed_type.dart';
 import '../../widgets/app_drawer.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/notification_badge.dart';
-import '../../services/notification_service.dart';
 import 'package:unihub_mobile/features/announcements/presentation/widgets/announcement_display.dart';
 import 'package:unihub_mobile/features/ads/ads_module.dart';
 
@@ -168,6 +166,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
   Widget _buildDiscoverTab() {
     final filterState = ref.watch(marketplaceControllerProvider);
     final controller = ref.read(marketplaceControllerProvider.notifier);
+    final user = ref.watch(appUserProvider).valueOrNull;
 
     final bool isDiscoveryMode = filterState.searchQuery.isEmpty && 
                                  filterState.selectedCategory == null &&
@@ -211,6 +210,62 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
           if (isDiscoveryMode)
             SliverToBoxAdapter(
               child: _buildDiscoveryContent(),
+            ),
+
+          // Growth Phase: Featured Section in Main Feed
+          if (isDiscoveryMode)
+            ref.watch(listingsProvider(ListingFilter(isFeaturedOnly: true, itemsLimit: 10))).when(
+              data: (featured) {
+                if (featured.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+                final theme = Theme.of(context);
+                return SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 32),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.auto_awesome, color: Colors.orange, size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Featured Listings',
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        height: 260,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          itemCount: featured.length,
+                          itemBuilder: (context, index) => Padding(
+                            padding: const EdgeInsets.only(right: 16),
+                            child: SizedBox(
+                              width: 170,
+                              child: MarketplaceCard(
+                                listing: featured[index], 
+                                index: index,
+                                heroTag: 'hero_featured_${featured[index].id}',
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+              error: (_, __) => const SliverToBoxAdapter(child: SizedBox.shrink()),
             ),
 
           _buildListingsGrid(isDiscoveryMode ? ListingFilter() : filterState),
@@ -446,6 +501,8 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
 
   Widget _buildSearchBar(MarketplaceController controller, ListingFilter filterState) {
     final theme = Theme.of(context);
+    final hasSearch = filterState.searchQuery.isNotEmpty;
+
     return Row(
       children: [
         Expanded(
@@ -456,40 +513,88 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                 context: context,
                 delegate: MarketplaceSearchDelegate(ref: ref, scrollController: _scrollController),
               ),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: theme.colorScheme.outlineVariant),
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                  border: Border.all(
+                    color: hasSearch ? theme.colorScheme.primary.withValues(alpha: 0.3) : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.search_rounded, color: AppColors.secondary),
+                    Icon(
+                      Icons.search_rounded, 
+                      color: hasSearch ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                      size: 20,
+                    ),
                     const SizedBox(width: 12),
-                    Text(
-                      filterState.searchQuery.isEmpty 
-                          ? 'What are you looking for?' 
-                          : filterState.searchQuery,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: filterState.searchQuery.isEmpty ? AppColors.grey : theme.colorScheme.onSurface,
+                    Expanded(
+                      child: Text(
+                        filterState.searchQuery.isEmpty 
+                            ? 'Search campus listings...' 
+                            : filterState.searchQuery,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: filterState.searchQuery.isEmpty ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6) : theme.colorScheme.onSurface,
+                          fontWeight: hasSearch ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    if (hasSearch)
+                      GestureDetector(
+                        onTap: () => controller.setSearchQuery(''),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.close_rounded, size: 14, color: theme.colorScheme.onSurface),
+                        ),
+                      ),
                   ],
                 ),
               ),
             ),
           ),
         ),
-        const SizedBox(width: 10),
-        IconButton(
-          onPressed: () => _showFilterSheet(context, filterState, controller), 
-          icon: Icon(Icons.tune_rounded, color: theme.colorScheme.onSurface),
-          style: IconButton.styleFrom(
-            backgroundColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-            padding: const EdgeInsets.all(12),
-          ),
+        const SizedBox(width: 12),
+        Stack(
+          children: [
+            IconButton(
+              onPressed: () => _showFilterSheet(context, filterState, controller), 
+              icon: Icon(Icons.tune_rounded, color: theme.colorScheme.onSurface),
+              style: IconButton.styleFrom(
+                backgroundColor: theme.colorScheme.surface,
+                padding: const EdgeInsets.all(12),
+                side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+              ),
+            ),
+            if (filterState.selectedCategory != null || filterState.selectedConditions.isNotEmpty || filterState.priceRange != null)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+          ],
         ),
       ],
     );
@@ -685,7 +790,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                   child: Icon(
                     CategoryUtils.getIcon(FeedType.marketplace), 
                     size: 56, 
-                    color: theme.colorScheme.primary.withOpacity(0.5)
+                    color: theme.colorScheme.primary.withValues(alpha: 0.5)
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -850,7 +955,6 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
 
   Widget _buildMyListingsTab() {
     final theme = Theme.of(context);
-    // Optimization: only watch necessary user properties
     final userData = ref.watch(appUserProvider.select((u) {
       final user = u.valueOrNull;
       if (user == null) return null;
@@ -865,153 +969,239 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
     final applicationAsync = ref.watch(applicationByRoleProvider(ProfessionalRole.seller));
     final myListingsAsync = ref.watch(sellerListingsProvider(userData.uid));
 
-    return ListView(
-      physics: const BouncingScrollPhysics(),
-      children: [
-        applicationAsync.when(
-          data: (app) => (userData.verifiedRoles.contains('seller')) ? const SizedBox.shrink() : _buildSellerVerificationCTA(app),
-          loading: () => const LinearProgressIndicator(),
-          error: (_, __) => const SizedBox.shrink(),
-        ),
-        
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-          child: InkWell(
-            onTap: () => context.push('/seller-dashboard'),
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [theme.colorScheme.primary, theme.colorScheme.primary.withOpacity(0.8)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(sellerListingsProvider(userData.uid));
+        ref.invalidate(applicationByRoleProvider(ProfessionalRole.seller));
+      },
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        children: [
+          applicationAsync.when(
+            data: (app) => (userData.verifiedRoles.contains('seller')) ? const SizedBox.shrink() : _buildSellerVerificationCTA(app),
+            loading: () => const LinearProgressIndicator(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
+          
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildHubCard(
+                    title: 'Seller Dashboard',
+                    subtitle: 'Track performance',
+                    icon: Icons.analytics_outlined,
+                    color: theme.colorScheme.primary,
+                    onTap: () => context.push('/seller-dashboard'),
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: theme.colorScheme.primary.withOpacity(0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildHubCard(
+                    title: 'Active Offers',
+                    subtitle: 'Manage negotiations',
+                    icon: Icons.handshake_outlined,
+                    color: Colors.orange,
+                    onTap: () => context.push('/seller-offers'), // Ensure this route exists or redirect to dashboard
                   ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.analytics_outlined, color: Colors.white, size: 32),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Seller Dashboard',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                          ),
-                        ),
-                        Text(
-                          'Track your listing performance',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        ),
-        
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 20),
-          child: BannerAdWidget(),
-        ),
 
-        myListingsAsync.when(
-          data: (listings) {
-            if (listings.isEmpty) {
+          Consumer(
+            builder: (context, ref, _) {
+              final user = ref.watch(appUserProvider).valueOrNull;
+              if (user == null || user.accountType == 'business') return const SizedBox.shrink();
+              
               return Padding(
-                padding: const EdgeInsets.only(top: 60),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                          shape: BoxShape.circle,
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                child: InkWell(
+                  onTap: () => context.push('/business-upgrade'),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), shape: BoxShape.circle),
+                          child: const Icon(Icons.business_center_rounded, color: Colors.blue, size: 18),
                         ),
-                        child: Icon(
-                          Icons.shopping_bag_outlined, 
-                          size: 56, 
-                          color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Upgrade to Business', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              Text('Get a professional badge & pro tools', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'No listings posted', 
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Sell your textbooks, electronics, or clothes \nto fellow students.', 
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                      ),
-                      const SizedBox(height: 32),
-                      FilledButton.icon(
-                        onPressed: () => context.push('/add-listing'),
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('Create Your First Listing'),
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        ),
-                      ),
-                    ],
+                        const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 18),
+                      ],
+                    ),
                   ),
                 ),
               );
             }
-            return GridView.builder(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 16,
-                childAspectRatio: 0.7,
-              ),
-              itemCount: listings.length,
-              itemBuilder: (context, index) => MarketplaceCard(
-                listing: listings[index], 
-                index: index,
-                heroTag: 'hero_my_${listings[index].id}',
-              ),
-            );
-          },
-          loading: () => const Padding(
-            padding: EdgeInsets.all(40),
-            child: Center(child: CircularProgressIndicator()),
           ),
-          error: (err, _) => Padding(
-            padding: const EdgeInsets.all(40),
-            child: Center(child: Text('Error: $err')),
+          
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: BannerAdWidget(),
           ),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'My Items',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () => context.push('/add-listing'),
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('New Listing'),
+                ),
+              ],
+            ),
+          ),
+
+          myListingsAsync.when(
+            data: (listings) {
+              if (listings.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 40),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.shopping_bag_outlined, 
+                            size: 56, 
+                            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          'No active listings', 
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Start selling to your campus community.', 
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 13, color: AppColors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              return GridView.builder(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 16,
+                  childAspectRatio: 0.7,
+                ),
+                itemCount: listings.length,
+                itemBuilder: (context, index) => MarketplaceCard(
+                  listing: listings[index], 
+                  index: index,
+                  heroTag: 'hero_my_${listings[index].id}',
+                ),
+              );
+            },
+            loading: () => const Padding(
+              padding: EdgeInsets.all(40),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (err, _) => Padding(
+              padding: const EdgeInsets.all(40),
+              child: Center(child: Text('Error: $err')),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHubCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-      ],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              subtitle,
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -1,10 +1,10 @@
 class AdConfig {
   /// Global toggle for all advertising functionality.
   /// Set to false to completely disable ad initialization and widgets.
-  static const bool enabled = true;
+  static const bool enabled = false;
 
   /// How often to insert a banner in the Marketplace grid (every X items).
-  static const int marketplaceAdInterval = 10;
+  static const int marketplaceAdInterval = 8;
   
   /// How often to insert a banner in the Housing list (every X items).
   static const int housingAdInterval = 8;

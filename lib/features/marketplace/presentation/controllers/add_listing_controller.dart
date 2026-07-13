@@ -33,6 +33,11 @@ class AddListingState {
   final Map<String, dynamic> attributes;
   final int currentStep;
   final bool isEditing;
+  
+  // Growth Phase Promotions
+  final bool promoteAsFeatured;
+  final bool promoteAsSponsored;
+  final bool applyBoost;
 
   AddListingState({
     required this.id,
@@ -56,6 +61,9 @@ class AddListingState {
     this.attributes = const {},
     this.currentStep = 0,
     this.isEditing = false,
+    this.promoteAsFeatured = false,
+    this.promoteAsSponsored = false,
+    this.applyBoost = false,
   });
 
   double get qualityScore {
@@ -108,6 +116,9 @@ class AddListingState {
     Map<String, dynamic>? attributes,
     int? currentStep,
     bool? isEditing,
+    bool? promoteAsFeatured,
+    bool? promoteAsSponsored,
+    bool? applyBoost,
   }) {
     return AddListingState(
       id: id,
@@ -131,6 +142,9 @@ class AddListingState {
       attributes: attributes ?? this.attributes,
       currentStep: currentStep ?? this.currentStep,
       isEditing: isEditing ?? this.isEditing,
+      promoteAsFeatured: promoteAsFeatured ?? this.promoteAsFeatured,
+      promoteAsSponsored: promoteAsSponsored ?? this.promoteAsSponsored,
+      applyBoost: applyBoost ?? this.applyBoost,
     );
   }
 
@@ -152,6 +166,9 @@ class AddListingState {
       'attributes': attributes,
       'currentStep': currentStep,
       'isEditing': isEditing,
+      'promoteAsFeatured': promoteAsFeatured,
+      'promoteAsSponsored': promoteAsSponsored,
+      'applyBoost': applyBoost,
     };
   }
 }
@@ -259,6 +276,10 @@ class AddListingController extends StateNotifier<AddListingState> {
     if (!state.isEditing) _saveDraft();
   }
 
+  void togglePromoteFeatured(bool val) => state = state.copyWith(promoteAsFeatured: val);
+  void togglePromoteSponsored(bool val) => state = state.copyWith(promoteAsSponsored: val);
+  void toggleApplyBoost(bool val) => state = state.copyWith(applyBoost: val);
+
   void nextStep() {
     if (state.currentStep < 2) {
       state = state.copyWith(currentStep: state.currentStep + 1);
@@ -335,6 +356,9 @@ class AddListingController extends StateNotifier<AddListingState> {
           quantity: int.tryParse(data['quantity']?.toString() ?? '1') ?? 1,
           tags: (data['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
           attributes: Map<String, dynamic>.from(data['attributes'] ?? {}),
+          promoteAsFeatured: data['promoteAsFeatured'] == true,
+          promoteAsSponsored: data['promoteAsSponsored'] == true,
+          applyBoost: data['applyBoost'] == true,
           currentStep: 0, // Always start at step 0
           isEditing: false,
         );
@@ -362,6 +386,10 @@ class AddListingController extends StateNotifier<AddListingState> {
       final user = _ref.read(appUserProvider).valueOrNull;
       if (user == null) throw Exception('User not found');
 
+      final bool isVerified = user.isIdentityVerified == true || 
+                             user.isStudentVerified == true || 
+                             user.accountType == 'business';
+
       final imageUrls = [...state.existingImageUrls];
       
       for (var i = 0; i < state.selectedImages.length; i++) {
@@ -381,10 +409,24 @@ class AddListingController extends StateNotifier<AddListingState> {
 
       state = state.copyWith(uploadProgress: 1.0);
 
+      final originalListing = state.isEditing ? _ref.read(listingProvider(state.id)).valueOrNull : null;
+
+      // Enforce server-side verification check for promotions
+      // If unverified, we PRESERVE original values to avoid permission denial in Firestore rules
+      final bool canModifyPremium = isVerified;
+      
+      final bool finalFeatured = canModifyPremium 
+          ? state.promoteAsFeatured 
+          : (originalListing?.isFeatured ?? false);
+          
+      final bool finalSponsored = canModifyPremium 
+          ? state.promoteAsSponsored 
+          : (originalListing?.isSponsored ?? false);
+
       final listing = Listing(
         id: state.id,
         sellerId: user.uid,
-        sellerName: user.fullName,
+        sellerName: user.accountType == 'business' ? (user.businessName ?? user.fullName) : user.fullName,
         sellerUniversity: CampusConstants.resolveToId(user.university) ?? user.university ?? 'Campus',
         sellerTrustScore: user.trustScore,
         title: state.title,
@@ -401,11 +443,27 @@ class AddListingController extends StateNotifier<AddListingState> {
         quantity: state.quantity,
         tags: state.tags,
         attributes: state.attributes,
-        createdAt: state.isEditing 
-            ? (_ref.read(listingProvider(state.id)).value?.createdAt ?? DateTime.now())
-            : DateTime.now(),
+        // Growth Phase Promotions
+        isFeatured: finalFeatured,
+        featuredAt: (finalFeatured && finalFeatured != originalListing?.isFeatured) 
+            ? DateTime.now() 
+            : originalListing?.featuredAt,
+        featuredUntil: (finalFeatured && finalFeatured != originalListing?.isFeatured)
+            ? DateTime.now().add(const Duration(days: 7))
+            : originalListing?.featuredUntil,
+        isSponsored: finalSponsored,
+        sponsoredUntil: (finalSponsored && finalSponsored != originalListing?.isSponsored)
+            ? DateTime.now().add(const Duration(days: 3))
+            : originalListing?.sponsoredUntil,
+        lastBoostedAt: (canModifyPremium && state.applyBoost)
+            ? DateTime.now()
+            : originalListing?.lastBoostedAt,
+        boostCount: (canModifyPremium && state.applyBoost)
+            ? (originalListing?.boostCount ?? 0) + 1
+            : (originalListing?.boostCount ?? 0),
+        createdAt: originalListing?.createdAt ?? DateTime.now(),
         updatedAt: state.isEditing ? DateTime.now() : null,
-        expiresAt: DateTime.now().add(const Duration(days: 30)),
+        expiresAt: originalListing?.expiresAt ?? DateTime.now().add(const Duration(days: 30)),
       );
 
       if (state.isEditing) {

@@ -139,8 +139,10 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
 
   Widget _buildFilters(int count, List<ModeratedContent> items) {
     List<String> statuses = ['active', 'removed'];
-    if (widget.contentType == ContentType.marketplace) {
-      statuses = ['active', 'sold', 'paused', 'expired', 'archived', 'removed'];
+    bool isMarketplace = widget.contentType == ContentType.marketplace;
+    
+    if (isMarketplace) {
+      statuses = ['active', 'sold', 'paused', 'expired', 'archived', 'removed', 'flagged'];
     } else if (widget.contentType == ContentType.housing) {
       statuses = ['available', 'taken', 'pendingReview', 'reported', 'archived', 'removed'];
     } else if (widget.contentType == ContentType.events) {
@@ -319,6 +321,7 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
   Widget _buildStatusChip(String status) {
     Color color = AppColors.primary;
     if (status == 'removed' || status == 'suspended') color = AppColors.error;
+    if (status == 'flagged') color = AppColors.warning;
     if (status == 'active' || status == 'available' || status == 'approved' || status == 'live') color = AppColors.success;
     if (status == 'submitted' || status == 'pendingReview') color = AppColors.warning;
     if (status == 'sold' || status == 'taken' || status == 'ended') color = AppColors.grey600;
@@ -473,18 +476,87 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
                   _confirmAction('active', item);
                 },
               ),
+            if (widget.contentType == ContentType.marketplace && item.status == 'active') ...[
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.bolt, color: Colors.orange),
+                title: const Text('Admin Boost', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+                subtitle: const Text('Bump to top of feed'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _handleMarketplaceAdminAction('boost', item);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.star, color: Colors.blue),
+                title: const Text('Feature Listing', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                subtitle: const Text('7 days featured placement'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _handleMarketplaceAdminAction('feature', item);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.ads_click, color: Colors.purple),
+                title: const Text('Sponsor Search', style: TextStyle(color: Colors.purple, fontWeight: FontWeight.bold)),
+                subtitle: const Text('3 days sponsored search'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _handleMarketplaceAdminAction('sponsor', item);
+                },
+              ),
+            ],
             ListTile(
               leading: const Icon(Icons.person_outline),
               title: const Text('View Author Profile'),
               onTap: () {
                 Navigator.pop(context);
-                // Navigate to user management or profile
+                context.push('/admin/users/${item.authorId}', extra: item.originalData);
               },
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _handleMarketplaceAdminAction(String action, ModeratedContent item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Apply Admin ${action.toUpperCase()}?'),
+        content: Text('Are you sure you want to manually $action "${item.title}"? This will be logged in the audit trail.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Apply')),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      if (!mounted) return;
+      try {
+        final admin = ref.read(appUserProvider).valueOrNull;
+        if (admin == null) throw Exception('Admin session not found');
+        
+        await ref.read(adminServiceProvider).marketplacePromotionAction(
+          listingId: item.id,
+          action: action,
+          adminId: admin.uid,
+          adminName: admin.fullName,
+        );
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('✅ Admin $action applied successfully')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Error: $e')));
+        }
+      }
+    }
   }
 
   Future<void> _confirmAction(String newStatus, ModeratedContent item) async {

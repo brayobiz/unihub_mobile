@@ -3,7 +3,7 @@ import '../../../../core/constants/campus_constants.dart';
 import 'price_history.dart';
 
 enum ListingCondition { newCondition, likeNew, good, fair }
-enum ListingStatus { active, sold, paused, expired, reserved, archived, removed }
+enum ListingStatus { active, sold, paused, expired, reserved, archived, removed, userSuspended }
 enum ModerationStatus { active, flagged, suspended, removed }
 
 class Listing {
@@ -37,11 +37,30 @@ class Listing {
   
   // Algorithmic & Engagement Data
   final bool isFeatured;
+  final DateTime? featuredUntil;
+  final String? featuredPackage;
+  final DateTime? featuredAt;
+  final DateTime? lastBoostedAt;
+  final int boostCount;
   final bool isPromoted;
+  final bool isSponsored;
+  final DateTime? sponsoredUntil;
+  
   final int viewsCount;
   final int savesCount;
   final int sharesCount;
   final int chatsStartedCount;
+  
+  // Moderation Data
+  final bool flagged;
+  final String? flagReason;
+  final String? flagAdminNotes;
+  final DateTime? flaggedAt;
+  final String? moderationReason;
+  final String? suspendedBy;
+  final DateTime? suspendedAt;
+  final String? suspensionReason;
+  final DateTime? approvedAt;
   
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -71,11 +90,27 @@ class Listing {
     this.tags = const [],
     this.attributes = const {},
     this.isFeatured = false,
+    this.featuredUntil,
+    this.featuredPackage,
+    this.featuredAt,
+    this.lastBoostedAt,
+    this.boostCount = 0,
     this.isPromoted = false,
+    this.isSponsored = false,
+    this.sponsoredUntil,
     this.viewsCount = 0,
     this.savesCount = 0,
     this.sharesCount = 0,
     this.chatsStartedCount = 0,
+    this.flagged = false,
+    this.flagReason,
+    this.flagAdminNotes,
+    this.flaggedAt,
+    this.moderationReason,
+    this.suspendedBy,
+    this.suspendedAt,
+    this.suspensionReason,
+    this.approvedAt,
     required this.createdAt,
     this.updatedAt,
     required this.expiresAt,
@@ -106,11 +141,27 @@ class Listing {
       'tags': tags,
       'attributes': attributes,
       'isFeatured': isFeatured,
+      'featuredUntil': featuredUntil != null ? Timestamp.fromDate(featuredUntil!) : null,
+      'featuredPackage': featuredPackage,
+      'featuredAt': featuredAt != null ? Timestamp.fromDate(featuredAt!) : null,
+      'lastBoostedAt': lastBoostedAt != null ? Timestamp.fromDate(lastBoostedAt!) : null,
+      'boostCount': boostCount,
       'isPromoted': isPromoted,
+      'isSponsored': isSponsored,
+      'sponsoredUntil': sponsoredUntil != null ? Timestamp.fromDate(sponsoredUntil!) : null,
       'viewsCount': viewsCount,
       'savesCount': savesCount,
       'sharesCount': sharesCount,
       'chatsStartedCount': chatsStartedCount,
+      'flagged': flagged,
+      'flagReason': flagReason,
+      'flagAdminNotes': flagAdminNotes,
+      'flaggedAt': flaggedAt != null ? Timestamp.fromDate(flaggedAt!) : null,
+      'moderationReason': moderationReason,
+      'suspendedBy': suspendedBy,
+      'suspendedAt': suspendedAt != null ? Timestamp.fromDate(suspendedAt!) : null,
+      'suspensionReason': suspensionReason,
+      'approvedAt': approvedAt != null ? Timestamp.fromDate(approvedAt!) : null,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
       'expiresAt': Timestamp.fromDate(expiresAt),
@@ -176,11 +227,41 @@ class Listing {
       tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? <String>[],
       attributes: Map<String, dynamic>.from(json['attributes'] ?? {}),
       isFeatured: safeBool(json['isFeatured'], false),
+      featuredUntil: (json['featuredUntil'] is Timestamp)
+          ? (json['featuredUntil'] as Timestamp).toDate()
+          : null,
+      featuredPackage: json['featuredPackage']?.toString(),
+      featuredAt: (json['featuredAt'] is Timestamp)
+          ? (json['featuredAt'] as Timestamp).toDate()
+          : null,
+      lastBoostedAt: (json['lastBoostedAt'] is Timestamp)
+          ? (json['lastBoostedAt'] as Timestamp).toDate()
+          : null,
+      boostCount: safeInt(json['boostCount'], 0),
       isPromoted: safeBool(json['isPromoted'], false),
+      isSponsored: safeBool(json['isSponsored'], false),
+      sponsoredUntil: (json['sponsoredUntil'] is Timestamp)
+          ? (json['sponsoredUntil'] as Timestamp).toDate()
+          : null,
       viewsCount: safeInt(json['viewsCount'], 0),
       savesCount: safeInt(json['savesCount'], 0),
       sharesCount: safeInt(json['sharesCount'], 0),
       chatsStartedCount: safeInt(json['chatsStartedCount'], 0),
+      flagged: safeBool(json['flagged'], false),
+      flagReason: json['flagReason']?.toString(),
+      flagAdminNotes: json['flagAdminNotes']?.toString(),
+      flaggedAt: (json['flaggedAt'] is Timestamp)
+          ? (json['flaggedAt'] as Timestamp).toDate()
+          : null,
+      moderationReason: json['moderationReason']?.toString(),
+      suspendedBy: json['suspendedBy']?.toString(),
+      suspendedAt: (json['suspendedAt'] is Timestamp)
+          ? (json['suspendedAt'] as Timestamp).toDate()
+          : null,
+      suspensionReason: json['suspensionReason']?.toString(),
+      approvedAt: (json['approvedAt'] is Timestamp)
+          ? (json['approvedAt'] as Timestamp).toDate()
+          : null,
       createdAt: (json['createdAt'] is Timestamp) 
           ? (json['createdAt'] as Timestamp).toDate() 
           : DateTime.now(),

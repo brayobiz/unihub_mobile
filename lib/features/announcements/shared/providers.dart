@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../auth/shared/providers.dart';
 import '../data/repositories/announcement_repository.dart';
 import '../domain/models/announcement.dart';
@@ -17,6 +18,31 @@ final allAnnouncementsProvider = StreamProvider.autoDispose<List<Announcement>>(
 final activeAnnouncementsProvider = StreamProvider.autoDispose<List<Announcement>>((ref) {
   return ref.watch(announcementRepositoryProvider).watchActiveAnnouncements();
 });
+
+/// Tracks which announcements have been dismissed as modals
+final dismissedAnnouncementsProvider = StateNotifierProvider<DismissedAnnouncementsNotifier, Set<String>>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return DismissedAnnouncementsNotifier(prefs);
+});
+
+class DismissedAnnouncementsNotifier extends StateNotifier<Set<String>> {
+  final SharedPreferences _prefs;
+  static const _key = 'dismissed_announcements';
+
+  DismissedAnnouncementsNotifier(this._prefs) : super({}) {
+    final list = _prefs.getStringList(_key) ?? [];
+    state = list.toSet();
+  }
+
+  void dismiss(String id) {
+    if (state.contains(id)) return;
+    state = {...state, id};
+    _prefs.setStringList(_key, state.toList());
+  }
+}
+
+/// Tracks which announcements have already been shown as a modal in the current app session
+final sessionShownModalsProvider = StateProvider<Set<String>>((ref) => {});
 
 /// Filtered announcements based on the current user's profile and the specified feature
 final relevantAnnouncementsProvider = Provider.autoDispose.family<List<Announcement>, String?>((ref, feature) {

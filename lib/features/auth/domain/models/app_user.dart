@@ -29,6 +29,14 @@ class AppUser {
   final bool isPhoneVerified;
   final bool isStudentVerified;
   final String studentStatus; // 'none' | 'pending' | 'approved' | 'rejected'
+  
+  // Business & Monetization
+  final String accountType; // 'student' | 'business'
+  final String? businessName;
+  final String? businessCategory;
+  final String? businessSubscriptionStatus;
+  final DateTime? subscriptionExpiry;
+
   final bool isIdentityVerified;
   final String identityStatus; // 'none' | 'pending' | 'approved' | 'rejected'
   final List<String> verifiedRoles; // List of ProfessionalRole names
@@ -68,6 +76,9 @@ class AppUser {
   final bool isBanned;
   final String? banReason;
   final DateTime? suspendedUntil;
+  final bool hasActiveWarning;
+  final String? warningReason;
+  final DateTime? lastWarningAt;
   final bool isDeleted;
 
   AppUser({
@@ -92,6 +103,11 @@ class AppUser {
     this.isPhoneVerified = false,
     this.isStudentVerified = false,
     this.studentStatus = 'none',
+    this.accountType = 'student',
+    this.businessName,
+    this.businessCategory,
+    this.businessSubscriptionStatus,
+    this.subscriptionExpiry,
     this.isIdentityVerified = false,
     this.identityStatus = 'none',
     this.verifiedRoles = const [],
@@ -138,6 +154,9 @@ class AppUser {
     this.isBanned = false,
     this.banReason,
     this.suspendedUntil,
+    this.hasActiveWarning = false,
+    this.warningReason,
+    this.lastWarningAt,
     this.isDeleted = false,
   }) : _reputationPoints = reputationPoints ?? 0.0,
        _isAdmin = isAdmin;
@@ -192,8 +211,11 @@ class AppUser {
         score += 3.0;
       }
     }
+
+    // 5. Moderation Penalties
+    if (hasActiveWarning) score -= 15.0; // Significant penalty for warnings
     
-    // 5. Bonus Reputation (Optional Activity Boosts from legacy system)
+    // 6. Bonus Reputation (Optional Activity Boosts from legacy system)
     // This allows repositories to still provide manual boosts if needed.
     // We cap the influence of legacy points to 20% to avoid score inflation.
     score += (reputationPoints.clamp(0, 20));
@@ -270,6 +292,8 @@ class AppUser {
       blockedUids: [],
       phoneNumber: null,
       whatsappNumber: null,
+      businessSubscriptionStatus: null,
+      subscriptionExpiry: null,
     );
   }
 
@@ -295,6 +319,11 @@ class AppUser {
     bool? isPhoneVerified,
     bool? isStudentVerified,
     String? studentStatus,
+    String? accountType,
+    String? businessName,
+    String? businessCategory,
+    String? businessSubscriptionStatus,
+    DateTime? subscriptionExpiry,
     bool? isIdentityVerified,
     String? identityStatus,
     List<String>? verifiedRoles,
@@ -326,6 +355,9 @@ class AppUser {
     bool? isBanned,
     String? banReason,
     DateTime? suspendedUntil,
+    bool? hasActiveWarning,
+    String? warningReason,
+    DateTime? lastWarningAt,
     bool? isDeleted,
   }) {
     return AppUser(
@@ -350,6 +382,11 @@ class AppUser {
       isPhoneVerified: isPhoneVerified ?? this.isPhoneVerified,
       isStudentVerified: isStudentVerified ?? this.isStudentVerified,
       studentStatus: studentStatus ?? this.studentStatus,
+      accountType: accountType ?? this.accountType,
+      businessName: businessName ?? this.businessName,
+      businessCategory: businessCategory ?? this.businessCategory,
+      businessSubscriptionStatus: businessSubscriptionStatus ?? this.businessSubscriptionStatus,
+      subscriptionExpiry: subscriptionExpiry ?? this.subscriptionExpiry,
       isIdentityVerified: isIdentityVerified ?? this.isIdentityVerified,
       identityStatus: identityStatus ?? this.identityStatus,
       verifiedRoles: verifiedRoles ?? this.verifiedRoles,
@@ -381,6 +418,9 @@ class AppUser {
       isBanned: isBanned ?? this.isBanned,
       banReason: banReason ?? this.banReason,
       suspendedUntil: suspendedUntil ?? this.suspendedUntil,
+      hasActiveWarning: hasActiveWarning ?? this.hasActiveWarning,
+      warningReason: warningReason ?? this.warningReason,
+      lastWarningAt: lastWarningAt ?? this.lastWarningAt,
       isDeleted: isDeleted ?? this.isDeleted,
     );
   }
@@ -410,6 +450,11 @@ class AppUser {
       'isPhoneVerified': isPhoneVerified,
       'isStudentVerified': isStudentVerified,
       'studentStatus': studentStatus,
+      'accountType': accountType,
+      'businessName': businessName,
+      'businessCategory': businessCategory,
+      'businessSubscriptionStatus': businessSubscriptionStatus,
+      'subscriptionExpiry': subscriptionExpiry != null ? Timestamp.fromDate(subscriptionExpiry!) : null,
       'isIdentityVerified': isIdentityVerified,
       'identityStatus': identityStatus,
       'verifiedRoles': verifiedRoles,
@@ -441,6 +486,9 @@ class AppUser {
       'isBanned': isBanned,
       'banReason': banReason,
       'suspendedUntil': suspendedUntil != null ? Timestamp.fromDate(suspendedUntil!) : null,
+      'hasActiveWarning': hasActiveWarning,
+      'warningReason': warningReason,
+      'lastWarningAt': lastWarningAt != null ? Timestamp.fromDate(lastWarningAt!) : null,
       'isDeleted': isDeleted,
     };
   }
@@ -496,6 +544,13 @@ class AppUser {
       isPhoneVerified: safeBool(json['isPhoneVerified'], false),
       isStudentVerified: safeBool(json['isStudentVerified'], false),
       studentStatus: json['studentStatus']?.toString() ?? 'none',
+      accountType: json['accountType']?.toString() ?? 'student',
+      businessName: json['businessName']?.toString(),
+      businessCategory: json['businessCategory']?.toString(),
+      businessSubscriptionStatus: json['businessSubscriptionStatus']?.toString(),
+      subscriptionExpiry: json['subscriptionExpiry'] != null 
+          ? (json['subscriptionExpiry'] as Timestamp).toDate() 
+          : null,
       isIdentityVerified: safeBool(json['isIdentityVerified'], false),
       identityStatus: json['identityStatus']?.toString() ?? 'none',
       verifiedRoles: (json['verifiedRoles'] as List?)?.map((e) => e.toString()).toList() ?? <String>[],
@@ -554,6 +609,11 @@ class AppUser {
       banReason: json['banReason']?.toString(),
       suspendedUntil: json['suspendedUntil'] != null 
           ? (json['suspendedUntil'] as Timestamp).toDate()
+          : null,
+      hasActiveWarning: safeBool(json['hasActiveWarning'], false),
+      warningReason: json['warningReason']?.toString(),
+      lastWarningAt: (json['lastWarningAt'] is Timestamp)
+          ? (json['lastWarningAt'] as Timestamp).toDate()
           : null,
       isDeleted: safeBool(json['isDeleted'], false),
     );

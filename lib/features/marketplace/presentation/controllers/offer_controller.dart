@@ -39,3 +39,7 @@ final listingOffersProvider = StreamProvider.family<List<Offer>, String>((ref, l
 final userOffersProvider = StreamProvider.family<List<Offer>, String>((ref, userId) {
   return ref.watch(marketplaceRepositoryProvider).watchUserOffers(userId);
 });
+
+final receivedOffersProvider = StreamProvider.family<List<Offer>, String>((ref, sellerId) {
+  return ref.watch(marketplaceRepositoryProvider).watchReceivedOffers(sellerId);
+});

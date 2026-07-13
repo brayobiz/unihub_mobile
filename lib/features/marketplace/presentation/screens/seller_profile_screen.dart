@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +14,7 @@ import 'package:unihub_mobile/features/marketplace/domain/models/review.dart';
 import 'package:unihub_mobile/features/marketplace/shared/providers.dart';
 import 'package:unihub_mobile/features/marketplace/domain/models/listing.dart';
 import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
+import 'package:unihub_mobile/features/ads/ads_module.dart';
 import 'package:unihub_mobile/features/chat/shared/providers.dart';
 import 'package:unihub_mobile/core/constants/campus_constants.dart';
 
@@ -35,7 +35,6 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final textTheme = theme.textTheme;
     final sellerAsync = ref.watch(publicUserProvider(widget.userId));
     final listingsAsync = ref.watch(sellerListingsProvider(widget.userId));
     final reviewsAsync = ref.watch(sellerReviewsProvider(widget.userId));
@@ -83,7 +82,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                               children: [
                                 Container(
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.2),
+                                    color: Colors.black.withValues(alpha: 0.2),
                                     shape: BoxShape.circle,
                                   ),
                                   child: IconButton(
@@ -97,7 +96,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                                 const SizedBox(width: 8),
                                 Container(
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.2),
+                                    color: Colors.black.withValues(alpha: 0.2),
                                     shape: BoxShape.circle,
                                   ),
                                   child: IconButton(
@@ -144,6 +143,10 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                         _buildAboutSection(seller),
                         const SizedBox(height: 24),
                         _buildMarketplaceInfo(seller),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: BannerAdWidget(),
+                        ),
                         const SizedBox(height: 24),
                         _buildActiveListingsSection(context, seller, listingsAsync),
                         const SizedBox(height: 24),
@@ -171,14 +174,18 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
   Widget _buildAvatar(AppUser seller) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isBusiness = seller.accountType == 'business';
     
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 4),
+        border: Border.all(
+          color: isBusiness ? AppColors.businessGold : Colors.white, 
+          width: 4
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: (isBusiness ? AppColors.business : Colors.black).withValues(alpha: 0.1),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -189,7 +196,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
         children: [
           CircleAvatar(
             radius: avatarRadius,
-            backgroundColor: colorScheme.surfaceVariant,
+            backgroundColor: colorScheme.surfaceContainerHighest,
             backgroundImage: seller.photoUrl != null ? CachedNetworkImageProvider(seller.photoUrl!) : null,
             child: seller.photoUrl == null
                 ? Text(
@@ -198,14 +205,18 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                   )
                 : null,
           ),
-          if (seller.isVerified)
+          if (seller.isVerified || isBusiness)
             Positioned(
               right: 2,
               bottom: 2,
               child: Container(
                 padding: const EdgeInsets.all(2),
                 decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                child: const Icon(Icons.verified, color: AppColors.success, size: 24),
+                child: Icon(
+                  Icons.verified, 
+                  color: isBusiness ? AppColors.business : AppColors.success, 
+                  size: 24
+                ),
               ),
             ),
         ],
@@ -268,6 +279,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
     final colorScheme = theme.colorScheme;
     final isOnline = seller.isOnline == true;
     final lastSeen = seller.lastSeen;
+    final isBusiness = seller.accountType == 'business';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -277,7 +289,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
           children: [
             Flexible(
               child: Text(
-                seller.fullName,
+                isBusiness ? (seller.businessName ?? seller.fullName) : seller.fullName,
                 style: const TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w900,
@@ -288,17 +300,21 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            if (seller.isVerified)
-              const Padding(
-                padding: EdgeInsets.only(left: 6),
-                child: Icon(Icons.verified_rounded, color: Colors.white, size: 22),
+            if (seller.isVerified || isBusiness)
+              Padding(
+                padding: const EdgeInsets.only(left: 6),
+                child: Icon(
+                  Icons.verified_rounded, 
+                  color: isBusiness ? AppColors.businessGold : Colors.white, 
+                  size: 22
+                ),
               ),
           ],
         ),
         Row(
           children: [
             Text(
-              '@${seller.username ?? 'unihub_seller'}',
+              isBusiness ? '${seller.businessCategory ?? 'Business'} • @${seller.username}' : '@${seller.username ?? 'unihub_seller'}',
               style: TextStyle(
                 fontSize: 15,
                 color: Colors.white.withOpacity(0.8),
@@ -310,7 +326,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.orange,
+                  color: isBusiness ? AppColors.businessGold : Colors.orange,
                   borderRadius: BorderRadius.circular(6),
                   boxShadow: [
                     BoxShadow(
@@ -320,13 +336,17 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                     ),
                   ],
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.bolt_rounded, color: Colors.white, size: 12),
-                    SizedBox(width: 4),
+                    Icon(Icons.bolt_rounded, color: isBusiness ? Colors.black : Colors.white, size: 12),
+                    const SizedBox(width: 4),
                     Text(
                       'AVAILABLE NOW',
-                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.white),
+                      style: TextStyle(
+                        fontSize: 9, 
+                        fontWeight: FontWeight.w900, 
+                        color: isBusiness ? Colors.black : Colors.white
+                      ),
                     ),
                   ],
                 ),
@@ -350,12 +370,20 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              _buildSmallInfoPill(
-                context, 
-                Icons.school_rounded, 
-                CampusConstants.getDisplayName(seller.university),
-                isVerified: seller.isStudentVerified,
-              ),
+              if (isBusiness)
+                _buildSmallInfoPill(
+                  context, 
+                  Icons.business_center_rounded, 
+                  'Business Account',
+                  isVerified: true,
+                )
+              else
+                _buildSmallInfoPill(
+                  context, 
+                  Icons.school_rounded, 
+                  CampusConstants.getDisplayName(seller.university),
+                  isVerified: seller.isStudentVerified,
+                ),
               const SizedBox(width: 8),
               _buildSmallInfoPill(context, Icons.calendar_today_rounded, seller.yearOfStudy ?? 'Year'),
             ],

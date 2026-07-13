@@ -17,6 +17,7 @@ import '../../../../core/location/utils/landmark_ui_utils.dart';
 import '../../../../core/location/repositories/campus_repository.dart';
 import '../../../../core/location/models/campus.dart';
 import '../../../../core/location/services/location_service.dart';
+import '../../../../core/utils/permission_utils.dart';
 import '../../../events/domain/models/event.dart';
 
 class CampusMapsScreen extends ConsumerStatefulWidget {
@@ -72,20 +73,18 @@ class _CampusMapsScreenState extends ConsumerState<CampusMapsScreen> {
     final campus = ref.read(campusMapsControllerProvider).selectedCampus;
     final locationService = ref.read(locationServiceProvider);
     
-    var status = await locationService.checkPermission();
+    // Policy Compliance: Use prominent disclosure before requesting location
+    final granted = await PermissionUtils.requestLocationPermission(context);
     
-    if (status.isDenied) {
-      status = await locationService.requestPermission();
-    }
-    
-    if (status.isGranted) {
+    if (granted) {
       final userLoc = await locationService.getCurrentLocation();
       if (userLoc != null) {
         _mapController.move(LatLng(userLoc.latitude, userLoc.longitude), 16.0);
         return;
       }
-    } else if (status.isPermanentlyDenied) {
-      if (mounted) {
+    } else {
+      final status = await Permission.location.status;
+      if (status.isPermanentlyDenied && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Location permission is required to show your position'),

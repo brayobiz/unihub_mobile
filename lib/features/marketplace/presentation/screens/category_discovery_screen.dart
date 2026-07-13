@@ -6,6 +6,7 @@ import '../../shared/providers.dart';
 import '../../domain/models/listing_filter.dart';
 import '../widgets/marketplace_card.dart';
 import '../../../../widgets/skeleton_loader.dart';
+import 'package:unihub_mobile/features/ads/ads_module.dart';
 
 class CategoryDiscoveryScreen extends ConsumerWidget {
   final String category;
@@ -46,6 +47,10 @@ class CategoryDiscoveryScreen extends ConsumerWidget {
                       sortBy: ListingSortType.lowestPrice,
                       itemsLimit: 10,
                     )),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: BannerAdWidget(),
                   ),
                   const SizedBox(height: 24),
                   Text(

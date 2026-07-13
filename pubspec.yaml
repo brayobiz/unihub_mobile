@@ -83,9 +83,9 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/icon/app_icon.png"
+  image_path: "assets/icon/campus_icon.png"
   adaptive_icon_background: "#ffffff"
-  adaptive_icon_foreground: "assets/icon/app_icon.png"
+  adaptive_icon_foreground: "assets/icon/campus_icon.png"
 
 # Remove win32 override - it was causing the FFI errors
 # dependency_overrides:

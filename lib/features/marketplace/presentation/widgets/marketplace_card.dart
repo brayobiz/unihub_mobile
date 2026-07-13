@@ -98,26 +98,26 @@ class MarketplaceCard extends ConsumerWidget {
                                   ),
                           ),
                         ),
-                        if (listing.isFeatured == true)
+                        if (listing.isFeatured == true || listing.isSponsored == true)
                           Positioned(
                             top: 10,
                             left: 10,
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: AppColors.warning,
+                                color: listing.isSponsored ? Colors.purple : AppColors.warning,
                                 borderRadius: BorderRadius.circular(8),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppColors.warning.withValues(alpha: 0.3),
+                                    color: (listing.isSponsored ? Colors.purple : AppColors.warning).withValues(alpha: 0.3),
                                     blurRadius: 8,
                                     offset: const Offset(0, 4),
                                   ),
                                 ],
                               ),
-                              child: const Text(
-                                'FEATURED',
-                                style: TextStyle(
+                              child: Text(
+                                listing.isSponsored ? 'SPONSORED' : 'FEATURED',
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 8,
                                   fontWeight: FontWeight.w900,
@@ -239,71 +239,94 @@ class MarketplaceCard extends ConsumerWidget {
                           builder: (context, ref, child) {
                             final sellerAsync = ref.watch(publicUserProvider(listing.sellerId));
                             return sellerAsync.when(
-                              data: (seller) => Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 9,
-                                        backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                                        backgroundImage: seller.photoUrl != null 
-                                            ? CachedNetworkImageProvider(seller.photoUrl!)
-                                            : null,
-                                        child: seller.photoUrl == null
-                                          ? Text(
-                                              seller.fullName.isNotEmpty ? seller.fullName[0].toUpperCase() : '?',
-                                              style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
-                                            )
-                                          : null,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          seller.fullName,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: theme.colorScheme.onSurfaceVariant,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                      if (seller.isVerifiedSeller) ...[
-                                        Icon(Icons.verified, color: theme.colorScheme.primary, size: 12),
-                                      ],
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: (seller.displayTrustScore > 80 ? AppColors.success : AppColors.warning).withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
+                              data: (seller) {
+                                final isBusiness = seller.accountType == 'business';
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
                                       children: [
-                                        Icon(
-                                          Icons.shield_rounded, 
-                                          size: 10, 
-                                          color: seller.displayTrustScore > 80 ? AppColors.success : AppColors.warning
+                                        CircleAvatar(
+                                          radius: 11,
+                                          backgroundColor: isBusiness 
+                                              ? AppColors.business.withValues(alpha: 0.1)
+                                              : theme.colorScheme.primary.withValues(alpha: 0.1),
+                                          backgroundImage: seller.photoUrl != null 
+                                              ? CachedNetworkImageProvider(seller.photoUrl!)
+                                              : null,
+                                          child: seller.photoUrl == null
+                                            ? Text(
+                                                seller.fullName.isNotEmpty ? seller.fullName[0].toUpperCase() : '?',
+                                                style: TextStyle(
+                                                  fontSize: 10, 
+                                                  fontWeight: FontWeight.bold, 
+                                                  color: isBusiness ? AppColors.business : theme.colorScheme.primary
+                                                ),
+                                              )
+                                            : null,
                                         ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${seller.displayTrustScore.toInt()}% Trust',
-                                          style: TextStyle(
-                                            fontSize: 9,
-                                            color: seller.displayTrustScore > 80 ? AppColors.success : AppColors.warning,
-                                            fontWeight: FontWeight.w800,
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            isBusiness 
+                                                ? (seller.businessName ?? seller.fullName) 
+                                                : seller.fullName,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: theme.colorScheme.onSurface,
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                           ),
                                         ),
+                                        if (isBusiness)
+                                          const Icon(Icons.verified, color: AppColors.businessGold, size: 14)
+                                        else if (seller.isVerifiedSeller)
+                                          Icon(Icons.verified, color: theme.colorScheme.primary, size: 14),
+                                        if (seller.hasActiveWarning)
+                                          const Padding(
+                                            padding: EdgeInsets.only(left: 4),
+                                            child: Icon(Icons.report_problem_rounded, color: Colors.orange, size: 14),
+                                          ),
                                       ],
                                     ),
-                                  ),
-                                ],
-                              ),
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: isBusiness 
+                                            ? AppColors.businessGold.withValues(alpha: 0.15)
+                                            : (seller.displayTrustScore > 80 ? Colors.green : Colors.orange).withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: isBusiness 
+                                            ? Border.all(color: AppColors.businessGold.withValues(alpha: 0.3))
+                                            : Border.all(color: (seller.displayTrustScore > 80 ? Colors.green : Colors.orange).withValues(alpha: 0.2)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            isBusiness ? Icons.business_center_rounded : Icons.verified_user_rounded, 
+                                            size: 11, 
+                                            color: isBusiness ? AppColors.business : (seller.displayTrustScore > 80 ? Colors.green : Colors.orange)
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            isBusiness ? 'BUSINESS PRO' : '${seller.displayTrustScore.toInt()}% TRUST',
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              color: isBusiness ? AppColors.business : (seller.displayTrustScore > 80 ? Colors.green.shade700 : Colors.orange.shade900),
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: 0.2,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
                               loading: () => const SizedBox(height: 24),
                               error: (_, __) => Text(
                                 'By Student',

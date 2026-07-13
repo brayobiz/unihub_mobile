@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
@@ -24,17 +25,80 @@ class _IdentityVerificationScreenState extends ConsumerState<IdentityVerificatio
   double _uploadProgress = 0;
   final _picker = ImagePicker();
 
-  Future<void> _pickImage(bool isSelfie) async {
-    final XFile? pickedFile = await _picker.pickImage(
-      source: isSelfie ? ImageSource.camera : ImageSource.gallery,
-      imageQuality: 70,
-    );
+  @override
+  void initState() {
+    super.initState();
+    _checkLostData();
+  }
 
-    if (pickedFile != null) {
-      setState(() {
-        if (isSelfie) _selfieFile = File(pickedFile.path);
-        else _idFile = File(pickedFile.path);
-      });
+  Future<void> _checkLostData() async {
+    if (Platform.isAndroid) {
+      final LostDataResponse response = await _picker.retrieveLostData();
+      if (response.isEmpty) return;
+      if (response.file != null) {
+        setState(() {
+          // Note: In a real app we might need to know if it was a selfie or ID
+          // For now, we'll try to guess or just set it to ID by default if both null
+          if (_idFile == null) {
+            _idFile = File(response.file!.path);
+          } else if (_selfieFile == null) {
+            _selfieFile = File(response.file!.path);
+          }
+        });
+      }
+    }
+  }
+
+  Future<void> _pickImage(bool isSelfie) async {
+    // Explicitly check for camera permission on Android/iOS when using camera
+    if (isSelfie) {
+      final status = await Permission.camera.request();
+      if (status.isPermanentlyDenied) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Camera Permission'),
+              content: const Text('Camera access is required for selfies. Please enable it in settings.'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                TextButton(onPressed: () {
+                  openAppSettings();
+                  Navigator.pop(ctx);
+                }, child: const Text('Settings')),
+              ],
+            ),
+          );
+        }
+        return;
+      }
+      if (!status.isGranted) return;
+    }
+
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: isSelfie ? ImageSource.camera : ImageSource.gallery,
+        imageQuality: 70,
+        maxWidth: 1800, // Prevent OOM by constraining large images
+        maxHeight: 1800,
+        preferredCameraDevice: isSelfie ? CameraDevice.front : CameraDevice.rear,
+      );
+
+      if (pickedFile != null) {
+        setState(() {
+          if (isSelfie) {
+            _selfieFile = File(pickedFile.path);
+          } else {
+            _idFile = File(pickedFile.path);
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error capturing image: $e')),
+        );
+      }
     }
   }
 
