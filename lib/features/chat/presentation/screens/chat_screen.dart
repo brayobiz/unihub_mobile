@@ -247,26 +247,50 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
         title: Consumer(
           builder: (context, ref, child) {
-            final otherUser = (otherUserId != null && otherUserId!.isNotEmpty) 
-                ? ref.watch(publicUserProvider(otherUserId!)).valueOrNull
+            final isSupport = widget.otherUserName == 'UniHub Support' || otherUserId == 'unihub_admin';
+            
+            // If support, and we have an assigned admin, track THAT admin's status
+            final effectiveStatusId = (isSupport && conversation?.assignedAdminId != null) 
+                ? conversation!.assignedAdminId! 
+                : otherUserId;
+
+            final otherUser = (effectiveStatusId != null && effectiveStatusId.isNotEmpty && effectiveStatusId != 'unihub_admin') 
+                ? ref.watch(publicUserProvider(effectiveStatusId)).valueOrNull
                 : null;
 
             final isOnline = otherUser?.isOnline == true;
             final lastSeen = otherUser?.lastSeen;
             final bool isOtherTyping = conversation?.typing[otherUserId] != null;
 
+            // Support-specific status text
+            String statusText;
+            if (isOtherTyping) {
+              statusText = 'typing...';
+            } else if (isSupport && conversation?.assignedAdminId == null) {
+              // Check if within business hours (8 AM - 8 PM)
+              final now = DateTime.now();
+              final isWorkingHours = now.hour >= 8 && now.hour < 20;
+              statusText = isWorkingHours ? 'Typical reply: 5m' : 'Away • Back at 8 AM';
+            } else {
+              statusText = isOnline ? 'Online' : (lastSeen != null ? 'Last seen ${_formatLastSeen(lastSeen)}' : 'Offline');
+            }
+
             return Row(
               children: [
                 CircleAvatar(
                   radius: 18,
                   backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-                  backgroundImage: otherUser?.photoUrl != null ? NetworkImage(otherUser!.photoUrl!) : null,
-                  child: otherUser?.photoUrl == null
-                    ? Text(
-                        widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : '?',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
-                      )
-                    : null,
+                  backgroundImage: (isSupport && otherUser == null) 
+                      ? null // Use icon for support
+                      : (otherUser?.photoUrl != null ? NetworkImage(otherUser!.photoUrl!) : null),
+                  child: (isSupport && (otherUser == null || otherUser.photoUrl == null))
+                    ? Icon(Icons.headset_mic_rounded, size: 18, color: theme.colorScheme.primary)
+                    : (otherUser?.photoUrl == null
+                        ? Text(
+                            widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : '?',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+                          )
+                        : null),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -282,16 +306,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          if (otherUser?.isVerified == true) ...[
+                          if (otherUser?.isVerified == true || isSupport) ...[
                             const SizedBox(width: 4),
                             Icon(Icons.verified, color: theme.colorScheme.primary, size: 14),
                           ],
                         ],
                       ),
                       Text(
-                        isOtherTyping 
-                            ? 'typing...' 
-                            : (isOnline ? 'Online' : (lastSeen != null ? 'Last seen ${_formatLastSeen(lastSeen)}' : 'Offline')),
+                        statusText,
                         style: TextStyle(
                           fontSize: 11, 
                           color: isOtherTyping || isOnline ? AppColors.success : theme.colorScheme.onSurfaceVariant,

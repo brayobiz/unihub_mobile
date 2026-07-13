@@ -16,7 +16,17 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
 });
 
 final conversationsProvider = StreamProvider.autoDispose.family<List<Conversation>, String>((ref, userId) {
-  return ref.watch(chatRepositoryProvider).watchConversations(userId);
+  final appUser = ref.watch(appUserProvider).valueOrNull;
+  final isAdmin = appUser?.isAdmin ?? false;
+
+  return ref.watch(chatRepositoryProvider).watchConversations(userId).map((conversations) {
+    if (isAdmin) {
+      // Filter out support conversations for admins in the regular list.
+      // Admins manage support through the dedicated Support Center.
+      return conversations.where((c) => !c.isSupport).toList();
+    }
+    return conversations;
+  });
 });
 
 final conversationProvider = StreamProvider.autoDispose.family<Conversation?, String>((ref, conversationId) {
@@ -28,7 +38,7 @@ final messagesStreamProvider = StreamProvider.autoDispose.family<List<Message>, 
 });
 
 final totalUnreadChatCountProvider = StreamProvider.autoDispose.family<int, String>((ref, userId) {
-  return ref.watch(chatRepositoryProvider).watchConversations(userId).map((conversations) {
+  return ref.watch(conversationsProvider(userId).stream).map((conversations) {
     return conversations.fold(0, (sum, conv) => sum + (conv.unreadCounts[userId] ?? 0));
   });
 });

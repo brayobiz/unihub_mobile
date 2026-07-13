@@ -36,6 +36,8 @@ class HelpCentreScreen extends ConsumerWidget {
           Text('Our support team is available from 8 AM to 8 PM.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
           const SizedBox(height: 20),
           
+          _buildActiveTickets(context, ref),
+          
           Card(
             color: theme.colorScheme.surface,
             elevation: 0,
@@ -91,6 +93,79 @@ class HelpCentreScreen extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
+  }
+
+  Widget _buildActiveTickets(BuildContext context, WidgetRef ref) {
+    final authUser = ref.watch(authStateProvider).valueOrNull;
+    if (authUser == null) return const SizedBox.shrink();
+
+    final conversationsAsync = ref.watch(conversationsProvider(authUser.uid));
+    final theme = Theme.of(context);
+
+    return conversationsAsync.when(
+      data: (conversations) {
+        final supportTickets = conversations
+            .where((c) => c.isSupport && (c.supportStatus != 'resolved' && c.supportStatus != 'closed'))
+            .toList();
+
+        if (supportTickets.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'My Open Tickets',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+            ),
+            const SizedBox(height: 12),
+            ...supportTickets.map((ticket) {
+              final unreadCount = ticket.unreadCounts[authUser.uid] ?? 0;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: theme.colorScheme.primary.withOpacity(0.1)),
+                ),
+                child: ListTile(
+                  onTap: () => context.push('/chat', extra: {
+                    'conversationId': ticket.id,
+                    'otherUserName': 'UniHub Support',
+                  }),
+                  leading: CircleAvatar(
+                    backgroundColor: theme.colorScheme.primary,
+                    child: const Icon(Icons.support_agent_rounded, color: Colors.white, size: 20),
+                  ),
+                  title: Text(
+                    'Support Session',
+                    style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                  ),
+                  subtitle: Text(
+                    ticket.lastMessage ?? 'Waiting for assistant...',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                  trailing: unreadCount > 0
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(color: theme.colorScheme.primary, borderRadius: BorderRadius.circular(10)),
+                          child: Text(
+                            unreadCount.toString(),
+                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        )
+                      : const Icon(Icons.chevron_right, size: 20),
+                ),
+              );
+            }),
+            const SizedBox(height: 24),
+          ],
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
   }
 
   Widget _buildFaqItem(BuildContext context, String question, String answer) {

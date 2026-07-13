@@ -40,7 +40,13 @@ class ChatRepositoryImpl implements ChatRepository {
           .where((c) {
             // Filter 1: Not expired
             final isNotExpired = c.expiresAt == null || c.expiresAt!.isAfter(now);
-            // Filter 2: No participants are in our blocked list
+            
+            // Filter 2: Personal chats only for admins
+            // If the user is an admin, we might want to hide support chats from this specific personal stream
+            // BUT, the repository doesn't know if 'userId' is an admin.
+            // We handle this in the Provider layer for better separation of concerns.
+            
+            // Filter 3: No participants are in our blocked list
             final otherParticipant = c.participants.firstWhere((id) => id != userId, orElse: () => '');
             final isNotBlocked = !blockedUids.contains(otherParticipant);
             
@@ -161,8 +167,31 @@ class ChatRepositoryImpl implements ChatRepository {
     // 4. Increment unread counts for other participants
     // We use a Set to avoid duplicates if participants list is messy
     final Map<String, dynamic> unreadUpdates = {};
+    final bool isSupportMsg = (data['isSupport'] ?? false);
+    final String studentId = participants.isNotEmpty ? participants[0] : '';
+    
     for (final participantId in participants.toSet()) {
-      if (participantId.isNotEmpty && participantId != message.senderId) {
+      if (participantId.isEmpty || participantId == message.senderId) continue;
+      
+      // LOGIC: In Support Chats, we only increment the student's unread count 
+      // if an admin is sending, and vice versa. 
+      // We NEVER increment an admin's unread count if an admin is sending (even if they use different IDs).
+      
+      if (isSupportMsg) {
+        final bool isSenderAdmin = message.senderId == 'unihub_admin' || (message.metadata?['adminId'] != null);
+        
+        if (isSenderAdmin) {
+          // Admin -> Student: Notify only the student
+          if (participantId == studentId) {
+            unreadUpdates['unreadCounts.$participantId'] = FieldValue.increment(1);
+          }
+        } else {
+          // Student -> Admin: WE DO NOT increment admin unread counts.
+          // Support tickets use 'supportStatus' for admin visibility.
+          // This keeps the admin's personal chat badge clean.
+        }
+      } else {
+        // Standard P2P chat: notify everyone else
         unreadUpdates['unreadCounts.$participantId'] = FieldValue.increment(1);
       }
     }
@@ -228,12 +257,12 @@ class ChatRepositoryImpl implements ChatRepository {
         await _notificationSender.sendNotification(
           recipientId: recipientId,
           actorId: message.senderId,
-          actorName: actorName,
-          title: isSupport ? (actorName != null ? 'UniHub Support ($actorName)' : 'UniHub Support') : 'New Message',
+          actorName: isSupport ? 'UniHub Support' : actorName, // Mask personal admin names in general notifications
+          title: isSupport ? 'Support Request Update' : 'New Message',
           body: message.type == MessageType.text ? message.content : 'Sent an attachment',
           type: isSupport ? NotificationType.support : NotificationType.chat,
           targetId: conversationId,
-          targetType: module,
+          targetType: isSupport ? 'support' : module,
         );
       }
     } catch (e) {

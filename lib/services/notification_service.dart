@@ -539,8 +539,14 @@ class NotificationService implements NotificationSender {
     } else if (targetId != null) {
       switch (type) {
         case NotificationType.chat:
+          route = '/chat';
+          break;
         case NotificationType.support:
-          route = '/chat'; 
+          // Intelligent routing: If recipient is an admin, go to Support Center, else regular chat
+          final recipientData = await _firestore.collection('users').doc(recipientId).get();
+          final bool recipientIsAdmin = (recipientData.data()?['isAdmin'] == true) || 
+                                       (recipientData.data()?['roles'] as List?)?.contains('admin') == true;
+          route = recipientIsAdmin ? '/admin/support/$targetId' : '/chat';
           break;
         case NotificationType.listing:
           route = '/listing-detail';
