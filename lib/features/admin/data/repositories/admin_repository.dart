@@ -1509,8 +1509,10 @@ class AdminRepository {
     }
 
     return query.snapshots().asyncMap((snapshot) async {
+      final now = DateTime.now();
       var conversations = snapshot.docs
           .map((doc) => Conversation.fromJson(doc.data() as Map<String, dynamic>))
+          .where((c) => c.expiresAt == null || c.expiresAt!.isAfter(now))
           .toList();
 
       if (searchQuery != null && searchQuery.isNotEmpty) {

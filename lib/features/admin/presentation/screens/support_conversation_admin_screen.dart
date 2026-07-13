@@ -530,122 +530,240 @@ class _SupportConversationAdminScreenState extends ConsumerState<SupportConversa
 
   Widget _buildManagementSidebar(Conversation conversation, AsyncValue<AppUser?> userAsync) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 1. User Header Section
           userAsync.when(
             data: (user) => _buildUserCard(user),
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => const Text('Error loading user'),
+            loading: () => const Center(child: Padding(
+              padding: EdgeInsets.all(20.0),
+              child: CircularProgressIndicator(),
+            )),
+            error: (_, __) => const Text('Error loading user metadata'),
           ),
+          
           const SizedBox(height: 32),
-          const Text('Session Controls', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const Divider(),
+          
+          // 2. Active Session Management Section
+          _buildSectionHeader('Live Session Management', Icons.admin_panel_settings_rounded),
           const SizedBox(height: 16),
           _buildAssignmentControl(conversation),
-          const SizedBox(height: 12),
-          if (conversation.supportStatus != 'resolved' && conversation.supportStatus != 'closed')
-            ElevatedButton.icon(
+          
+          const SizedBox(height: 24),
+          _buildPriorityControl(conversation),
+          
+          const SizedBox(height: 24),
+          _buildStatusControl(conversation),
+          
+          const SizedBox(height: 32),
+          
+          // 3. Resolution Section
+          if (conversation.supportStatus != 'resolved' && conversation.supportStatus != 'closed') ...[
+            _buildSectionHeader('Final Actions', Icons.check_circle_outline),
+            const SizedBox(height: 12),
+            FilledButton.icon(
               onPressed: _resolveAndClose,
-              icon: const Icon(Icons.check_circle_outline),
-              label: const Text('Resolve & Close'),
-              style: ElevatedButton.styleFrom(
+              icon: const Icon(Icons.verified_rounded),
+              label: const Text('Resolve & Close Session'),
+              style: FilledButton.styleFrom(
                 backgroundColor: AppColors.success,
                 foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 44),
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
-          const SizedBox(height: 24),
-          _buildControlGroup('Status', conversation.supportStatus ?? 'active', [
-            'waiting_admin', 'waiting_user', 'resolved', 'closed'
-          ], (val) => _updateStatus(val!)),
-          const SizedBox(height: 16),
-          _buildControlGroup('Priority', conversation.supportPriority ?? 'normal', [
-            'low', 'normal', 'high', 'urgent'
-          ], (val) => _updatePriority(val!)),
-          const SizedBox(height: 32),
-          const Text('Internal Notes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const Divider(),
-          const SizedBox(height: 16),
-          ...conversation.supportAdminNotes.map((note) => _buildInternalNote(note)),
-          const SizedBox(height: 16),
+            const SizedBox(height: 32),
+          ],
+          
+          // 4. Internal Documentation Section
+          _buildSectionHeader('Internal Audit Trail', Icons.history_edu_rounded),
+          const SizedBox(height: 12),
+          if (conversation.supportAdminNotes.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Text(
+                'No internal notes have been added yet.',
+                style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic),
+              ),
+            )
+          else
+            ...conversation.supportAdminNotes.map((note) => _buildInternalNote(note)),
+          
+          const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: () => _showAddNoteDialog(),
-            icon: const Icon(Icons.add_comment),
+            icon: const Icon(Icons.add_comment_rounded),
             label: const Text('Add Internal Note'),
-            style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 44)),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 44),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: AppColors.primary),
+        const SizedBox(width: 8),
+        Text(
+          title.toUpperCase(),
+          style: const TextStyle(
+            fontWeight: FontWeight.w900, 
+            fontSize: 11, 
+            letterSpacing: 1.2,
+            color: Colors.grey,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPriorityControl(Conversation conversation) {
+    final priorities = ['low', 'normal', 'high', 'urgent'];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Ticket Priority', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: priorities.map((p) {
+            final isSelected = conversation.supportPriority == p;
+            Color color = AppColors.grey;
+            if (p == 'high') color = AppColors.warning;
+            if (p == 'urgent') color = AppColors.error;
+            if (p == 'low') color = AppColors.success;
+
+            return FilterChip(
+              label: Text(p.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+              selected: isSelected,
+              onSelected: (_) => _updatePriority(p),
+              selectedColor: color.withOpacity(0.2),
+              checkmarkColor: color,
+              labelStyle: TextStyle(color: isSelected ? color : Colors.grey),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(color: isSelected ? color : Colors.grey.withOpacity(0.3)),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatusControl(Conversation conversation) {
+    final statuses = ['waiting_admin', 'waiting_user', 'resolved', 'closed'];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Lifecycle Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Theme.of(context).dividerColor),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: conversation.supportStatus ?? 'waiting_admin',
+              isExpanded: true,
+              items: statuses.map((s) => DropdownMenuItem(
+                value: s,
+                child: Text(s.replaceAll('_', ' ').toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              )).toList(),
+              onChanged: (val) => _updateStatus(val!),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUserCard(AppUser? user) {
+    if (user == null) return const Text('User context unavailable');
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).dividerColor),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 30,
+                backgroundImage: user.photoUrl != null ? NetworkImage(user.photoUrl!) : null,
+                child: user.photoUrl == null ? const Icon(Icons.person, size: 30) : null,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(user.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    Text(user.email, style: TextStyle(color: Colors.grey, fontSize: 11)),
+                    if (user.university != null)
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
+                        child: Text(
+                          CampusConstants.getDisplayName(user.university), 
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primary),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: () => context.push('/admin/users/${user.uid}', extra: user),
+                icon: const Icon(Icons.open_in_new_rounded, size: 18, color: AppColors.primary),
+                tooltip: 'View Full Profile',
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildCompactStat('Listings', user.activeListingsCount.toString()),
+              _buildCompactStat('Trust', '${user.trustScore.toStringAsFixed(0)}%'),
+              _buildCompactStat('Status', user.isBanned ? 'Banned' : 'Active', color: user.isBanned ? AppColors.error : AppColors.success),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildUserCard(AppUser? user) {
-    if (user == null) return const Text('User data unavailable');
+  Widget _buildCompactStat(String label, String value, {Color? color}) {
     return Column(
       children: [
-        CircleAvatar(
-          radius: 40,
-          backgroundImage: user.photoUrl != null ? NetworkImage(user.photoUrl!) : null,
-          child: user.photoUrl == null ? const Icon(Icons.person, size: 40) : null,
-        ),
-        const SizedBox(height: 12),
-        Text(user.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), textAlign: TextAlign.center),
-        Text(user.email, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
-        if (user.university != null)
-           Padding(
-             padding: const EdgeInsets.only(top: 4),
-             child: Text(CampusConstants.getDisplayName(user.university), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-           ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            children: [
-              _buildContextRow(Icons.calendar_today_outlined, 'Joined', DateFormat('MMM yyyy').format(user.createdAt ?? DateTime.now())),
-              const Divider(height: 16),
-              _buildContextRow(Icons.shopping_bag_outlined, 'Listings', user.activeListingsCount.toString()),
-              const Divider(height: 16),
-              _buildContextRow(Icons.verified_outlined, 'Trust Score', '${user.trustScore.toStringAsFixed(0)}%'),
-              const Divider(height: 16),
-              _buildContextRow(Icons.report_problem_outlined, 'Status', user.isBanned ? 'Banned' : (user.isCurrentlySuspended ? 'Suspended' : 'Active'), color: user.isRestricted ? AppColors.error : AppColors.success),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextButton(
-          onPressed: () => context.push('/admin/users/${user.uid}', extra: user),
-          child: const Text('Full User Profile'),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildContextRow(IconData icon, String label, String value, {Color? color}) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: Colors.grey),
-        const SizedBox(width: 8),
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-        const Spacer(),
-        Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
-      ],
-    );
-  }
-
-  Widget _buildQuickStat(String label, String value) {
-    return Column(
-      children: [
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+        Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color)),
         Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
       ],
     );
   }
+
 
   Widget _buildAssignmentControl(Conversation conversation) {
     final admin = ref.read(appUserProvider).valueOrNull;
@@ -706,50 +824,35 @@ class _SupportConversationAdminScreenState extends ConsumerState<SupportConversa
     );
   }
 
-  Widget _buildControlGroup(String label, String current, List<String> options, Function(String?) onChanged) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-        const SizedBox(height: 8),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            border: Border.all(color: Theme.of(context).dividerColor),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: DropdownButton<String>(
-            value: current,
-            isExpanded: true,
-            underline: const SizedBox(),
-            items: options.map((o) => DropdownMenuItem(value: o, child: Text(o.replaceAll('_', ' ').toUpperCase(), style: const TextStyle(fontSize: 13)))).toList(),
-            onChanged: onChanged,
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _buildInternalNote(Map<String, dynamic> note) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.amber.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+        color: Colors.amber.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.amber.withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(note['note'] ?? '', style: const TextStyle(fontSize: 13)),
-          const SizedBox(height: 4),
-          if (note['timestamp'] != null)
-            Text(
-              DateFormat('MMM dd, HH:mm').format((note['timestamp'] as Timestamp).toDate()),
-              style: const TextStyle(fontSize: 10, color: Colors.grey),
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('ADMIN NOTE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.orange, letterSpacing: 1.0)),
+              if (note['timestamp'] != null)
+                Text(
+                  DateFormat('MMM dd, HH:mm').format((note['timestamp'] as Timestamp).toDate()),
+                  style: const TextStyle(fontSize: 10, color: Colors.grey),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            note['note'] ?? '', 
+            style: const TextStyle(fontSize: 13, height: 1.4, color: Colors.black87),
+          ),
         ],
       ),
     );
