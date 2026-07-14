@@ -808,86 +808,106 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final String? botName = message.metadata?['botName'];
     
     return RepaintBoundary(
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Row(
-          mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (!isMe) ...[
-              Consumer(
-                builder: (context, ref, _) {
-                  final sender = ref.watch(publicUserProvider(message.senderId)).valueOrNull;
-                  return Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surface,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.3)),
-                      image: (!isAi && sender?.photoUrl != null) 
-                          ? DecorationImage(image: NetworkImage(sender!.photoUrl!), fit: BoxFit.cover)
-                          : null,
-                    ),
-                    child: (!isAi && sender?.photoUrl == null)
-                      ? Icon(isAi ? Icons.smart_toy_rounded : Icons.person_rounded, 
-                             size: 20, color: isAi ? const Color(0xFF6C63FF) : Colors.grey)
-                      : (isAi ? const Icon(Icons.smart_toy_rounded, size: 20, color: Color(0xFF6C63FF)) : null),
-                  );
-                }
-              ),
-              const SizedBox(width: 8),
-            ],
-            Flexible(
-              child: Container(
-                constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isMe ? const Color(0xFF6C63FF) : theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(20),
-                  border: isMe ? null : Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.2)),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                  children: [
-                    if (!isMe && isAi)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Text(
-                          botName ?? 'UniBot',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF6C63FF),
-                          ),
-                        ),
+      child: Align(
+        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (!isMe) ...[
+                Consumer(
+                  builder: (context, ref, _) {
+                    final sender = ref.watch(publicUserProvider(message.senderId)).valueOrNull;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 2),
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.3)),
+                        image: (!isAi && sender?.photoUrl != null) 
+                            ? DecorationImage(image: NetworkImage(sender!.photoUrl!), fit: BoxFit.cover)
+                            : null,
                       ),
-                    _buildMessageContent(context, message, isMe),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          DateFormat('HH:mm').format(message.timestamp), 
-                          style: TextStyle(
-                            fontSize: 10, 
-                            color: isMe ? Colors.white70 : Colors.grey,
+                      child: (!isAi && sender?.photoUrl == null)
+                        ? Icon(isAi ? Icons.smart_toy_rounded : Icons.person_rounded, 
+                               size: 16, color: isAi ? const Color(0xFF6C63FF) : Colors.grey)
+                        : (isAi ? const Icon(Icons.smart_toy_rounded, size: 16, color: Color(0xFF6C63FF)) : null),
+                    );
+                  }
+                ),
+                const SizedBox(width: 8),
+              ],
+              Flexible(
+                child: Container(
+                  constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isMe ? const Color(0xFF6C63FF) : theme.colorScheme.surface,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(20),
+                      topRight: const Radius.circular(20),
+                      bottomLeft: Radius.circular(isMe ? 20 : 4),
+                      bottomRight: Radius.circular(isMe ? 4 : 20),
+                    ),
+                    border: isMe ? null : Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.3)),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 4, offset: const Offset(0, 2))
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                    children: [
+                      if (!isMe && isAi)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.auto_awesome, size: 12, color: Color(0xFF6C63FF)),
+                              const SizedBox(width: 6),
+                              Text(
+                                botName ?? 'Campus Buddy',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF6C63FF),
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        if (isMe) ...[
-                          const SizedBox(width: 4),
-                          _buildStatusIcon(message.status),
+                      _buildMessageContent(context, message, isMe),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            DateFormat('HH:mm').format(message.timestamp), 
+                            style: TextStyle(
+                              fontSize: 10, 
+                              fontWeight: FontWeight.w500,
+                              color: isMe ? Colors.white.withOpacity(0.7) : Colors.grey.withOpacity(0.8),
+                            ),
+                          ),
+                          if (isMe) ...[
+                            const SizedBox(width: 4),
+                            _buildStatusIcon(message.status),
+                          ],
                         ],
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+              if (isMe) const SizedBox(width: 4),
+            ],
+          ),
         ),
       ),
     );
