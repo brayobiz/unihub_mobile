@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/campus_filter/shared/providers.dart';
 import 'package:unihub_mobile/services/notification_service.dart';
+import 'package:unihub_mobile/core/utils/app_logger.dart';
 import '../data/repositories/attendance_repository_impl.dart';
 import '../data/repositories/event_repository_impl.dart';
 import '../data/repositories/organizer_repository_impl.dart';
@@ -252,6 +253,14 @@ final homepageEventsProvider = Provider.autoDispose<AsyncValue<HomepageEventsDat
 
   if (goingAsync.isLoading || liveAsync.isLoading || todayAsync.isLoading || featuredAsync.isLoading) {
     return const AsyncValue.loading();
+  }
+
+  // Gracefully handle errors from individual streams to prevent total dashboard crash
+  if (goingAsync.hasError || liveAsync.hasError || todayAsync.hasError || featuredAsync.hasError) {
+    final error = goingAsync.error ?? liveAsync.error ?? todayAsync.error ?? featuredAsync.error;
+    AppLogger.warning('Dashboard Events: One or more streams failed: $error', 'EVENTS_PROVIDER');
+    // Return empty data instead of throwing so the rest of the dashboard can still render
+    return AsyncValue.data(HomepageEventsData(goingSoon: [], liveNow: [], today: [], featured: []));
   }
 
   final now = DateTime.now();

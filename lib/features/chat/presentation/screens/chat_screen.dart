@@ -232,24 +232,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       otherUserId = conversation.participants.firstWhere((id) => id != currentUser.uid, orElse: () => '');
     }
     
-    final bool isResolved = conversation?.supportStatus == 'resolved' || conversation?.supportStatus == 'closed';
+    final bool isResolved = (conversation?.supportStatus == 'resolved' || conversation?.supportStatus == 'closed') && 
+                           (conversation?.lastMessageSenderId == 'unihub_admin');
     final effectiveContext = widget.chatContext ?? conversation?.context;
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         backgroundColor: theme.colorScheme.surface,
-        elevation: 0.5,
+        elevation: 0,
         centerTitle: false,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.colorScheme.onSurface, size: 20),
+          icon: Icon(Icons.chevron_left_rounded, color: theme.colorScheme.onSurface, size: 30),
           onPressed: () => context.pop(),
         ),
         title: Consumer(
           builder: (context, ref, child) {
             final isSupport = widget.otherUserName == 'UniHub Support' || otherUserId == 'unihub_admin';
             
-            // If support, and we have an assigned admin, track THAT admin's status
             final effectiveStatusId = (isSupport && conversation?.assignedAdminId != null) 
                 ? conversation!.assignedAdminId! 
                 : otherUserId;
@@ -259,38 +259,45 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 : null;
 
             final isOnline = otherUser?.isOnline == true;
-            final lastSeen = otherUser?.lastSeen;
-            final bool isOtherTyping = conversation?.typing[otherUserId] != null;
 
-            // Support-specific status text
+            // Check if ANY other participant is typing
+            String? typingUserId;
+            if (conversation != null) {
+              for (final uid in conversation.participants) {
+                if (uid != currentUser?.uid && (conversation.typing[uid] != null)) {
+                  typingUserId = uid;
+                  break;
+                }
+              }
+            }
+            final bool isOtherTyping = typingUserId != null;
+
             String statusText;
             if (isOtherTyping) {
-              statusText = 'typing...';
+              statusText = (typingUserId == 'unihub_admin') ? 'Campus Buddy is typing...' : 'typing...';
             } else if (isSupport && conversation?.assignedAdminId == null) {
-              // Check if within business hours (8 AM - 8 PM)
-              final now = DateTime.now();
-              final isWorkingHours = now.hour >= 8 && now.hour < 20;
-              statusText = isWorkingHours ? 'Typical reply: 5m' : 'Away • Back at 8 AM';
+              statusText = '🤖 Always active • Instant Support';
             } else {
-              statusText = isOnline ? 'Online' : (lastSeen != null ? 'Last seen ${_formatLastSeen(lastSeen)}' : 'Offline');
+              statusText = isOnline ? 'Online' : 'Typically replies in 5m';
             }
 
             return Row(
               children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-                  backgroundImage: (isSupport && otherUser == null) 
-                      ? null // Use icon for support
-                      : (otherUser?.photoUrl != null ? NetworkImage(otherUser!.photoUrl!) : null),
-                  child: (isSupport && (otherUser == null || otherUser.photoUrl == null))
-                    ? Icon(Icons.headset_mic_rounded, size: 18, color: theme.colorScheme.primary)
-                    : (otherUser?.photoUrl == null
-                        ? Text(
-                            widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : '?',
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
-                          )
-                        : null),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF8E8FFA), Color(0xFF6C63FF)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(color: const Color(0xFF6C63FF).withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))
+                    ],
+                  ),
+                  child: const Icon(Icons.headset_mic_rounded, size: 22, color: Colors.white),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -302,22 +309,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           Flexible(
                             child: Text(
                               widget.otherUserName,
-                              style: theme.textTheme.titleSmall?.copyWith(fontSize: 15, color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+                              style: theme.textTheme.titleSmall?.copyWith(fontSize: 16, color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          if (otherUser?.isVerified == true || isSupport) ...[
-                            const SizedBox(width: 4),
-                            Icon(Icons.verified, color: theme.colorScheme.primary, size: 14),
-                          ],
+                          const SizedBox(width: 4),
+                          const Icon(Icons.verified, color: Color(0xFF6C63FF), size: 16),
                         ],
                       ),
                       Text(
                         statusText,
                         style: TextStyle(
                           fontSize: 11, 
-                          color: isOtherTyping || isOnline ? AppColors.success : theme.colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600
+                          color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                          fontWeight: FontWeight.w500
                         ),
                       ),
                     ],
@@ -336,6 +341,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
       body: Column(
         children: [
+          // Safety Banner (New)
+          if (widget.otherUserName == 'UniHub Support' || otherUserId == 'unihub_admin')
+            _buildSafetyBanner(context),
+            
           if (effectiveContext != null && effectiveContext.type != 'support') 
             _buildContextBanner(context, effectiveContext),
           
@@ -447,105 +456,72 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
+  Widget _buildSafetyBanner(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF6C63FF).withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.shield_outlined, color: Color(0xFF6C63FF), size: 20),
+          ),
+          const SizedBox(width: 16),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your conversations are secure and private',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  "We're here to help you 24/7",
+                  style: TextStyle(fontSize: 11, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
+        ],
+      ),
+    );
+  }
+
   Widget _buildContextDivider(BuildContext context, ChatContext chatContext) {
     final theme = Theme.of(context);
-    final isSupport = chatContext.type == 'support';
     
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 20, horizontal: 4),
-      child: Column(
+      margin: const EdgeInsets.symmetric(vertical: 24),
+      child: Row(
         children: [
-          Row(
-            children: [
-              const Expanded(child: Divider(height: 1, thickness: 0.5)),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  chatContext.type.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: theme.colorScheme.onSurfaceVariant.withOpacity(0.4),
-                    letterSpacing: 2.0,
-                  ),
-                ),
-              ),
-              const Expanded(child: Divider(height: 1, thickness: 0.5)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (!isSupport)
-            InkWell(
-              onTap: () => _navigateToContext(chatContext),
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.3)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    )
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    if (chatContext.thumbnail != null)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: OptimizedImage(imageUrl: chatContext.thumbnail!, width: 52, height: 52, fit: BoxFit.cover),
-                      )
-                    else
-                      Container(
-                        width: 52, height: 52,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(_getContextIcon(chatContext.type), color: theme.colorScheme.primary, size: 24),
-                      ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            chatContext.title,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: theme.colorScheme.onSurface,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Text(
-                                'Tap to view details',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: theme.colorScheme.primary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Icon(Icons.arrow_forward_ios_rounded, size: 10, color: theme.colorScheme.primary),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+          const Expanded(child: Divider(height: 1, thickness: 0.5)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'SUPPORT',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: theme.colorScheme.primary.withOpacity(0.5),
+                letterSpacing: 2.0,
               ),
             ),
-          const SizedBox(height: 4),
+          ),
+          const Expanded(child: Divider(height: 1, thickness: 0.5)),
         ],
       ),
     );
@@ -691,33 +667,44 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -2))
-        ]
       ),
       child: SafeArea(
         child: Row(
           children: [
-            IconButton(
-              icon: Icon(Icons.add_circle_outline_rounded, color: theme.colorScheme.primary, size: 28),
-              onPressed: () => _showAttachmentMenu(),
+            Container(
+              decoration: const BoxDecoration(color: Color(0xFF6C63FF), shape: BoxShape.circle),
+              child: IconButton(
+                icon: const Icon(Icons.add_rounded, color: Colors.white, size: 24),
+                onPressed: () => _showAttachmentMenu(),
+              ),
             ),
+            const SizedBox(width: 12),
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(24),
                   border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
                 ),
-                child: TextField(
-                  controller: _messageController,
-                  style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurface),
-                  decoration: InputDecoration(
-                    hintText: 'Type a message...',
-                    hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5), fontSize: 14),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _messageController,
+                        style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurface),
+                        decoration: InputDecoration(
+                          hintText: 'Type a message...',
+                          hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5), fontSize: 14),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.sentiment_satisfied_alt_rounded, color: Colors.grey.shade400),
+                      onPressed: () {},
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -726,8 +713,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               onTap: () => _sendMessage(),
               child: Container(
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF6C63FF),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
@@ -817,55 +804,90 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Widget _buildMessageBubble(BuildContext context, Message message, bool isMe, bool showTail) {
     final theme = Theme.of(context);
+    final isAi = message.metadata?['isAi'] == true;
+    final String? botName = message.metadata?['botName'];
+    
     return RepaintBoundary(
-      child: Align(
-        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-        child: Container(
-          margin: EdgeInsets.only(bottom: showTail ? 12 : 4),
-          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: isMe ? theme.colorScheme.primary : theme.colorScheme.surfaceVariant.withOpacity(0.3),
-            borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(16),
-              topRight: const Radius.circular(16),
-              bottomLeft: Radius.circular(isMe ? 16 : (showTail ? 4 : 16)),
-              bottomRight: Radius.circular(isMe ? (showTail ? 4 : 16) : 16),
-            ),
-            border: isMe ? null : Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
-            boxShadow: [
-              if (!isMe)
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                )
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-            children: [
-              _buildMessageContent(context, message, isMe),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    DateFormat('HH:mm').format(message.timestamp), 
-                    style: TextStyle(
-                      fontSize: 9, 
-                      fontWeight: FontWeight.w500,
-                      color: isMe ? Colors.white.withOpacity(0.7) : theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (!isMe) ...[
+              Consumer(
+                builder: (context, ref, _) {
+                  final sender = ref.watch(publicUserProvider(message.senderId)).valueOrNull;
+                  return Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.3)),
+                      image: (!isAi && sender?.photoUrl != null) 
+                          ? DecorationImage(image: NetworkImage(sender!.photoUrl!), fit: BoxFit.cover)
+                          : null,
                     ),
-                  ),
-                  if (isMe) ...[
-                    const SizedBox(width: 4),
-                    _buildStatusIcon(message.status),
-                  ],
-                ],
+                    child: (!isAi && sender?.photoUrl == null)
+                      ? Icon(isAi ? Icons.smart_toy_rounded : Icons.person_rounded, 
+                             size: 20, color: isAi ? const Color(0xFF6C63FF) : Colors.grey)
+                      : (isAi ? const Icon(Icons.smart_toy_rounded, size: 20, color: Color(0xFF6C63FF)) : null),
+                  );
+                }
               ),
+              const SizedBox(width: 8),
             ],
-          ),
+            Flexible(
+              child: Container(
+                constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isMe ? const Color(0xFF6C63FF) : theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: isMe ? null : Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.2)),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  children: [
+                    if (!isMe && isAi)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          botName ?? 'UniBot',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF6C63FF),
+                          ),
+                        ),
+                      ),
+                    _buildMessageContent(context, message, isMe),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          DateFormat('HH:mm').format(message.timestamp), 
+                          style: TextStyle(
+                            fontSize: 10, 
+                            color: isMe ? Colors.white70 : Colors.grey,
+                          ),
+                        ),
+                        if (isMe) ...[
+                          const SizedBox(width: 4),
+                          _buildStatusIcon(message.status),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1004,17 +1026,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Widget _buildQuickReplies(BuildContext context, String? contextType) {
     final theme = Theme.of(context);
-    List<String> replies;
+    List<Map<String, dynamic>> replies;
+    
     if (contextType == 'marketplace') {
-      replies = ["Is this available?", "Last price?", "Can we meet today?"];
-    } else if (contextType == 'housing') {
-      replies = ["Is this still vacant?", "When can I view?", "Are utilities included?"];
+      replies = [
+        {'text': "Is this available?", 'icon': Icons.shopping_bag_outlined},
+        {'text': "Last price?", 'icon': Icons.sell_outlined},
+      ];
     } else {
-      replies = ["Hello!", "I have a question", "Thank you"];
+      replies = [
+        {'text': "Hello!", 'icon': Icons.waving_hand_rounded},
+        {'text': "I have a question", 'icon': Icons.help_outline_rounded},
+        {'text': "Thank you", 'icon': Icons.thumb_up_rounded},
+      ];
     }
 
     return Container(
-      height: 40,
+      height: 50,
       color: theme.colorScheme.surface,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
@@ -1023,11 +1051,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         itemBuilder: (context, index) => Padding(
           padding: const EdgeInsets.only(right: 8),
           child: ActionChip(
-            label: Text(replies[index], style: const TextStyle(fontSize: 12)),
-            onPressed: () => _sendMessage(replies[index]),
+            avatar: Icon(replies[index]['icon'], size: 16, color: const Color(0xFF6C63FF)),
+            label: Text(replies[index]['text'], style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            onPressed: () => _sendMessage(replies[index]['text']),
             backgroundColor: theme.colorScheme.surface,
-            labelStyle: TextStyle(color: theme.colorScheme.onSurface),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: theme.colorScheme.outlineVariant.withOpacity(0.5))),
+            labelStyle: const TextStyle(color: Color(0xFF6C63FF)),
+            side: BorderSide(color: const Color(0xFF6C63FF).withOpacity(0.2)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           ),
         ),
       ),

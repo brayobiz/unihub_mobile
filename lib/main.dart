@@ -10,6 +10,7 @@ import 'app/theme/app_theme.dart';
 import 'app/theme/theme_provider.dart';
 import 'features/auth/shared/providers.dart';
 import 'features/ads/providers/ad_provider.dart';
+import 'core/services/ai_assistant_service.dart';
 import 'firebase_options.dart';
 
 import 'services/notification_service.dart';
@@ -63,6 +64,12 @@ Future<void> main() async {
     unawaited(container.read(notificationServiceProvider).init().catchError((e) {
       AppLogger.error('Main: Notification Service init failed', e);
     }));
+
+    // Configure UniBot AI (Dify AI)
+    // Replace 'YOUR_DIFY_API_KEY' with your actual key from Dify Dashboard
+    container.read(aiAssistantServiceProvider).config(
+      apiKey: 'app-xXRlCxQxyZzkgRlj8x6Oi9cN',
+    );
     
     container.read(appLifecycleServiceProvider).init();
 

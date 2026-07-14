@@ -101,6 +101,7 @@ class AuthRepositoryImpl implements AuthRepository {
           fullName: user.displayName ?? 'UniHub User',
           photoUrl: user.photoURL,
           createdAt: DateTime.now(),
+          roles: ['student'], // Set explicitly for clarity
         );
 
         // Security Hardening: Strip restricted fields for initial creation
@@ -177,6 +178,7 @@ class AuthRepositoryImpl implements AuthRepository {
           email: normalizedEmail,
           fullName: fullName,
           createdAt: DateTime.now(),
+          roles: ['student'], // Set explicitly for clarity
         );
 
         // Security Hardening: Strip restricted fields before initial creation

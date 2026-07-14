@@ -8,15 +8,23 @@ import 'package:unihub_mobile/services/notification_service.dart';
 import 'package:unihub_mobile/core/services/notification_sender.dart';
 import 'package:unihub_mobile/features/shared/notification_repository.dart';
 import 'package:unihub_mobile/core/utils/app_logger.dart';
+import 'package:unihub_mobile/core/services/ai_assistant_service.dart';
+import 'package:unihub_mobile/features/auth/shared/providers.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 class ChatRepositoryImpl implements ChatRepository {
   final FirebaseFirestore _firestore;
   final NotificationSender _notificationSender;
+  final Ref _ref; // Need ref to call AI service
   
   // Cache for blocked users to avoid frequent Firestore reads during stream updates
   final Map<String, List<String>> _blockedCache = {};
 
-  ChatRepositoryImpl(this._firestore, this._notificationSender);
+  // Track active AI requests to prevent overlapping replies
+  final Set<String> _botThinkingConversations = {};
+
+  ChatRepositoryImpl(this._firestore, this._notificationSender, this._ref);
 
   @override
   Stream<List<Conversation>> watchConversations(String userId) {
@@ -154,8 +162,11 @@ class ChatRepositoryImpl implements ChatRepository {
         });
       }
 
-      // If the sender is the student (usually index 0), it's waiting for admin
-      if (participants.isNotEmpty && message.senderId == participants[0]) {
+      // Logic: If the sender is NOT an admin, it's a student request waiting for admin response.
+      // Firestore rules ONLY allow students to set status to 'waiting_admin'.
+      final bool isSenderAdmin = message.senderId == 'unihub_admin' || (message.metadata?['adminId'] != null);
+      
+      if (!isSenderAdmin) {
         updateData['supportStatus'] = 'waiting_admin';
       } else {
         updateData['supportStatus'] = 'waiting_user';
@@ -167,7 +178,7 @@ class ChatRepositoryImpl implements ChatRepository {
     // 4. Increment unread counts for other participants
     // We use a Set to avoid duplicates if participants list is messy
     final Map<String, dynamic> unreadUpdates = {};
-    final bool isSupportMsg = (data['isSupport'] ?? false);
+    final bool isSupportMsg = (data['isSupport'] ?? false) || conversationId.contains('unihub_admin');
     final String studentId = participants.isNotEmpty ? participants[0] : '';
     
     for (final participantId in participants.toSet()) {
@@ -204,6 +215,121 @@ class ChatRepositoryImpl implements ChatRepository {
 
     // 5. Send Notification (non-blocking)
     _sendNotificationForMessage(conversationId, sentMessage, data);
+
+    // 6. UniBot Logic (Client-Side AI)
+    // Trigger if:
+    // A) It is a support message
+    // B) The sender is a student (not an admin)
+    // C) Either no admin is assigned OR the ticket was just re-opened (waiting_admin)
+    final bool isStudentMsg = message.senderId != 'unihub_admin' && message.metadata?['adminId'] == null;
+    final bool isReopened = data['supportStatus'] == 'resolved' || data['supportStatus'] == 'closed';
+    final bool isCurrentlyWaitingAdmin = data['supportStatus'] == 'waiting_admin';
+    final bool shouldBotRespond = isSupportMsg && (data['assignedAdminId'] == null || isReopened || isCurrentlyWaitingAdmin) && isStudentMsg;
+    
+    debugPrint('🚀 UniBot: Support=$isSupportMsg, Unassigned=${data['assignedAdminId'] == null}, Reopened=$isReopened, WaitingAdmin=$isCurrentlyWaitingAdmin, StudentMsg=$isStudentMsg');
+    debugPrint('🚀 UniBot: shouldBotRespond=$shouldBotRespond');
+    
+    if (shouldBotRespond) {
+      // Use the actual Firebase UID from auth state to ensure a valid ID is sent to Botpress
+      final currentUid = _ref.read(firebaseAuthProvider).currentUser?.uid ?? message.senderId;
+      _triggerUniBotReply(conversationId, message.content, currentUid);
+    }
+  }
+
+  Future<void> _triggerUniBotReply(String conversationId, String userMessage, String userId) async {
+    // 1. Concurrency Check: Don't trigger if the bot is already "thinking" for this chat
+    if (_botThinkingConversations.contains(conversationId)) return;
+
+    debugPrint('🚀 UniBot: Triggering reply for $conversationId');
+
+    try {
+      _botThinkingConversations.add(conversationId);
+
+      // 2. Show "Bot is typing" in Firestore
+      await updateTypingStatus(conversationId, 'unihub_admin', true);
+
+      // 3. Get AI Response
+      final aiReply = await _ref.read(aiAssistantServiceProvider).getAiResponse(
+        message: userMessage,
+        conversationId: conversationId,
+        userId: userId,
+      );
+
+      if (aiReply == null || aiReply.isEmpty) {
+        AppLogger.warning('UniBot: No reply received from service.', 'AI_SERVICE');
+      }
+
+      // 4. Clear typing status immediately after response (or failure)
+      await updateTypingStatus(conversationId, 'unihub_admin', false);
+
+      if (aiReply != null && aiReply.isNotEmpty) {
+        final bool needsEscalation = aiReply.contains('[ESCALATE]');
+        
+        // Clean up the reply: Remove [ESCALATE] tag and any common Markdown symbols
+        final cleanReply = aiReply
+            .replaceAll('[ESCALATE]', '')
+            .replaceAll('**', '') // Remove bold
+            .replaceAll('__', '') // Remove italic
+            .replaceAll('#', '')  // Remove headers
+            .trim();
+
+        AppLogger.info('UniBot: Injecting reply into Firestore', 'AI_SERVICE');
+
+        final botMessage = Message(
+          id: const Uuid().v4(),
+          senderId: 'unihub_admin',
+          content: cleanReply,
+          type: MessageType.text,
+          status: MessageStatus.sent,
+          timestamp: DateTime.now(),
+          metadata: {
+            'isAi': true, 
+            'escalated': needsEscalation,
+            'botName': 'UniBot',
+          },
+        );
+
+        final batch = _firestore.batch();
+        
+        final messageRef = _firestore
+            .collection('conversations')
+            .doc(conversationId)
+            .collection('messages')
+            .doc(botMessage.id);
+            
+        batch.set(messageRef, botMessage.toJson());
+
+        // Update conversation metadata
+        final convRef = _firestore.collection('conversations').doc(conversationId);
+        batch.update(convRef, {
+          'lastMessage': cleanReply,
+          'lastMessageSenderId': 'unihub_admin',
+          'lastMessageTime': FieldValue.serverTimestamp(),
+          'supportStatus': needsEscalation ? 'waiting_admin' : 'waiting_user',
+          'supportPriority': needsEscalation ? 'high' : 'normal',
+        });
+
+        await batch.commit();
+        AppLogger.info('UniBot: Reply saved successfully', 'AI_SERVICE');
+
+        if (needsEscalation) {
+           // Notify admins that a human is needed
+           _notificationSender.triggerPushNotification(
+             recipientId: '',
+             isBroadcast: true,
+             title: '🚨 Human Required',
+             body: 'UniBot has escalated a support request.',
+             data: {'route': '/admin/support/$conversationId', 'topic': 'admins'},
+           );
+        }
+      }
+    } catch (e) {
+      AppLogger.error('UniBot: Error injecting reply', e);
+      // Ensure typing status is cleared on error
+      await updateTypingStatus(conversationId, 'unihub_admin', false);
+    } finally {
+      _botThinkingConversations.remove(conversationId);
+    }
   }
 
   Future<void> _sendNotificationForMessage(String conversationId, Message message, Map<String, dynamic> data) async {
@@ -217,7 +343,9 @@ class ChatRepositoryImpl implements ChatRepository {
       
       if (isSupport) {
         // Support Logic
-        if (message.senderId == 'unihub_admin' || (participants.contains(message.senderId) && message.senderId != participants[0])) {
+        final bool isSenderAdmin = message.senderId == 'unihub_admin' || (message.metadata?['adminId'] != null);
+        
+        if (isSenderAdmin) {
           // Message from admin, notify student (always at index 0 for support)
           if (participants.isNotEmpty) recipients.add(participants[0]);
         } else {
@@ -225,8 +353,7 @@ class ChatRepositoryImpl implements ChatRepository {
           if (assignedAdminId != null) {
             recipients.add(assignedAdminId);
           } else {
-            // NEW: Unassigned ticket: Notify the generic support identity or use a broadcast
-            // Since 'unihub_admin' might not have a token, we broadcast to 'admins' topic
+            // NEW: Unassigned ticket: Use broadcast to admins topic
             await _notificationSender.triggerPushNotification(
               recipientId: '',
               isBroadcast: true,
@@ -236,9 +363,10 @@ class ChatRepositoryImpl implements ChatRepository {
                 'type': NotificationType.support.name,
                 'targetId': conversationId,
                 'route': '/admin/support/$conversationId',
-                'topic': 'admins', // Hint for backend to only send to admin tokens
+                'topic': 'admins',
               },
             );
+            return; // Exit as we've handled unassigned via broadcast
           }
         }
       } else {
@@ -246,18 +374,22 @@ class ChatRepositoryImpl implements ChatRepository {
         final recipientId = participants.firstWhere((id) => id != message.senderId, orElse: () => '');
         if (recipientId.isNotEmpty) recipients.add(recipientId);
         
-        // Use sender's name if we have it in metadata (optional enhancement)
         actorName = message.metadata?['senderName'] as String?;
       }
       
       for (final recipientId in recipients) {
+        // IMPORTANT: We do not send standard in-app notifications if the recipient is an admin 
+        // to avoid permission issues and workflow pollution. Admins use the Support Center.
+        final bool isRecipientAdmin = (recipientId == 'unihub_admin');
+        if (isRecipientAdmin) continue;
+
         final contextData = data['context'] as Map<String, dynamic>?;
         final module = contextData?['type'] as String?;
         
         await _notificationSender.sendNotification(
           recipientId: recipientId,
           actorId: message.senderId,
-          actorName: isSupport ? 'UniHub Support' : actorName, // Mask personal admin names in general notifications
+          actorName: isSupport ? 'UniHub Support' : actorName,
           title: isSupport ? 'Support Request Update' : 'New Message',
           body: message.type == MessageType.text ? message.content : 'Sent an attachment',
           type: isSupport ? NotificationType.support : NotificationType.chat,
@@ -312,45 +444,46 @@ class ChatRepositoryImpl implements ChatRepository {
     
     final convRef = _firestore.collection('conversations').doc(conversationId);
     
-    // 1. Reset unread count
     try {
+      // 1. Reset unread count
       await convRef.update({
         'unreadCounts.$userId': 0,
+      }).catchError((e) {
+        AppLogger.warning('Failed to reset unread count: $e', 'CHAT_REPO');
       });
-    } catch (e) {
-      AppLogger.warning('Failed to reset unread count for $userId in $conversationId: $e', 'CHAT_REPO');
-    }
 
-    // 2. Clear associated notifications
-    await _notificationSender.markAsReadByTarget(userId, conversationId);
+      // 2. Clear associated notifications
+      await _notificationSender.markAsReadByTarget(userId, conversationId);
 
-    // 3. Mark messages from others as read
-    // Use a single property filter to avoid composite index requirement
-    final unreadMessages = await convRef
-        .collection('messages')
-        .where('status', isNotEqualTo: MessageStatus.read.name)
-        .limit(50) 
-        .get();
+      // 3. Mark messages from others as read
+      final snapshot = await convRef
+          .collection('messages')
+          .where('status', isNotEqualTo: MessageStatus.read.name)
+          .get();
 
-    if (unreadMessages.docs.isNotEmpty) {
-      final batch = _firestore.batch();
-      bool updatedAny = false;
-      for (var doc in unreadMessages.docs) {
-        if (doc.data()['senderId'] != userId) {
-          batch.update(doc.reference, {'status': MessageStatus.read.name});
-          updatedAny = true;
+      if (snapshot.docs.isNotEmpty) {
+        final batch = _firestore.batch();
+        bool needsCommit = false;
+        
+        for (var doc in snapshot.docs) {
+          if (doc.data()['senderId'] != userId) {
+            batch.update(doc.reference, {'status': MessageStatus.read.name});
+            needsCommit = true;
+          }
+        }
+        
+        if (needsCommit) {
+          // Check lastMessageStatus on the conversation
+          final convDoc = await convRef.get(const GetOptions(source: Source.cache));
+          if (convDoc.exists && convDoc.data()?['lastMessageSenderId'] != userId) {
+            batch.update(convRef, {'lastMessageStatus': MessageStatus.read.name});
+          }
+          
+          await batch.commit();
         }
       }
-      
-      if (!updatedAny) return;
-
-      // Update lastMessageStatus if it was from someone else
-      final convDoc = await convRef.get(const GetOptions(source: Source.cache));
-      if (convDoc.exists && convDoc.data()?['lastMessageSenderId'] != userId) {
-        batch.update(convRef, {'lastMessageStatus': MessageStatus.read.name});
-      }
-      
-      await batch.commit();
+    } catch (e) {
+      AppLogger.warning('markAsRead background error (likely rules): $e', 'CHAT_REPO');
     }
   }
 
@@ -358,33 +491,35 @@ class ChatRepositoryImpl implements ChatRepository {
   Future<void> markAsDelivered(String conversationId, String userId) async {
     final convRef = _firestore.collection('conversations').doc(conversationId);
     
-    // Use a single property filter to avoid composite index requirement
-    final undeliveredMessages = await convRef
-        .collection('messages')
-        .where('status', isEqualTo: MessageStatus.sent.name)
-        .limit(50)
-        .get();
+    try {
+      final snapshot = await convRef
+          .collection('messages')
+          .where('status', isEqualTo: MessageStatus.sent.name)
+          .get();
 
-    if (undeliveredMessages.docs.isNotEmpty) {
-      final batch = _firestore.batch();
-      bool updatedAny = false;
-      for (var doc in undeliveredMessages.docs) {
-        if (doc.data()['senderId'] != userId) {
-          batch.update(doc.reference, {'status': MessageStatus.delivered.name});
-          updatedAny = true;
+      if (snapshot.docs.isNotEmpty) {
+        final batch = _firestore.batch();
+        bool needsCommit = false;
+        
+        for (var doc in snapshot.docs) {
+          if (doc.data()['senderId'] != userId) {
+            batch.update(doc.reference, {'status': MessageStatus.delivered.name});
+            needsCommit = true;
+          }
+        }
+        
+        if (needsCommit) {
+          final convDoc = await convRef.get(const GetOptions(source: Source.cache));
+          if (convDoc.exists && 
+              convDoc.data()?['lastMessageSenderId'] != userId && 
+              convDoc.data()?['lastMessageStatus'] == MessageStatus.sent.name) {
+            batch.update(convRef, {'lastMessageStatus': MessageStatus.delivered.name});
+          }
+          await batch.commit();
         }
       }
-      
-      if (!updatedAny) return;
-      
-      final convDoc = await convRef.get(const GetOptions(source: Source.cache));
-      if (convDoc.exists && 
-          convDoc.data()?['lastMessageSenderId'] != userId && 
-          convDoc.data()?['lastMessageStatus'] == MessageStatus.sent.name) {
-        batch.update(convRef, {'lastMessageStatus': MessageStatus.delivered.name});
-      }
-      
-      await batch.commit();
+    } catch (e) {
+      AppLogger.warning('markAsDelivered background error: $e', 'CHAT_REPO');
     }
   }
 
@@ -400,6 +535,23 @@ class ChatRepositoryImpl implements ChatRepository {
     final doc = await convRef.get();
 
     if (doc.exists) {
+      final data = doc.data()!;
+      final status = data['supportStatus'] as String?;
+      
+      // If the session was resolved or closed, we RE-OPEN it for the new request
+      if (status == 'resolved' || status == 'closed') {
+        final now = DateTime.now();
+        await convRef.update({
+          'supportStatus': 'waiting_admin',
+          'lastMessage': 'Re-opened support request',
+          'lastMessageSenderId': userId,
+          'lastMessageTime': FieldValue.serverTimestamp(),
+          'expiresAt': Timestamp.fromDate(now.add(const Duration(hours: 48))),
+          // Note: isSupport and supportPriority are PROTECTED fields.
+          // Students cannot update them, so we leave them as is.
+        });
+      }
+
       return conversationId;
     }
 
@@ -467,8 +619,15 @@ class ChatRepositoryImpl implements ChatRepository {
 
   @override
   Future<void> updateTypingStatus(String conversationId, String userId, bool isTyping) async {
-    await _firestore.collection('conversations').doc(conversationId).update({
-      'typing.$userId': isTyping ? FieldValue.serverTimestamp() : FieldValue.delete(),
-    });
+    if (conversationId.isEmpty || userId.isEmpty) return;
+    
+    try {
+      await _firestore.collection('conversations').doc(conversationId).update({
+        'typing.$userId': isTyping ? FieldValue.serverTimestamp() : FieldValue.delete(),
+      });
+    } catch (e) {
+      // Don't let typing status errors crash the app
+      AppLogger.warning('Failed to update typing status: $e', 'CHAT_REPO');
+    }
   }
 }

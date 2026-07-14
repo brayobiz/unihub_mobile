@@ -127,35 +127,39 @@ class HelpCentreScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: theme.colorScheme.primary.withOpacity(0.1)),
                 ),
-                child: ListTile(
-                  onTap: () => context.push('/chat', extra: {
-                    'conversationId': ticket.id,
-                    'otherUserName': 'UniHub Support',
-                  }),
-                  leading: CircleAvatar(
-                    backgroundColor: theme.colorScheme.primary,
-                    child: const Icon(Icons.support_agent_rounded, color: Colors.white, size: 20),
+                child: Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    onTap: () => context.push('/chat', extra: {
+                      'conversationId': ticket.id,
+                      'otherUserName': 'UniHub Support',
+                    }),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    leading: CircleAvatar(
+                      backgroundColor: theme.colorScheme.primary,
+                      child: const Icon(Icons.support_agent_rounded, color: Colors.white, size: 20),
+                    ),
+                    title: Text(
+                      'Support Session',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                    ),
+                    subtitle: Text(
+                      ticket.lastMessage ?? 'Waiting for assistant...',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                    trailing: unreadCount > 0
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(color: theme.colorScheme.primary, borderRadius: BorderRadius.circular(10)),
+                            child: Text(
+                              unreadCount.toString(),
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          )
+                        : const Icon(Icons.chevron_right, size: 20),
                   ),
-                  title: Text(
-                    'Support Session',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
-                  ),
-                  subtitle: Text(
-                    ticket.lastMessage ?? 'Waiting for assistant...',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
-                  ),
-                  trailing: unreadCount > 0
-                      ? Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(color: theme.colorScheme.primary, borderRadius: BorderRadius.circular(10)),
-                          child: Text(
-                            unreadCount.toString(),
-                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                          ),
-                        )
-                      : const Icon(Icons.chevron_right, size: 20),
                 ),
               );
             }),

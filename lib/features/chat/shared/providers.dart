@@ -12,6 +12,7 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   return ChatRepositoryImpl(
     ref.watch(firestoreProvider),
     ref.watch(notificationServiceProvider),
+    ref,
   );
 });
 

@@ -79,8 +79,9 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAuthenticated(); // Needed for profile views
       allow create: if isOwner(userId) &&
-                      !request.resource.data.keys().hasAny(['isAdmin', 'roles', 'isBanned', 'isIdentityVerified', 'isStudentVerified', 'isEmailVerified', 'isPhoneVerified']) &&
+                      !request.resource.data.keys().hasAny(['isAdmin', 'isBanned', 'isIdentityVerified', 'isStudentVerified', 'isEmailVerified', 'isPhoneVerified']) &&
                       request.resource.data.get('accountType', 'student') == 'student' &&
+                      request.resource.data.get('roles', ['student']) == ['student'] &&
                       (request.resource.data.get('businessSubscriptionStatus', 'none') == 'none' || request.resource.data.get('businessSubscriptionStatus', null) == null) &&
                       request.resource.data.get('trustScore', 0.0) <= 5.0;
 
@@ -194,7 +195,7 @@ service cloud.firestore {
     // --- Events ---
     match /events/{eventId} {
       allow read: if true;
-      allow create: if isMemberOfOrganizer(request.resource.data.organizerId) || isAdmin();
+      allow create: if isAuthenticated() && (isMemberOfOrganizer(request.resource.data.organizerId) || isAdmin());
 
       allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewsCount', 'sharesCount', 'savesCount', 'currentAttendeeCount'])) ||
                     (isAdmin() || (
@@ -213,19 +214,17 @@ service cloud.firestore {
 
     match /event_attendance/{docId} {
       allow read: if isAuthenticated() && (
-        docId.matches('^' + request.auth.uid + '_.*') ||
         isAdmin() ||
-        (resource != null && (
-          resource.data.userId == request.auth.uid ||
-          (exists(/databases/$(database)/documents/events/$(resource.data.eventId)) &&
-           canManageOrganizer(get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.get("organizerId", "")))
-        ))
+        (resource != null && resource.data.userId == request.auth.uid) ||
+        (docId.matches('^' + request.auth.uid + '_.*')) ||
+        (resource != null && exists(/databases/$(database)/documents/events/$(resource.data.eventId)) &&
+         canManageOrganizer(get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.get("organizerId", "")))
       );
       allow create: if isAuthenticated() &&
                       request.resource.data.userId == request.auth.uid &&
-                      docId == request.auth.uid + "_" + request.resource.data.eventId &&
                       (request.resource.data.status != "going" || isIdentityVerified());
-      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.get("userId", "") == request.auth.uid);
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
     }
 
     match /event_categories/{catId} {
@@ -341,7 +340,6 @@ service cloud.firestore {
     match /conversations/{convId} {
       allow read: if isAuthenticated() && (
         isAdmin() ||
-        resource == null ||
         request.auth.uid in resource.data.get("participants", [])
       );
       allow create: if isAuthenticated() &&
@@ -349,27 +347,30 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (
         isAdmin() || (
           request.auth.uid in resource.data.get("participants", []) &&
-          // Non-admins (students) can only update non-administrative fields
+          // Students can't change participants or admin notes
           !request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['isSupport', 'supportStatus', 'supportPriority', 'assignedAdminId', 'supportAdminNotes', 'participants'])
+            .hasAny(['participants', 'supportAdminNotes'])
         )
       );
 
       match /messages/{msgId} {
         allow read: if isAuthenticated() && (
           isAdmin() ||
-          (exists(/databases/$(database)/documents/conversations/$(convId)) &&
-           request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.get("participants", []))
+          request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.get("participants", [])
         );
         allow create: if isAuthenticated() && (
           isAdmin() ||
-          (exists(/databases/$(database)/documents/conversations/$(convId)) &&
-           request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.get("participants", []))
+          request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.get("participants", [])
         );
-        allow update, delete: if isAuthenticated() && (
-          isAdmin() ||
-          (resource != null && resource.data.senderId == request.auth.uid)
+        allow update: if isAuthenticated() && (
+          isAdmin() || (
+            request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.get("participants", []) &&
+            // Allow participants to update status or their own messages
+            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) ||
+             resource.data.senderId == request.auth.uid)
+          )
         );
+        allow delete: if isAdmin() || (resource != null && resource.data.senderId == request.auth.uid);
       }
     }
 
@@ -446,7 +447,7 @@ service cloud.firestore {
     // --- Background Tasks ---
     match /notifications_queue/{queueId} {
       allow read: if isAdmin();
-      allow create: if isAuthenticated();
+      allow create: if true;
       allow update, delete: if isAdmin();
     }
 
