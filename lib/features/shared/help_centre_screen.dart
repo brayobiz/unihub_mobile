@@ -21,9 +21,9 @@ class HelpCentreScreen extends ConsumerWidget {
           Text('Frequently Asked Questions', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 20),
           _buildFaqItem(context, 'How do I buy an item?', 'You can contact the seller via the "Messenger" button or "Contact Student" button (WhatsApp) to arrange a meetup on campus.'),
-          _buildFaqItem(context, 'Is it safe?', 'UniHub is for students on the same campus. Always meet in public places like the library or cafeteria and never pay before seeing the item.'),
+          _buildFaqItem(context, 'Is it safe?', 'Ulify is for students on the same campus. Always meet in public places like the library or cafeteria and never pay before seeing the item.'),
           _buildFaqItem(context, 'How do I rent a house?', 'Browse the housing section and contact the "Housing Plug" (agent) via chat. We strongly advise against paying any "viewing fees" or deposits before seeing the property.'),
-          _buildFaqItem(context, 'What is a "Verified Plug"?', 'Verified Plugs are housing agents who have undergone identity and campus affiliation checks by the UniHub team to ensure listing reliability.'),
+          _buildFaqItem(context, 'What is a "Verified Plug"?', 'Verified Plugs are housing agents who have undergone identity and campus affiliation checks by the Ulify team to ensure listing reliability.'),
           _buildFaqItem(context, 'How do I apply for Gigs?', 'Find a task in the Gigs section, click "Apply", and message the poster. Be clear about your skills and availability.'),
           _buildFaqItem(context, 'How do I boost my listing?', 'Go to "My Listings" and click the "Boost" button. This uses community points to pin your item to the top of the category for 24 hours.'),
           _buildFaqItem(context, 'What is a Trust Score?', 'Your Trust Score (0-100%) is a reputation metric based on your ratings, university email verification, and successful transactions.'),
@@ -85,7 +85,7 @@ class HelpCentreScreen extends ConsumerWidget {
       if (context.mounted) {
         context.push('/chat', extra: {
           'conversationId': conversationId,
-          'otherUserName': 'UniHub Support',
+          'otherUserName': 'Ulify Support',
         });
       }
     } catch (e) {
@@ -132,7 +132,7 @@ class HelpCentreScreen extends ConsumerWidget {
                   child: ListTile(
                     onTap: () => context.push('/chat', extra: {
                       'conversationId': ticket.id,
-                      'otherUserName': 'UniHub Support',
+                      'otherUserName': 'Ulify Support',
                     }),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     leading: CircleAvatar(

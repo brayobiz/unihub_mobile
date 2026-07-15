@@ -128,7 +128,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        'UniHub',
+                        'Ulify',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
@@ -295,7 +295,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        "New to UniHub?", 
+                        "New to Ulify?",
                         style: GoogleFonts.plusJakartaSans(
                           color: theme.colorScheme.onSurfaceVariant,
                           fontSize: 14,

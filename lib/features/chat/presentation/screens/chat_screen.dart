@@ -248,7 +248,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
         title: Consumer(
           builder: (context, ref, child) {
-            final isSupport = widget.otherUserName == 'UniHub Support' || otherUserId == 'unihub_admin';
+            final isSupport = widget.otherUserName == 'Ulify Support' || otherUserId == 'unihub_admin';
             
             final effectiveStatusId = (isSupport && conversation?.assignedAdminId != null) 
                 ? conversation!.assignedAdminId! 
@@ -342,7 +342,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       body: Column(
         children: [
           // Safety Banner (New)
-          if (widget.otherUserName == 'UniHub Support' || otherUserId == 'unihub_admin')
+          if (widget.otherUserName == 'Ulify Support' || otherUserId == 'unihub_admin')
             _buildSafetyBanner(context),
             
           if (effectiveContext != null && effectiveContext.type != 'support') 

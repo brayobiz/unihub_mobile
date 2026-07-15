@@ -264,7 +264,7 @@ class RouterNotifier extends ChangeNotifier {
     // 9. Profile Completion Guard (Identity & Data)
     // Forced check: Even old users must have a real name and campus data.
     final name = appUser.fullName.trim().toLowerCase();
-    final isDefaultName = name == 'unihub user' || name == 'unihubuser' || name == 'a student';
+    final isDefaultName = name == 'ulify user' || name == 'ulifyuser' || name == 'a student';
     
     final isProfileIncomplete =
         appUser.university == null || 

@@ -257,6 +257,15 @@ class ChatRepositoryImpl implements ChatRepository {
 
       if (aiReply == null || aiReply.isEmpty) {
         AppLogger.warning('UniBot: No reply received from service.', 'AI_SERVICE');
+        
+        // Fallback: If AI fails, ensure admins are notified so a human can step in
+        _notificationSender.triggerPushNotification(
+          recipientId: '',
+          isBroadcast: true,
+          title: '🤖 UniBot Down (Credits?)',
+          body: 'A student is waiting and UniBot failed to respond. Please check the support queue.',
+          data: {'route': '/admin/support/$conversationId', 'topic': 'admins'},
+        );
       }
 
       // 4. Clear typing status immediately after response (or failure)
@@ -389,7 +398,7 @@ class ChatRepositoryImpl implements ChatRepository {
         await _notificationSender.sendNotification(
           recipientId: recipientId,
           actorId: message.senderId,
-          actorName: isSupport ? 'UniHub Support' : actorName,
+          actorName: isSupport ? 'Ulify Support' : actorName,
           title: isSupport ? 'Support Request Update' : 'New Message',
           body: message.type == MessageType.text ? message.content : 'Sent an attachment',
           type: isSupport ? NotificationType.support : NotificationType.chat,
@@ -562,7 +571,7 @@ class ChatRepositoryImpl implements ChatRepository {
       context: ChatContext(
         type: 'support',
         id: 'support_$userId',
-        title: 'UniHub Support',
+        title: 'Ulify Support',
       ),
       lastMessageTime: now,
       unreadCounts: {userId: 0, adminId: 0},

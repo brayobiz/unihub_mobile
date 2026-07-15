@@ -38,7 +38,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
       final user = ref.read(appUserProvider).valueOrNull;
       if (user != null) {
         final name = user.fullName.trim().toLowerCase();
-        final isDefault = name == 'unihub user' || name == 'unihubuser' || name == 'a student' || user.fullName.length < 3;
+        final isDefault = name == 'ulify user' || name == 'ulifyuser' || name == 'a student' || user.fullName.length < 3;
         
         if (!isDefault) {
           nameController.text = user.fullName;
@@ -285,7 +285,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
     }
 
     final lowerName = fullName.toLowerCase();
-    if (lowerName == 'unihub user' || lowerName == 'unihubuser' || lowerName == 'a student' || fullName.length < 3) {
+    if (lowerName == 'ulify user' || lowerName == 'ulifyuser' || lowerName == 'a student' || fullName.length < 3) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter your real full name')),
       );

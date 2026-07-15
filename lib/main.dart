@@ -11,6 +11,7 @@ import 'app/theme/theme_provider.dart';
 import 'features/auth/shared/providers.dart';
 import 'features/ads/providers/ad_provider.dart';
 import 'core/services/ai_assistant_service.dart';
+import 'core/config/env_config.dart';
 import 'firebase_options.dart';
 
 import 'services/notification_service.dart';
@@ -66,9 +67,9 @@ Future<void> main() async {
     }));
 
     // Configure UniBot AI (Dify AI)
-    // Replace 'YOUR_DIFY_API_KEY' with your actual key from Dify Dashboard
     container.read(aiAssistantServiceProvider).config(
-      apiKey: 'app-xXRlCxQxyZzkgRlj8x6Oi9cN',
+      apiKey: EnvConfig.difyApiKey,
+      useMock: EnvConfig.useMockAi,
     );
     
     container.read(appLifecycleServiceProvider).init();
@@ -123,7 +124,7 @@ class UniHubApp extends ConsumerWidget {
     final connectivity = ref.watch(connectivityServiceProvider);
     
     return MaterialApp.router(
-      title: 'UniHub',
+      title: 'Ulify',
       debugShowCheckedModeBanner: false,
 
       // Theme

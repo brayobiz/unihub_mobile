@@ -46,7 +46,7 @@ class PermissionUtils {
     final shouldShowDisclosure = await showProminentDisclosure(
       context,
       title: 'Location Access',
-      message: 'UniHub uses your location to show listings and campus events nearest to you. This data is only used while the app is in use.',
+      message: 'Ulify uses your location to show listings and campus events nearest to you. This data is only used while the app is in use.',
       icon: Icons.location_on_outlined,
     );
 

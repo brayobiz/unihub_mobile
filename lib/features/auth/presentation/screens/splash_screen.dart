@@ -27,7 +27,7 @@ class SplashScreen extends StatelessWidget {
               ),
               const SizedBox(height: 32),
               Text(
-                'UniHub',
+                'Ulify',
                 style: theme.textTheme.displayLarge?.copyWith(
                   fontSize: 40,
                   fontWeight: FontWeight.w900,

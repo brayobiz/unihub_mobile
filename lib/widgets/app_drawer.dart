@@ -52,7 +52,7 @@ class AppDrawer extends ConsumerWidget {
                 const Icon(Icons.hub_rounded, color: Colors.white, size: 40),
                 const SizedBox(height: 12),
                 Text(
-                  'UniHub Services',
+                  'Ulify Services',
                   style: theme.textTheme.titleLarge?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -226,7 +226,7 @@ class AppDrawer extends ConsumerWidget {
                 _drawerItem(
                   context,
                   Icons.info_outline,
-                  'About UniHub',
+                  'About Ulify',
                   onTap: () {
                     Navigator.of(context).pop();
                     context.push('/about');
@@ -250,7 +250,7 @@ class AppDrawer extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.all(20.0),
             child: Text(
-              'v1.0.0-rc.2',
+              'v1.0.1+3',
               style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
               ),

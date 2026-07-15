@@ -252,9 +252,9 @@ class SettingsScreen extends ConsumerWidget {
         const SizedBox(height: 32),
         Center(child: Column(children: [
           settingsAsync.when(
-            data: (settings) => Text('UniHub v${settings.appVersion} (Stable)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: 12)),
-            loading: () => Text('UniHub v1.2.5 (Stable)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: 12)),
-            error: (_, __) => Text('UniHub v1.2.5 (Stable)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: 12)),
+            data: (settings) => Text('Ulify v${settings.appVersion} (Stable)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: 12)),
+            loading: () => Text('Ulify v1.2.5 (Stable)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: 12)),
+            error: (_, __) => Text('Ulify v1.2.5 (Stable)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: 12)),
           ),
         ])),
         const SizedBox(height: 60),
@@ -343,7 +343,7 @@ class SettingsScreen extends ConsumerWidget {
       const SizedBox(height: 12),
       Text('Control who can see your detailed profile and contact info.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
       const SizedBox(height: 24),
-      _visibilityOption(context, ref, user, 'public', 'Public', 'Visible to everyone on UniHub', Icons.public),
+      _visibilityOption(context, ref, user, 'public', 'Public', 'Visible to everyone on Ulify', Icons.public),
       _visibilityOption(context, ref, user, 'university', 'My University', 'Only students from your campus', Icons.school_outlined),
       _visibilityOption(context, ref, user, 'private', 'Private', 'Hidden from all users', Icons.lock_outline),
       const SizedBox(height: 20),
@@ -443,7 +443,7 @@ class SettingsScreen extends ConsumerWidget {
 
   void _showDeleteAccountDialog(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    showDialog(context: context, builder: (context) => AlertDialog(backgroundColor: theme.colorScheme.surface, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), title: const Text('Delete Account?'), content: const Text('This action is permanent and will remove all your listings, messages, and profile data from UniHub.'), actions: [
+    showDialog(context: context, builder: (context) => AlertDialog(backgroundColor: theme.colorScheme.surface, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), title: const Text('Delete Account?'), content: const Text('This action is permanent and will remove all your listings, messages, and profile data from Ulify.'), actions: [
       TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
       TextButton(onPressed: () { ref.read(authControllerProvider.notifier).deleteAccount(); Navigator.pop(context); }, child: const Text('Delete Permanently', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold))),
     ]));

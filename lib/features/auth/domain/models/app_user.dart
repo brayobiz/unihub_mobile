@@ -525,7 +525,7 @@ class AppUser {
     return AppUser(
       uid: safeString(json['uid'], ''),
       email: safeString(json['email'], ''),
-      fullName: safeString(json['fullName'] ?? json['full_name'], 'UniHub User'),
+      fullName: safeString(json['fullName'] ?? json['full_name'], 'Ulify User'),
       username: json['username']?.toString(),
       bio: json['bio']?.toString(),
       photoUrl: json['photoUrl']?.toString(),

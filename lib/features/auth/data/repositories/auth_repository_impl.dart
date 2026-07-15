@@ -98,7 +98,7 @@ class AuthRepositoryImpl implements AuthRepository {
         final appUser = AppUser(
           uid: user.uid,
           email: user.email ?? '',
-          fullName: user.displayName ?? 'UniHub User',
+          fullName: user.displayName ?? 'Ulify User',
           photoUrl: user.photoURL,
           createdAt: DateTime.now(),
           roles: ['student'], // Set explicitly for clarity

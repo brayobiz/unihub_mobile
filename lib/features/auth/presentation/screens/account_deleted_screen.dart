@@ -43,7 +43,7 @@ class AccountDeletedScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Your account and all associated data have been permanently deleted. We hope to see you back at UniHub someday!',
+                'Your account and all associated data have been permanently deleted. We hope to see you back at Ulify someday!',
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   height: 1.5,

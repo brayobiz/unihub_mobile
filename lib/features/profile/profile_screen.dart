@@ -40,6 +40,21 @@ class ProfileScreen extends ConsumerWidget {
         Scaffold(
           backgroundColor: theme.colorScheme.surface,
           drawer: const AppDrawer(),
+          appBar: AppBar(
+            backgroundColor: const Color(0xFF0F172A), // Matches start of gradient
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+              onPressed: () => context.pop(),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.edit_rounded, color: Colors.white),
+                onPressed: () => context.push('/edit-profile'),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
           body: appUserAsync.when(
             data: (user) {
               if (user == null) {
@@ -102,7 +117,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
                 ClipPath(
                   clipper: _HeaderClipper(),
                   child: Container(
-                    height: 220,
+                    height: 160,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
@@ -117,22 +132,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
                   ),
                 ),
                 Positioned(
-                  top: MediaQuery.of(context).padding.top + 10,
-                  left: 16,
-                  right: 16,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                        onPressed: () => context.pop(),
-                      ),
-                      _buildEditButton(context),
-                    ],
-                  ),
-                ),
-                Positioned(
-                  top: 130,
+                  top: 70,
                   left: 16,
                   right: 16,
                   child: Row(
@@ -154,7 +154,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
           ),
         ),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 60, 16, 40),
+          padding: const EdgeInsets.fromLTRB(16, 100, 16, 40),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
               _buildStatsSection(),
@@ -337,7 +337,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'My UniHub Activity',
+          'My Ulify Activity',
           style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface, letterSpacing: -0.5),
         ),
         const SizedBox(height: 16),
@@ -498,7 +498,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
           ],
         ),
         Text(
-          isBusiness ? '${user.businessCategory ?? 'Business'} • @${user.username}' : '@${user.username ?? 'unihub_user'}',
+          isBusiness ? '${user.businessCategory ?? 'Business'} • @${user.username}' : '@${user.username ?? 'ulify_user'}',
           style: TextStyle(fontSize: 15, color: Colors.white.withValues(alpha: 0.8), fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 12),

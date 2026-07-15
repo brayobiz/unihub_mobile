@@ -43,7 +43,7 @@
     </queries>
 
     <application
-        android:label="UniHub"
+        android:label="Ulify"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true">

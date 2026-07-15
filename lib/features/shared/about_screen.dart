@@ -11,7 +11,7 @@ class AboutScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text('About UniHub'),
+        title: const Text('About Ulify'),
         centerTitle: true,
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
@@ -25,13 +25,13 @@ class AboutScreen extends StatelessWidget {
               child: Column(
                 children: [
                   const Icon(
-                    Icons.hub_rounded,
+                    Icons.school_rounded,
                     color: AppColors.primary,
                     size: 64,
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'About UniHub',
+                    'About Ulify',
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.w900,
                     ),
@@ -49,7 +49,7 @@ class AboutScreen extends StatelessWidget {
             ),
             const SizedBox(height: 32),
             Text(
-              'Welcome to your digital campus home! UniHub is built by students, for students—a comprehensive ecosystem that brings together everything you need for a thriving university life. From finding a cozy bedsitter to selling last semester\'s textbooks, earning money through gigs, sharing study notes, and staying connected with your campus community—all in one secure, trusted space.',
+              'Welcome to your digital campus home! Ulify is built by students, for students—a comprehensive ecosystem that brings together everything you need for a thriving university life. From finding a cozy bedsitter to selling last semester\'s textbooks, earning money through gigs, sharing study notes, and staying connected with your campus community—all in one secure, trusted space.',
               style: theme.textTheme.bodyLarge?.copyWith(height: 1.5),
             ),
             const SizedBox(height: 16),
@@ -62,7 +62,7 @@ class AboutScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'The UniHub Difference: Why juggle multiple platforms when one trusted app can handle it all? We\'ve created a verified campus marketplace where you can confidently buy, sell, and collaborate. Real student profiles with verification badges mean no more guessing if someone\'s legitimate. Whether you\'re a first-year searching for accommodation, an entrepreneur selling notes, a student offering tutoring services, or someone building study groups with classmates—UniHub is your campus community gateway. Seamless messaging keeps all your campus conversations in one place. Security and transparency aren\'t afterthoughts; they\'re the foundation.',
+              'The Ulify Difference: Why juggle multiple platforms when one trusted app can handle it all? We\'ve created a verified campus marketplace where you can confidently buy, sell, and collaborate. Real student profiles with verification badges mean no more guessing if someone\'s legitimate. Whether you\'re a first-year searching for accommodation, an entrepreneur selling notes, a student offering tutoring services, or someone building study groups with classmates—Ulify is your campus community gateway. Seamless messaging keeps all your campus conversations in one place. Security and transparency aren\'t afterthoughts; they\'re the foundation.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 height: 1.5,
                 color: theme.colorScheme.onSurfaceVariant,
@@ -83,7 +83,7 @@ class AboutScreen extends StatelessWidget {
               Icons.home_work_outlined,
               'Housing',
               'Find your next home with confidence.',
-              'Tired of scams and sketchy listings? UniHub connects you with verified House Plugs who understand the local student housing landscape. Browse hostels, bedsitters, shared apartments, and rentals complete with photos, pricing, and owner contact. Plug verification means you\'re talking to someone the community trusts. Message landlords directly, ask questions, and book with peace of mind.',
+              'Tired of scams and sketchy listings? Ulify connects you with verified House Plugs who understand the local student housing landscape. Browse hostels, bedsitters, shared apartments, and rentals complete with photos, pricing, and owner contact. Plug verification means you\'re talking to someone the community trusts. Message landlords directly, ask questions, and book with peace of mind.',
             ),
 
             _buildFeatureSection(
@@ -138,7 +138,7 @@ class AboutScreen extends StatelessWidget {
             _buildSimpleSection(
               context,
               '🎓 Built by Students, for Students',
-              'Every feature started with a real problem from campus life. We listened to first-years struggling to find housing, watched seniors scramble to clear their dorms, saw entrepreneurs looking for ways to earn money, and noticed students isolated without proper campus connections. UniHub isn\'t built on assumptions—it\'s built on the lived experiences of thousands of students like you. From day one to graduation day, we\'re here to make campus life simpler, safer, and more connected.',
+              'Every feature started with a real problem from campus life. We listened to first-years struggling to find housing, watched seniors scramble to clear their dorms, saw entrepreneurs looking for ways to earn money, and noticed students isolated without proper campus connections. Ulify isn\'t built on assumptions—it\'s built on the lived experiences of thousands of students like you. From day one to graduation day, we\'re here to make campus life simpler, safer, and more connected.',
             ),
 
             _buildSimpleSection(
@@ -178,7 +178,7 @@ class AboutScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'UniHub isn\'t static—it evolves based on what you need. Found a bug? Have a feature idea? Know something that\'s missing? Your campus community makes this platform better every day. We actively listen, iterate, and build features that matter to students like you. Every suggestion counts; every voice matters.',
+                    'Ulify isn\'t static—it evolves based on what you need. Found a bug? Have a feature idea? Know something that\'s missing? Your campus community makes this platform better every day. We actively listen, iterate, and build features that matter to students like you. Every suggestion counts; every voice matters.',
                     style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
                     textAlign: TextAlign.center,
                   ),
@@ -189,7 +189,7 @@ class AboutScreen extends StatelessWidget {
             const SizedBox(height: 32),
             Center(
               child: Text(
-                'UniHub Version 1.0',
+                'Ulify Version 1.0',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
                   fontWeight: FontWeight.bold,
@@ -198,7 +198,7 @@ class AboutScreen extends StatelessWidget {
             ),
             Center(
               child: Text(
-                '© ${DateTime.now().year} UniHub. All rights reserved.',
+                '© ${DateTime.now().year} Ulify. All rights reserved.',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant.withOpacity(0.3),
                 ),

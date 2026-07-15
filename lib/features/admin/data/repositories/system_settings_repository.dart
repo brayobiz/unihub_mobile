@@ -10,7 +10,7 @@ class SystemSettingsRepository {
       _firestore.collection('config').doc('system_settings');
 
   static final SystemSettings _defaultSettings = SystemSettings(
-    supportEmail: 'support.unihub@gmail.com',
+    supportEmail: 'support.ulify@gmail.com',
     privacyPolicyUrl: 'https://unihub-3663e.web.app/privacy',
     termsOfServiceUrl: 'https://unihub-3663e.web.app/terms',
     websiteUrl: 'https://unihub-3663e.web.app',
@@ -19,7 +19,7 @@ class SystemSettingsRepository {
       'twitter': 'https://twitter.com/unihub_campus',
     },
     maintenanceMode: false,
-    maintenanceMessage: 'UniHub is currently under maintenance. We\'ll be back shortly!',
+    maintenanceMessage: 'Ulify is currently under maintenance. We\'ll be back shortly!',
     appVersion: '1.0.0',
     lastUpdated: DateTime.now(),
     updatedBy: 'system',

@@ -40,6 +40,25 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0F172A),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => context.pop(),
+        ),
+        actions: [
+          plugAsync.when(
+            data: (plug) => plug != null ? IconButton(
+              icon: const Icon(Icons.share_outlined, color: Colors.white, size: 20),
+              onPressed: () => _showShareMenu(context, plug),
+            ) : const SizedBox.shrink(),
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: plugAsync.when(
         data: (plug) {
           if (plug == null) {
@@ -59,7 +78,7 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
                           ClipPath(
                             clipper: _HeaderClipper(),
                             child: Container(
-                              height: 220,
+                              height: 160,
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
@@ -74,21 +93,7 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
                             ),
                           ),
                           Positioned(
-                            top: MediaQuery.of(context).padding.top + 10,
-                            left: 16,
-                            right: 16,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.share_outlined, color: Colors.white),
-                                  onPressed: () => _showShareMenu(context, plug),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Positioned(
-                            top: 130,
+                            top: 70,
                             left: 16,
                             right: 16,
                             child: Row(
@@ -112,7 +117,7 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
 
                   // 2. Main Content
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 60, 16, 140),
+                    padding: const EdgeInsets.fromLTRB(16, 100, 16, 140),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
                         _buildStatsSection(plug),
@@ -888,7 +893,7 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
     } else if (cleanNumber.length == 9 && (cleanNumber.startsWith('7') || cleanNumber.startsWith('1'))) {
       cleanNumber = '254$cleanNumber';
     }
-    final whatsappUrl = Uri.parse("https://wa.me/$cleanNumber?text=Hi $name, I'm interested in one of your listings on UniHub.");
+    final whatsappUrl = Uri.parse("https://wa.me/$cleanNumber?text=Hi $name, I'm interested in one of your listings on Ulify.");
     try {
       await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
     } catch (e) {
@@ -934,7 +939,7 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
                   _buildShareOption(
                     context,
                     Icons.chat_bubble_outline_rounded,
-                    'UniHub Chat',
+                    'Ulify Chat',
                     () {
                       Navigator.pop(context);
                       final chatContext = ChatContext(
@@ -954,10 +959,10 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
                     () {
                       Navigator.pop(context);
                       Share.share(
-                        'Check out ${plug.fullName}, a Housing Plug on UniHub!\n\n'
+                        'Check out ${plug.fullName}, a Housing Plug on Ulify!\n\n'
                         '${plug.bio ?? ''}\n'
-                        'Download UniHub to see their listings.',
-                        subject: '${plug.fullName} on UniHub',
+                        'Download Ulify to see their listings.',
+                        subject: '${plug.fullName} on Ulify',
                       );
                     },
                   ),

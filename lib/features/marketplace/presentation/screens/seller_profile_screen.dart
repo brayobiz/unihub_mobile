@@ -41,6 +41,31 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0F172A),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => context.pop(),
+        ),
+        actions: [
+          sellerAsync.when(
+            data: (seller) => seller != null ? _buildBlockButton(seller) : const SizedBox.shrink(),
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
+          const SizedBox(width: 8),
+          sellerAsync.when(
+            data: (seller) => seller != null ? IconButton(
+              icon: const Icon(Icons.share_outlined, color: Colors.white, size: 20),
+              onPressed: () => _showShareMenu(context, seller),
+            ) : const SizedBox.shrink(),
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: sellerAsync.when(
         data: (seller) {
           if (seller == null) {
@@ -60,7 +85,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                           ClipPath(
                             clipper: _HeaderClipper(),
                             child: Container(
-                              height: 220,
+                              height: 160,
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
@@ -75,41 +100,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                             ),
                           ),
                           Positioned(
-                            top: MediaQuery.of(context).padding.top + 10,
-                            left: 16,
-                            right: 16,
-                            child: Row(
-                              children: [
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.2),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: IconButton(
-                                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
-                                    onPressed: () => context.pop(),
-                                    tooltip: 'Back',
-                                  ),
-                                ),
-                                const Spacer(),
-                                _buildBlockButton(seller),
-                                const SizedBox(width: 8),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.2),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: IconButton(
-                                    icon: const Icon(Icons.share_outlined, color: Colors.white, size: 18),
-                                    onPressed: () => _showShareMenu(context, seller),
-                                    tooltip: 'Share Profile',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Positioned(
-                            top: 130,
+                            top: 70,
                             left: 16,
                             right: 16,
                             child: Row(
@@ -133,7 +124,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
 
                   // 2. Main Content
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 60, 16, 140),
+                    padding: const EdgeInsets.fromLTRB(16, 100, 16, 140),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
                         _buildStatsSection(seller),
@@ -313,14 +304,14 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
         ),
         Row(
           children: [
-            Text(
-              isBusiness ? '${seller.businessCategory ?? 'Business'} • @${seller.username}' : '@${seller.username ?? 'unihub_seller'}',
-              style: TextStyle(
-                fontSize: 15,
-                color: Colors.white.withOpacity(0.8),
-                fontWeight: FontWeight.w600,
-              ),
+          Text(
+            isBusiness ? '${seller.businessCategory ?? 'Business'} • @${seller.username}' : '@${seller.username ?? 'ulify_seller'}',
+            style: TextStyle(
+              fontSize: 15,
+              color: Colors.white.withOpacity(0.8),
+              fontWeight: FontWeight.w600,
             ),
+          ),
             const SizedBox(width: 8),
             if (isOnline)
               Container(
@@ -948,7 +939,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
     } else if (cleanNumber.length == 9 && (cleanNumber.startsWith('7') || cleanNumber.startsWith('1'))) {
       cleanNumber = '254$cleanNumber';
     }
-    final whatsappUrl = Uri.parse("https://wa.me/$cleanNumber?text=Hi $name, I'm interested in one of your listings on UniHub.");
+    final whatsappUrl = Uri.parse("https://wa.me/$cleanNumber?text=Hi $name, I'm interested in one of your listings on Ulify.");
     try {
       await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
     } catch (e) {
@@ -994,7 +985,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                   _buildShareOption(
                     context,
                     Icons.chat_bubble_outline_rounded,
-                    'UniHub Chat',
+                    'Ulify Chat',
                     () {
                       Navigator.pop(context);
                       final chatContext = ChatContext(
@@ -1014,10 +1005,10 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                     () {
                       Navigator.pop(context);
                       Share.share(
-                        'Check out ${seller.fullName}\'s profile on UniHub Marketplace!\n\n'
+                        'Check out ${seller.fullName}\'s profile on Ulify Marketplace!\n\n'
                         '${seller.bio ?? ''}\n'
-                        'Download UniHub to see their listings.',
-                        subject: '${seller.fullName} on UniHub',
+                        'Download Ulify to see their listings.',
+                        subject: '${seller.fullName} on Ulify',
                       );
                     },
                   ),

@@ -21,7 +21,7 @@ class LogoutDialog extends StatelessWidget {
           ),
         ),
         content: Text(
-          'Are you sure you want to sign out of UniHub?',
+          'Are you sure you want to sign out of Ulify?',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),

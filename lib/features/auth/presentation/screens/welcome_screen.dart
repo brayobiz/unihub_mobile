@@ -24,7 +24,7 @@ class WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 30),
 
               const Text(
-                'Welcome to UniHub',
+                'Welcome to Ulify',
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
