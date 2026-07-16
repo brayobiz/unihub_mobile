@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:unihub_mobile/features/chat/domain/models/conversation.dart';
 import 'package:unihub_mobile/features/chat/domain/models/message.dart';
 import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
@@ -23,6 +25,13 @@ class ChatRepositoryImpl implements ChatRepository {
 
   // Track active AI requests to prevent overlapping replies
   final Set<String> _botThinkingConversations = {};
+  // Track message IDs already processed by the bot to prevent double-replies
+  final Set<String> _processedMessageIds = {};
+  // Debounce timers for each conversation to batch messages
+  final Map<String, Timer> _botDebouncers = {};
+  // Tracking usage to prevent quota abuse (Simple in-memory for now)
+  final Map<String, int> _userDailyAiCount = {};
+  final String _todayKey = DateTime.now().toIso8601String().substring(0, 10);
 
   ChatRepositoryImpl(this._firestore, this._notificationSender, this._ref);
 
@@ -220,50 +229,113 @@ class ChatRepositoryImpl implements ChatRepository {
     // Trigger if:
     // A) It is a support message
     // B) The sender is a student (not an admin)
-    // C) Either no admin is assigned OR the ticket was just re-opened (waiting_admin)
+    // C) NO human admin is assigned yet
     final bool isStudentMsg = message.senderId != 'unihub_admin' && message.metadata?['adminId'] == null;
+    final bool hasHumanAdmin = data['assignedAdminId'] != null;
     final bool isReopened = data['supportStatus'] == 'resolved' || data['supportStatus'] == 'closed';
-    final bool isCurrentlyWaitingAdmin = data['supportStatus'] == 'waiting_admin';
-    final bool shouldBotRespond = isSupportMsg && (data['assignedAdminId'] == null || isReopened || isCurrentlyWaitingAdmin) && isStudentMsg;
+    final bool isWaiting = data['supportStatus'] == 'waiting_admin' || data['supportStatus'] == 'waiting_user';
     
-    debugPrint('🚀 UniBot: Support=$isSupportMsg, Unassigned=${data['assignedAdminId'] == null}, Reopened=$isReopened, WaitingAdmin=$isCurrentlyWaitingAdmin, StudentMsg=$isStudentMsg');
-    debugPrint('🚀 UniBot: shouldBotRespond=$shouldBotRespond');
+    // CRITICAL: Bot stays silent if a human admin has joined the chat
+    final bool shouldBotRespond = isSupportMsg && !hasHumanAdmin && (isReopened || isWaiting || data['supportStatus'] == null) && isStudentMsg;
+
+    debugPrint('🚀 UniBot: Status=${data['supportStatus']}, hasHuman=$hasHumanAdmin, shouldBotRespond=$shouldBotRespond');
     
     if (shouldBotRespond) {
-      // Use the actual Firebase UID from auth state to ensure a valid ID is sent to Botpress
       final currentUid = _ref.read(firebaseAuthProvider).currentUser?.uid ?? message.senderId;
-      _triggerUniBotReply(conversationId, message.content, currentUid);
+      final bool isEscalated = data['supportStatus'] == 'waiting_admin';
+
+      // 1. Fair Use Cap: Limit individual users to 10 bot requests per day
+      final userCount = _userDailyAiCount[currentUid] ?? 0;
+      if (userCount >= 10) return;
+
+      // 2. Phrase Filter
+      final cleanMsg = message.content.trim().toLowerCase();
+      if (cleanMsg.length < 3 || cleanMsg == 'hi' || cleanMsg == 'hello' || cleanMsg == 'hey') return;
+
+      // 3. Debouncing
+      _botDebouncers[conversationId]?.cancel();
+      _botDebouncers[conversationId] = Timer(const Duration(seconds: 3), () {
+        if (!_processedMessageIds.contains(message.id)) {
+          _processedMessageIds.add(message.id);
+          _userDailyAiCount[currentUid] = (userCount + 1);
+
+          _triggerUniBotReply(conversationId, message.content, currentUid, isEscalated: isEscalated);
+        }
+        _botDebouncers.remove(conversationId);
+      });
     }
   }
 
-  Future<void> _triggerUniBotReply(String conversationId, String userMessage, String userId) async {
-    // 1. Concurrency Check: Don't trigger if the bot is already "thinking" for this chat
+  Future<void> _triggerUniBotReply(String conversationId, String userMessage, String userId, {bool isEscalated = false}) async {
+    // 1. Concurrency Check
     if (_botThinkingConversations.contains(conversationId)) return;
-
-    debugPrint('🚀 UniBot: Triggering reply for $conversationId');
 
     try {
       _botThinkingConversations.add(conversationId);
 
-      // 2. Show "Bot is typing" in Firestore
+      // 2. Immediate Check: If already escalated, respond with a polite hold message instead of calling Gemini
+      if (isEscalated) {
+        await Future.delayed(const Duration(seconds: 1)); // Feel natural
+        await _injectBotMessage(conversationId, "I've already notified the Ulify team about your request! 🚀 A human admin will be with you as soon as possible. Thanks for your patience.");
+        return;
+      }
+
+      // 3. Show "Bot is typing"
       await updateTypingStatus(conversationId, 'unihub_admin', true);
 
-      // 3. Get AI Response
-      final aiReply = await _ref.read(aiAssistantServiceProvider).getAiResponse(
+      // 3. Fetch recent history for context (last 6 messages)
+      final historySnap = await _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .collection('messages')
+          .orderBy('timestamp', descending: true)
+          .limit(7) // Last 7 messages (current one included)
+          .get();
+      
+      final recentMessages = historySnap.docs
+          .map((doc) => Message.fromJson(doc.data()))
+          .toList()
+          .reversed
+          .toList();
+
+      // Remove the current message from history (Gemini SDK adds the current message via sendMessage)
+      if (recentMessages.isNotEmpty && recentMessages.last.content == userMessage) {
+        recentMessages.removeLast();
+      }
+
+      // Convert to Gemini Content format
+      final List<Content> geminiHistory = recentMessages.map((m) {
+        if (m.senderId == 'unihub_admin') {
+          return Content.model([TextPart(m.content)]);
+        } else {
+          return Content.text(m.content);
+        }
+      }).toList();
+
+      debugPrint('🚀 Ulify Assistant: Calling getAiResponse with ${geminiHistory.length} history messages...');
+
+      // 4. Get AI Response
+      final aiService = _ref.read(aiAssistantServiceProvider);
+      debugPrint('🚀 Ulify Assistant: Service instance: ${aiService.runtimeType}');
+
+      final aiReply = await aiService.getAiResponse(
         message: userMessage,
         conversationId: conversationId,
         userId: userId,
+        history: geminiHistory,
       );
+      
+      debugPrint('🚀 Ulify Assistant: Received reply: ${aiReply?.substring(0, 10)}...');
 
       if (aiReply == null || aiReply.isEmpty) {
-        AppLogger.warning('UniBot: No reply received from service.', 'AI_SERVICE');
+        AppLogger.warning('Ulify Assistant: No reply received from service.', 'AI_SERVICE');
         
         // Fallback: If AI fails, ensure admins are notified so a human can step in
         _notificationSender.triggerPushNotification(
           recipientId: '',
           isBroadcast: true,
-          title: '🤖 UniBot Down (Credits?)',
-          body: 'A student is waiting and UniBot failed to respond. Please check the support queue.',
+          title: '🤖 Assistant Unavailable',
+          body: 'A student is waiting and Ulify Assistant failed to respond. Please check the support queue.',
           data: {'route': '/admin/support/$conversationId', 'topic': 'admins'},
         );
       }
@@ -282,7 +354,7 @@ class ChatRepositoryImpl implements ChatRepository {
             .replaceAll('#', '')  // Remove headers
             .trim();
 
-        AppLogger.info('UniBot: Injecting reply into Firestore', 'AI_SERVICE');
+        AppLogger.info('Ulify Assistant: Injecting reply into Firestore', 'AI_SERVICE');
 
         final botMessage = Message(
           id: const Uuid().v4(),
@@ -294,7 +366,7 @@ class ChatRepositoryImpl implements ChatRepository {
           metadata: {
             'isAi': true, 
             'escalated': needsEscalation,
-            'botName': 'UniBot',
+            'botName': 'Ulify Assistant',
           },
         );
 
@@ -339,6 +411,43 @@ class ChatRepositoryImpl implements ChatRepository {
     } finally {
       _botThinkingConversations.remove(conversationId);
     }
+  }
+
+  Future<void> _injectBotMessage(String conversationId, String content) async {
+    final botMessage = Message(
+      id: const Uuid().v4(),
+      senderId: 'unihub_admin',
+      content: content,
+      type: MessageType.text,
+      status: MessageStatus.sent,
+      timestamp: DateTime.now(),
+      metadata: {
+        'isAi': true,
+        'botName': 'Ulify Assistant',
+      },
+    );
+
+    final batch = _firestore.batch();
+    final messageRef = _firestore
+        .collection('conversations')
+        .doc(conversationId)
+        .collection('messages')
+        .doc(botMessage.id);
+
+    batch.set(messageRef, botMessage.toJson());
+
+    final convRef = _firestore.collection('conversations').doc(conversationId);
+    batch.update(convRef, {
+      'lastMessage': content,
+      'lastMessageSenderId': 'unihub_admin',
+      'lastMessageTime': FieldValue.serverTimestamp(),
+      'supportStatus': 'waiting_admin',
+    });
+
+    await batch.commit();
+
+    // Clear typing status
+    await updateTypingStatus(conversationId, 'unihub_admin', false);
   }
 
   Future<void> _sendNotificationForMessage(String conversationId, Message message, Map<String, dynamic> data) async {
@@ -414,7 +523,15 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   String _getDeterministicConversationId(List<String> ids) {
-    final sortedIds = List<String>.from(ids)..sort();
+    final cleanIds = ids.where((id) => id.isNotEmpty).toList();
+    if (cleanIds.length < 2) {
+      // If we only have one ID (e.g. current user), we can't make a P2P chat ID safely.
+      // But for support, we always have 'unihub_admin'.
+      if (!cleanIds.contains('unihub_admin')) {
+         cleanIds.add('unihub_admin');
+      }
+    }
+    final sortedIds = List<String>.from(cleanIds)..sort();
     return 'chat_${sortedIds.join('_')}';
   }
 
@@ -423,23 +540,33 @@ class ChatRepositoryImpl implements ChatRepository {
     required List<String> participantIds,
     required ChatContext context,
   }) async {
-    final conversationId = _getDeterministicConversationId(participantIds);
+    // Filter out empty IDs to prevent malformed conversation IDs (like chat__uid)
+    final validIds = participantIds.where((id) => id.isNotEmpty).toList();
+    if (validIds.length < 2) throw Exception('At least two participants required');
+
+    final conversationId = _getDeterministicConversationId(validIds);
     final convRef = _firestore.collection('conversations').doc(conversationId);
     
-    final doc = await convRef.get();
-    if (doc.exists) {
-      // If it exists, we update the context to the latest one being accessed
-      await convRef.update({'context': context.toJson()});
-      return conversationId;
+    try {
+      final doc = await convRef.get();
+      if (doc.exists) {
+        // If it exists, we update the context to the latest one being accessed
+        await convRef.update({'context': context.toJson()});
+        return conversationId;
+      }
+    } catch (e) {
+      // If get() fails due to permissions, it might not exist yet.
+      // We proceed to try and create it.
+      debugPrint('ChatRepo: get() failed or doc missing, attempting create: $e');
     }
 
     final now = DateTime.now();
     final conversation = Conversation(
       id: conversationId,
-      participants: participantIds,
+      participants: validIds,
       context: context,
       lastMessageTime: now,
-      unreadCounts: {for (var id in participantIds) id: 0},
+      unreadCounts: {for (var id in validIds) id: 0},
       expiresAt: now.add(const Duration(hours: 48)),
     );
 
@@ -533,6 +660,7 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
+  @override
   Future<String> getSupportConversation(String userId) async {
     if (userId.isEmpty) throw Exception('User ID cannot be empty');
 
@@ -541,27 +669,29 @@ class ChatRepositoryImpl implements ChatRepository {
     final conversationId = _getDeterministicConversationId(participantIds);
     
     final convRef = _firestore.collection('conversations').doc(conversationId);
-    final doc = await convRef.get();
 
-    if (doc.exists) {
-      final data = doc.data()!;
-      final status = data['supportStatus'] as String?;
-      
-      // If the session was resolved or closed, we RE-OPEN it for the new request
-      if (status == 'resolved' || status == 'closed') {
-        final now = DateTime.now();
-        await convRef.update({
-          'supportStatus': 'waiting_admin',
-          'lastMessage': 'Re-opened support request',
-          'lastMessageSenderId': userId,
-          'lastMessageTime': FieldValue.serverTimestamp(),
-          'expiresAt': Timestamp.fromDate(now.add(const Duration(hours: 48))),
-          // Note: isSupport and supportPriority are PROTECTED fields.
-          // Students cannot update them, so we leave them as is.
-        });
+    try {
+      final doc = await convRef.get();
+
+      if (doc.exists) {
+        final data = doc.data()!;
+        final status = data['supportStatus'] as String?;
+
+        // If the session was resolved or closed, we RE-OPEN it for the new request
+        if (status == 'resolved' || status == 'closed') {
+          final now = DateTime.now();
+          await convRef.update({
+            'supportStatus': 'waiting_admin',
+            'lastMessage': 'Re-opened support request',
+            'lastMessageSenderId': userId,
+            'lastMessageTime': FieldValue.serverTimestamp(),
+            'expiresAt': Timestamp.fromDate(now.add(const Duration(hours: 48))),
+          });
+        }
+        return conversationId;
       }
-
-      return conversationId;
+    } catch (e) {
+      debugPrint('ChatRepo: Support get() failed, attempting create: $e');
     }
 
     final now = DateTime.now();

@@ -493,7 +493,7 @@ class AppUser {
     };
   }
 
-  factory AppUser.fromJson(Map<String, dynamic> json) {
+  factory AppUser.fromJson(Map<String, dynamic> json, [String? id]) {
     // Extremely defensive parsing to prevent "Null is not subtype of String" errors
     String safeString(dynamic value, String defaultValue) {
       if (value == null) return defaultValue;
@@ -523,7 +523,7 @@ class AppUser {
     }
 
     return AppUser(
-      uid: safeString(json['uid'], ''),
+      uid: id ?? safeString(json['uid'], ''),
       email: safeString(json['email'], ''),
       fullName: safeString(json['fullName'] ?? json['full_name'], 'Ulify User'),
       username: json['username']?.toString(),

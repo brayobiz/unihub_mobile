@@ -828,7 +828,7 @@ class AdminRepository {
 
     return query.snapshots().map((snapshot) {
       var users = snapshot.docs
-          .map((doc) => AppUser.fromJson(doc.data() as Map<String, dynamic>))
+          .map((doc) => AppUser.fromJson(doc.data() as Map<String, dynamic>, doc.id))
           .toList();
 
       // Filter by Date Range
@@ -1535,7 +1535,7 @@ class AdminRepository {
             
             final usersSnap = await _firestore.collection('users').where(FieldPath.documentId, whereIn: chunk).get();
             for (var doc in usersSnap.docs) {
-              _userCache[doc.id] = AppUser.fromJson(doc.data());
+              _userCache[doc.id] = AppUser.fromJson(doc.data(), doc.id);
             }
           }
         }

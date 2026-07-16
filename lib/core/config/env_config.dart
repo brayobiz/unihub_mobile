@@ -3,10 +3,11 @@ import 'package:flutter/foundation.dart';
 /// Environment configuration for the app.
 /// Use --dart-define or --dart-define-from-file to set these values.
 class EnvConfig {
-  /// Dify AI API Key
-  static const String difyApiKey = String.fromEnvironment(
-    'DIFY_API_KEY',
-    defaultValue: 'app-xXRlCxQxyZzkgRlj8x6Oi9cN', // Fallback for development
+  /// Gemini AI API Key (from Google AI Studio)
+  /// To provide this, use: --dart-define=AI_API_KEY=your_key_here
+  static const String aiApiKey = String.fromEnvironment(
+    'AI_API_KEY',
+    defaultValue: '',
   );
 
   /// Whether to use mock AI responses

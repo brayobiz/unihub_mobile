@@ -1,4 +1,5 @@
-import 'package:dio/dio.dart';
+import 'dart:async';
+import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../utils/app_logger.dart';
@@ -8,85 +9,98 @@ final aiAssistantServiceProvider = Provider<AIAssistantService>((ref) {
 });
 
 class AIAssistantService {
-  final _dio = Dio();
-  String? _apiKey;
+  GenerativeModel? _model;
   bool _useMock = false;
-  String _baseUrl = 'https://api.dify.ai/v1';
 
-  void config({required String apiKey, String? baseUrl, bool useMock = false}) {
-    _apiKey = apiKey;
+  // VERIFIED LITE MODEL: Optimized for speed and low latency
+  static const String _modelId = 'gemini-flash-lite-latest';
+
+  // Detailed System Prompt (Verified against actual app structure)
+  static const String _appKnowledgePrompt =
+    "You are Ulify Assistant. "
+    "MANDATORY STYLE RULES: "
+    "1. DO NOT introduce yourself in every reply. Only introduce yourself if the history is empty. "
+    "2. Be concise and direct. "
+    "3. Use a helpful, student-focused tone. "
+    "\n\n"
+    "APP STRUCTURE & NAVIGATION: "
+    "1. Bottom Navigation Bar: Home, Market, Housing, Notes, and Chat (Messages). "
+    "2. App Drawer (Top-Left): Community, Student Gigs, Confessions, My Events, Campus Map, and Events & Clubs. "
+    "\n\n"
+    "FEATURE WORKFLOWS: "
+    "- MARKETPLACE: Sell by tapping Market -> '+' button. Buy by browsing -> 'Chat with Seller'. "
+    "- HOUSING: Find houses/roommates via the Housing tab. "
+    "- NOTES: Access and search study notes directly via the Notes tab in the Bottom Nav. "
+    "- GIGS/EVENTS: Found in the App Drawer. "
+    "- ESCALATION: Start your reply with [ESCALATE] ONLY if you cannot solve the issue or a human is requested.";
+
+  void config({required String apiKey, bool useMock = false}) {
     _useMock = useMock;
-    if (baseUrl != null) _baseUrl = baseUrl;
-    debugPrint('🚀 UniBot: Configured with Dify AI (Mock Mode: $_useMock)');
+    if (_useMock) return;
+
+    try {
+      if (apiKey.isEmpty) return;
+
+      _model = GenerativeModel(
+        model: _modelId,
+        apiKey: apiKey,
+        generationConfig: GenerationConfig(
+          maxOutputTokens: 400,
+          temperature: 0.7,
+        ),
+        requestOptions: const RequestOptions(apiVersion: 'v1beta'),
+      );
+      debugPrint('🚀 AI_SERVICE: Initialized for Speed & Accuracy.');
+    } catch (e) {
+      debugPrint('❌ AI_SERVICE: Init Error: $e');
+    }
   }
 
   Future<String?> getAiResponse({
     required String message,
     required String conversationId,
     required String userId,
+    List<Content>? history,
   }) async {
-    if (_useMock) {
-      await Future.delayed(const Duration(seconds: 2)); // Simulating network lag
-      return _getMockResponse(message);
-    }
-    if (_apiKey == null) {
-      debugPrint('❌ Dify AI: API Key not configured.');
-      return null;
-    }
+    if (_useMock) return "Mock response.";
+    if (_model == null) return null;
 
-    final effectiveUserId = userId.isNotEmpty ? userId : 'user_${conversationId.hashCode.abs()}';
-    debugPrint('🚀 Dify AI: Sending message for user: $effectiveUserId');
+    final String cleanMessage = message.length > 1000 ? message.substring(0, 1000) : message;
 
-    try {
-      final response = await _dio.post(
-        '$_baseUrl/chat-messages',
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $_apiKey',
-            'Content-Type': 'application/json',
-          },
-        ),
-        data: {
-          'inputs': {},
-          'query': message,
-          'response_mode': 'blocking', // Wait for the full response
-          'conversation_id': '', // Let Dify manage the history internally for now or pass conversationId
-          'user': effectiveUserId,
-        },
-      ).timeout(const Duration(seconds: 30));
+    return _callWithRetry<String?>(() async {
+      // Start a chat session with the provided history and system instructions
+      final chat = _model!.startChat(
+        history: [
+          Content.text(_appKnowledgePrompt),
+          Content.model([TextPart('Understood. I am the Ulify Assistant. I will follow your instructions and help the student without repeating my introduction unless necessary.')]),
+          ...?history,
+        ],
+      );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final String? answer = response.data['answer'];
-        debugPrint('🚀 Dify AI SUCCESS: $answer');
-        return answer;
-      }
-    } catch (e) {
-      if (e is DioException) {
-        final errorData = e.response?.data;
-        if (errorData is Map && errorData['code'] == 'invalid_param') {
-          debugPrint('❌ Dify AI: Credits exhausted or Model unconfigured. Check Dify dashboard.');
+      debugPrint('🚀 AI_SERVICE: Requesting $_modelId (Chat Mode)...');
+      final response = await chat.sendMessage(Content.text(cleanMessage));
+
+      final text = response.text;
+      if (text != null) debugPrint('✅ AI_SERVICE: Success! (${text.length} chars)');
+      return text;
+    });
+  }
+
+  Future<T?> _callWithRetry<T>(Future<T> Function() call, {int maxRetries = 2}) async {
+    for (int i = 0; i < maxRetries; i++) {
+      try {
+        return await call().timeout(const Duration(seconds: 90));
+      } catch (e) {
+        if (e is TimeoutException) {
+          debugPrint('⏳ AI_SERVICE: Attempt ${i+1} timed out. Retrying...');
+        } else {
+          debugPrint('❌ AI_SERVICE: Attempt ${i+1} failed: $e');
         }
-        debugPrint('❌ Dify AI API ERROR: ${e.response?.statusCode} - $errorData');
-      } else {
-        debugPrint('❌ Dify AI ERROR: $e');
+
+        if (i == maxRetries - 1) break;
+        await Future.delayed(const Duration(seconds: 3));
       }
     }
     return null;
-  }
-
-  String _getMockResponse(String userQuery) {
-    final query = userQuery.toLowerCase();
-    if (query.contains('help') || query.contains('support') || query.contains('human')) {
-      return "I'll get a human to help you with that right away. [ESCALATE]";
-    }
-    
-    final responses = [
-      "Hello! I'm UniBot. How can I assist you today?",
-      "That's an interesting question. Let me look into that for you.",
-      "I'm currently in maintenance mode, but I can still answer basic questions!",
-      "You can find more info about that in the Campus Guide section.",
-      "I've noted your request. Is there anything else you need?"
-    ];
-    return responses[DateTime.now().second % responses.length];
   }
 }

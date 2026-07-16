@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
+import '../../../auth/domain/models/app_user.dart';
 import '../../../auth/shared/providers.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/message.dart';
@@ -103,6 +104,7 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
       body: Column(
         children: [
           _buildSearchBox(context),
+          _buildSecurityBadge(context),
           Expanded(
             child: conversationsAsync.when(
               data: (conversations) {
@@ -117,19 +119,31 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
                   return _buildEmptyState(context);
                 }
 
+                // Separate Support sessions from regular chats for better visibility
+                final supportSessions = filtered.where((c) => c.isSupport && c.supportStatus != 'closed' && c.supportStatus != 'resolved').toList();
+                final regularChats = filtered.where((c) => !c.isSupport || c.supportStatus == 'closed' || c.supportStatus == 'resolved').toList();
+
                 return RefreshIndicator(
                   onRefresh: () async {
-                    // Riverpod streams auto-refresh, but we can trigger a manual reload if needed
                     ref.invalidate(conversationsProvider(user.uid));
                   },
-                  child: ListView.builder(
-                    itemCount: filtered.length,
-                    itemBuilder: (context, index) {
-                      return _ConversationTile(
-                        conversation: filtered[index],
+                  child: ListView(
+                    children: [
+                      if (supportSessions.isNotEmpty && _searchQuery.isEmpty) ...[
+                        _buildSectionHeader(context, 'Open Support Sessions', Icons.support_agent_rounded),
+                        ...supportSessions.map((conv) => _ConversationTile(
+                          conversation: conv,
+                          currentUserId: user.uid,
+                          isHighlight: true,
+                        )),
+                        const Divider(height: 1),
+                        _buildSectionHeader(context, 'Recent Messages', Icons.history_rounded),
+                      ],
+                      ...regularChats.map((conv) => _ConversationTile(
+                        conversation: conv,
                         currentUserId: user.uid,
-                      );
-                    },
+                      )),
+                    ],
                   ),
                 );
               },
@@ -177,6 +191,58 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
     );
   }
 
+  Widget _buildSecurityBadge(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.gpp_good_outlined, size: 18, color: theme.colorScheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Your conversations are end-to-end encrypted and private.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: theme.colorScheme.primary),
+          const SizedBox(width: 8),
+          Text(
+            title.toUpperCase(),
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.primary,
+              letterSpacing: 1.1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildEmptyState(BuildContext context) {
     final theme = Theme.of(context);
     return Center(
@@ -195,7 +261,7 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
           ),
           const SizedBox(height: 8),
           Text(
-            'Messages from marketplace and housing\nwill appear here.',
+            'Messages from marketplace, housing,\nand support will appear here.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
@@ -211,10 +277,12 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
 class _ConversationTile extends ConsumerWidget {
   final Conversation conversation;
   final String currentUserId;
+  final bool isHighlight;
 
   const _ConversationTile({
     required this.conversation,
     required this.currentUserId,
+    this.isHighlight = false,
   });
 
   @override
@@ -225,95 +293,118 @@ class _ConversationTile extends ConsumerWidget {
       orElse: () => '',
     );
 
-    final otherUserAsync = ref.watch(publicUserProvider(otherUserId));
+    // Support logic: Ensure support chats are ALWAYS visible and maintain 'Ulify Support' identity
+    final bool isSupport = conversation.isSupport || otherUserId == 'unihub_admin' || conversation.context?.type == 'support';
+
     final unreadCount = conversation.unreadCounts[currentUserId] ?? 0;
 
-    return otherUserAsync.when(
-      data: (otherUser) {
-        final displayName = otherUser?.fullName ?? 'User';
-        final photoUrl = otherUser?.photoUrl;
+    if (isSupport) {
+      // For support chats, we ignore the assigned admin's personal name/photo in the list view
+      // to maintain the official "Ulify Support" channel identity.
+      return _buildTile(context, theme, null, unreadCount);
+    }
 
-        return ListTile(
-          onTap: () {
-            context.push('/chat', extra: {
-              'conversationId': conversation.id,
-              'otherUserName': displayName,
-              'context': conversation.context,
-            });
-          },
-          leading: CircleAvatar(
-            radius: 28,
-            backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-            backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
-            child: photoUrl == null
-                ? Text(displayName[0].toUpperCase(),
-                    style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary))
-                : null,
+    return ref.watch(publicUserProvider(otherUserId)).when(
+      data: (otherUser) => _buildTile(context, theme, otherUser, unreadCount),
+      loading: () => const _ConversationLoadingTile(),
+      error: (err, stack) => _buildTile(context, theme, null, unreadCount),
+    );
+  }
+
+  Widget _buildTile(BuildContext context, ThemeData theme, AppUser? otherUser, int unreadCount) {
+    final bool isSupport = conversation.isSupport ||
+                          conversation.participants.contains('unihub_admin') ||
+                          conversation.context?.type == 'support';
+
+    // Always use 'Ulify Support' for support channels regardless of who is assigned.
+    final String displayName = isSupport ? 'Ulify Support' : (otherUser?.fullName ?? 'User');
+
+    final String? photoUrl = isSupport ? null : otherUser?.photoUrl;
+
+    return ListTile(
+      tileColor: isHighlight ? theme.colorScheme.primary.withOpacity(0.03) : null,
+      onTap: () {
+        context.push('/chat', extra: {
+          'conversationId': conversation.id,
+          'otherUserName': displayName,
+          'context': conversation.context,
+        });
+      },
+      leading: CircleAvatar(
+        radius: 28,
+        backgroundColor: isSupport ? theme.colorScheme.primary : theme.colorScheme.primary.withOpacity(0.1),
+        backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+        child: photoUrl == null
+            ? (isSupport
+                ? const Icon(Icons.support_agent_rounded, color: Colors.white, size: 24)
+                : Text(displayName[0].toUpperCase(),
+                    style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)))
+            : null,
+      ),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              displayName,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: unreadCount > 0 || isHighlight ? FontWeight.bold : FontWeight.w600,
+                fontSize: 15,
+                color: theme.colorScheme.onSurface,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          title: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  displayName,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.w600,
-                    fontSize: 15,
-                    color: theme.colorScheme.onSurface,
+          Text(
+            _formatTime(conversation.lastMessageTime),
+            style: TextStyle(
+              fontSize: 11,
+              color: unreadCount > 0 ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+              fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 2),
+          if (conversation.context != null)
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: _getContextColor(conversation.context!.type).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  child: Text(
+                    conversation.context!.type.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                      color: _getContextColor(conversation.context!.type),
+                    ),
+                  ),
                 ),
-              ),
-              Text(
-                _formatTime(conversation.lastMessageTime),
-                style: TextStyle(
-                  fontSize: 11,
-                  color: unreadCount > 0 ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
-                  fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    conversation.context!.title,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+              ],
+            ),
+          const SizedBox(height: 4),
+          Row(
             children: [
-              const SizedBox(height: 2),
-              if (conversation.context != null)
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: _getContextColor(conversation.context!.type).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        conversation.context!.type.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          color: _getContextColor(conversation.context!.type),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        conversation.context!.title,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
               Expanded(
                 child: Row(
                   children: [
@@ -337,26 +428,22 @@ class _ConversationTile extends ConsumerWidget {
                 ),
               ),
               if (unreadCount > 0)
-                    Container(
-                      margin: const EdgeInsets.only(left: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        unreadCount.toString(),
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                ],
-              ),
+                Container(
+                  margin: const EdgeInsets.only(left: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    unreadCount.toString(),
+                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
             ],
           ),
-        );
-      },
-      loading: () => const _ConversationLoadingTile(),
-      error: (err, stack) => const SizedBox.shrink(),
+        ],
+      ),
     );
   }
 

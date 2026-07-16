@@ -232,7 +232,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       otherUserId = conversation.participants.firstWhere((id) => id != currentUser.uid, orElse: () => '');
     }
     
-    final bool isResolved = (conversation?.supportStatus == 'resolved' || conversation?.supportStatus == 'closed') && 
+    final bool isSupport = widget.otherUserName == 'Ulify Support' ||
+                          otherUserId == 'unihub_admin' ||
+                          (conversation?.isSupport ?? false);
+
+    final bool isResolved = (conversation?.supportStatus == 'resolved' || conversation?.supportStatus == 'closed') &&
                            (conversation?.lastMessageSenderId == 'unihub_admin');
     final effectiveContext = widget.chatContext ?? conversation?.context;
 
@@ -248,9 +252,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
         title: Consumer(
           builder: (context, ref, child) {
-            final isSupport = widget.otherUserName == 'Ulify Support' || otherUserId == 'unihub_admin';
-            
-            final effectiveStatusId = (isSupport && conversation?.assignedAdminId != null) 
+            final effectiveStatusId = (isSupport && conversation?.assignedAdminId != null)
                 ? conversation!.assignedAdminId! 
                 : otherUserId;
 
@@ -274,7 +276,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
             String statusText;
             if (isOtherTyping) {
-              statusText = (typingUserId == 'unihub_admin') ? 'Campus Buddy is typing...' : 'typing...';
+              statusText = (typingUserId == 'unihub_admin') ? 'Ulify Assistant is typing...' : 'typing...';
             } else if (isSupport && conversation?.assignedAdminId == null) {
               statusText = '🤖 Always active • Instant Support';
             } else {
@@ -341,9 +343,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
       body: Column(
         children: [
-          // Safety Banner (New)
-          if (widget.otherUserName == 'Ulify Support' || otherUserId == 'unihub_admin')
-            _buildSafetyBanner(context),
+          // Safety & Security Banner (Visible in all chats)
+          _buildSafetyBanner(context, isSupport),
             
           if (effectiveContext != null && effectiveContext.type != 'support') 
             _buildContextBanner(context, effectiveContext),
@@ -385,9 +386,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     final isMe = message.senderId == currentUser?.uid;
                     final bool isSameSenderAsNext = index > 0 && messages[index - 1].senderId == message.senderId;
                     
-                    // Context Divider Logic
+                    // Context Divider Logic: Only show for marketplace/housing to distinguish topics.
+                    // Support chats are clean by default as they have a single clear context.
                     bool showContextDivider = false;
-                    if (message.context != null) {
+                    if (message.context != null && message.context?.type != 'support') {
                       if (index == messages.length - 1) {
                         showContextDivider = true;
                       } else {
@@ -456,46 +458,128 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Widget _buildSafetyBanner(BuildContext context) {
+  Widget _buildSafetyBanner(BuildContext context, bool isSupport) {
     final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.all(12),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.3)),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF6C63FF).withOpacity(0.1),
-              shape: BoxShape.circle,
+    return GestureDetector(
+      onTap: () => _showSafetyInfo(context, isSupport),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2))
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: (isSupport ? const Color(0xFF6C63FF) : Colors.orange).withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isSupport ? Icons.verified_user_outlined : Icons.shield_outlined,
+                color: isSupport ? const Color(0xFF6C63FF) : Colors.orange,
+                size: 20
+              ),
             ),
-            child: const Icon(Icons.shield_outlined, color: Color(0xFF6C63FF), size: 20),
-          ),
-          const SizedBox(width: 16),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isSupport ? 'Official Support Channel' : 'Secure Student Chat',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    isSupport ? 'Verified assistance is active' : 'Tap for campus safety tips',
+                    style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.info_outline_rounded, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5), size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSafetyInfo(BuildContext context, bool isSupport) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
+                Icon(isSupport ? Icons.verified_user : Icons.security, color: theme.colorScheme.primary),
+                const SizedBox(width: 12),
                 Text(
-                  'Your conversations are secure and private',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  "We're here to help you 24/7",
-                  style: TextStyle(fontSize: 11, color: Colors.grey),
+                  isSupport ? 'Security & Privacy' : 'Campus Safety Guide',
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
               ],
             ),
+            const SizedBox(height: 20),
+            if (isSupport) ...[
+              _safetyInfoItem(Icons.lock_outline, 'End-to-End Encryption', 'Your messages with support are encrypted and only accessible by authorized admins.'),
+              _safetyInfoItem(Icons.history, 'Session Logging', 'Transcripts are saved to ensure quality and resolve disputes. They are never shared with third parties.'),
+              _safetyInfoItem(Icons.gpp_good_outlined, 'Official Support', 'You are chatting with a verified Ulify staff member or automated assistant.'),
+            ] else ...[
+              _safetyInfoItem(Icons.location_on_outlined, 'Meet in Public', 'Always meet in well-lit, public campus areas like the library or cafeteria.'),
+              _safetyInfoItem(Icons.payments_outlined, 'No Pre-payments', 'Never send money or deposits before inspecting the item or room in person.'),
+              _safetyInfoItem(Icons.report_problem_outlined, 'Report Activity', 'Use the "Block" or "Report" tools in the menu if you feel uncomfortable.'),
+            ],
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('I Understand', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _safetyInfoItem(IconData icon, String title, String description) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: const Color(0xFF6C63FF)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const SizedBox(height: 2),
+                Text(description, style: const TextStyle(fontSize: 12, color: Colors.grey, height: 1.3)),
+              ],
+            ),
           ),
-          Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
         ],
       ),
     );
@@ -512,7 +596,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              'SUPPORT',
+              chatContext.type.toUpperCase(),
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w800,

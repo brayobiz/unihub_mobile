@@ -66,9 +66,9 @@ Future<void> main() async {
       AppLogger.error('Main: Notification Service init failed', e);
     }));
 
-    // Configure UniBot AI (Dify AI)
+    // Configure Ulify Assistant (Gemini 1.5 Flash)
     container.read(aiAssistantServiceProvider).config(
-      apiKey: EnvConfig.difyApiKey,
+      apiKey: EnvConfig.aiApiKey,
       useMock: EnvConfig.useMockAi,
     );
     

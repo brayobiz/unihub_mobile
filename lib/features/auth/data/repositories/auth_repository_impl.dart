@@ -279,7 +279,7 @@ class AuthRepositoryImpl implements AuthRepository {
   Stream<AppUser?> watchUser(String uid) {
     return _firestore.collection('users').doc(uid).snapshots().map((snapshot) {
       if (snapshot.exists && snapshot.data() != null) {
-        return AppUser.fromJson(snapshot.data()!);
+        return AppUser.fromJson(snapshot.data()!, snapshot.id);
       }
       return null;
     }).handleError((error) {
@@ -292,7 +292,7 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       final doc = await _firestore.collection('users').doc(uid).get();
       if (doc.exists && doc.data() != null) {
-        return AppUser.fromJson(doc.data()!);
+        return AppUser.fromJson(doc.data()!, doc.id);
       }
     } catch (e) {
       AppLogger.error('Auth: Error getting user', e, null, 'AUTH');
@@ -606,7 +606,7 @@ class AuthRepositoryImpl implements AuthRepository {
           // Filter out deleted or banned users from search results
           if (data['isDeleted'] == true || data['isBanned'] == true) continue;
           
-          final user = AppUser.fromJson(data);
+          final user = AppUser.fromJson(data, doc.id);
           // Security: strip sensitive PII from search results before they reach UI
           uniqueUsers[user.uid] = user.stripSensitiveInfo();
         }
