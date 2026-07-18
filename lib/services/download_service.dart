@@ -43,9 +43,7 @@ class DownloadService {
     final savePath = await getSavePath(fileName);
     final tempPath = '$savePath.tmp';
     
-    if (Platform.isAndroid) {
-      await Permission.storage.request();
-    }
+    // Note: No storage permission required for getApplicationDocumentsDirectory() on Android
 
     try {
       final notificationId = noteId.hashCode;

@@ -17,18 +17,21 @@ class RelevantAnnouncementsWidget extends ConsumerWidget {
     return activeAsync.when(
       data: (_) {
         final announcements = ref.watch(relevantAnnouncementsProvider(feature));
-        if (announcements.isEmpty) return const SizedBox.shrink();
+        final dismissed = ref.watch(dismissedAnnouncementsProvider);
+        
+        // Filter out dismissed announcements
+        final visible = announcements.where((a) => !dismissed.contains(a.id)).toList();
+        if (visible.isEmpty) return const SizedBox.shrink();
 
         // Sort by priority and then by date
-        final sorted = List<Announcement>.from(announcements);
+        final sorted = List<Announcement>.from(visible);
         sorted.sort((a, b) {
           final priorityDiff = b.priority.index.compareTo(a.priority.index);
           if (priorityDiff != 0) return priorityDiff;
           return b.publishAt.compareTo(a.publishAt);
         });
 
-        // Modal Logic: Find first modal announcement that hasn't been dismissed yet
-        final dismissed = ref.watch(dismissedAnnouncementsProvider);
+        // Modal Logic: Find first modal announcement that hasn't been shown in session yet
         final sessionShown = ref.watch(sessionShownModalsProvider);
         
         final pendingModals = sorted.where((a) => 
@@ -93,16 +96,16 @@ class RelevantAnnouncementsWidget extends ConsumerWidget {
   }
 }
 
-class _AnnouncementItem extends StatefulWidget {
+class _AnnouncementItem extends ConsumerStatefulWidget {
   final Announcement announcement;
 
   const _AnnouncementItem({super.key, required this.announcement});
 
   @override
-  State<_AnnouncementItem> createState() => _AnnouncementItemState();
+  ConsumerState<_AnnouncementItem> createState() => _AnnouncementItemState();
 }
 
-class _AnnouncementItemState extends State<_AnnouncementItem> with TickerProviderStateMixin {
+class _AnnouncementItemState extends ConsumerState<_AnnouncementItem> with TickerProviderStateMixin {
   bool _dismissed = false;
   
   late AnimationController _entryController;
@@ -347,7 +350,10 @@ class _AnnouncementItemState extends State<_AnnouncementItem> with TickerProvide
                   ),
                   IconButton(
                     icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 20),
-                    onPressed: () => setState(() => _dismissed = true),
+                    onPressed: () {
+                      ref.read(dismissedAnnouncementsProvider.notifier).dismiss(a.id);
+                      setState(() => _dismissed = true);
+                    },
                   ),
                 ],
               ),
@@ -400,7 +406,10 @@ class _AnnouncementItemState extends State<_AnnouncementItem> with TickerProvide
               ),
               IconButton(
                 icon: const Icon(Icons.close, size: 20),
-                onPressed: () => setState(() => _dismissed = true),
+                onPressed: () {
+                  ref.read(dismissedAnnouncementsProvider.notifier).dismiss(a.id);
+                  setState(() => _dismissed = true);
+                },
               ),
             ],
           ),

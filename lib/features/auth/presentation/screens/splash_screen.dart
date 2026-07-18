@@ -13,15 +13,21 @@ class SplashScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Show the branded logo from assets
-              Container(
+              // Show the branded logo from assets with safety fallback
+              SizedBox(
                 width: 200,
                 height: 200,
-                decoration: const BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage('assets/icon/campus_icon.png'),
-                    fit: BoxFit.contain,
-                  ),
+                child: Image.asset(
+                  'assets/icon/campus_icon.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    // Fallback to a themed icon if the asset is missing
+                    return Icon(
+                      Icons.school_rounded,
+                      size: 100,
+                      color: theme.colorScheme.primary,
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 64),
