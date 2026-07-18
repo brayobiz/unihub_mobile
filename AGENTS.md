@@ -1,7 +1,7 @@
-# UniHub Mobile - AI Agent Guide
+# Ulify Mobile - AI Agent Guide
 
 ## Project Overview
-UniHub is a multi-feature Flutter mobile app (Android) for university communities. It integrates Firebase backend (Auth, Firestore, Storage, Messaging) with cloud functions for backend logic. All state management uses Riverpod, and code generation via `build_runner`.
+Ulify is a multi-feature Flutter mobile app (Android) for university communities. It integrates Firebase backend (Auth, Firestore, Storage, Messaging) with cloud functions for backend logic. All state management uses Riverpod, and code generation via `build_runner`.
 
 **Project Config**: `pubspec.yaml` | **Startup**: `lib/main.dart` | **Navigation**: `lib/app/router/app_router.dart`
 

@@ -113,7 +113,7 @@ class AdminService {
       recipientId: userId,
       title: isBanned ? 'Account Banned ⛔' : 'Account Reinstated ✅',
       body: isBanned 
-          ? 'Your account has been permanently banned from UniHub.'
+          ? 'Your account has been permanently banned from Ulify.'
           : 'Your account access has been restored. Welcome back!',
       timestamp: DateTime.now(),
       metadata: {'reason': reason},
@@ -318,7 +318,7 @@ class AdminService {
         recipientId: userId,
         title: isBanned ? 'Account Banned ⛔' : 'Account Reinstated ✅',
         body: isBanned 
-            ? 'Your account has been permanently banned from UniHub.'
+            ? 'Your account has been permanently banned from Ulify.'
             : 'Your account access has been restored. Welcome back!',
         timestamp: DateTime.now(),
       ));

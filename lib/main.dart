@@ -82,7 +82,7 @@ Future<void> main() async {
     runApp(
       UncontrolledProviderScope(
         container: container,
-        child: const UniHubApp(),
+        child: const UlifyApp(),
       ),
     );
   } catch (e, stack) {
@@ -101,8 +101,8 @@ Future<void> main() async {
   }
 }
 
-class UniHubApp extends ConsumerWidget {
-  const UniHubApp({super.key});
+class UlifyApp extends ConsumerWidget {
+  const UlifyApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -175,7 +175,7 @@ class UniHubApp extends ConsumerWidget {
 // RC-3 Production Diagnostic Initializer
 void _initProductionDiagnostics() {
   if (kReleaseMode) {
-    AppLogger.info('🚀 UniHub Production Build Initialized');
+    AppLogger.info('🚀 Ulify Production Build Initialized');
     
     // Pass all uncaught errors from the framework to Crashlytics.
     FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;

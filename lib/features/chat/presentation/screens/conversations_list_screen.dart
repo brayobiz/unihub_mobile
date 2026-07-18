@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -87,7 +88,8 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
                 return CircleAvatar(
                   radius: 16,
                   backgroundColor: theme.colorScheme.surfaceVariant,
-                  backgroundImage: userData?.photoUrl != null ? NetworkImage(userData!.photoUrl!) : null,
+                  backgroundImage: userData?.photoUrl != null ? CachedNetworkImageProvider(userData!.photoUrl!) : null,
+                  onBackgroundImageError: userData?.photoUrl != null ? (e, s) => debugPrint('🖼️ AppBar Avatar Error: $e') : null,
                   child: userData?.photoUrl == null 
                       ? Text(
                           userData?.fullName.isNotEmpty == true ? userData!.fullName[0].toUpperCase() : 'U',
@@ -104,10 +106,15 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
       body: Column(
         children: [
           _buildSearchBox(context),
-          _buildSecurityBadge(context),
+          // Hardware: Only show security badge when not searching to keep results focused
+          if (_searchQuery.isEmpty) _buildSecurityBadge(context),
           Expanded(
             child: conversationsAsync.when(
               data: (conversations) {
+                if (conversations.isEmpty) {
+                  return _buildEmptyState(context);
+                }
+
                 final filtered = conversations.where((c) {
                   final titleMatch = c.context?.title.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false;
                   final typeMatch = c.context?.type.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false;
@@ -331,10 +338,13 @@ class _ConversationTile extends ConsumerWidget {
         });
       },
       leading: CircleAvatar(
-        radius: 28,
+        radius: isSupport ? 28 : 24, // Slightly reduced avatar for personal chats
         backgroundColor: isSupport ? theme.colorScheme.primary : theme.colorScheme.primary.withOpacity(0.1),
-        backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
-        child: photoUrl == null
+        backgroundImage: (photoUrl != null && !isSupport) ? CachedNetworkImageProvider(photoUrl) : null,
+        onBackgroundImageError: photoUrl != null ? (exception, stackTrace) {
+          debugPrint('🖼️ Avatar: Failed to load $photoUrl: $exception');
+        } : null,
+        child: (photoUrl == null || isSupport)
             ? (isSupport
                 ? const Icon(Icons.support_agent_rounded, color: Colors.white, size: 24)
                 : Text(displayName[0].toUpperCase(),
@@ -348,7 +358,7 @@ class _ConversationTile extends ConsumerWidget {
               displayName,
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: unreadCount > 0 || isHighlight ? FontWeight.bold : FontWeight.w600,
-                fontSize: 15,
+                fontSize: isSupport ? 15 : 14, // Slightly varied font size for hierarchy
                 color: theme.colorScheme.onSurface,
               ),
               maxLines: 1,
@@ -369,7 +379,8 @@ class _ConversationTile extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 2),
-          if (conversation.context != null)
+          // Only show context row if it's NOT a generic user chat
+          if (conversation.context != null && conversation.context!.type != 'user')
             Row(
               children: [
                 Container(
@@ -387,19 +398,22 @@ class _ConversationTile extends ConsumerWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    conversation.context!.title,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w500,
+                // Only show context title if it's NOT a support chat (to avoid "UniHub Support" redundancy)
+                if (conversation.context!.type != 'support') ...[
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      conversation.context!.title,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
+                ],
               ],
             ),
           const SizedBox(height: 4),
@@ -457,13 +471,15 @@ class _ConversationTile extends ConsumerWidget {
         break;
       case MessageStatus.sent:
         icon = Icons.check;
+        color = Colors.grey.shade400;
         break;
       case MessageStatus.delivered:
         icon = Icons.done_all;
+        color = Colors.grey.shade400;
         break;
       case MessageStatus.read:
         icon = Icons.done_all;
-        color = theme.colorScheme.primary;
+        color = const Color(0xFF00FFFF); // High Glow Electric Cyan
         break;
     }
     return Icon(icon, size: 14, color: color);

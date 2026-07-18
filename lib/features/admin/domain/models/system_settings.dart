@@ -31,7 +31,7 @@ class SystemSettings {
       websiteUrl: json['websiteUrl'] ?? '',
       socialLinks: Map<String, String>.from(json['socialLinks'] ?? {}),
       maintenanceMode: json['maintenanceMode'] ?? false,
-      maintenanceMessage: json['maintenanceMessage'] ?? 'UniHub is currently under maintenance. We\'ll be back shortly!',
+      maintenanceMessage: json['maintenanceMessage'] ?? 'Ulify is currently under maintenance. We\'ll be back shortly!',
       appVersion: json['appVersion'] ?? '1.0.0',
       lastUpdated: json['lastUpdated'] != null 
           ? DateTime.fromMillisecondsSinceEpoch(json['lastUpdated']) 

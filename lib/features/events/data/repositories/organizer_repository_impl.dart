@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:rxdart/rxdart.dart';
+import 'package:unihub_mobile/core/error/error_handler.dart';
 import '../../domain/models/organizer.dart';
 import '../../domain/models/organizer_member.dart';
 import '../../domain/repositories/organizer_repository.dart';
@@ -91,47 +92,59 @@ class OrganizerRepositoryImpl implements OrganizerRepository {
 
   @override
   Future<void> createOrganizer(Organizer organizer) async {
-    final batch = _firestore.batch();
-    final organizerRef = _firestore.collection('organizers').doc(organizer.id);
-    
-    batch.set(organizerRef, organizer.toFirestore());
-    
-    // Add owner as a member
-    final memberId = '${organizer.id}_${organizer.ownerId}';
-    final memberRef = organizerRef.collection('members').doc(memberId);
-    
-    // Fetch user details to create a complete member record
-    final userDoc = await _firestore.collection('users').doc(organizer.ownerId).get();
-    final userData = userDoc.data();
-    final userName = userData?['fullName'] ?? 'Organizer Owner';
-    final userPhotoUrl = userData?['photoUrl'];
+    try {
+      final batch = _firestore.batch();
+      final organizerRef = _firestore.collection('organizers').doc(organizer.id);
+      
+      batch.set(organizerRef, organizer.toFirestore());
+      
+      // Add owner as a member
+      final memberId = '${organizer.id}_${organizer.ownerId}';
+      final memberRef = organizerRef.collection('members').doc(memberId);
+      
+      // Fetch user details to create a complete member record
+      final userDoc = await _firestore.collection('users').doc(organizer.ownerId).get();
+      final userData = userDoc.data();
+      final userName = userData?['fullName'] ?? 'Organizer Owner';
+      final userPhotoUrl = userData?['photoUrl'];
 
-    final member = OrganizerMember(
-      id: memberId,
-      organizerId: organizer.id,
-      userId: organizer.ownerId,
-      userName: userName,
-      userPhotoUrl: userPhotoUrl,
-      role: OrganizerRole.owner,
-      joinedAt: DateTime.now(),
-    );
-    
-    batch.set(memberRef, member.toFirestore());
-    
-    await batch.commit();
+      final member = OrganizerMember(
+        id: memberId,
+        organizerId: organizer.id,
+        userId: organizer.ownerId,
+        userName: userName,
+        userPhotoUrl: userPhotoUrl,
+        role: OrganizerRole.owner,
+        joinedAt: DateTime.now(),
+      );
+      
+      batch.set(memberRef, member.toFirestore());
+      
+      await batch.commit();
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
   Future<void> updateOrganizer(Organizer organizer) async {
-    await _firestore.collection('organizers').doc(organizer.id).update(organizer.toFirestore());
+    try {
+      await _firestore.collection('organizers').doc(organizer.id).update(organizer.toFirestore());
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
   Future<void> deleteOrganizer(String id) async {
-    await _firestore.collection('organizers').doc(id).update({
-      'isDeleted': true,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await _firestore.collection('organizers').doc(id).update({
+        'isDeleted': true,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override

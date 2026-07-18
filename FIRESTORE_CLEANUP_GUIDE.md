@@ -11,7 +11,7 @@ ERROR: Please set GOOGLE_APPLICATION_CREDENTIALS to your service account JSON pa
 ### Step 1: Download Service Account Key from Firebase Console
 
 1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Select your **UniHub** project
+2. Select your **Ulify** project
 3. Click the **⚙️ Settings icon** (top-left) → **Project Settings**
 4. Click the **Service Accounts** tab
 5. Click **Generate New Private Key**

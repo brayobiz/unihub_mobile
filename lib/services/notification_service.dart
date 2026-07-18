@@ -71,9 +71,19 @@ class NotificationService implements NotificationSender {
       importance: Importance.max,
     );
 
-    await _localNotifications
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(channel);
+    const downloadChannel = AndroidNotificationChannel(
+      'unihub_downloads',
+      'UniHub Downloads',
+      description: 'Progress of material downloads',
+      importance: Importance.low, // Lower importance for progress bars
+      showBadge: false,
+    );
+
+    final androidPlugin = _localNotifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+
+    await androidPlugin?.createNotificationChannel(channel);
+    await androidPlugin?.createNotificationChannel(downloadChannel);
 
     await _localNotifications.initialize(
       initSettings,
@@ -320,6 +330,7 @@ class NotificationService implements NotificationSender {
       'UniHub Notifications',
       importance: Importance.max,
       priority: Priority.high,
+      groupKey: 'com.unihub.notifications',
     );
     const iosDetails = DarwinNotificationDetails();
     const details = NotificationDetails(android: androidDetails, iOS: iosDetails);

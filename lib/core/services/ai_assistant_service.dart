@@ -44,13 +44,14 @@ class AIAssistantService {
       _model = GenerativeModel(
         model: _modelId,
         apiKey: apiKey,
+        systemInstruction: Content.system(_appKnowledgePrompt),
         generationConfig: GenerationConfig(
           maxOutputTokens: 400,
           temperature: 0.7,
         ),
         requestOptions: const RequestOptions(apiVersion: 'v1beta'),
       );
-      debugPrint('🚀 AI_SERVICE: Initialized for Speed & Accuracy.');
+      debugPrint('🚀 AI_SERVICE: Initialized with System Instruction for Speed & Accuracy.');
     } catch (e) {
       debugPrint('❌ AI_SERVICE: Init Error: $e');
     }
@@ -63,27 +64,48 @@ class AIAssistantService {
     List<Content>? history,
   }) async {
     if (_useMock) return "Mock response.";
-    if (_model == null) return null;
+    if (_model == null) {
+      debugPrint('⚠️ AI_SERVICE: Model not initialized (API Key might be missing).');
+      return null;
+    }
 
     final String cleanMessage = message.length > 1000 ? message.substring(0, 1000) : message;
 
-    return _callWithRetry<String?>(() async {
-      // Start a chat session with the provided history and system instructions
-      final chat = _model!.startChat(
-        history: [
-          Content.text(_appKnowledgePrompt),
-          Content.model([TextPart('Understood. I am the Ulify Assistant. I will follow your instructions and help the student without repeating my introduction unless necessary.')]),
-          ...?history,
-        ],
-      );
+    try {
+      return await _callWithRetry<String?>(() async {
+        // Filter history to ensure it alternates between user and model, starting with user
+        // This is a strict requirement for the Gemini SDK's ChatSession
+        List<Content> cleanHistory = [];
+        if (history != null && history.isNotEmpty) {
+          bool nextShouldBeUser = true;
+          for (var content in history) {
+            // Role can be 'user' or 'model'
+            if (nextShouldBeUser && content.role == 'user') {
+              cleanHistory.add(content);
+              nextShouldBeUser = false;
+            } else if (!nextShouldBeUser && content.role == 'model') {
+              cleanHistory.add(content);
+              nextShouldBeUser = true;
+            }
+          }
+        }
 
-      debugPrint('🚀 AI_SERVICE: Requesting $_modelId (Chat Mode)...');
-      final response = await chat.sendMessage(Content.text(cleanMessage));
+        final chat = _model!.startChat(history: cleanHistory);
 
-      final text = response.text;
-      if (text != null) debugPrint('✅ AI_SERVICE: Success! (${text.length} chars)');
-      return text;
-    });
+        debugPrint('🚀 AI_SERVICE: Requesting $_modelId (Chat Mode with ${cleanHistory.length} history items)...');
+        final response = await chat.sendMessage(Content.text(cleanMessage));
+
+        final text = response.text;
+        if (text != null) {
+          debugPrint('✅ AI_SERVICE: Success! (${text.length} chars)');
+          return text;
+        }
+        return null;
+      });
+    } catch (e) {
+      debugPrint('❌ AI_SERVICE: Critical Error during generation: $e');
+      return null;
+    }
   }
 
   Future<T?> _callWithRetry<T>(Future<T> Function() call, {int maxRetries = 2}) async {

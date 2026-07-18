@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:unihub_mobile/core/error/error_handler.dart';
 import 'package:unihub_mobile/core/services/notification_sender.dart';
 import 'package:unihub_mobile/core/utils/app_logger.dart';
 import '../../domain/models/verification_application.dart';
@@ -15,40 +16,44 @@ class TrustRepositoryImpl implements TrustRepository {
 
   @override
   Future<void> submitProfessionalApplication(VerificationApplication application) async {
-    final batch = _firestore.batch();
-    
-    // 1. Create the professional application
-    final appRef = _firestore.collection('verification_applications').doc(application.id);
-    batch.set(appRef, application.toFirestore());
+    try {
+      final batch = _firestore.batch();
+      
+      // 1. Create the professional application
+      final appRef = _firestore.collection('verification_applications').doc(application.id);
+      batch.set(appRef, application.toFirestore());
 
-    // 2. If identity documents are provided, also create an identity verification record
-    // this ensures the identity journey is also tracked.
-    if (application.idDocumentUrl != null && application.selfieUrl != null) {
-      final identityRef = _firestore.collection('identity_verifications').doc(application.userId);
-      batch.set(identityRef, {
-        'userId': application.userId,
-        'idDocumentUrl': application.idDocumentUrl,
-        'selfieUrl': application.selfieUrl,
-        'status': 'pending',
-        'submittedAt': FieldValue.serverTimestamp(),
-        'source': 'professional_application',
-        'roleType': application.role.name,
-      });
+      // 2. If identity documents are provided, also create an identity verification record
+      // this ensures the identity journey is also tracked.
+      if (application.idDocumentUrl != null && application.selfieUrl != null) {
+        final identityRef = _firestore.collection('identity_verifications').doc(application.userId);
+        batch.set(identityRef, {
+          'userId': application.userId,
+          'idDocumentUrl': application.idDocumentUrl,
+          'selfieUrl': application.selfieUrl,
+          'status': 'pending',
+          'submittedAt': FieldValue.serverTimestamp(),
+          'source': 'professional_application',
+          'roleType': application.role.name,
+        });
 
-      // Update user status for immediate UI feedback
-      batch.update(_firestore.collection('users').doc(application.userId), {
-        'identityStatus': 'pending',
-      });
-    }
+        // Update user status for immediate UI feedback
+        batch.update(_firestore.collection('users').doc(application.userId), {
+          'identityStatus': 'pending',
+        });
+      }
 
-    await batch.commit();
+      await batch.commit();
 
-    if (_notificationSender != null) {
-      await _notificationSender!.notifyAdmins(
-        title: 'New Professional Application 💼',
-        body: 'A user has applied for the ${application.role.label} role.',
-        route: '/admin/verifications',
-      );
+      if (_notificationSender != null) {
+        await _notificationSender!.notifyAdmins(
+          title: 'New Professional Application 💼',
+          body: 'A user has applied for the ${application.role.label} role.',
+          route: '/admin/verifications',
+        );
+      }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -93,26 +98,30 @@ class TrustRepositoryImpl implements TrustRepository {
       throw Exception('Invalid userId');
     }
 
-    await _firestore.collection('student_verifications').doc(userId).set({
-      'userId': userId,
-      'studentIdUrl': studentIdUrl,
-      'status': StudentVerificationStatus.pending.name,
-      'submittedAt': FieldValue.serverTimestamp(),
-    });
-
-    // Also update the user document status for immediate UI feedback
-    if (userId.isNotEmpty) {
-      await _firestore.collection('users').doc(userId).update({
-        'studentStatus': 'pending',
+    try {
+      await _firestore.collection('student_verifications').doc(userId).set({
+        'userId': userId,
+        'studentIdUrl': studentIdUrl,
+        'status': StudentVerificationStatus.pending.name,
+        'submittedAt': FieldValue.serverTimestamp(),
       });
-    }
 
-    if (_notificationSender != null) {
-      await _notificationSender!.notifyAdmins(
-        title: 'New Student Verification 🎓',
-        body: 'A user has submitted their student ID for verification.',
-        route: '/admin/verifications',
-      );
+      // Also update the user document status for immediate UI feedback
+      if (userId.isNotEmpty) {
+        await _firestore.collection('users').doc(userId).update({
+          'studentStatus': 'pending',
+        });
+      }
+
+      if (_notificationSender != null) {
+        await _notificationSender!.notifyAdmins(
+          title: 'New Student Verification 🎓',
+          body: 'A user has submitted their student ID for verification.',
+          route: '/admin/verifications',
+        );
+      }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -162,29 +171,33 @@ class TrustRepositoryImpl implements TrustRepository {
       throw Exception('Invalid userId');
     }
 
-    await _firestore.collection('identity_verifications').doc(userId).set({
-      'userId': userId,
-      'idDocumentUrl': idUrl,
-      'selfieUrl': selfieUrl,
-      'status': IdentityVerificationStatus.pending.name,
-      'submittedAt': FieldValue.serverTimestamp(),
-    });
-    
-    // Also update the user document status for immediate UI feedback if needed
-    if (userId.isNotEmpty) {
-      await _firestore.collection('users').doc(userId).update({
-        'identityStatus': 'pending',
+    try {
+      await _firestore.collection('identity_verifications').doc(userId).set({
+        'userId': userId,
+        'idDocumentUrl': idUrl,
+        'selfieUrl': selfieUrl,
+        'status': IdentityVerificationStatus.pending.name,
+        'submittedAt': FieldValue.serverTimestamp(),
       });
-    } else {
-      AppLogger.warning('Skipping users/{userId} update because userId is empty', 'TrustRepository');
-    }
+      
+      // Also update the user document status for immediate UI feedback if needed
+      if (userId.isNotEmpty) {
+        await _firestore.collection('users').doc(userId).update({
+          'identityStatus': 'pending',
+        });
+      } else {
+        AppLogger.warning('Skipping users/{userId} update because userId is empty', 'TrustRepository');
+      }
 
-    if (_notificationSender != null) {
-      await _notificationSender!.notifyAdmins(
-        title: 'New Identity Verification 🛡️',
-        body: 'A user has submitted identity documents and a selfie for review.',
-        route: '/admin/verifications',
-      );
+      if (_notificationSender != null) {
+        await _notificationSender!.notifyAdmins(
+          title: 'New Identity Verification 🛡️',
+          body: 'A user has submitted identity documents and a selfie for review.',
+          route: '/admin/verifications',
+        );
+      }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -234,6 +247,10 @@ class TrustRepositoryImpl implements TrustRepository {
       throw Exception('Invalid userId');
     }
 
-    await _firestore.collection('users').doc(userId).update(delta);
+    try {
+      await _firestore.collection('users').doc(userId).update(delta);
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 }

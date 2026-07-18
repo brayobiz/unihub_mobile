@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Centralized color palette for UniHub.
+/// Centralized color palette for Ulify.
 class AppColors {
   AppColors._();
 

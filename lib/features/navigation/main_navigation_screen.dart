@@ -10,6 +10,7 @@ import '../housing/presentation/screens/housing_screen.dart';
 import '../marketplace/marketplace_screen.dart';
 import '../notes/notes_screen.dart';
 import '../profile/profile_screen.dart';
+import '../chat/domain/models/message.dart';
 import '../chat/presentation/screens/conversations_list_screen.dart';
 import '../chat/shared/providers.dart';
 import '../auth/shared/providers.dart';
@@ -44,7 +45,24 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     final currentIndex = ref.watch(mainNavigationIndexProvider);
-    
+    final user = ref.watch(authStateProvider).valueOrNull;
+
+    // GLOBAL DELIVERY TRACKER:
+    // Marks incoming messages as 'delivered' (2 grey checks)
+    // as long as the user has the app open anywhere.
+    if (user != null) {
+      ref.listen(conversationsProvider(user.uid), (previous, next) {
+        if (next.hasValue) {
+          for (final conv in next.value!) {
+            if (conv.lastMessageSenderId != user.uid &&
+                conv.lastMessageStatus == MessageStatus.sent) {
+              ref.read(chatRepositoryProvider).markAsDelivered(conv.id, user.uid);
+            }
+          }
+        }
+      });
+    }
+
     return Stack(
       children: [
         Scaffold(

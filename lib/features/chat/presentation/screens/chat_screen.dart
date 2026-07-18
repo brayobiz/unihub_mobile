@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +12,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
+import '../../../auth/domain/models/app_user.dart';
 import '../../../auth/shared/providers.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../domain/models/conversation.dart';
@@ -233,11 +235,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
     
     final bool isSupport = widget.otherUserName == 'Ulify Support' ||
-                          otherUserId == 'unihub_admin' ||
+                          otherUserId == 'ulify_admin' ||
                           (conversation?.isSupport ?? false);
 
+    final effectiveStatusId = (isSupport && conversation?.assignedAdminId != null)
+        ? conversation!.assignedAdminId!
+        : otherUserId;
+
+    final otherUser = (effectiveStatusId != null && effectiveStatusId.isNotEmpty && effectiveStatusId != 'ulify_admin')
+        ? ref.watch(publicUserProvider(effectiveStatusId)).valueOrNull
+        : null;
+
     final bool isResolved = (conversation?.supportStatus == 'resolved' || conversation?.supportStatus == 'closed') &&
-                           (conversation?.lastMessageSenderId == 'unihub_admin');
+                           (conversation?.lastMessageSenderId == 'ulify_admin');
     final effectiveContext = widget.chatContext ?? conversation?.context;
 
     return Scaffold(
@@ -252,13 +262,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
         title: Consumer(
           builder: (context, ref, child) {
-            final effectiveStatusId = (isSupport && conversation?.assignedAdminId != null)
-                ? conversation!.assignedAdminId! 
-                : otherUserId;
-
-            final otherUser = (effectiveStatusId != null && effectiveStatusId.isNotEmpty && effectiveStatusId != 'unihub_admin') 
-                ? ref.watch(publicUserProvider(effectiveStatusId)).valueOrNull
-                : null;
+            // Identity Logic: Ensure we distinguish between Support and regular Users
+            final bool isSupportSession = isSupport;
 
             final isOnline = otherUser?.isOnline == true;
 
@@ -276,31 +281,54 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
             String statusText;
             if (isOtherTyping) {
-              statusText = (typingUserId == 'unihub_admin') ? 'Ulify Assistant is typing...' : 'typing...';
-            } else if (isSupport && conversation?.assignedAdminId == null) {
-              statusText = '🤖 Always active • Instant Support';
+              statusText = (typingUserId == 'ulify_admin') ? 'Ulify Assistant is typing...' : 'typing...';
+            } else if (isSupportSession && conversation?.assignedAdminId == null) {
+              final bool isHighPriority = conversation?.supportPriority == 'high';
+              statusText = isHighPriority ? '🚀 Escalated to Human Team' : '🤖 Always active • Instant Support';
             } else {
-              statusText = isOnline ? 'Online' : 'Typically replies in 5m';
+              // Hardware: For production, we remove the "typically replies in 5m" estimation
+              // as requested and use real-time online/offline status.
+              statusText = isOnline
+                  ? 'Online'
+                  : (otherUser?.lastSeen != null
+                      ? 'Last seen ${_formatLastSeen(otherUser!.lastSeen!)}'
+                      : 'Offline');
             }
 
             return Row(
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF8E8FFA), Color(0xFF6C63FF)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                if (isSupportSession)
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF8E8FFA), Color(0xFF6C63FF)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: const Color(0xFF6C63FF).withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))
+                      ],
                     ),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(color: const Color(0xFF6C63FF).withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))
-                    ],
+                    child: const Icon(Icons.headset_mic_rounded, size: 22, color: Colors.white),
+                  )
+                else
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                    backgroundImage: otherUser?.photoUrl != null ? CachedNetworkImageProvider(otherUser!.photoUrl!) : null,
+                    onBackgroundImageError: otherUser?.photoUrl != null ? (exception, stackTrace) {
+                      debugPrint('🖼️ Header Avatar Error: $exception');
+                    } : null,
+                    child: otherUser?.photoUrl == null
+                        ? Text(
+                            widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : 'U',
+                            style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
+                          )
+                        : null,
                   ),
-                  child: const Icon(Icons.headset_mic_rounded, size: 22, color: Colors.white),
-                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -315,8 +343,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.verified, color: Color(0xFF6C63FF), size: 16),
+                          // Blue tick: Only for Support or Identity-Verified Users
+                          if (isSupportSession || otherUser?.isVerified == true) ...[
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.verified,
+                              color: isSupportSession ? const Color(0xFF6C63FF) : theme.colorScheme.primary,
+                              size: 16
+                            ),
+                          ],
                         ],
                       ),
                       Text(
@@ -346,7 +381,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           // Safety & Security Banner (Visible in all chats)
           _buildSafetyBanner(context, isSupport),
             
-          if (effectiveContext != null && effectiveContext.type != 'support') 
+          // Context Banner: Only show for specific topics like Marketplace, Housing, or Events.
+          // Hide for 'support' and generic 'user' chats to keep the UI clean.
+          if (effectiveContext != null &&
+              effectiveContext.type != 'support' &&
+              effectiveContext.type != 'user')
             _buildContextBanner(context, effectiveContext),
           
           if (isResolved)
@@ -387,9 +426,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     final bool isSameSenderAsNext = index > 0 && messages[index - 1].senderId == message.senderId;
                     
                     // Context Divider Logic: Only show for marketplace/housing to distinguish topics.
-                    // Support chats are clean by default as they have a single clear context.
+                    // Hide for 'support' and generic 'user' chats to keep the conversation clean.
                     bool showContextDivider = false;
-                    if (message.context != null && message.context?.type != 'support') {
+                    if (message.context != null &&
+                        message.context?.type != 'support' &&
+                        message.context?.type != 'user') {
                       if (index == messages.length - 1) {
                         showContextDivider = true;
                       } else {
@@ -406,7 +447,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           _buildContextDivider(context, message.context!),
                         GestureDetector(
                           onLongPress: () => _onLongPressMessage(message, isMe),
-                          child: _buildMessageBubble(context, message, isMe, !isSameSenderAsNext),
+                          child: _buildMessageBubble(context, message, isMe, !isSameSenderAsNext, isSupport, otherUser),
                         ),
                       ],
                     );
@@ -886,7 +927,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Widget _buildMessageBubble(BuildContext context, Message message, bool isMe, bool showTail) {
+  Widget _buildMessageBubble(BuildContext context, Message message, bool isMe, bool showTail, bool isSupport, AppUser? otherUser) {
     final theme = Theme.of(context);
     final isAi = message.metadata?['isAi'] == true;
     final String? botName = message.metadata?['botName'];
@@ -913,7 +954,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         shape: BoxShape.circle,
                         border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.3)),
                         image: (!isAi && sender?.photoUrl != null) 
-                            ? DecorationImage(image: NetworkImage(sender!.photoUrl!), fit: BoxFit.cover)
+                            ? DecorationImage(
+                                image: CachedNetworkImageProvider(sender!.photoUrl!),
+                                fit: BoxFit.cover,
+                                onError: (exception, stackTrace) {
+                                  debugPrint('🖼️ Bubble Avatar Error: $exception');
+                                },
+                              )
                             : null,
                       ),
                       child: (!isAi && sender?.photoUrl == null)
@@ -928,7 +975,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               Flexible(
                 child: Container(
                   constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // Tighter padding
                   decoration: BoxDecoration(
                     color: isMe ? const Color(0xFF6C63FF) : theme.colorScheme.surface,
                     borderRadius: BorderRadius.only(
@@ -948,16 +995,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     children: [
                       if (!isMe && isAi)
                         Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.only(bottom: 4),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.auto_awesome, size: 12, color: Color(0xFF6C63FF)),
-                              const SizedBox(width: 6),
+                              const Icon(Icons.auto_awesome, size: 10, color: Color(0xFF6C63FF)),
+                              const SizedBox(width: 4),
                               Text(
-                                botName ?? 'Campus Buddy',
+                                botName ?? 'Ulify Assistant',
                                 style: const TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 10,
                                   fontWeight: FontWeight.w800,
                                   color: Color(0xFF6C63FF),
                                   letterSpacing: 0.5,
@@ -966,23 +1013,36 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             ],
                           ),
                         ),
-                      _buildMessageContent(context, message, isMe),
-                      const SizedBox(height: 6),
                       Row(
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text(
-                            DateFormat('HH:mm').format(message.timestamp), 
-                            style: TextStyle(
-                              fontSize: 10, 
-                              fontWeight: FontWeight.w500,
-                              color: isMe ? Colors.white.withOpacity(0.7) : Colors.grey.withOpacity(0.8),
-                            ),
+                          Flexible(
+                            child: _buildMessageContent(context, message, isMe),
                           ),
-                          if (isMe) ...[
-                            const SizedBox(width: 4),
-                            _buildStatusIcon(message.status),
-                          ],
+                          const SizedBox(width: 8),
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              if (isMe)
+                                _buildStatusIcon(
+                                  message.status,
+                                  showMiniAvatar: showTail && message.status == MessageStatus.read,
+                                  otherUser: otherUser,
+                                  isSupport: isSupport
+                                ),
+                              Text(
+                                DateFormat('HH:mm').format(message.timestamp),
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w400,
+                                  color: isMe ? Colors.white.withOpacity(0.5) : Colors.grey.withOpacity(0.6),
+                                  letterSpacing: 0.1,
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ],
@@ -997,25 +1057,67 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Widget _buildStatusIcon(MessageStatus status) {
+  Widget _buildStatusIcon(MessageStatus status, {bool showMiniAvatar = false, AppUser? otherUser, bool isSupport = false}) {
     IconData icon;
     Color color = Colors.white70;
+    bool hasGlow = false;
+
     switch (status) {
       case MessageStatus.sending:
         icon = Icons.access_time;
         break;
       case MessageStatus.sent:
         icon = Icons.check;
+        color = Colors.grey.shade400; // 1 Grey Check (Sent/Offline)
         break;
       case MessageStatus.delivered:
         icon = Icons.done_all;
+        color = Colors.grey.shade400; // 2 Grey Checks (Delivered/In-app)
         break;
       case MessageStatus.read:
         icon = Icons.done_all;
-        color = Colors.lightBlueAccent;
+        color = const Color(0xFF00FFFF); // Electric Cyan (High Glow)
+        hasGlow = true;
         break;
     }
-    return Icon(icon, size: 12, color: color);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (hasGlow)
+          Container(
+            decoration: BoxDecoration(
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.4),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                )
+              ],
+            ),
+            child: Icon(icon, size: 12, color: color),
+          )
+        else
+          Icon(icon, size: 12, color: color),
+        if (showMiniAvatar) ...[
+          const SizedBox(width: 4),
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 0.5),
+              image: (!isSupport && otherUser?.photoUrl != null)
+                  ? DecorationImage(image: CachedNetworkImageProvider(otherUser!.photoUrl!), fit: BoxFit.cover)
+                  : null,
+            ),
+            child: (isSupport || otherUser?.photoUrl == null)
+                ? Icon(isSupport ? Icons.headset_mic_rounded : Icons.person_rounded, size: 8, color: Colors.white)
+                : null,
+          ),
+        ],
+      ],
+    );
   }
 
   Widget _buildMessageContent(BuildContext context, Message message, bool isMe) {
@@ -1073,7 +1175,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           style: theme.textTheme.bodyMedium?.copyWith(
             color: isMe ? Colors.white : theme.colorScheme.onSurface, 
             fontSize: 14,
-            height: 1.4,
+            height: 1.3, // Sleeker line height
           ),
         );
     }

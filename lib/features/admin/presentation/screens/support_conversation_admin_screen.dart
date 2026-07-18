@@ -68,7 +68,7 @@ class _SupportConversationAdminScreenState extends ConsumerState<SupportConversa
 
     final message = Message(
       id: const Uuid().v4(),
-      senderId: 'unihub_admin', // Send as the generic support identity
+      senderId: 'ulify_admin', // Send as the generic support identity
       content: content,
       type: type,
       status: MessageStatus.sending,
@@ -186,7 +186,7 @@ class _SupportConversationAdminScreenState extends ConsumerState<SupportConversa
     {'title': 'Need Info', 'text': 'To help you further, could you please provide more details or a screenshot of the issue?'},
     {'title': 'Resolved', 'text': 'I have resolved the issue for you. Is there anything else I can help with?'},
     {'title': 'Escalated', 'text': 'I am escalating this to our technical team. We will get back to you soon.'},
-    {'title': 'Closing', 'text': 'Thank you for contacting UniHub support. This session will now be closed.'},
+    {'title': 'Closing', 'text': 'Thank you for contacting Ulify support. This session will now be closed.'},
   ];
 
   void _showQuickReplies() {
@@ -227,7 +227,7 @@ class _SupportConversationAdminScreenState extends ConsumerState<SupportConversa
     setState(() => _isProcessing = true);
     final navigator = Navigator.of(context);
     try {
-      _sendMessage('Thank you for using UniHub Support. This ticket is now marked as Resolved.');
+      _sendMessage('Thank you for using Ulify Support. This ticket is now marked as Resolved.');
       
       // Mark as read and update status
       await ref.read(adminRepositoryProvider).updateSupportConversationStatus(
@@ -260,7 +260,7 @@ class _SupportConversationAdminScreenState extends ConsumerState<SupportConversa
         data: (conversation) {
           if (conversation == null) return const Center(child: Text('Conversation not found'));
           
-          final userId = conversation.participants.firstWhere((p) => p != 'unihub_admin' && p != currentUser?.uid, orElse: () => '');
+          final userId = conversation.participants.firstWhere((p) => p != 'ulify_admin' && p != currentUser?.uid, orElse: () => '');
           final userAsync = ref.watch(userByIdProvider(userId));
 
           if (isMobile) {
@@ -346,7 +346,7 @@ class _SupportConversationAdminScreenState extends ConsumerState<SupportConversa
               itemCount: messages.length,
               itemBuilder: (context, index) {
                 final message = messages[index];
-                final isMe = message.senderId == 'unihub_admin';
+                final isMe = message.senderId == 'ulify_admin';
                 return _buildMessageBubble(message, isMe);
               },
             ),

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:unihub_mobile/core/error/error_handler.dart';
 import '../../domain/models/attendance.dart';
 import '../../domain/models/event.dart';
 import '../../domain/repositories/attendance_repository.dart';
@@ -39,73 +40,77 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
 
   @override
   Future<void> setAttendance(String userId, String eventId, AttendanceStatus? status) async {
-    final docRef = _firestore.collection('event_attendance').doc('${userId}_$eventId');
-    final eventRef = _firestore.collection('events').doc(eventId);
-    
-    await _firestore.runTransaction((transaction) async {
-      final attendanceDoc = await transaction.get(docRef);
-      final eventDoc = await transaction.get(eventRef);
+    try {
+      final docRef = _firestore.collection('event_attendance').doc('${userId}_$eventId');
+      final eventRef = _firestore.collection('events').doc(eventId);
       
-      if (!eventDoc.exists) throw Exception('Event not found');
-      
-      final oldStatusStr = attendanceDoc.exists ? (attendanceDoc.data()?['status'] as String?) : null;
-      AttendanceStatus? oldStatus;
-      if (oldStatusStr != null) {
-        for (final s in AttendanceStatus.values) {
-          if (s.name == oldStatusStr) {
-            oldStatus = s;
-            break;
+      await _firestore.runTransaction((transaction) async {
+        final attendanceDoc = await transaction.get(docRef);
+        final eventDoc = await transaction.get(eventRef);
+        
+        if (!eventDoc.exists) throw Exception('Event not found');
+        
+        final oldStatusStr = attendanceDoc.exists ? (attendanceDoc.data()?['status'] as String?) : null;
+        AttendanceStatus? oldStatus;
+        if (oldStatusStr != null) {
+          for (final s in AttendanceStatus.values) {
+            if (s.name == oldStatusStr) {
+              oldStatus = s;
+              break;
+            }
           }
         }
-      }
 
-      if (status == AttendanceStatus.going && oldStatus != AttendanceStatus.going) {
-        final data = eventDoc.data() as Map<String, dynamic>;
-        final maxCapacity = data['maxCapacity'] as int?;
-        final currentCount = (data['currentAttendeeCount'] ?? 0) as int;
-        if (maxCapacity != null && currentCount >= maxCapacity) {
-          throw Exception('Event is at full capacity');
+        if (status == AttendanceStatus.going && oldStatus != AttendanceStatus.going) {
+          final data = eventDoc.data() as Map<String, dynamic>;
+          final maxCapacity = data['maxCapacity'] as int?;
+          final currentCount = (data['currentAttendeeCount'] ?? 0) as int;
+          if (maxCapacity != null && currentCount >= maxCapacity) {
+            throw Exception('Event is at full capacity');
+          }
         }
-      }
 
-      if (status == null) {
-        // Remove attendance
-        if (attendanceDoc.exists) {
-          transaction.delete(docRef);
-          _updateCounts(transaction, eventRef, oldStatus, null);
+        if (status == null) {
+          // Remove attendance
+          if (attendanceDoc.exists) {
+            transaction.delete(docRef);
+            _updateCounts(transaction, eventRef, oldStatus, null);
+          }
+        } else {
+          // Set/Update attendance
+          transaction.set(docRef, {
+            'userId': userId,
+            'eventId': eventId,
+            'status': status.name,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+          _updateCounts(transaction, eventRef, oldStatus, status);
         }
+      });
+
+      if (status != null) {
+        AppLogger.info('Attendance Update: User $userId marked ${status.name} for Event $eventId', 'ATTENDANCE_REPO');
       } else {
-        // Set/Update attendance
-        transaction.set(docRef, {
-          'userId': userId,
-          'eventId': eventId,
-          'status': status.name,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-        _updateCounts(transaction, eventRef, oldStatus, status);
+        AppLogger.info('Attendance Removed: User $userId removed status for Event $eventId', 'ATTENDANCE_REPO');
       }
-    });
 
-    if (status != null) {
-      AppLogger.info('Attendance Update: User $userId marked ${status.name} for Event $eventId', 'ATTENDANCE_REPO');
-    } else {
-      AppLogger.info('Attendance Removed: User $userId removed status for Event $eventId', 'ATTENDANCE_REPO');
-    }
-
-    if (_notificationSender != null && status != null) {
-      final eventDoc = await _firestore.collection('events').doc(eventId).get();
-      final event = Event.fromFirestore(eventDoc);
-      
-      if (status == AttendanceStatus.going) {
-        await _notificationSender!.sendNotification(
-          recipientId: userId,
-          title: 'You\'re going! 📅',
-          body: 'Success! "${event.title}" has been added to your My Events hub.',
-          type: NotificationType.events,
-          targetId: eventId,
-          targetType: 'event',
-        );
+      if (_notificationSender != null && status != null) {
+        final eventDoc = await _firestore.collection('events').doc(eventId).get();
+        final event = Event.fromFirestore(eventDoc);
+        
+        if (status == AttendanceStatus.going) {
+          await _notificationSender!.sendNotification(
+            recipientId: userId,
+            title: 'You\'re going! 📅',
+            body: 'Success! "${event.title}" has been added to your My Events hub.',
+            type: NotificationType.events,
+            targetId: eventId,
+            targetType: 'event',
+          );
+        }
       }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 

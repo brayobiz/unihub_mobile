@@ -348,7 +348,7 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'This will send a push notification to ALL UniHub users.',
+                  'This will send a push notification to ALL Ulify users.',
                   style: TextStyle(fontSize: 12),
                 ),
                 const SizedBox(height: 16),

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:unihub_mobile/core/error/error_handler.dart';
 import 'package:unihub_mobile/core/utils/app_logger.dart';
 import 'package:unihub_mobile/core/services/notification_sender.dart';
 import 'package:unihub_mobile/features/shared/domain/models/uni_notification.dart';
@@ -94,10 +95,9 @@ class NotificationRepositoryImpl implements NotificationRepository {
       if (notificationId.isEmpty) {
         if (aggregatable) {
           notificationId = _generateAggregationId(notification);
-        } else if (notification.type == NotificationType.review || 
-                   notification.title.toLowerCase().contains('saved')) {
-          // Keep existing legacy de-duplication for reviews
-          notificationId = '${notification.recipientId}_${notification.type.name}_${notification.targetId}';
+        } else if (notification.title.toLowerCase().contains('saved')) {
+          // Keep existing legacy de-duplication for saved items
+          notificationId = '${notification.recipientId}_save_${notification.targetId}';
         }
       }
 
@@ -150,7 +150,7 @@ class NotificationRepositoryImpl implements NotificationRepository {
       return finalNotification;
     } catch (e) {
       AppLogger.error('Error creating/aggregating notification', e, null, 'NOTIF_REPO');
-      rethrow;
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -163,6 +163,7 @@ class NotificationRepositoryImpl implements NotificationRepository {
     // 2. High-volume engagement events
     if (n.type == NotificationType.follower) return true;
     if (n.type == NotificationType.community) return true; // Likes/Comments
+    if (n.type == NotificationType.review) return true;
 
     // 3. Resource-specific engagement (Saves/Downloads)
     final title = n.title.toLowerCase();
@@ -176,7 +177,6 @@ class NotificationRepositoryImpl implements NotificationRepository {
     // - marketplace_offer (Each is a distinct negotiation step/order-like)
     // - gig (Transactional)
     // - system (Official announcements)
-    // - review (Handled by legacy de-duplication/overwriting)
 
     return false;
   }
@@ -187,6 +187,9 @@ class NotificationRepositoryImpl implements NotificationRepository {
     }
     if (n.type == NotificationType.follower) {
       return '${n.recipientId}_follower_summary';
+    }
+    if (n.type == NotificationType.review) {
+      return '${n.recipientId}_review_${n.targetId}';
     }
     if (n.title.toLowerCase().contains('saved')) {
       return '${n.recipientId}_save_${n.targetId}';
@@ -210,6 +213,9 @@ class NotificationRepositoryImpl implements NotificationRepository {
     } else if (existing.type == NotificationType.follower) {
       updatedTitle = 'New Followers';
       updatedBody = '${incoming.actorName} and ${count - 1} others followed you';
+    } else if (existing.type == NotificationType.review) {
+      updatedTitle = 'New Reviews';
+      updatedBody = '${incoming.actorName} and ${count - 1} others reviewed your item';
     } else if (existing.title.toLowerCase().contains('saved')) {
       updatedTitle = 'New Saves';
       updatedBody = '$count people saved your ${incoming.targetType ?? 'item'}';

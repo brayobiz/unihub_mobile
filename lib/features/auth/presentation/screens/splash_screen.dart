@@ -13,35 +13,15 @@ class SplashScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Show the branded logo from assets
               Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.school_rounded,
-                  size: 80,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-              const SizedBox(height: 32),
-              Text(
-                'Ulify',
-                style: theme.textTheme.displayLarge?.copyWith(
-                  fontSize: 40,
-                  fontWeight: FontWeight.w900,
-                  color: theme.colorScheme.onSurface,
-                  letterSpacing: -1.5,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Your Campus, Your Opportunities',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: theme.colorScheme.onSurfaceVariant,
+                width: 200,
+                height: 200,
+                decoration: const BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage('assets/icon/campus_icon.png'),
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
               const SizedBox(height: 64),

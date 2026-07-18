@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:unihub_mobile/core/error/error_handler.dart';
 import '../../domain/models/browsing_scope.dart';
 import '../../domain/repositories/campus_filter_repository.dart';
 
@@ -11,8 +12,12 @@ class CampusFilterRepositoryImpl implements CampusFilterRepository {
 
   @override
   Future<void> saveBrowsingScope(BrowsingScope scope) async {
-    final json = jsonEncode(scope.toJson());
-    await _prefs.setString(_key, json);
+    try {
+      final json = jsonEncode(scope.toJson());
+      await _prefs.setString(_key, json);
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override

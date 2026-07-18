@@ -156,7 +156,7 @@ class OrganizerService {
       id: '${organizerId}_$targetUserId',
       organizerId: organizerId,
       userId: targetUserId,
-      userName: targetData['fullName'] ?? 'UniHub User',
+      userName: targetData['fullName'] ?? 'Ulify User',
       userPhotoUrl: targetData['photoUrl'],
       role: role,
       joinedAt: DateTime.now(),
@@ -355,7 +355,7 @@ class OrganizerService {
             break;
           case OrganizerVerificationStatus.official:
             title = 'Official Status Granted 👑';
-            body = 'Congratulations! "${organizer.name}" is now an Official Organizer on UniHub.';
+            body = 'Congratulations! "${organizer.name}" is now an Official Organizer on Ulify.';
             break;
           case OrganizerVerificationStatus.rejected:
             title = 'Application Needs Attention ⚠️';

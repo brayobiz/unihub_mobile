@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:rxdart/rxdart.dart';
+import 'package:unihub_mobile/core/error/error_handler.dart';
 import '../../domain/models/admin_stats.dart';
 import '../../domain/models/verification_request.dart';
 import '../../domain/models/report.dart';
@@ -330,33 +331,33 @@ class AdminRepository {
     String? adminNotes,
     double trustBoost = 0,
   }) async {
-    // DEBUG: Log all inputs
-    AppLogger.info('=== VERIFICATION APPROVAL DEBUG LOG === requestId: "${request.id}" newStatus: $newStatus', 'AdminRepository');
-    
-    // Defense-in-depth: Re-verify admin status for destructive actions
-    if (!await _isUserAdmin(adminId)) {
-      throw Exception('Unauthorized: Administrative privileges required.');
-    }
-
-    final timestamp = FieldValue.serverTimestamp();
-
-    // ID Validation: Firestore doc() requires non-empty strings
-    if (request.id.isEmpty || request.id.trim().isEmpty) {
-      AppLogger.error('❌ Cannot process verification: EMPTY request.id', null, null, 'AdminRepository');
-      throw Exception('Invalid Verification Request ID - value is empty');
-    }
-    
-    final collectionName = _getCollectionName(request.type);
-    if (collectionName.isEmpty) {
-      AppLogger.error('❌ Cannot process verification with invalid type: ${request.type}', null, null, 'AdminRepository');
-      throw Exception('Invalid Verification Type');
-    }
-
-    AppLogger.info('collectionName: "$collectionName"', 'AdminRepository');
-
-    final batch = _firestore.batch();
-
     try {
+      // DEBUG: Log all inputs
+      AppLogger.info('=== VERIFICATION APPROVAL DEBUG LOG === requestId: "${request.id}" newStatus: $newStatus', 'AdminRepository');
+      
+      // Defense-in-depth: Re-verify admin status for destructive actions
+      if (!await _isUserAdmin(adminId)) {
+        throw Exception('Unauthorized: Administrative privileges required.');
+      }
+
+      final timestamp = FieldValue.serverTimestamp();
+
+      // ID Validation: Firestore doc() requires non-empty strings
+      if (request.id.isEmpty || request.id.trim().isEmpty) {
+        AppLogger.error('❌ Cannot process verification: EMPTY request.id', null, null, 'AdminRepository');
+        throw Exception('Invalid Verification Request ID - value is empty');
+      }
+      
+      final collectionName = _getCollectionName(request.type);
+      if (collectionName.isEmpty) {
+        AppLogger.error('❌ Cannot process verification with invalid type: ${request.type}', null, null, 'AdminRepository');
+        throw Exception('Invalid Verification Type');
+      }
+
+      AppLogger.info('collectionName: "$collectionName"', 'AdminRepository');
+
+      final batch = _firestore.batch();
+
       // 1. Update the specific verification document
       AppLogger.info('📝 About to update verification document at: $collectionName/$request.id', 'AdminRepository');
       final verifRef = _firestore.collection(collectionName).doc(request.id);
@@ -491,18 +492,18 @@ class AdminRepository {
          adminId: adminId,
          adminName: adminName,
          actionType: AdminActionType.bulkAction,
-         targetId: request.id,
+         targetId: request.id ?? 'unknown',
          targetType: 'verification_error',
          timestamp: DateTime.now(),
          reason: 'Verification processing failed: $e',
          metadata: {
-           'userId': request.userId,
-           'type': request.type.name,
+           'userId': request.userId ?? 'unknown',
+           'type': request.type?.name ?? 'unknown',
            'error': e.toString(),
          },
        ));
        
-       rethrow;
+       throw Exception(AppErrorHandler.mapError(e));
      }
   }
 
@@ -550,31 +551,35 @@ class AdminRepository {
     String newStatus, 
     {required String adminId, required String adminName, String? reason}
   ) async {
-    // Defense-in-depth: ensure caller is an admin
-    if (!await _isUserAdmin(adminId)) {
-      throw Exception('Unauthorized: Administrative privileges required.');
-    }
-    if (contentId.isEmpty) throw Exception('Invalid Content ID');
-    final collection = _getCollectionForType(type);
-    final docRef = _firestore.collection(collection).doc(contentId);
-    
-    await docRef.update({
-      'status': newStatus,
-      'updatedAt': FieldValue.serverTimestamp(),
-      if (reason != null) 'moderationReason': reason,
-    });
+    try {
+      // Defense-in-depth: ensure caller is an admin
+      if (!await _isUserAdmin(adminId)) {
+        throw Exception('Unauthorized: Administrative privileges required.');
+      }
+      if (contentId.isEmpty) throw Exception('Invalid Content ID');
+      final collection = _getCollectionForType(type);
+      final docRef = _firestore.collection(collection).doc(contentId);
+      
+      await docRef.update({
+        'status': newStatus,
+        'updatedAt': FieldValue.serverTimestamp(),
+        if (reason != null) 'moderationReason': reason,
+      });
 
-    await logAction(AdminAuditLog(
-      id: '',
-      adminId: adminId,
-      adminName: adminName,
-      actionType: newStatus == 'removed' ? AdminActionType.contentRemoval : AdminActionType.contentRestore,
-      targetId: contentId,
-      targetType: type.name,
-      timestamp: DateTime.now(),
-      reason: reason,
-      metadata: {'status': newStatus},
-    ));
+      await logAction(AdminAuditLog(
+        id: '',
+        adminId: adminId,
+        adminName: adminName,
+        actionType: newStatus == 'removed' ? AdminActionType.contentRemoval : AdminActionType.contentRestore,
+        targetId: contentId,
+        targetType: type.name,
+        timestamp: DateTime.now(),
+        reason: reason,
+        metadata: {'status': newStatus},
+      ));
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   Future<void> marketplacePromotionAction({
@@ -584,42 +589,46 @@ class AdminRepository {
     required String adminName,
     Map<String, dynamic>? metadata,
   }) async {
-    if (!await _isUserAdmin(adminId)) {
-      throw Exception('Unauthorized: Administrative privileges required.');
+    try {
+      if (!await _isUserAdmin(adminId)) {
+        throw Exception('Unauthorized: Administrative privileges required.');
+      }
+
+      final docRef = _firestore.collection('listings').doc(listingId);
+      final now = DateTime.now();
+      final Map<String, dynamic> updateData = {'updatedAt': FieldValue.serverTimestamp()};
+
+      if (action == 'feature') {
+        final days = metadata?['days'] ?? 7;
+        updateData['isFeatured'] = true;
+        updateData['featuredAt'] = FieldValue.serverTimestamp();
+        updateData['featuredUntil'] = Timestamp.fromDate(now.add(Duration(days: days)));
+        updateData['featuredPackage'] = 'admin_promo';
+      } else if (action == 'boost') {
+        updateData['lastBoostedAt'] = FieldValue.serverTimestamp();
+        updateData['boostCount'] = FieldValue.increment(1);
+      } else if (action == 'sponsor') {
+        final days = metadata?['days'] ?? 3;
+        updateData['isSponsored'] = true;
+        updateData['sponsoredUntil'] = Timestamp.fromDate(now.add(Duration(days: days)));
+      }
+
+      await docRef.update(updateData);
+
+      await logAction(AdminAuditLog(
+        id: '',
+        adminId: adminId,
+        adminName: adminName,
+        actionType: AdminActionType.bulkAction, // Or add MarketplacePromotion action type
+        targetId: listingId,
+        targetType: 'marketplace',
+        timestamp: DateTime.now(),
+        reason: 'Admin $action applied',
+        metadata: {'action': action, ...?metadata},
+      ));
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
-
-    final docRef = _firestore.collection('listings').doc(listingId);
-    final now = DateTime.now();
-    final Map<String, dynamic> updateData = {'updatedAt': FieldValue.serverTimestamp()};
-
-    if (action == 'feature') {
-      final days = metadata?['days'] ?? 7;
-      updateData['isFeatured'] = true;
-      updateData['featuredAt'] = FieldValue.serverTimestamp();
-      updateData['featuredUntil'] = Timestamp.fromDate(now.add(Duration(days: days)));
-      updateData['featuredPackage'] = 'admin_promo';
-    } else if (action == 'boost') {
-      updateData['lastBoostedAt'] = FieldValue.serverTimestamp();
-      updateData['boostCount'] = FieldValue.increment(1);
-    } else if (action == 'sponsor') {
-      final days = metadata?['days'] ?? 3;
-      updateData['isSponsored'] = true;
-      updateData['sponsoredUntil'] = Timestamp.fromDate(now.add(Duration(days: days)));
-    }
-
-    await docRef.update(updateData);
-
-    await logAction(AdminAuditLog(
-      id: '',
-      adminId: adminId,
-      adminName: adminName,
-      actionType: AdminActionType.bulkAction, // Or add MarketplacePromotion action type
-      targetId: listingId,
-      targetType: 'marketplace',
-      timestamp: DateTime.now(),
-      reason: 'Admin $action applied',
-      metadata: {'action': action, ...?metadata},
-    ));
   }
 
   String _getCollectionForType(ContentType type) {
@@ -733,65 +742,69 @@ class AdminRepository {
   }) async {
     if (report.id.isEmpty) throw Exception('Invalid Report ID');
     
-    // Defense-in-depth: Re-verify admin status for destructive actions
-    if (!await _isUserAdmin(adminId)) {
-      throw Exception('Unauthorized: Administrative privileges required.');
+    try {
+      // Defense-in-depth: Re-verify admin status for destructive actions
+      if (!await _isUserAdmin(adminId)) {
+        throw Exception('Unauthorized: Administrative privileges required.');
+      }
+
+      final batch = _firestore.batch();
+      final timestamp = DateTime.now();
+      final historyItem = ModerationHistoryItem(
+        adminId: adminId,
+        action: action,
+        notes: notes,
+        timestamp: timestamp,
+      );
+
+      // 1. Update Report Status & History
+      final collection = report.type == ReportType.housing ? 'housing_reports' : 'reports';
+      final reportRef = _firestore.collection(collection).doc(report.id);
+      
+      batch.update(reportRef, {
+        'status': action == 'dismiss' ? 'dismissed' : 'resolved',
+        'lastAction': action,  // Track the specific action taken
+        'history': FieldValue.arrayUnion([historyItem.toJson()]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // 2. Perform Content/User Actions
+      if (action == 'remove' && report.targetId != null && report.targetId!.isNotEmpty) {
+        await _removeContent(batch, report.type, report.targetId!);
+      } else if (action == 'warn' && report.reportedUserId != null && report.reportedUserId!.isNotEmpty) {
+        batch.update(_firestore.collection('users').doc(report.reportedUserId!), {
+          'hasActiveWarning': true,
+          'warningReason': notes ?? report.reason,
+          'lastWarningAt': FieldValue.serverTimestamp(),
+        });
+      } else if (action == 'suspend' && report.reportedUserId != null && report.reportedUserId!.isNotEmpty) {
+        final until = timestamp.add(Duration(days: suspensionDays ?? 7));
+        batch.update(_firestore.collection('users').doc(report.reportedUserId!), {
+          'suspendedUntil': Timestamp.fromDate(until),
+        });
+      } else if (action == 'ban' && report.reportedUserId != null && report.reportedUserId!.isNotEmpty) {
+        batch.update(_firestore.collection('users').doc(report.reportedUserId!), {
+          'isBanned': true,
+          'banReason': notes ?? report.reason,
+        });
+      }
+
+      await batch.commit();
+
+      await logAction(AdminAuditLog(
+        id: '',
+        adminId: adminId,
+        adminName: adminName,
+        actionType: action == 'dismiss' ? AdminActionType.reportDismissal : AdminActionType.reportResolution,
+        targetId: report.id,
+        targetType: 'report',
+        timestamp: DateTime.now(),
+        reason: notes,
+        metadata: {'action': action, 'targetId': report.targetId, 'reportedUserId': report.reportedUserId},
+      ));
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
-
-    final batch = _firestore.batch();
-    final timestamp = DateTime.now();
-    final historyItem = ModerationHistoryItem(
-      adminId: adminId,
-      action: action,
-      notes: notes,
-      timestamp: timestamp,
-    );
-
-    // 1. Update Report Status & History
-    final collection = report.type == ReportType.housing ? 'housing_reports' : 'reports';
-    final reportRef = _firestore.collection(collection).doc(report.id);
-    
-    batch.update(reportRef, {
-      'status': action == 'dismiss' ? 'dismissed' : 'resolved',
-      'lastAction': action,  // Track the specific action taken
-      'history': FieldValue.arrayUnion([historyItem.toJson()]),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-
-    // 2. Perform Content/User Actions
-    if (action == 'remove' && report.targetId != null && report.targetId!.isNotEmpty) {
-      await _removeContent(batch, report.type, report.targetId!);
-    } else if (action == 'warn' && report.reportedUserId != null && report.reportedUserId!.isNotEmpty) {
-      batch.update(_firestore.collection('users').doc(report.reportedUserId!), {
-        'hasActiveWarning': true,
-        'warningReason': notes ?? report.reason,
-        'lastWarningAt': FieldValue.serverTimestamp(),
-      });
-    } else if (action == 'suspend' && report.reportedUserId != null && report.reportedUserId!.isNotEmpty) {
-      final until = timestamp.add(Duration(days: suspensionDays ?? 7));
-      batch.update(_firestore.collection('users').doc(report.reportedUserId!), {
-        'suspendedUntil': Timestamp.fromDate(until),
-      });
-    } else if (action == 'ban' && report.reportedUserId != null && report.reportedUserId!.isNotEmpty) {
-      batch.update(_firestore.collection('users').doc(report.reportedUserId!), {
-        'isBanned': true,
-        'banReason': notes ?? report.reason,
-      });
-    }
-
-    await batch.commit();
-
-    await logAction(AdminAuditLog(
-      id: '',
-      adminId: adminId,
-      adminName: adminName,
-      actionType: action == 'dismiss' ? AdminActionType.reportDismissal : AdminActionType.reportResolution,
-      targetId: report.id,
-      targetType: 'report',
-      timestamp: DateTime.now(),
-      reason: notes,
-      metadata: {'action': action, 'targetId': report.targetId, 'reportedUserId': report.reportedUserId},
-    ));
   }
 
   Future<void> _removeContent(WriteBatch batch, ReportType type, String targetId) async {
@@ -895,204 +908,224 @@ class AdminRepository {
 
   Future<void> updateUserRoles(String userId, List<String> roles, {required String adminId, required String adminName}) async {
     if (userId.isEmpty) throw Exception('Invalid User ID');
-    // Re-verify admin privileges
-    if (!await _isUserAdmin(adminId)) {
-      throw Exception('Unauthorized: Administrative privileges required.');
-    }
-    await _firestore.collection('users').doc(userId).update({
-      'roles': roles,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      // Re-verify admin privileges
+      if (!await _isUserAdmin(adminId)) {
+        throw Exception('Unauthorized: Administrative privileges required.');
+      }
+      await _firestore.collection('users').doc(userId).update({
+        'roles': roles,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
-    await logAction(AdminAuditLog(
-      id: '',
-      adminId: adminId,
-      adminName: adminName,
-      actionType: AdminActionType.userRoleUpdate,
-      targetId: userId,
-      targetType: 'user',
-      timestamp: DateTime.now(),
-      metadata: {'roles': roles},
-    ));
+      await logAction(AdminAuditLog(
+        id: '',
+        adminId: adminId,
+        adminName: adminName,
+        actionType: AdminActionType.userRoleUpdate,
+        targetId: userId,
+        targetType: 'user',
+        timestamp: DateTime.now(),
+        metadata: {'roles': roles},
+      ));
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   Future<void> toggleUserBan(String userId, bool isBanned, {required String adminId, required String adminName, String? reason}) async {
     if (userId.isEmpty) throw Exception('Invalid User ID');
     
-    // Defense-in-depth: Re-verify admin status for destructive actions
-    if (!await _isUserAdmin(adminId)) {
-      throw Exception('Unauthorized: Administrative privileges required.');
-    }
+    try {
+      // Defense-in-depth: Re-verify admin status for destructive actions
+      if (!await _isUserAdmin(adminId)) {
+        throw Exception('Unauthorized: Administrative privileges required.');
+      }
 
-    final batch = _firestore.batch();
-    final userRef = _firestore.collection('users').doc(userId);
-    
-    batch.update(userRef, {
-      'isBanned': isBanned,
-      'banReason': isBanned ? reason : null,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+      final batch = _firestore.batch();
+      final userRef = _firestore.collection('users').doc(userId);
+      
+      batch.update(userRef, {
+        'isBanned': isBanned,
+        'banReason': isBanned ? reason : null,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
-    // Spark Plan Workaround: Manually update listings since Cloud Functions are disabled
-    final listings = await _firestore.collection('listings')
-        .where('sellerId', isEqualTo: userId)
-        .get();
-        
-    for (var doc in listings.docs) {
-      if (isBanned) {
-        if (doc.data()['status'] == 'active') {
-          batch.update(doc.reference, {
-            'status': 'userSuspended',
-            'originalStatus': 'active',
-          });
-        }
-      } else {
-        if (doc.data()['status'] == 'userSuspended') {
-          batch.update(doc.reference, {
-            'status': doc.data()['originalStatus'] ?? 'active',
-            'originalStatus': FieldValue.delete(),
-          });
+      // Spark Plan Workaround: Manually update listings since Cloud Functions are disabled
+      final listings = await _firestore.collection('listings')
+          .where('sellerId', isEqualTo: userId)
+          .get();
+          
+      for (var doc in listings.docs) {
+        if (isBanned) {
+          if (doc.data()['status'] == 'active') {
+            batch.update(doc.reference, {
+              'status': 'userSuspended',
+              'originalStatus': 'active',
+            });
+          }
+        } else {
+          if (doc.data()['status'] == 'userSuspended') {
+            batch.update(doc.reference, {
+              'status': doc.data()['originalStatus'] ?? 'active',
+              'originalStatus': FieldValue.delete(),
+            });
+          }
         }
       }
-    }
 
-    // Also handle housing
-    final housing = await _firestore.collection('housing_listings')
-        .where('plugId', isEqualTo: userId)
-        .get();
-    for (var doc in housing.docs) {
-      if (isBanned) {
-        if (doc.data()['status'] == 'available') {
-          batch.update(doc.reference, {'status': 'userSuspended', 'originalStatus': 'available'});
-        }
-      } else {
-        if (doc.data()['status'] == 'userSuspended') {
-          batch.update(doc.reference, {'status': doc.data()['originalStatus'] ?? 'available', 'originalStatus': FieldValue.delete()});
+      // Also handle housing
+      final housing = await _firestore.collection('housing_listings')
+          .where('plugId', isEqualTo: userId)
+          .get();
+      for (var doc in housing.docs) {
+        if (isBanned) {
+          if (doc.data()['status'] == 'available') {
+            batch.update(doc.reference, {'status': 'userSuspended', 'originalStatus': 'available'});
+          }
+        } else {
+          if (doc.data()['status'] == 'userSuspended') {
+            batch.update(doc.reference, {'status': doc.data()['originalStatus'] ?? 'available', 'originalStatus': FieldValue.delete()});
+          }
         }
       }
+
+      await batch.commit();
+
+      await logAction(AdminAuditLog(
+        id: '',
+        adminId: adminId,
+        adminName: adminName,
+        actionType: isBanned ? AdminActionType.userBan : AdminActionType.userRestore,
+        targetId: userId,
+        targetType: 'user',
+        timestamp: DateTime.now(),
+        reason: reason,
+      ));
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
-
-    await batch.commit();
-
-    await logAction(AdminAuditLog(
-      id: '',
-      adminId: adminId,
-      adminName: adminName,
-      actionType: isBanned ? AdminActionType.userBan : AdminActionType.userRestore,
-      targetId: userId,
-      targetType: 'user',
-      timestamp: DateTime.now(),
-      reason: reason,
-    ));
   }
 
   Future<void> suspendUser(String userId, DateTime until, String reason, {required String adminId, required String adminName}) async {
     if (userId.isEmpty) throw Exception('Invalid User ID');
-    // Re-verify admin privileges
-    if (!await _isUserAdmin(adminId)) {
-      throw Exception('Unauthorized: Administrative privileges required.');
-    }
-    final batch = _firestore.batch();
-    final userRef = _firestore.collection('users').doc(userId);
-    
-    batch.update(userRef, {
-      'suspendedUntil': Timestamp.fromDate(until),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-
-    // Spark Plan Workaround: Manually update listings since Cloud Functions are disabled
-    final listings = await _firestore.collection('listings')
-        .where('sellerId', isEqualTo: userId)
-        .where('status', isEqualTo: 'active')
-        .get();
-        
-    for (var doc in listings.docs) {
-      batch.update(doc.reference, {
-        'status': 'userSuspended',
-        'originalStatus': 'active',
+    try {
+      // Re-verify admin privileges
+      if (!await _isUserAdmin(adminId)) {
+        throw Exception('Unauthorized: Administrative privileges required.');
+      }
+      final batch = _firestore.batch();
+      final userRef = _firestore.collection('users').doc(userId);
+      
+      batch.update(userRef, {
+        'suspendedUntil': Timestamp.fromDate(until),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
+
+      // Spark Plan Workaround: Manually update listings since Cloud Functions are disabled
+      final listings = await _firestore.collection('listings')
+          .where('sellerId', isEqualTo: userId)
+          .where('status', isEqualTo: 'active')
+          .get();
+          
+      for (var doc in listings.docs) {
+        batch.update(doc.reference, {
+          'status': 'userSuspended',
+          'originalStatus': 'active',
+        });
+      }
+
+      final housing = await _firestore.collection('housing_listings')
+          .where('plugId', isEqualTo: userId)
+          .where('status', isEqualTo: 'available')
+          .get();
+
+      for (var doc in housing.docs) {
+        batch.update(doc.reference, {
+          'status': 'userSuspended',
+          'originalStatus': 'available',
+        });
+      }
+
+      await batch.commit();
+
+      await logAction(AdminAuditLog(
+        id: '',
+        adminId: adminId,
+        adminName: adminName,
+        actionType: AdminActionType.userSuspension,
+        targetId: userId,
+        targetType: 'user',
+        timestamp: DateTime.now(),
+        reason: reason,
+        metadata: {'until': until.toIso8601String()},
+      ));
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
-
-    final housing = await _firestore.collection('housing_listings')
-        .where('plugId', isEqualTo: userId)
-        .where('status', isEqualTo: 'available')
-        .get();
-
-    for (var doc in housing.docs) {
-      batch.update(doc.reference, {
-        'status': 'userSuspended',
-        'originalStatus': 'available',
-      });
-    }
-
-    await batch.commit();
-
-    await logAction(AdminAuditLog(
-      id: '',
-      adminId: adminId,
-      adminName: adminName,
-      actionType: AdminActionType.userSuspension,
-      targetId: userId,
-      targetType: 'user',
-      timestamp: DateTime.now(),
-      reason: reason,
-      metadata: {'until': until.toIso8601String()},
-    ));
   }
 
   Future<void> updateUserTrustScore(String userId, double score, {required String adminId, required String adminName}) async {
     if (userId.isEmpty) throw Exception('Invalid User ID');
-    // Re-verify admin privileges
-    if (!await _isUserAdmin(adminId)) {
-      throw Exception('Unauthorized: Administrative privileges required.');
-    }
-    await _firestore.collection('users').doc(userId).update({
-      'trustScore': score,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      // Re-verify admin privileges
+      if (!await _isUserAdmin(adminId)) {
+        throw Exception('Unauthorized: Administrative privileges required.');
+      }
+      await _firestore.collection('users').doc(userId).update({
+        'trustScore': score,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
-    await logAction(AdminAuditLog(
-      id: '',
-      adminId: adminId,
-      adminName: adminName,
-      actionType: AdminActionType.trustScoreAdjustment,
-      targetId: userId,
-      targetType: 'user',
-      timestamp: DateTime.now(),
-      metadata: {'newScore': score},
-    ));
+      await logAction(AdminAuditLog(
+        id: '',
+        adminId: adminId,
+        adminName: adminName,
+        actionType: AdminActionType.trustScoreAdjustment,
+        targetId: userId,
+        targetType: 'user',
+        timestamp: DateTime.now(),
+        metadata: {'newScore': score},
+      ));
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   Future<void> resetUserVerification(String userId, {required String adminId, required String adminName}) async {
     if (userId.isEmpty) throw Exception('Invalid User ID');
-    // Re-verify admin privileges
-    if (!await _isUserAdmin(adminId)) {
-      throw Exception('Unauthorized: Administrative privileges required.');
+    try {
+      // Re-verify admin privileges
+      if (!await _isUserAdmin(adminId)) {
+        throw Exception('Unauthorized: Administrative privileges required.');
+      }
+      final batch = _firestore.batch();
+      final userRef = _firestore.collection('users').doc(userId);
+      
+      batch.update(userRef, {
+        'isIdentityVerified': false,
+        'identityStatus': 'none',
+        'isStudentVerified': false,
+        'studentStatus': 'none',
+        'verifiedRoles': [],
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      await batch.commit();
+
+      await logAction(AdminAuditLog(
+        id: '',
+        adminId: adminId,
+        adminName: adminName,
+        actionType: AdminActionType.bulkAction, // Or add a specific one
+        targetId: userId,
+        targetType: 'user',
+        timestamp: DateTime.now(),
+        reason: 'Reset verification status',
+      ));
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
-    final batch = _firestore.batch();
-    final userRef = _firestore.collection('users').doc(userId);
-    
-    batch.update(userRef, {
-      'isIdentityVerified': false,
-      'identityStatus': 'none',
-      'isStudentVerified': false,
-      'studentStatus': 'none',
-      'verifiedRoles': [],
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-
-    await batch.commit();
-
-    await logAction(AdminAuditLog(
-      id: '',
-      adminId: adminId,
-      adminName: adminName,
-      actionType: AdminActionType.bulkAction, // Or add a specific one
-      targetId: userId,
-      targetType: 'user',
-      timestamp: DateTime.now(),
-      reason: 'Reset verification status',
-    ));
   }
 
   Future<Map<String, dynamic>> getUserActivityStats(String userId) async {
@@ -1236,26 +1269,34 @@ class AdminRepository {
 
   Future<void> addAdminNote(String userId, String note, String adminId) async {
     if (userId.isEmpty) throw Exception('Invalid User ID');
-    // Verify admin privileges
-    if (!await _isUserAdmin(adminId)) {
-      throw Exception('Unauthorized: Administrative privileges required.');
-    }
-    final noteObj = {
-      'adminId': adminId,
-      'note': note,
-      'timestamp': FieldValue.serverTimestamp(),
-    };
+    try {
+      // Verify admin privileges
+      if (!await _isUserAdmin(adminId)) {
+        throw Exception('Unauthorized: Administrative privileges required.');
+      }
+      final noteObj = {
+        'adminId': adminId,
+        'note': note,
+        'timestamp': FieldValue.serverTimestamp(),
+      };
 
-    await _firestore.collection('users').doc(userId).update({
-      'adminNotes': FieldValue.arrayUnion([noteObj]),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+      await _firestore.collection('users').doc(userId).update({
+        'adminNotes': FieldValue.arrayUnion([noteObj]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   // --- Audit Logging ---
 
   Future<void> logAction(AdminAuditLog log) async {
-    await _firestore.collection('admin_audit_logs').add(log.toJson());
+    try {
+      await _firestore.collection('admin_audit_logs').add(log.toJson());
+    } catch (e) {
+      AppLogger.error('Failed to log admin action', e, null, 'AdminRepository');
+    }
   }
 
   // --- Bulk Operations ---
@@ -1267,115 +1308,119 @@ class AdminRepository {
      required String adminName,
      String? reason,
    }) async {
-     // Authorization check - defense in depth
-     if (!await _isUserAdmin(adminId)) {
-       throw Exception('Unauthorized: Administrative privileges required.');
-     }
-
-     AppLogger.info('=== BULK VERIFICATION PROCESSING === count: ${requests.length}', 'AdminRepository');
-
-     final batch = _firestore.batch();
-     final timestamp = FieldValue.serverTimestamp();
-     double totalBoost = 0.0;
-     int skipped = 0;
-     int processed = 0;
-
-     for (var request in requests) {
-       if (request.id.isEmpty || request.id.trim().isEmpty) {
-         AppLogger.warning('⚠️ Skipping verification with empty ID', 'AdminRepository');
-         skipped++;
-         continue;
-       }
-       
-       if (request.userId.isEmpty || request.userId.trim().isEmpty) {
-         AppLogger.warning('⚠️ Skipping verification with empty userId: id=${request.id}', 'AdminRepository');
-         skipped++;
-         continue;
-       }
-       
-       final collectionName = _getCollectionName(request.type);
-       if (collectionName.isEmpty) {
-         AppLogger.warning('⚠️ Skipping verification with invalid type: ${request.type}', 'AdminRepository');
-         skipped++;
-         continue;
+     try {
+       // Authorization check - defense in depth
+       if (!await _isUserAdmin(adminId)) {
+         throw Exception('Unauthorized: Administrative privileges required.');
        }
 
-       final boost = TrustEngine.getTrustBoost(request.type, status);
-       totalBoost += boost;
+       AppLogger.info('=== BULK VERIFICATION PROCESSING === count: ${requests.length}', 'AdminRepository');
 
-       batch.update(_firestore.collection(collectionName).doc(request.id), {
-         'status': _statusToDb(status),
-         'updatedAt': timestamp,
-         if (status == AdminVerificationStatus.approved) 'verifiedAt': timestamp,
-         if (reason != null && reason.isNotEmpty) 'rejectionReason': reason,
-       });
+       final batch = _firestore.batch();
+       final timestamp = FieldValue.serverTimestamp();
+       double totalBoost = 0.0;
+       int skipped = 0;
+       int processed = 0;
 
-       // Update associated target (User or Organizer)
-       if (request.type == AdminVerificationType.organizer) {
-         final organizerId = request.metadata['organizerId']?.toString();
-         if (organizerId != null && organizerId.isNotEmpty && organizerId.trim().isNotEmpty) {
-           String organizerStatus = 'submitted';
-           switch (status) {
-             case AdminVerificationStatus.approved: organizerStatus = 'verified'; break;
-             case AdminVerificationStatus.rejected: organizerStatus = 'rejected'; break;
-             case AdminVerificationStatus.underReview: organizerStatus = 'underReview'; break;
-             case AdminVerificationStatus.resubmissionRequested: organizerStatus = 'rejected'; break;
-             case AdminVerificationStatus.pending: organizerStatus = 'submitted'; break;
-           }
-           
-           batch.update(_firestore.collection('organizers').doc(organizerId), {
-             'verificationStatus': organizerStatus,
-             'updatedAt': timestamp,
-             if (status == AdminVerificationStatus.approved) 'trustScore': FieldValue.increment(boost),
-           });
-           
-           // Also update owner's trust score if approved
-           final ownerId = request.metadata['ownerId']?.toString();
-           if (ownerId != null && ownerId.isNotEmpty && ownerId.trim().isNotEmpty && status == AdminVerificationStatus.approved) {
-             batch.update(_firestore.collection('users').doc(ownerId), {
-               'trustScore': FieldValue.increment(boost),
-             });
-           }
+       for (var request in requests) {
+         if (request.id.isEmpty || request.id.trim().isEmpty) {
+           AppLogger.warning('⚠️ Skipping verification with empty ID', 'AdminRepository');
+           skipped++;
+           continue;
          }
-       } else {
-         final userRef = _firestore.collection('users').doc(request.userId);
          
-         if (request.type == AdminVerificationType.identity) {
-           batch.update(userRef, {
-             'isIdentityVerified': status == AdminVerificationStatus.approved,
-             'identityStatus': _statusToDb(status),
-           });
-         } else if (request.type == AdminVerificationType.student) {
-           batch.update(userRef, {
-             'isStudentVerified': status == AdminVerificationStatus.approved,
-             'studentStatus': _statusToDb(status),
-           });
-         } else if (request.type == AdminVerificationType.professional && status == AdminVerificationStatus.approved) {
-            if (request.role != null) {
-              batch.update(userRef, {
-                'verifiedRoles': FieldValue.arrayUnion([request.role]),
-              });
-            }
+         if (request.userId.isEmpty || request.userId.trim().isEmpty) {
+           AppLogger.warning('⚠️ Skipping verification with empty userId: id=${request.id}', 'AdminRepository');
+           skipped++;
+           continue;
          }
+         
+         final collectionName = _getCollectionName(request.type);
+         if (collectionName.isEmpty) {
+           AppLogger.warning('⚠️ Skipping verification with invalid type: ${request.type}', 'AdminRepository');
+           skipped++;
+           continue;
+         }
+
+         final boost = TrustEngine.getTrustBoost(request.type, status);
+         totalBoost += boost;
+
+         batch.update(_firestore.collection(collectionName).doc(request.id), {
+           'status': _statusToDb(status),
+           'updatedAt': timestamp,
+           if (status == AdminVerificationStatus.approved) 'verifiedAt': timestamp,
+           if (reason != null && reason.isNotEmpty) 'rejectionReason': reason,
+         });
+
+         // Update associated target (User or Organizer)
+         if (request.type == AdminVerificationType.organizer) {
+           final organizerId = request.metadata['organizerId']?.toString();
+           if (organizerId != null && organizerId.isNotEmpty && organizerId.trim().isNotEmpty) {
+             String organizerStatus = 'submitted';
+             switch (status) {
+               case AdminVerificationStatus.approved: organizerStatus = 'verified'; break;
+               case AdminVerificationStatus.rejected: organizerStatus = 'rejected'; break;
+               case AdminVerificationStatus.underReview: organizerStatus = 'underReview'; break;
+               case AdminVerificationStatus.resubmissionRequested: organizerStatus = 'rejected'; break;
+               case AdminVerificationStatus.pending: organizerStatus = 'submitted'; break;
+             }
+             
+             batch.update(_firestore.collection('organizers').doc(organizerId), {
+               'verificationStatus': organizerStatus,
+               'updatedAt': timestamp,
+               if (status == AdminVerificationStatus.approved) 'trustScore': FieldValue.increment(boost),
+             });
+             
+             // Also update owner's trust score if approved
+             final ownerId = request.metadata['ownerId']?.toString();
+             if (ownerId != null && ownerId.isNotEmpty && ownerId.trim().isNotEmpty && status == AdminVerificationStatus.approved) {
+               batch.update(_firestore.collection('users').doc(ownerId), {
+                 'trustScore': FieldValue.increment(boost),
+               });
+             }
+           }
+         } else {
+           final userRef = _firestore.collection('users').doc(request.userId);
+           
+           if (request.type == AdminVerificationType.identity) {
+             batch.update(userRef, {
+               'isIdentityVerified': status == AdminVerificationStatus.approved,
+               'identityStatus': _statusToDb(status),
+             });
+           } else if (request.type == AdminVerificationType.student) {
+             batch.update(userRef, {
+               'isStudentVerified': status == AdminVerificationStatus.approved,
+               'studentStatus': _statusToDb(status),
+             });
+           } else if (request.type == AdminVerificationType.professional && status == AdminVerificationStatus.approved) {
+              if (request.role != null) {
+                batch.update(userRef, {
+                  'verifiedRoles': FieldValue.arrayUnion([request.role]),
+                });
+              }
+           }
+         }
+         
+         processed++;
        }
-       
-       processed++;
+
+       AppLogger.info('📊 Bulk processing summary: $processed processed, $skipped skipped', 'AdminRepository');
+       await batch.commit();
+
+       await logAction(AdminAuditLog(
+         id: '',
+         adminId: adminId,
+         adminName: adminName,
+         actionType: AdminActionType.bulkAction,
+         targetId: 'multiple',
+         targetType: 'verification',
+         timestamp: DateTime.now(),
+         reason: 'Bulk ${status.name} of ${processed} verified requests (${skipped} skipped, Total Trust Boost: ${totalBoost.toStringAsFixed(1)})',
+         metadata: {'count': processed, 'skipped': skipped, 'totalBoost': totalBoost, 'status': status.name},
+       ));
+     } catch (e) {
+       throw Exception(AppErrorHandler.mapError(e));
      }
-
-     AppLogger.info('📊 Bulk processing summary: $processed processed, $skipped skipped', 'AdminRepository');
-     await batch.commit();
-
-     await logAction(AdminAuditLog(
-       id: '',
-       adminId: adminId,
-       adminName: adminName,
-       actionType: AdminActionType.bulkAction,
-       targetId: 'multiple',
-       targetType: 'verification',
-       timestamp: DateTime.now(),
-       reason: 'Bulk ${status.name} of ${processed} verified requests (${skipped} skipped, Total Trust Boost: ${totalBoost.toStringAsFixed(1)})',
-       metadata: {'count': processed, 'skipped': skipped, 'totalBoost': totalBoost, 'status': status.name},
-     ));
    }
 
   Future<void> bulkResolveReports({
@@ -1384,28 +1429,32 @@ class AdminRepository {
     required String adminId,
     required String adminName,
   }) async {
-    final batch = _firestore.batch();
-    
-    for (var report in reports) {
-      final collection = report.type == ReportType.housing ? 'housing_reports' : 'reports';
-      batch.update(_firestore.collection(collection).doc(report.id), {
-        'status': action == 'dismiss' ? 'dismissed' : 'resolved',
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+    try {
+      final batch = _firestore.batch();
+      
+      for (var report in reports) {
+        final collection = report.type == ReportType.housing ? 'housing_reports' : 'reports';
+        batch.update(_firestore.collection(collection).doc(report.id), {
+          'status': action == 'dismiss' ? 'dismissed' : 'resolved',
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+
+      await logAction(AdminAuditLog(
+        id: '',
+        adminId: adminId,
+        adminName: adminName,
+        actionType: AdminActionType.bulkAction,
+        targetId: 'multiple',
+        targetType: 'report',
+        timestamp: DateTime.now(),
+        reason: 'Bulk $action of ${reports.length} reports',
+      ));
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
-
-    await batch.commit();
-
-    await logAction(AdminAuditLog(
-      id: '',
-      adminId: adminId,
-      adminName: adminName,
-      actionType: AdminActionType.bulkAction,
-      targetId: 'multiple',
-      targetType: 'report',
-      timestamp: DateTime.now(),
-      reason: 'Bulk $action of ${reports.length} reports',
-    ));
   }
 
   Future<void> bulkUpdateContentStatus({
@@ -1415,28 +1464,32 @@ class AdminRepository {
     required String adminId,
     required String adminName,
   }) async {
-    final batch = _firestore.batch();
-    final collection = _getCollectionForType(type);
-    
-    for (var id in contentIds) {
-      batch.update(_firestore.collection(collection).doc(id), {
-        'status': newStatus,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+    try {
+      final batch = _firestore.batch();
+      final collection = _getCollectionForType(type);
+      
+      for (var id in contentIds) {
+        batch.update(_firestore.collection(collection).doc(id), {
+          'status': newStatus,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+
+      await logAction(AdminAuditLog(
+        id: '',
+        adminId: adminId,
+        adminName: adminName,
+        actionType: AdminActionType.bulkAction,
+        targetId: 'multiple',
+        targetType: type.name,
+        timestamp: DateTime.now(),
+        reason: 'Bulk $newStatus of ${contentIds.length} items',
+      ));
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
-
-    await batch.commit();
-
-    await logAction(AdminAuditLog(
-      id: '',
-      adminId: adminId,
-      adminName: adminName,
-      actionType: AdminActionType.bulkAction,
-      targetId: 'multiple',
-      targetType: type.name,
-      timestamp: DateTime.now(),
-      reason: 'Bulk $newStatus of ${contentIds.length} items',
-    ));
   }
 
   Future<void> bulkUpdateUserStatus({
@@ -1445,32 +1498,36 @@ class AdminRepository {
     required String adminId,
     required String adminName,
   }) async {
-    // Defense-in-depth: Re-verify admin status
-    if (!await _isUserAdmin(adminId)) {
-      throw Exception('Unauthorized: Administrative privileges required.');
+    try {
+      // Defense-in-depth: Re-verify admin status
+      if (!await _isUserAdmin(adminId)) {
+        throw Exception('Unauthorized: Administrative privileges required.');
+      }
+
+      final batch = _firestore.batch();
+      
+      for (var id in userIds) {
+        batch.update(_firestore.collection('users').doc(id), {
+          'isBanned': isBanned,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+
+      await logAction(AdminAuditLog(
+        id: '',
+        adminId: adminId,
+        adminName: adminName,
+        actionType: AdminActionType.bulkAction,
+        targetId: 'multiple',
+        targetType: 'user',
+        timestamp: DateTime.now(),
+        reason: 'Bulk ${isBanned ? "ban" : "restore"} of ${userIds.length} users',
+      ));
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
-
-    final batch = _firestore.batch();
-    
-    for (var id in userIds) {
-      batch.update(_firestore.collection('users').doc(id), {
-        'isBanned': isBanned,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    }
-
-    await batch.commit();
-
-    await logAction(AdminAuditLog(
-      id: '',
-      adminId: adminId,
-      adminName: adminName,
-      actionType: AdminActionType.bulkAction,
-      targetId: 'multiple',
-      targetType: 'user',
-      timestamp: DateTime.now(),
-      reason: 'Bulk ${isBanned ? "ban" : "restore"} of ${userIds.length} users',
-    ));
   }
 
   Stream<List<AdminAuditLog>> watchAuditLogs({int limit = 50}) {
@@ -1558,96 +1615,112 @@ class AdminRepository {
 
   Future<void> updateSupportConversationStatus(String conversationId, String status, {required String adminId, required String adminName}) async {
     if (conversationId.isEmpty) throw Exception('Invalid Conversation ID');
-    // Defense-in-depth: re-verify admin privileges
-    if (!await _isUserAdmin(adminId)) {
-      throw Exception('Unauthorized: Administrative privileges required.');
-    }
-    final doc = await _firestore.collection('conversations').doc(conversationId).get();
-    final currentStatus = (doc.data() as Map<String, dynamic>?)?['supportStatus'];
-    
-    if (currentStatus == 'resolved' && status == 'resolved') {
-      throw Exception('This session is already resolved.');
-    }
+    try {
+      // Defense-in-depth: re-verify admin privileges
+      if (!await _isUserAdmin(adminId)) {
+        throw Exception('Unauthorized: Administrative privileges required.');
+      }
+      final doc = await _firestore.collection('conversations').doc(conversationId).get();
+      final currentStatus = (doc.data() as Map<String, dynamic>?)?['supportStatus'];
+      
+      if (currentStatus == 'resolved' && status == 'resolved') {
+        throw Exception('This session is already resolved.');
+      }
 
-    await _firestore.collection('conversations').doc(conversationId).update({
-      'supportStatus': status,
-      'updatedAt': FieldValue.serverTimestamp(),
-      if (status == 'resolved') 'resolvedAt': FieldValue.serverTimestamp(),
-      if (status == 'resolved') 'resolvedBy': adminId,
-    });
+      await _firestore.collection('conversations').doc(conversationId).update({
+        'supportStatus': status,
+        'updatedAt': FieldValue.serverTimestamp(),
+        if (status == 'resolved') 'resolvedAt': FieldValue.serverTimestamp(),
+        if (status == 'resolved') 'resolvedBy': adminId,
+      });
 
-    await logAction(AdminAuditLog(
-      id: '',
-      adminId: adminId,
-      adminName: adminName,
-      actionType: AdminActionType.reportResolution,
-      targetId: conversationId,
-      targetType: 'support_conversation',
-      timestamp: DateTime.now(),
-      reason: 'Status updated to $status',
-    ));
+      await logAction(AdminAuditLog(
+        id: '',
+        adminId: adminId,
+        adminName: adminName,
+        actionType: AdminActionType.reportResolution,
+        targetId: conversationId,
+        targetType: 'support_conversation',
+        timestamp: DateTime.now(),
+        reason: 'Status updated to $status',
+      ));
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   Future<void> updateSupportConversationPriority(String conversationId, String priority, {required String adminId, required String adminName}) async {
     if (conversationId.isEmpty) throw Exception('Invalid Conversation ID');
-    // Ensure caller is an admin
-    if (!await _isUserAdmin(adminId)) {
-      throw Exception('Unauthorized: Administrative privileges required.');
+    try {
+      // Ensure caller is an admin
+      if (!await _isUserAdmin(adminId)) {
+        throw Exception('Unauthorized: Administrative privileges required.');
+      }
+      await _firestore.collection('conversations').doc(conversationId).update({
+        'supportPriority': priority,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
-    await _firestore.collection('conversations').doc(conversationId).update({
-      'supportPriority': priority,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
   }
 
   Future<void> assignSupportConversation(String conversationId, String? adminId, {required String adminName, required String performingAdminId}) async {
     if (conversationId.isEmpty) throw Exception('Invalid Conversation ID');
-    // Verify the performing admin
-    if (!await _isUserAdmin(performingAdminId)) {
-      throw Exception('Unauthorized: Administrative privileges required.');
+    try {
+      // Verify the performing admin
+      if (!await _isUserAdmin(performingAdminId)) {
+        throw Exception('Unauthorized: Administrative privileges required.');
+      }
+      final batch = _firestore.batch();
+      final convRef = _firestore.collection('conversations').doc(conversationId);
+      
+      final Map<String, dynamic> updateData = {
+        'assignedAdminId': adminId,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (adminId != null) {
+        // Add the assigned admin to participants so they have read/write access if rules are participant-based
+        updateData['participants'] = FieldValue.arrayUnion([adminId]);
+      }
+
+      batch.update(convRef, updateData);
+
+      await batch.commit();
+
+      await logAction(AdminAuditLog(
+        id: '',
+        adminId: performingAdminId,
+        adminName: adminName,
+        actionType: AdminActionType.bulkAction,
+        targetId: conversationId,
+        targetType: 'support_conversation',
+        timestamp: DateTime.now(),
+        reason: adminId == null ? 'Unassigned ticket' : 'Assigned ticket to $adminId',
+      ));
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
-    final batch = _firestore.batch();
-    final convRef = _firestore.collection('conversations').doc(conversationId);
-    
-    final Map<String, dynamic> updateData = {
-      'assignedAdminId': adminId,
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
-
-    if (adminId != null) {
-      // Add the assigned admin to participants so they have read/write access if rules are participant-based
-      updateData['participants'] = FieldValue.arrayUnion([adminId]);
-    }
-
-    batch.update(convRef, updateData);
-
-    await batch.commit();
-
-    await logAction(AdminAuditLog(
-      id: '',
-      adminId: performingAdminId,
-      adminName: adminName,
-      actionType: AdminActionType.bulkAction,
-      targetId: conversationId,
-      targetType: 'support_conversation',
-      timestamp: DateTime.now(),
-      reason: adminId == null ? 'Unassigned ticket' : 'Assigned ticket to $adminId',
-    ));
   }
 
   Future<void> addSupportAdminNote(String conversationId, String note, String adminId) async {
     if (conversationId.isEmpty) throw Exception('Invalid Conversation ID');
-    if (!await _isUserAdmin(adminId)) {
-      throw Exception('Unauthorized: Administrative privileges required.');
+    try {
+      if (!await _isUserAdmin(adminId)) {
+        throw Exception('Unauthorized: Administrative privileges required.');
+      }
+      final noteObj = {
+        'adminId': adminId,
+        'note': note,
+        'timestamp': Timestamp.now(),
+      };
+      await _firestore.collection('conversations').doc(conversationId).update({
+        'supportAdminNotes': FieldValue.arrayUnion([noteObj]),
+      });
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
-    final noteObj = {
-      'adminId': adminId,
-      'note': note,
-      'timestamp': Timestamp.now(),
-    };
-    await _firestore.collection('conversations').doc(conversationId).update({
-      'supportAdminNotes': FieldValue.arrayUnion([noteObj]),
-    });
   }
 
   Future<Map<String, dynamic>> getSupportStats() async {
@@ -1695,60 +1768,64 @@ class AdminRepository {
     required String adminId,
     String? reason,
   }) async {
-    if (!await _isUserAdmin(adminId)) {
-      throw Exception('Unauthorized: Administrative privileges required.');
-    }
-
-    final event = await getSubmittedEvent(eventId);
-    if (event == null) throw Exception('Event not found');
-    if (event.status != EventStatus.submitted) {
-      throw Exception('Only submitted events can be approved');
-    }
-
-    // Update event status to approved
-    await _firestore.collection('events').doc(eventId).update({
-      'status': EventStatus.approved.name,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-
-    // Notify organizer members
-    final membersSnapshot = await _firestore
-        .collection('organizers')
-        .doc(event.organizerId)
-        .collection('members')
-        .get();
-
-    for (final memberDoc in membersSnapshot.docs) {
-      final memberData = memberDoc.data() as Map<String, dynamic>;
-      final userId = memberData['userId'] as String?;
-      if (userId != null) {
-        // Queue notification (will be sent by Cloud Function or NotificationService)
-        await _firestore.collection('notifications_queue').add({
-          'recipientId': userId,
-          'title': 'Event Approved! ✅',
-          'body': 'Your event "${event.title}" has been approved and is now live on campus.',
-          'type': 'events',
-          'targetId': eventId,
-          'targetType': 'event',
-          'createdAt': FieldValue.serverTimestamp(),
-          'status': 'pending',
-        });
+    try {
+      if (!await _isUserAdmin(adminId)) {
+        throw Exception('Unauthorized: Administrative privileges required.');
       }
+
+      final event = await getSubmittedEvent(eventId);
+      if (event == null) throw Exception('Event not found');
+      if (event.status != EventStatus.submitted) {
+        throw Exception('Only submitted events can be approved');
+      }
+
+      // Update event status to approved
+      await _firestore.collection('events').doc(eventId).update({
+        'status': EventStatus.approved.name,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Notify organizer members
+      final membersSnapshot = await _firestore
+          .collection('organizers')
+          .doc(event.organizerId)
+          .collection('members')
+          .get();
+
+      for (final memberDoc in membersSnapshot.docs) {
+        final memberData = memberDoc.data() as Map<String, dynamic>;
+        final userId = memberData['userId'] as String?;
+        if (userId != null) {
+          // Queue notification (will be sent by Cloud Function or NotificationService)
+          await _firestore.collection('notifications_queue').add({
+            'recipientId': userId,
+            'title': 'Event Approved! ✅',
+            'body': 'Your event "${event.title}" has been approved and is now live on campus.',
+            'type': 'events',
+            'targetId': eventId,
+            'targetType': 'event',
+            'createdAt': FieldValue.serverTimestamp(),
+            'status': 'pending',
+          });
+        }
+      }
+
+      // Log audit trail
+      await logAction(AdminAuditLog(
+        id: '',
+        adminId: adminId,
+        adminName: 'Admin',
+        actionType: AdminActionType.eventApproval,
+        targetId: eventId,
+        targetType: 'event',
+        timestamp: DateTime.now(),
+        reason: reason ?? 'Event approved and published to campus',
+      ));
+
+      AppLogger.info('Event Approved: $eventId by Admin: $adminId', 'AdminRepository');
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
-
-    // Log audit trail
-    await logAction(AdminAuditLog(
-      id: '',
-      adminId: adminId,
-      adminName: 'Admin',
-      actionType: AdminActionType.eventApproval,
-      targetId: eventId,
-      targetType: 'event',
-      timestamp: DateTime.now(),
-      reason: reason ?? 'Event approved and published to campus',
-    ));
-
-    AppLogger.info('Event Approved: $eventId by Admin: $adminId', 'AdminRepository');
   }
 
   Future<void> rejectEvent({
@@ -1756,66 +1833,70 @@ class AdminRepository {
     required String adminId,
     required String reason,
   }) async {
-    if (!await _isUserAdmin(adminId)) {
-      throw Exception('Unauthorized: Administrative privileges required.');
-    }
-
-    if (reason.trim().isEmpty) {
-      throw Exception('Rejection reason is required');
-    }
-
-    final event = await getSubmittedEvent(eventId);
-    if (event == null) throw Exception('Event not found');
-    if (event.status != EventStatus.submitted) {
-      throw Exception('Only submitted events can be rejected');
-    }
-
-    // Update event status to draft with rejection metadata
-    await _firestore.collection('events').doc(eventId).update({
-      'status': EventStatus.draft.name,
-      'updatedAt': FieldValue.serverTimestamp(),
-      'rejectionReason': reason,
-      'rejectedAt': FieldValue.serverTimestamp(),
-      'rejectedBy': adminId,
-    });
-
-    // Notify organizer members
-    final membersSnapshot = await _firestore
-        .collection('organizers')
-        .doc(event.organizerId)
-        .collection('members')
-        .get();
-
-    for (final memberDoc in membersSnapshot.docs) {
-      final memberData = memberDoc.data() as Map<String, dynamic>;
-      final userId = memberData['userId'] as String?;
-      if (userId != null) {
-        await _firestore.collection('notifications_queue').add({
-          'recipientId': userId,
-          'title': 'Event Needs Review ⚠️',
-          'body': 'Your event "${event.title}" was not approved. Reason: $reason',
-          'type': 'events',
-          'targetId': eventId,
-          'targetType': 'event',
-          'createdAt': FieldValue.serverTimestamp(),
-          'status': 'pending',
-        });
+    try {
+      if (!await _isUserAdmin(adminId)) {
+        throw Exception('Unauthorized: Administrative privileges required.');
       }
+
+      if (reason.trim().isEmpty) {
+        throw Exception('Rejection reason is required');
+      }
+
+      final event = await getSubmittedEvent(eventId);
+      if (event == null) throw Exception('Event not found');
+      if (event.status != EventStatus.submitted) {
+        throw Exception('Only submitted events can be rejected');
+      }
+
+      // Update event status to draft with rejection metadata
+      await _firestore.collection('events').doc(eventId).update({
+        'status': EventStatus.draft.name,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'rejectionReason': reason,
+        'rejectedAt': FieldValue.serverTimestamp(),
+        'rejectedBy': adminId,
+      });
+
+      // Notify organizer members
+      final membersSnapshot = await _firestore
+          .collection('organizers')
+          .doc(event.organizerId)
+          .collection('members')
+          .get();
+
+      for (final memberDoc in membersSnapshot.docs) {
+        final memberData = memberDoc.data() as Map<String, dynamic>;
+        final userId = memberData['userId'] as String?;
+        if (userId != null) {
+          await _firestore.collection('notifications_queue').add({
+            'recipientId': userId,
+            'title': 'Event Needs Review ⚠️',
+            'body': 'Your event "${event.title}" was not approved. Reason: $reason',
+            'type': 'events',
+            'targetId': eventId,
+            'targetType': 'event',
+            'createdAt': FieldValue.serverTimestamp(),
+            'status': 'pending',
+          });
+        }
+      }
+
+      // Log audit trail
+      await logAction(AdminAuditLog(
+        id: '',
+        adminId: adminId,
+        adminName: 'Admin',
+        actionType: AdminActionType.eventRejection,
+        targetId: eventId,
+        targetType: 'event',
+        timestamp: DateTime.now(),
+        reason: reason,
+      ));
+
+      AppLogger.info('Event Rejected: $eventId by Admin: $adminId. Reason: $reason', 'AdminRepository');
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
-
-    // Log audit trail
-    await logAction(AdminAuditLog(
-      id: '',
-      adminId: adminId,
-      adminName: 'Admin',
-      actionType: AdminActionType.eventRejection,
-      targetId: eventId,
-      targetType: 'event',
-      timestamp: DateTime.now(),
-      reason: reason,
-    ));
-
-    AppLogger.info('Event Rejected: $eventId by Admin: $adminId. Reason: $reason', 'AdminRepository');
   }
 
   Future<void> bulkApproveEvents({
@@ -1823,17 +1904,16 @@ class AdminRepository {
     required String adminId,
     String? reason,
   }) async {
-    if (!await _isUserAdmin(adminId)) {
-      throw Exception('Unauthorized: Administrative privileges required.');
-    }
-
-    for (final eventId in eventIds) {
-      try {
-        await approveEvent(eventId: eventId, adminId: adminId, reason: reason);
-      } catch (e) {
-        AppLogger.error('Failed to approve event $eventId', e, StackTrace.current, 'AdminRepository');
-        rethrow;
+    try {
+      if (!await _isUserAdmin(adminId)) {
+        throw Exception('Unauthorized: Administrative privileges required.');
       }
+
+      for (final eventId in eventIds) {
+        await approveEvent(eventId: eventId, adminId: adminId, reason: reason);
+      }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -1842,17 +1922,16 @@ class AdminRepository {
     required String adminId,
     required String reason,
   }) async {
-    if (!await _isUserAdmin(adminId)) {
-      throw Exception('Unauthorized: Administrative privileges required.');
-    }
-
-    for (final eventId in eventIds) {
-      try {
-        await rejectEvent(eventId: eventId, adminId: adminId, reason: reason);
-      } catch (e) {
-        AppLogger.error('Failed to reject event $eventId', e, StackTrace.current, 'AdminRepository');
-        rethrow;
+    try {
+      if (!await _isUserAdmin(adminId)) {
+        throw Exception('Unauthorized: Administrative privileges required.');
       }
+
+      for (final eventId in eventIds) {
+        await rejectEvent(eventId: eventId, adminId: adminId, reason: reason);
+      }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 }

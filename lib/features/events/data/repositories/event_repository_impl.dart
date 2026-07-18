@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:unihub_mobile/core/error/error_handler.dart';
 import '../../domain/models/event.dart';
 import '../../domain/models/event_category.dart';
 import '../../domain/repositories/event_repository.dart';
@@ -104,54 +105,70 @@ class EventRepositoryImpl implements EventRepository {
 
   @override
   Future<void> createEvent(Event event) async {
-    // DEFENSIVE: Validate event data
-    if (event.id.isEmpty) {
-      throw Exception('Event id cannot be empty');
-    }
-    if (event.organizerId.isEmpty) {
-      throw Exception('Event organizerId cannot be empty');
-    }
-    if (event.campusId.isEmpty) {
-      throw Exception('Event campusId cannot be empty');
-    }
-    if (event.title.trim().isEmpty) {
-      throw Exception('Event title cannot be empty');
-    }
-    if (event.createdBy.isEmpty) {
-      throw Exception('Event createdBy cannot be empty');
-    }
+    try {
+      // DEFENSIVE: Validate event data
+      if (event.id.isEmpty) {
+        throw Exception('Event id cannot be empty');
+      }
+      if (event.organizerId.isEmpty) {
+        throw Exception('Event organizerId cannot be empty');
+      }
+      if (event.campusId.isEmpty) {
+        throw Exception('Event campusId cannot be empty');
+      }
+      if (event.title.trim().isEmpty) {
+        throw Exception('Event title cannot be empty');
+      }
+      if (event.createdBy.isEmpty) {
+        throw Exception('Event createdBy cannot be empty');
+      }
 
-    await _firestore.collection('events').doc(event.id).set(event.toFirestore());
+      await _firestore.collection('events').doc(event.id).set(event.toFirestore());
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
   Future<void> updateEvent(Event event) async {
-    // DEFENSIVE: Validate event data
-    if (event.id.isEmpty || event.id.trim().isEmpty) {
-      throw Exception('Event id cannot be empty');
-    }
-    if (event.organizerId.isEmpty) {
-      throw Exception('Event organizerId cannot be empty');
-    }
+    try {
+      // DEFENSIVE: Validate event data
+      if (event.id.isEmpty || event.id.trim().isEmpty) {
+        throw Exception('Event id cannot be empty');
+      }
+      if (event.organizerId.isEmpty) {
+        throw Exception('Event organizerId cannot be empty');
+      }
 
-    await _firestore.collection('events').doc(event.id).update(event.toFirestore());
+      await _firestore.collection('events').doc(event.id).update(event.toFirestore());
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
   Future<void> updateEventStatus(String id, EventStatus status) async {
     if (id.isEmpty) return;
-    await _firestore.collection('events').doc(id).update({
-      'status': status.name,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await _firestore.collection('events').doc(id).update({
+        'status': status.name,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
   Future<void> deleteEvent(String id) async {
-    await _firestore.collection('events').doc(id).update({
-      'isDeleted': true,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await _firestore.collection('events').doc(id).update({
+        'isDeleted': true,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override

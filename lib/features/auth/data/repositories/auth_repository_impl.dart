@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:unihub_mobile/core/error/error_handler.dart';
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import 'package:unihub_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:unihub_mobile/core/utils/app_logger.dart';
@@ -43,13 +44,10 @@ class AuthRepositoryImpl implements AuthRepository {
       AppLogger.info('Auth: Sign in successful', 'AUTH');
     } on FirebaseAuthException catch (e) {
       AppLogger.warning('Auth: FirebaseAuthException: ${e.code}', 'AUTH');
-      throw _handleAuthException(e);
+      throw Exception(AppErrorHandler.mapError(e));
     } catch (e) {
       AppLogger.error('Auth: General Exception', e, StackTrace.current, 'AUTH');
-      if (e.toString().contains('Connection reset by peer')) {
-        throw Exception('Network error: Connection reset by peer. Please check your internet connection or VPN.');
-      }
-      throw Exception('Authentication failed: $e');
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -78,13 +76,10 @@ class AuthRepositoryImpl implements AuthRepository {
       }
     } on FirebaseAuthException catch (e) {
       AppLogger.warning('Auth: Google Sign-in Firebase Error: ${e.code}', 'AUTH');
-      throw _handleAuthException(e);
+      throw Exception(AppErrorHandler.mapError(e));
     } catch (e) {
       AppLogger.error('Auth: Google Sign-in General Error', e, StackTrace.current, 'AUTH');
-      if (e.toString().contains('7000') || e.toString().contains('developer_error')) {
-        throw Exception('Google Sign-In configuration error: Please verify that you have added your SHA-1 fingerprint to the Firebase Console and enabled Google Auth.');
-      }
-      throw Exception('Failed to sign in with Google: $e');
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -209,10 +204,10 @@ class AuthRepositoryImpl implements AuthRepository {
       }
     } on FirebaseAuthException catch (e) {
       AppLogger.warning('Auth: Sign-up error: ${e.code}', 'AUTH');
-      throw _handleAuthException(e);
+      throw Exception(AppErrorHandler.mapError(e));
     } catch (e) {
       AppLogger.error('Auth: Sign-up general error', e, null, 'AUTH');
-      rethrow;
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -247,8 +242,8 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       await _firebaseAuth.sendPasswordResetEmail(email: email);
       AppLogger.info('Auth: Password reset email sent to $email', 'AUTH');
-    } on FirebaseAuthException catch (e) {
-      throw _handleAuthException(e);
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -260,8 +255,8 @@ class AuthRepositoryImpl implements AuthRepository {
         await user.sendEmailVerification();
         AppLogger.info('Auth: Email verification sent to ${user.email}', 'AUTH');
       }
-    } on FirebaseAuthException catch (e) {
-      throw _handleAuthException(e);
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -475,13 +470,13 @@ class AuthRepositoryImpl implements AuthRepository {
     } on FirebaseAuthException catch (e) {
       if (e.code == 'requires-recent-login') {
         AppLogger.warning('Auth: Delete account failed: Requires recent login', 'AUTH');
-        throw Exception('This operation is sensitive and requires recent authentication. Please sign in again to complete the deletion.');
+        throw Exception(AppErrorHandler.mapError(e));
       }
       AppLogger.error('Auth: Delete account FirebaseAuthException', e, null, 'AUTH');
-      throw _handleAuthException(e);
+      throw Exception(AppErrorHandler.mapError(e));
     } catch (e) {
       AppLogger.error('Auth: General error during account deletion', e, null, 'AUTH');
-      rethrow;
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 

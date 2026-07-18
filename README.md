@@ -1,4 +1,4 @@
-# unihub_mobile
+# ulify_mobile
 
 A new Flutter project.
 

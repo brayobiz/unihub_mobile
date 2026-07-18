@@ -1,11 +1,11 @@
-# UniHub Mobile - Play Store Release Workflow
+# Ulify Mobile - Play Store Release Workflow
 
-This document outlines the systematic process for preparing and releasing the UniHub Mobile app to the Google Play Store.
+This document outlines the systematic process for preparing and releasing the Ulify Mobile app to the Google Play Store.
 
 ---
 
 ## Phase 1: Branding & Assets
-- [x] **App Name & Package ID**: Verified `com.unihub.unihub_mobile` is final and `label` is "UniHub".
+- [x] **App Name & Package ID**: Verified `com.unihub.unihub_mobile` is final and `label` is "Ulify".
 - [x] **Launcher Icons**: Configuration verified in `pubspec.yaml`.
 - [ ] **Splash Screen**: Verify splash screen implementation for Android 12+.
 - [x] **Version Consistency**: Version `1.0.0+1` confirmed in `pubspec.yaml`.

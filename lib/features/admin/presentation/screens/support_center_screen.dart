@@ -365,7 +365,7 @@ class _SupportConversationTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userId = conversation.participants.firstWhere((p) => p != 'unihub_admin', orElse: () => '');
+    final userId = conversation.participants.firstWhere((p) => p != 'ulify_admin', orElse: () => '');
     final userAsync = ref.watch(userByIdProvider(userId));
     final currentUser = ref.watch(appUserProvider).valueOrNull;
 

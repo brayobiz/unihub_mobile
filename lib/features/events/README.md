@@ -1,4 +1,4 @@
-# UniHub Events Module Architecture
+# Ulify Events Module Architecture
 
 ## 1. Overview
 The Events module provides a campus-centric platform for students to discover and organize activities. It strictly enforces a hierarchical ownership model: **User -> Organizer Profile -> Event**.
@@ -37,7 +37,7 @@ The Events module provides a campus-centric platform for students to discover an
 | **Editor** | Create Drafts, Edit assigned Organizer events. |
 | **Admin** | Invite members, Manage Organizer Profile, Submit for Review. |
 | **Owner** | All of above + Role Management + Delete Organizer. |
-| **UniHub Admin** | Approve/Reject/Suspend Organizers and Events. |
+| **Ulify Admin** | Approve/Reject/Suspend Organizers and Events. |
 
 ## 5. Integration Points
 

@@ -732,7 +732,7 @@ class OrganizerDashboardScreen extends ConsumerWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Submit for Review?'),
-        content: const Text('UniHub admins will review your organizer profile. Once verified, you can publish events to your campus.'),
+        content: const Text('Ulify admins will review your organizer profile. Once verified, you can publish events to your campus.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
           ElevatedButton(

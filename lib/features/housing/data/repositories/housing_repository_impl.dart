@@ -8,6 +8,7 @@ import '../../domain/models/vacancy_request.dart';
 import '../../domain/models/viewing_request.dart';
 import '../../domain/repositories/housing_repository.dart';
 import 'package:unihub_mobile/core/services/notification_sender.dart';
+import 'package:unihub_mobile/core/error/error_handler.dart';
 import 'package:unihub_mobile/core/utils/app_logger.dart';
 import '../../../../services/notification_service.dart';
 import '../../../shared/domain/models/uni_notification.dart';
@@ -266,116 +267,128 @@ class HousingRepositoryImpl implements HousingRepository {
 
   @override
   Future<void> createListing(HousingListing listing) async {
-    final batch = _firestore.batch();
-    
-    // Aligned with Marketplace: Use the ID provided in the listing object
-    final listingRef = _firestore.collection('housing_listings').doc(listing.id);
-    batch.set(listingRef, listing.toFirestore());
-    
-    // Update user stats
-    final userRef = _firestore.collection('users').doc(listing.plugId);
-    batch.update(userRef, {
-      'housingListingsCount': FieldValue.increment(1),
-    });
+    try {
+      final batch = _firestore.batch();
+      
+      // Aligned with Marketplace: Use the ID provided in the listing object
+      final listingRef = _firestore.collection('housing_listings').doc(listing.id);
+      batch.set(listingRef, listing.toFirestore());
+      
+      // Update user stats
+      final userRef = _firestore.collection('users').doc(listing.plugId);
+      batch.update(userRef, {
+        'housingListingsCount': FieldValue.increment(1),
+      });
 
-    await batch.commit();
-    await _logHistory(listing.id, 'created', listing.toFirestore());
+      await batch.commit();
+      await _logHistory(listing.id, 'created', listing.toFirestore());
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
   Future<void> updateListing(HousingListing listing) async {
-    final oldDoc = await _firestore.collection('housing_listings').doc(listing.id).get();
-    final oldRent = oldDoc.data()?['rent'] as num?;
-    
-    await _firestore.collection('housing_listings').doc(listing.id).update(listing.toFirestore());
-    await _logHistory(listing.id, 'edited', listing.toFirestore());
-
-    // Price Drop Notification
-    if (oldRent != null && listing.rent < oldRent.toDouble() && _notificationSender != null) {
-      final savedBySnapshot = await _firestore.collectionGroup('saved_housing')
-          .where(FieldPath.documentId, isEqualTo: listing.id)
-          .get();
+    try {
+      final oldDoc = await _firestore.collection('housing_listings').doc(listing.id).get();
+      final oldRent = oldDoc.data()?['rent'] as num?;
       
-      for (var doc in savedBySnapshot.docs) {
-        final userId = doc.reference.parent.parent?.id;
-        if (userId != null) {
-          await _notificationSender!.sendNotification(
-            recipientId: userId,
-            title: 'Price Drop Alert! 📉',
-            body: 'The price for "${listing.title}" has dropped to KES ${listing.rent.toInt()}!',
-            type: NotificationType.housing,
-            targetId: listing.id,
-            targetType: 'housing',
-            deepLink: '/housing-detail',
-          );
+      await _firestore.collection('housing_listings').doc(listing.id).update(listing.toFirestore());
+      await _logHistory(listing.id, 'edited', listing.toFirestore());
+
+      // Price Drop Notification
+      if (oldRent != null && listing.rent < oldRent.toDouble() && _notificationSender != null) {
+        final savedBySnapshot = await _firestore.collectionGroup('saved_housing')
+            .where(FieldPath.documentId, isEqualTo: listing.id)
+            .get();
+        
+        for (var doc in savedBySnapshot.docs) {
+          final userId = doc.reference.parent.parent?.id;
+          if (userId != null) {
+            await _notificationSender!.sendNotification(
+              recipientId: userId,
+              title: 'Price Drop Alert! 📉',
+              body: 'The price for "${listing.title}" has dropped to KES ${listing.rent.toInt()}!',
+              type: NotificationType.housing,
+              targetId: listing.id,
+              targetType: 'housing',
+              deepLink: '/housing-detail',
+            );
+          }
         }
       }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
   @override
   Future<void> deleteListing(String id) async {
-    final doc = await _firestore.collection('housing_listings').doc(id).get();
-    if (!doc.exists) return;
-    
-    final plugId = doc.data()?['plugId'];
-    
-    // SECURITY HARDENING: Ownership check if we have a current user context
-    // Though usually enforced by Firestore Rules, adding it here for defense-in-depth
-    // and to prevent unnecessary operations if we had the context available.
-    
-    final batch = _firestore.batch();
-    batch.delete(_firestore.collection('housing_listings').doc(id));
-    
-    if (plugId != null) {
-      batch.update(_firestore.collection('users').doc(plugId), {
-        'housingListingsCount': FieldValue.increment(-1),
-      });
-    }
-    
     try {
+      final doc = await _firestore.collection('housing_listings').doc(id).get();
+      if (!doc.exists) return;
+      
+      final plugId = doc.data()?['plugId'];
+      
+      // SECURITY HARDENING: Ownership check if we have a current user context
+      // Though usually enforced by Firestore Rules, adding it here for defense-in-depth
+      // and to prevent unnecessary operations if we had the context available.
+      
+      final batch = _firestore.batch();
+      batch.delete(_firestore.collection('housing_listings').doc(id));
+      
+      if (plugId != null) {
+        batch.update(_firestore.collection('users').doc(plugId), {
+          'housingListingsCount': FieldValue.increment(-1),
+        });
+      }
+      
       await batch.commit();
       AppLogger.info('Housing: Listing $id deleted successfully', 'HOUSING');
     } catch (e) {
       AppLogger.error('Housing: Failed to delete listing $id', e, null, 'HOUSING');
-      rethrow;
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
   @override
   Future<void> updateListingStatus(String id, HousingStatus status) async {
-    final doc = await _firestore.collection('housing_listings').doc(id).get();
-    if (!doc.exists) return;
+    try {
+      final doc = await _firestore.collection('housing_listings').doc(id).get();
+      if (!doc.exists) return;
 
-    final currentStatus = doc.data()?['status'];
-    final plugId = doc.data()?['plugId'];
-    final batch = _firestore.batch();
+      final currentStatus = doc.data()?['status'];
+      final plugId = doc.data()?['plugId'];
+      final batch = _firestore.batch();
 
-    batch.update(_firestore.collection('housing_listings').doc(id), {
-      'status': status.name,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+      batch.update(_firestore.collection('housing_listings').doc(id), {
+        'status': status.name,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
-    // If marked as taken, increment completed deals and trust score
-    if (status == HousingStatus.taken && currentStatus != HousingStatus.taken.name) {
-      if (plugId != null) {
-        batch.update(_firestore.collection('users').doc(plugId), {
-          'completedSalesCount': FieldValue.increment(1),
-          'trustScore': FieldValue.increment(5.0), // Consistent with Marketplace
-        });
+      // If marked as taken, increment completed deals and trust score
+      if (status == HousingStatus.taken && currentStatus != HousingStatus.taken.name) {
+        if (plugId != null) {
+          batch.update(_firestore.collection('users').doc(plugId), {
+            'completedSalesCount': FieldValue.increment(1),
+            'trustScore': FieldValue.increment(5.0), // Consistent with Marketplace
+          });
+        }
+      } else if (status == HousingStatus.available && currentStatus == HousingStatus.taken.name) {
+        // Reverting from taken back to available
+        if (plugId != null) {
+          batch.update(_firestore.collection('users').doc(plugId), {
+            'completedSalesCount': FieldValue.increment(-1),
+            'trustScore': FieldValue.increment(-5.0),
+          });
+        }
       }
-    } else if (status == HousingStatus.available && currentStatus == HousingStatus.taken.name) {
-      // Reverting from taken back to available
-      if (plugId != null) {
-        batch.update(_firestore.collection('users').doc(plugId), {
-          'completedSalesCount': FieldValue.increment(-1),
-          'trustScore': FieldValue.increment(-5.0),
-        });
-      }
+
+      await batch.commit();
+      await _logHistory(id, 'status_change', {'new_status': status.name});
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
-
-    await batch.commit();
-    await _logHistory(id, 'status_change', {'new_status': status.name});
   }
 
   @override
@@ -384,30 +397,34 @@ class HousingRepositoryImpl implements HousingRepository {
     required HousingStatus status,
     String? moderatorNotes,
   }) async {
-    await _firestore.collection('housing_listings').doc(listingId).update({
-      'status': status.name,
-      'moderatorNotes': moderatorNotes,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-    
-    await _logHistory(listingId, 'moderated', {
-      'new_status': status.name,
-      'notes': moderatorNotes,
-    });
+    try {
+      await _firestore.collection('housing_listings').doc(listingId).update({
+        'status': status.name,
+        'moderatorNotes': moderatorNotes,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      
+      await _logHistory(listingId, 'moderated', {
+        'new_status': status.name,
+        'notes': moderatorNotes,
+      });
 
-    // Notify plug
-    final doc = await _firestore.collection('housing_listings').doc(listingId).get();
-    final plugId = doc.data()?['plugId'];
-    if (plugId != null && _notificationSender != null) {
-      await _notificationSender!.sendNotification(
-        recipientId: plugId,
-        title: 'Moderation Update',
-        body: 'Your listing status has been updated to ${status.name} by a moderator.',
-        type: NotificationType.system,
-        targetId: listingId,
-        targetType: 'housing',
-        deepLink: '/plug-dashboard',
-      );
+      // Notify plug
+      final doc = await _firestore.collection('housing_listings').doc(listingId).get();
+      final plugId = doc.data()?['plugId'];
+      if (plugId != null && _notificationSender != null) {
+        await _notificationSender!.sendNotification(
+          recipientId: plugId,
+          title: 'Moderation Update',
+          body: 'Your listing status has been updated to ${status.name} by a moderator.',
+          type: NotificationType.system,
+          targetId: listingId,
+          targetType: 'housing',
+          deepLink: '/plug-dashboard',
+        );
+      }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -455,80 +472,104 @@ class HousingRepositoryImpl implements HousingRepository {
   @override
   Future<void> refreshListingStatus(String id) async {
     if (id.isEmpty) return;
-    await _firestore.collection('housing_listings').doc(id).update({
-      'lastVerifiedAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await _firestore.collection('housing_listings').doc(id).update({
+        'lastVerifiedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      AppLogger.error('Housing: Failed to refresh status for $id', e, null, 'HOUSING');
+    }
   }
 
   @override
   Future<void> incrementChatCount(String id) async {
     if (id.isEmpty) return;
-    await _firestore.collection('housing_listings').doc(id).update({
-      'chatCount': FieldValue.increment(1),
-    });
+    try {
+      await _firestore.collection('housing_listings').doc(id).update({
+        'chatCount': FieldValue.increment(1),
+      });
+    } catch (e) {
+      AppLogger.error('Housing: Failed to increment chat count for $id', e, null, 'HOUSING');
+    }
   }
 
   @override
   Future<void> incrementCallCount(String id) async {
     if (id.isEmpty) return;
-    await _firestore.collection('housing_listings').doc(id).update({
-      'callCount': FieldValue.increment(1),
-    });
+    try {
+      await _firestore.collection('housing_listings').doc(id).update({
+        'callCount': FieldValue.increment(1),
+      });
+    } catch (e) {
+      AppLogger.error('Housing: Failed to increment call count for $id', e, null, 'HOUSING');
+    }
   }
 
   @override
   Future<void> incrementShareCount(String id) async {
     if (id.isEmpty) return;
-    await _firestore.collection('housing_listings').doc(id).update({
-      'sharesCount': FieldValue.increment(1),
-    });
+    try {
+      await _firestore.collection('housing_listings').doc(id).update({
+        'sharesCount': FieldValue.increment(1),
+      });
+    } catch (e) {
+      AppLogger.error('Housing: Failed to increment share count for $id', e, null, 'HOUSING');
+    }
   }
 
   @override
   Future<void> submitReview(HousingReview review) async {
-    await _firestore.runTransaction((transaction) async {
-      final reviewRef = _firestore.collection('housing_reviews').doc(review.id);
-      final userRef = _firestore.collection('users').doc(review.plugId);
+    try {
+      await _firestore.runTransaction((transaction) async {
+        final reviewRef = _firestore.collection('housing_reviews').doc(review.id);
+        final userRef = _firestore.collection('users').doc(review.plugId);
 
-      // 1. All Reads
-      final userDoc = await transaction.get(userRef);
-      final reviewDoc = await transaction.get(reviewRef);
+        // 1. All Reads
+        final userDoc = await transaction.get(userRef);
+        final reviewDoc = await transaction.get(reviewRef);
 
-      // 2. All Writes
-      transaction.set(reviewRef, review.toFirestore());
+        // 2. All Writes
+        transaction.set(reviewRef, review.toFirestore());
 
-      if (userDoc.exists) {
-        final data = userDoc.data()!;
-        final currentRating = (data['averageRating'] ?? 0.0).toDouble();
-        final currentCount = (data['ratingsCount'] ?? 0).toInt();
-        
-        double newRating;
-        int newCount;
+        if (userDoc.exists) {
+          final data = userDoc.data()!;
+          final currentRating = (data['averageRating'] ?? 0.0).toDouble();
+          final currentCount = (data['ratingsCount'] ?? 0).toInt();
+          
+          double newRating;
+          int newCount;
 
-        if (reviewDoc.exists) {
-          final oldRating = (reviewDoc.data()?['rating'] ?? 0.0).toDouble();
-          newCount = currentCount;
-          newRating = currentCount > 0 
-              ? ((currentRating * currentCount) - oldRating + review.rating) / newCount
-              : review.rating;
-        } else {
-          newCount = currentCount + 1;
-          newRating = ((currentRating * currentCount) + review.rating) / newCount;
+          if (reviewDoc.exists) {
+            final oldRating = (reviewDoc.data()?['rating'] ?? 0.0).toDouble();
+            newCount = currentCount;
+            newRating = currentCount > 0 
+                ? ((currentRating * currentCount) - oldRating + review.rating) / newCount
+                : review.rating;
+          } else {
+            newCount = currentCount + 1;
+            newRating = ((currentRating * currentCount) + review.rating) / newCount;
+          }
+
+          transaction.update(userRef, {
+            'averageRating': newRating,
+            'ratingsCount': newCount,
+            'trustScore': FieldValue.increment(review.rating >= 4 ? 2.0 : -1.0),
+          });
         }
-
-        transaction.update(userRef, {
-          'averageRating': newRating,
-          'ratingsCount': newCount,
-          'trustScore': FieldValue.increment(review.rating >= 4 ? 2.0 : -1.0),
-        });
-      }
-    });
+      });
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
   Future<void> createRoommateProfile(RoommateProfile profile) async {
-    await _firestore.collection('roommates').doc(profile.id).set(profile.toFirestore());
+    try {
+      await _firestore.collection('roommates').doc(profile.id).set(profile.toFirestore());
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
@@ -538,38 +579,42 @@ class HousingRepositoryImpl implements HousingRepository {
     required String reason,
     required String category,
   }) async {
-    await _firestore.collection('housing_reports').add({
-      'listingId': listingId,
-      'reporterId': reporterId,
-      'reason': reason,
-      'category': category,
-      'createdAt': FieldValue.serverTimestamp(),
-      'status': 'pending',
-    });
+    try {
+      await _firestore.collection('housing_reports').add({
+        'listingId': listingId,
+        'reporterId': reporterId,
+        'reason': reason,
+        'category': category,
+        'createdAt': FieldValue.serverTimestamp(),
+        'status': 'pending',
+      });
 
-    if (_notificationSender != null) {
-      await _notificationSender!.notifyAdmins(
-        title: 'Housing Report 🏠',
-        body: 'A property has been reported for: $reason',
-        route: '/admin/reports',
-      );
-    }
-
-    // Notify plug that their listing is under review
-    final listingDoc = await _firestore.collection('housing_listings').doc(listingId).get();
-    if (listingDoc.exists) {
-      final plugId = listingDoc.data()?['plugId'];
-      if (plugId != null && _notificationSender != null) {
-        await _notificationSender!.sendNotification(
-          recipientId: plugId,
-          title: 'Listing Reported',
-          body: 'One of your listings has been reported and is under moderation.',
-          type: NotificationType.system,
-          targetId: listingId,
-          targetType: 'housing',
-          deepLink: '/plug-dashboard',
+      if (_notificationSender != null) {
+        await _notificationSender!.notifyAdmins(
+          title: 'Housing Report 🏠',
+          body: 'A property has been reported for: $reason',
+          route: '/admin/reports',
         );
       }
+
+      // Notify plug that their listing is under review
+      final listingDoc = await _firestore.collection('housing_listings').doc(listingId).get();
+      if (listingDoc.exists) {
+        final plugId = listingDoc.data()?['plugId'];
+        if (plugId != null && _notificationSender != null) {
+          await _notificationSender!.sendNotification(
+            recipientId: plugId,
+            title: 'Listing Reported',
+            body: 'One of your listings has been reported and is under moderation.',
+            type: NotificationType.system,
+            targetId: listingId,
+            targetType: 'housing',
+            deepLink: '/plug-dashboard',
+          );
+        }
+      }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -577,33 +622,37 @@ class HousingRepositoryImpl implements HousingRepository {
   Future<void> saveListing(String userId, String listingId) async {
     if (userId.isEmpty || listingId.isEmpty || _userActivityRepository == null) return;
     
-    await _userActivityRepository!.recordActivity(
-      userId: userId, 
-      contentId: listingId, 
-      activityType: ActivityType.saved, 
-      contentType: ContentType.housing,
-    );
-    
-    final listingDoc = await _firestore.collection('housing_listings').doc(listingId).get();
-    if (listingDoc.exists) {
-      final plugId = listingDoc.data()?['plugId'];
-      final title = listingDoc.data()?['title'];
+    try {
+      await _userActivityRepository!.recordActivity(
+        userId: userId, 
+        contentId: listingId, 
+        activityType: ActivityType.saved, 
+        contentType: ContentType.housing,
+      );
       
-      await _firestore.collection('housing_listings').doc(listingId).update({
-        'saves': FieldValue.increment(1),
-      });
+      final listingDoc = await _firestore.collection('housing_listings').doc(listingId).get();
+      if (listingDoc.exists) {
+        final plugId = listingDoc.data()?['plugId'];
+        final title = listingDoc.data()?['title'];
+        
+        await _firestore.collection('housing_listings').doc(listingId).update({
+          'saves': FieldValue.increment(1),
+        });
 
-      if (plugId != null && _notificationSender != null) {
-        await _notificationSender!.sendNotification(
-          recipientId: plugId,
-          title: 'New Save!',
-          body: 'Someone saved your listing: $title',
-          type: NotificationType.housing,
-          targetId: listingId,
-          targetType: 'housing',
-          deepLink: '/plug-dashboard',
-        );
+        if (plugId != null && _notificationSender != null) {
+          await _notificationSender!.sendNotification(
+            recipientId: plugId,
+            title: 'New Save!',
+            body: 'Someone saved your listing: $title',
+            type: NotificationType.housing,
+            targetId: listingId,
+            targetType: 'housing',
+            deepLink: '/plug-dashboard',
+          );
+        }
       }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -611,16 +660,20 @@ class HousingRepositoryImpl implements HousingRepository {
   Future<void> unsaveListing(String userId, String listingId) async {
     if (userId.isEmpty || listingId.isEmpty || _userActivityRepository == null) return;
     
-    await _userActivityRepository!.removeActivity(
-      userId: userId, 
-      contentId: listingId, 
-      activityType: ActivityType.saved, 
-      contentType: ContentType.housing,
-    );
-    
-    await _firestore.collection('housing_listings').doc(listingId).update({
-      'saves': FieldValue.increment(-1),
-    });
+    try {
+      await _userActivityRepository!.removeActivity(
+        userId: userId, 
+        contentId: listingId, 
+        activityType: ActivityType.saved, 
+        contentType: ContentType.housing,
+      );
+      
+      await _firestore.collection('housing_listings').doc(listingId).update({
+        'saves': FieldValue.increment(-1),
+      });
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
@@ -702,7 +755,11 @@ class HousingRepositoryImpl implements HousingRepository {
 
   @override
   Future<void> submitVacancyRequest(VacancyRequest request) async {
-    await _firestore.collection('housing_vacancy_requests').add(request.toFirestore());
+    try {
+      await _firestore.collection('housing_vacancy_requests').add(request.toFirestore());
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
@@ -723,16 +780,24 @@ class HousingRepositoryImpl implements HousingRepository {
 
   @override
   Future<void> claimVacancyRequest(String requestId, String plugId, String plugName) async {
-    await _firestore.collection('housing_vacancy_requests').doc(requestId).update({
-      'status': VacancyRequestStatus.claimed.name,
-      'claimedByPlugId': plugId,
-      'claimedByPlugName': plugName,
-    });
+    try {
+      await _firestore.collection('housing_vacancy_requests').doc(requestId).update({
+        'status': VacancyRequestStatus.claimed.name,
+        'claimedByPlugId': plugId,
+        'claimedByPlugName': plugName,
+      });
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
   Future<void> saveHousingSearch(HousingSavedSearch search) async {
-    await _firestore.collection('housing_saved_searches').add(search.toFirestore());
+    try {
+      await _firestore.collection('housing_saved_searches').add(search.toFirestore());
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
@@ -749,31 +814,43 @@ class HousingRepositoryImpl implements HousingRepository {
 
   @override
   Future<void> deleteHousingSearch(String searchId) async {
-    await _firestore.collection('housing_saved_searches').doc(searchId).delete();
+    try {
+      await _firestore.collection('housing_saved_searches').doc(searchId).delete();
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
   Future<void> toggleHousingSearchNotifications(String searchId, bool enabled) async {
-    await _firestore.collection('housing_saved_searches').doc(searchId).update({
-      'notificationsEnabled': enabled,
-    });
+    try {
+      await _firestore.collection('housing_saved_searches').doc(searchId).update({
+        'notificationsEnabled': enabled,
+      });
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
   Future<void> submitViewingRequest(ViewingRequest request) async {
-    final ref = _firestore.collection('housing_viewing_requests').doc();
-    await ref.set(request.toFirestore());
+    try {
+      final ref = _firestore.collection('housing_viewing_requests').doc();
+      await ref.set(request.toFirestore());
 
-    if (_notificationSender != null) {
-      await _notificationSender!.sendNotification(
-        recipientId: request.plugId,
-        title: 'New Viewing Request 🏠',
-        body: '${request.studentName} wants to view ${request.listingTitle}',
-        type: NotificationType.housing,
-        targetId: ref.id,
-        targetType: 'viewing_request',
-        deepLink: '/viewing-requests',
-      );
+      if (_notificationSender != null) {
+        await _notificationSender!.sendNotification(
+          recipientId: request.plugId,
+          title: 'New Viewing Request 🏠',
+          body: '${request.studentName} wants to view ${request.listingTitle}',
+          type: NotificationType.housing,
+          targetId: ref.id,
+          targetType: 'viewing_request',
+          deepLink: '/viewing-requests',
+        );
+      }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -791,29 +868,33 @@ class HousingRepositoryImpl implements HousingRepository {
 
   @override
   Future<void> updateViewingRequestStatus(String requestId, ViewingRequestStatus status) async {
-    await _firestore.collection('housing_viewing_requests').doc(requestId).update({
-      'status': status.name,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await _firestore.collection('housing_viewing_requests').doc(requestId).update({
+        'status': status.name,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
-    // Notify the student
-    final doc = await _firestore.collection('housing_viewing_requests').doc(requestId).get();
-    if (doc.exists) {
-      final data = doc.data()!;
-      final studentId = data['studentId'];
-      final title = data['listingTitle'];
-      
-      if (_notificationSender != null) {
-        await _notificationSender!.sendNotification(
-          recipientId: studentId,
-          title: 'Viewing Request Update',
-          body: 'Your request for $title has been ${status.name}.',
-          type: NotificationType.housing,
-          targetId: requestId,
-          targetType: 'viewing_request',
-          deepLink: '/viewing-requests',
-        );
+      // Notify the student
+      final doc = await _firestore.collection('housing_viewing_requests').doc(requestId).get();
+      if (doc.exists) {
+        final data = doc.data()!;
+        final studentId = data['studentId'];
+        final title = data['listingTitle'];
+        
+        if (_notificationSender != null) {
+          await _notificationSender!.sendNotification(
+            recipientId: studentId,
+            title: 'Viewing Request Update',
+            body: 'Your request for $title has been ${status.name}.',
+            type: NotificationType.housing,
+            targetId: requestId,
+            targetType: 'viewing_request',
+            deepLink: '/viewing-requests',
+          );
+        }
       }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 }

@@ -26,7 +26,7 @@ class AdminSidebar extends StatelessWidget {
                   const Icon(Icons.admin_panel_settings, color: Colors.white, size: 48),
                   const SizedBox(height: 8),
                   Text(
-                    'UniHub Admin',
+                    'Ulify Admin',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,

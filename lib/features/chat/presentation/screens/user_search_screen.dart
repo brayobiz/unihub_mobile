@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -95,7 +96,8 @@ class _UserSearchScreenState extends ConsumerState<UserSearchScreen> {
                     return ListTile(
                       onTap: () => _startChat(user),
                       leading: CircleAvatar(
-                        backgroundImage: user.photoUrl != null ? NetworkImage(user.photoUrl!) : null,
+                        backgroundImage: user.photoUrl != null ? CachedNetworkImageProvider(user.photoUrl!) : null,
+                        onBackgroundImageError: user.photoUrl != null ? (e, s) => debugPrint('🖼️ Search Avatar Error: $e') : null,
                         child: user.photoUrl == null ? Text(user.fullName[0].toUpperCase()) : null,
                       ),
                       title: Text(user.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),

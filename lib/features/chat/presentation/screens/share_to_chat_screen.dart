@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -78,7 +79,7 @@ class _ShareToChatScreenState extends ConsumerState<ShareToChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Share to UniHub Chat', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Share to Ulify Chat', style: TextStyle(fontWeight: FontWeight.bold)),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => context.pop(),
@@ -166,7 +167,8 @@ class _ShareToChatScreenState extends ConsumerState<ShareToChatScreen> {
                             
                             return ListTile(
                               leading: CircleAvatar(
-                                backgroundImage: targetUser.photoUrl != null ? NetworkImage(targetUser.photoUrl!) : null,
+                                backgroundImage: targetUser.photoUrl != null ? CachedNetworkImageProvider(targetUser.photoUrl!) : null,
+                                onBackgroundImageError: targetUser.photoUrl != null ? (e, s) => debugPrint('🖼️ Share Search Avatar Error: $e') : null,
                                 child: targetUser.photoUrl == null ? Text(targetUser.fullName[0].toUpperCase()) : null,
                               ),
                               title: Text(targetUser.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -300,7 +302,8 @@ class _ConversationShareTile extends ConsumerWidget {
         if (user == null) return const SizedBox.shrink();
         return ListTile(
           leading: CircleAvatar(
-            backgroundImage: user.photoUrl != null ? NetworkImage(user.photoUrl!) : null,
+            backgroundImage: user.photoUrl != null ? CachedNetworkImageProvider(user.photoUrl!) : null,
+            onBackgroundImageError: user.photoUrl != null ? (e, s) => debugPrint('🖼️ Share Conv Avatar Error: $e') : null,
             child: user.photoUrl == null ? Text(user.fullName[0].toUpperCase()) : null,
           ),
           title: Text(user.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),

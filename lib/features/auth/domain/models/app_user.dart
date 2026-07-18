@@ -244,7 +244,7 @@ class AppUser {
         badges.add(AppBadge(
           id: 'role_${role.name}',
           label: role.label,
-          description: 'Verified professional status on UniHub',
+          description: 'Verified professional status on Ulify',
           icon: Icons.verified_user_rounded,
           color: const Color(0xFF1677F2),
           type: BadgeType.professional,
@@ -287,7 +287,7 @@ class AppUser {
 
   AppUser stripSensitiveInfo() {
     return copyWith(
-      email: 'hidden@unihub.student',
+      email: 'hidden@ulify.student',
       fcmToken: '',
       blockedUids: [],
       phoneNumber: null,

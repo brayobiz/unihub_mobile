@@ -405,7 +405,7 @@ class _CreateOrganizerScreenState extends ConsumerState<CreateOrganizerScreen> {
           ),
           const SizedBox(height: 16),
           const Text(
-            'By becoming an organizer, you agree to UniHub\'s Community Guidelines for events.',
+            'By becoming an organizer, you agree to Ulify\'s Community Guidelines for events.',
             style: TextStyle(fontSize: 11, color: Colors.grey),
           ),
         ],

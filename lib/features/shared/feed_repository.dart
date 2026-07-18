@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:unihub_mobile/core/error/error_handler.dart';
 import '../../models/feed_type.dart';
 import '../../features/auth/shared/providers.dart';
 import '../../services/notification_service.dart';
@@ -141,56 +142,62 @@ class FeedRepository {
     });
   }
 
-  /// Permanently deletes gigs older than 3 days from the database.
-  /// This is optimized to avoid Firestore Composite Index requirements.
   Future<void> cleanupExpiredGigs() async {
     final threeDaysAgo = DateTime.now().subtract(const Duration(days: 3));
     
-    // Fetch with a limit to avoid massive reads, and try to use createdAt if possible
-    // Using a safe approach that works without complex indexes first
-    final snapshot = await _firestore
-        .collection('feed')
-        .where('type', isEqualTo: FeedType.gig.name)
-        .limit(100)
-        .get();
+    try {
+      // Fetch with a limit to avoid massive reads, and try to use createdAt if possible
+      // Using a safe approach that works without complex indexes first
+      final snapshot = await _firestore
+          .collection('feed')
+          .where('type', isEqualTo: FeedType.gig.name)
+          .limit(100)
+          .get();
 
-    if (snapshot.docs.isEmpty) return;
+      if (snapshot.docs.isEmpty) return;
 
-    final batch = _firestore.batch();
-    int deleteCount = 0;
+      final batch = _firestore.batch();
+      int deleteCount = 0;
 
-    for (var doc in snapshot.docs) {
-      final data = doc.data();
-      final createdAt = (data['createdAt'] as Timestamp).toDate();
-      
-      if (createdAt.isBefore(threeDaysAgo)) {
-        batch.delete(doc.reference);
-        deleteCount++;
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final createdAt = (data['createdAt'] as Timestamp).toDate();
+        
+        if (createdAt.isBefore(threeDaysAgo)) {
+          batch.delete(doc.reference);
+          deleteCount++;
+        }
       }
-    }
 
-    if (deleteCount > 0) {
-      await batch.commit();
+      if (deleteCount > 0) {
+        await batch.commit();
+      }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
   Future<void> postToFeed(FeedItem item) async {
-    final batch = _firestore.batch();
-    
-    // 1. Post to feed
-    final feedRef = _firestore.collection('feed').doc(item.id);
-    batch.set(feedRef, item.toJson());
-    
-    // 2. If it's a gig, increment counter
-    if (item.type == FeedType.gig && item.authorId.isNotEmpty) {
-      final userRef = _firestore.collection('users').doc(item.authorId);
-      batch.update(userRef, {
-        'gigsPostedCount': FieldValue.increment(1),
-        'trustScore': FieldValue.increment(3.0),
-      });
-    }
+    try {
+      final batch = _firestore.batch();
+      
+      // 1. Post to feed
+      final feedRef = _firestore.collection('feed').doc(item.id);
+      batch.set(feedRef, item.toJson());
+      
+      // 2. If it's a gig, increment counter
+      if (item.type == FeedType.gig && item.authorId.isNotEmpty) {
+        final userRef = _firestore.collection('users').doc(item.authorId);
+        batch.update(userRef, {
+          'gigsPostedCount': FieldValue.increment(1),
+          'trustScore': FieldValue.increment(3.0),
+        });
+      }
 
-    await batch.commit();
+      await batch.commit();
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   Future<FeedItem?> getFeedItemById(String id) async {
@@ -207,32 +214,44 @@ class FeedRepository {
   }
 
   Future<void> deleteFeedItem(String id) async {
-    await _firestore.collection('feed').doc(id).delete();
+    try {
+      await _firestore.collection('feed').doc(id).delete();
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   Future<void> toggleLike(String itemId, String userId) async {
-    final docRef = _firestore.collection('feed').doc(itemId);
-    final doc = await docRef.get();
-    if (!doc.exists) return;
+    try {
+      final docRef = _firestore.collection('feed').doc(itemId);
+      final doc = await docRef.get();
+      if (!doc.exists) return;
 
-    final item = FeedItem.fromJson(doc.data() as Map<String, dynamic>);
-    if (item.likedBy.contains(userId)) {
-      await docRef.update({
-        'likesCount': FieldValue.increment(-1),
-        'likedBy': FieldValue.arrayRemove([userId]),
-      });
-    } else {
-      await docRef.update({
-        'likesCount': FieldValue.increment(1),
-        'likedBy': FieldValue.arrayUnion([userId]),
-      });
+      final item = FeedItem.fromJson(doc.data() as Map<String, dynamic>);
+      if (item.likedBy.contains(userId)) {
+        await docRef.update({
+          'likesCount': FieldValue.increment(-1),
+          'likedBy': FieldValue.arrayRemove([userId]),
+        });
+      } else {
+        await docRef.update({
+          'likesCount': FieldValue.increment(1),
+          'likedBy': FieldValue.arrayUnion([userId]),
+        });
+      }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
   Future<void> incrementShareCount(String itemId) async {
-    await _firestore.collection('feed').doc(itemId).update({
-      'sharesCount': FieldValue.increment(1),
-    });
+    try {
+      await _firestore.collection('feed').doc(itemId).update({
+        'sharesCount': FieldValue.increment(1),
+      });
+    } catch (e) {
+      // Non-critical
+    }
   }
 
   Future<void> addComment({
@@ -241,12 +260,16 @@ class FeedRepository {
     required String userName,
     required String text,
   }) async {
-    await _firestore.collection('feed').doc(itemId).collection('comments').add({
-      'userId': userId,
-      'userName': userName,
-      'text': text,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await _firestore.collection('feed').doc(itemId).collection('comments').add({
+        'userId': userId,
+        'userName': userName,
+        'text': text,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   Stream<List<Map<String, dynamic>>> watchComments(String itemId) {
@@ -260,21 +283,25 @@ class FeedRepository {
   }
 
   Future<void> reportItem(String itemId, String userId, String reason) async {
-    await _firestore.collection('reports').add({
-      'itemId': itemId,
-      'reporterId': userId,
-      'reason': reason,
-      'type': 'feed_item',
-      'createdAt': FieldValue.serverTimestamp(),
-      'status': 'pending',
-    });
+    try {
+      await _firestore.collection('reports').add({
+        'itemId': itemId,
+        'reporterId': userId,
+        'reason': reason,
+        'type': 'feed_item',
+        'createdAt': FieldValue.serverTimestamp(),
+        'status': 'pending',
+      });
 
-    if (_notificationSender != null) {
-      await _notificationSender!.notifyAdmins(
-        title: 'New Community Report ⚠️',
-        body: 'A feed item has been reported for: $reason',
-        route: '/admin/reports',
-      );
+      if (_notificationSender != null) {
+        await _notificationSender!.notifyAdmins(
+          title: 'New Community Report ⚠️',
+          body: 'A feed item has been reported for: $reason',
+          route: '/admin/reports',
+        );
+      }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Centralized typography definitions for UniHub.
+/// Centralized typography definitions for Ulify.
 class AppTypography {
   AppTypography._();
 

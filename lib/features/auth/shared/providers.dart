@@ -103,7 +103,7 @@ final publicUserProvider = StreamProvider.autoDispose.family<AppUser, String>((r
           ? targetUser.socialLinks
           : const <String, String>{},
       // Only the owner sees their own private contact info through this provider
-      email: isOwner ? targetUser.email : 'hidden@unihub.student',
+      email: isOwner ? targetUser.email : 'hidden@ulify.student',
       phoneNumber: isOwner ? targetUser.phoneNumber : null,
       whatsappNumber: isOwner ? targetUser.whatsappNumber : null,
     );

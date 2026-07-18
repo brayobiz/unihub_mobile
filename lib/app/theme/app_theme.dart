@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 import 'app_typography.dart';
 
-/// The entry point for the UniHub Theming System.
+/// The entry point for the Ulify Theming System.
 class AppTheme {
   AppTheme._();
 

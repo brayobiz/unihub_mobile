@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Unihub Mobile</string>
+	<string>Ulify</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>unihub_mobile</string>
+	<string>ulify_mobile</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -46,11 +46,11 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>UniHub needs access to your gallery to upload listing and profile photos.</string>
+	<string>Ulify needs access to your gallery to upload listing and profile photos.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>UniHub needs access to your camera to take photos for listings.</string>
+	<string>Ulify needs access to your camera to take photos for listings.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>UniHub needs access to your microphone (optional for videos).</string>
+	<string>Ulify needs access to your microphone (optional for videos).</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>

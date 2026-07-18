@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:unihub_mobile/core/error/error_handler.dart';
 import '../../domain/repositories/user_activity_repository.dart';
 
 class UserActivityRepositoryImpl implements UserActivityRepository {
@@ -35,13 +36,17 @@ class UserActivityRepositoryImpl implements UserActivityRepository {
   }) async {
     if (userId.isEmpty || contentId.isEmpty) return;
 
-    final docRef = _getCollection(userId, activityType, contentType).doc(contentId);
-    
-    await docRef.set({
-      'contentId': contentId,
-      'timestamp': FieldValue.serverTimestamp(),
-      if (metadata != null) ...metadata,
-    }, SetOptions(merge: true));
+    try {
+      final docRef = _getCollection(userId, activityType, contentType).doc(contentId);
+      
+      await docRef.set({
+        'contentId': contentId,
+        'timestamp': FieldValue.serverTimestamp(),
+        if (metadata != null) ...metadata,
+      }, SetOptions(merge: true));
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
@@ -52,7 +57,11 @@ class UserActivityRepositoryImpl implements UserActivityRepository {
     required ContentType contentType,
   }) async {
     if (userId.isEmpty || contentId.isEmpty) return;
-    await _getCollection(userId, activityType, contentType).doc(contentId).delete();
+    try {
+      await _getCollection(userId, activityType, contentType).doc(contentId).delete();
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
@@ -79,13 +88,17 @@ class UserActivityRepositoryImpl implements UserActivityRepository {
   }) async {
     if (userId.isEmpty) return;
 
-    final snapshot = await _getCollection(userId, activityType, contentType).get();
-    if (snapshot.docs.isEmpty) return;
+    try {
+      final snapshot = await _getCollection(userId, activityType, contentType).get();
+      if (snapshot.docs.isEmpty) return;
 
-    final batch = _firestore.batch();
-    for (var doc in snapshot.docs) {
-      batch.delete(doc.reference);
+      final batch = _firestore.batch();
+      for (var doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
-    await batch.commit();
   }
 }

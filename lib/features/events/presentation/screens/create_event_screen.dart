@@ -359,7 +359,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
           _buildReviewRow('Venue', state.venue?.address ?? 'Not set'),
           const SizedBox(height: 32),
           const Text(
-            'By submitting, you agree to follow UniHub community guidelines. Your event may require admin approval before being published.',
+            'By submitting, you agree to follow Ulify community guidelines. Your event may require admin approval before being published.',
             style: TextStyle(fontSize: 12, color: Colors.grey),
           ),
         ],

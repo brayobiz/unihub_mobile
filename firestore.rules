@@ -133,7 +133,7 @@ service cloud.firestore {
       match /{collectionId}/{docId} {
         allow read: if isOwner(userId) || isAdmin();
         allow write: if isOwner(userId) && (
-          collectionId in ["tokens", "recently_viewed", "saved_listings", "saved_housing", "saved_searches", "recent_searches", "study_progress", "followed_organizers", "collections", "saved_events", "saved_notes"] ||
+          collectionId in ["tokens", "metadata", "recently_viewed", "saved_listings", "saved_housing", "saved_searches", "recent_searches", "study_progress", "followed_organizers", "collections", "saved_events", "saved_notes"] ||
           collectionId.matches('^recently_viewed_.*') ||
           collectionId.matches('^saved_.*') ||
           collectionId.matches('^recent_searches_.*')
@@ -462,7 +462,9 @@ service cloud.firestore {
     // --- Background Tasks ---
     match /notifications_queue/{queueId} {
       allow read: if isAdmin();
-      allow create: if true;
+      allow create: if isAuthenticated() && (
+        request.resource.data.get('isBroadcast', false) == false || isAdmin()
+      );
       allow update, delete: if isAdmin();
     }
 

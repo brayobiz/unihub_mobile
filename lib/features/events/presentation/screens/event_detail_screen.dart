@@ -727,7 +727,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Report submitted. Thank you for keeping UniHub safe!'),
+                        content: Text('Report submitted. Thank you for keeping Ulify safe!'),
                         backgroundColor: AppColors.success,
                       ),
                     );

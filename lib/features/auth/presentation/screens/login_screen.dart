@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/error/error_handler.dart';
 import '../controllers/auth_controller.dart';
 import '../widgets/auth_button.dart';
 import '../widgets/auth_text_field.dart';
@@ -62,7 +63,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (state.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(state.error.toString().replaceAll('Exception: ', '')),
+            content: Text(AppErrorHandler.mapError(state.error)),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -258,7 +259,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         if (state.hasError) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(state.error.toString().replaceAll('Exception: ', '')),
+                              content: Text(AppErrorHandler.mapError(state.error)),
                               behavior: SnackBarBehavior.floating,
                             ),
                           );

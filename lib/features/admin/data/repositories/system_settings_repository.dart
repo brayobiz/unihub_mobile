@@ -15,8 +15,8 @@ class SystemSettingsRepository {
     termsOfServiceUrl: 'https://unihub-3663e.web.app/terms',
     websiteUrl: 'https://unihub-3663e.web.app',
     socialLinks: {
-      'instagram': 'https://instagram.com/unihub_campus',
-      'twitter': 'https://twitter.com/unihub_campus',
+      'instagram': 'https://instagram.com/ulify_campus',
+      'twitter': 'https://twitter.com/ulify_campus',
     },
     maintenanceMode: false,
     maintenanceMessage: 'Ulify is currently under maintenance. We\'ll be back shortly!',

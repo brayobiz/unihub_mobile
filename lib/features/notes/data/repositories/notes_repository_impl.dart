@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:unihub_mobile/core/error/error_handler.dart';
 import '../../domain/models/note.dart';
 import '../../domain/models/study_progress.dart';
 import '../../domain/repositories/notes_repository.dart';
@@ -114,25 +115,25 @@ class NotesRepositoryImpl implements NotesRepository {
       debugPrint('📝 Firestore: Processing note ${note.id}');
     }
     
-    final noteRef = _firestore.collection('notes').doc(note.id);
-    final doc = await noteRef.get();
-    final isNew = !doc.exists;
-
-    final batch = _firestore.batch();
-    
-    // 1. Create/Update the note
-    batch.set(noteRef, note.toJson(), SetOptions(merge: true));
-    
-    // 2. Increment counters only for NEW notes
-    if (isNew && note.authorId.isNotEmpty) {
-      final userRef = _firestore.collection('users').doc(note.authorId);
-      batch.update(userRef, {
-        'resourcesSharedCount': FieldValue.increment(1),
-        'trustScore': FieldValue.increment(2.0),
-      });
-    }
-
     try {
+      final noteRef = _firestore.collection('notes').doc(note.id);
+      final doc = await noteRef.get();
+      final isNew = !doc.exists;
+
+      final batch = _firestore.batch();
+      
+      // 1. Create/Update the note
+      batch.set(noteRef, note.toJson(), SetOptions(merge: true));
+      
+      // 2. Increment counters only for NEW notes
+      if (isNew && note.authorId.isNotEmpty) {
+        final userRef = _firestore.collection('users').doc(note.authorId);
+        batch.update(userRef, {
+          'resourcesSharedCount': FieldValue.increment(1),
+          'trustScore': FieldValue.increment(2.0),
+        });
+      }
+
       await batch.commit();
       if (kDebugMode) {
         debugPrint('✅ Firestore: Note ${isNew ? 'created' : 'updated'} successfully');
@@ -141,27 +142,31 @@ class NotesRepositoryImpl implements NotesRepository {
       if (kDebugMode) {
         debugPrint('❌ Firestore: Failed to process note: $e');
       }
-      rethrow;
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
   @override
   Future<void> deleteNote(String noteId) async {
-    final doc = await _firestore.collection('notes').doc(noteId).get();
-    if (!doc.exists) return;
-    
-    final authorId = doc.data()?['authorId'];
-    final batch = _firestore.batch();
-    
-    batch.delete(_firestore.collection('notes').doc(noteId));
-    
-    if (authorId != null && (authorId as String).isNotEmpty) {
-      batch.update(_firestore.collection('users').doc(authorId), {
-        'resourcesSharedCount': FieldValue.increment(-1),
-      });
-    }
+    try {
+      final doc = await _firestore.collection('notes').doc(noteId).get();
+      if (!doc.exists) return;
+      
+      final authorId = doc.data()?['authorId'];
+      final batch = _firestore.batch();
+      
+      batch.delete(_firestore.collection('notes').doc(noteId));
+      
+      if (authorId != null && (authorId as String).isNotEmpty) {
+        batch.update(_firestore.collection('users').doc(authorId), {
+          'resourcesSharedCount': FieldValue.increment(-1),
+        });
+      }
 
-    await batch.commit();
+      await batch.commit();
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
@@ -186,14 +191,18 @@ class NotesRepositoryImpl implements NotesRepository {
     required String reporterId,
     required String reason,
   }) async {
-    await _firestore.collection('reports').add({
-      'type': 'note',
-      'targetId': noteId,
-      'reporterId': reporterId,
-      'reason': reason,
-      'createdAt': FieldValue.serverTimestamp(),
-      'status': 'pending',
-    });
+    try {
+      await _firestore.collection('reports').add({
+        'type': 'note',
+        'targetId': noteId,
+        'reporterId': reporterId,
+        'reason': reason,
+        'createdAt': FieldValue.serverTimestamp(),
+        'status': 'pending',
+      });
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
@@ -206,29 +215,43 @@ class NotesRepositoryImpl implements NotesRepository {
   @override
   Future<void> incrementShareCount(String noteId) async {
     if (noteId.isEmpty) return;
-    await _firestore.collection('notes').doc(noteId).update({
-      'sharesCount': FieldValue.increment(1),
-    });
+    try {
+      await _firestore.collection('notes').doc(noteId).update({
+        'sharesCount': FieldValue.increment(1),
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Failed to increment share count: $e');
+      }
+    }
   }
 
   @override
   Future<void> updateStudyProgress(StudyProgress progress) async {
-    await _firestore
-        .collection('users')
-        .doc(progress.userId)
-        .collection('study_progress')
-        .doc(progress.noteId)
-        .set(progress.toJson(), SetOptions(merge: true));
+    try {
+      await _firestore
+          .collection('users')
+          .doc(progress.userId)
+          .collection('study_progress')
+          .doc(progress.noteId)
+          .set(progress.toJson(), SetOptions(merge: true));
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
   Future<void> deleteStudyProgress(String userId, String noteId) async {
-    await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('study_progress')
-        .doc(noteId)
-        .delete();
+    try {
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('study_progress')
+          .doc(noteId)
+          .delete();
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
@@ -281,24 +304,32 @@ class NotesRepositoryImpl implements NotesRepository {
     required String reason,
     String? adminNotes,
   }) async {
-    await _firestore.collection('notes').doc(noteId).update({
-      'flagged': true,
-      'flagReason': reason,
-      'flagAdminNotes': adminNotes,
-      'flaggedAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await _firestore.collection('notes').doc(noteId).update({
+        'flagged': true,
+        'flagReason': reason,
+        'flagAdminNotes': adminNotes,
+        'flaggedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
   Future<void> approveNote(String noteId) async {
-    final noteDoc = await _firestore.collection('notes').doc(noteId).get();
-    if (!noteDoc.exists) return;
+    try {
+      final noteDoc = await _firestore.collection('notes').doc(noteId).get();
+      if (!noteDoc.exists) return;
 
-    await _firestore.collection('notes').doc(noteId).update({
-      'status': 'active',
-      'flagged': false,
-      'approvedAt': FieldValue.serverTimestamp(),
-    });
+      await _firestore.collection('notes').doc(noteId).update({
+        'status': 'active',
+        'flagged': false,
+        'approvedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
@@ -307,15 +338,19 @@ class NotesRepositoryImpl implements NotesRepository {
     required String reason,
     required String adminId,
   }) async {
-    final noteDoc = await _firestore.collection('notes').doc(noteId).get();
-    if (!noteDoc.exists) return;
+    try {
+      final noteDoc = await _firestore.collection('notes').doc(noteId).get();
+      if (!noteDoc.exists) return;
 
-    await _firestore.collection('notes').doc(noteId).update({
-      'status': 'suspended',
-      'suspensionReason': reason,
-      'suspendedBy': adminId,
-      'suspendedAt': FieldValue.serverTimestamp(),
-    });
+      await _firestore.collection('notes').doc(noteId).update({
+        'status': 'suspended',
+        'suspensionReason': reason,
+        'suspendedBy': adminId,
+        'suspendedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
@@ -324,21 +359,25 @@ class NotesRepositoryImpl implements NotesRepository {
     required String reason,
     required String adminId,
   }) async {
-    final noteDoc = await _firestore.collection('notes').doc(noteId).get();
-    if (!noteDoc.exists) return;
+    try {
+      final noteDoc = await _firestore.collection('notes').doc(noteId).get();
+      if (!noteDoc.exists) return;
 
-    await _firestore.collection('notes').doc(noteId).update({
-      'status': 'removed',
-      'removalReason': reason,
-      'removedBy': adminId,
-      'removedAt': FieldValue.serverTimestamp(),
-    });
-
-    final authorId = noteDoc.data()?['authorId'];
-    if (authorId != null && (authorId as String).isNotEmpty) {
-      await _firestore.collection('users').doc(authorId).update({
-        'resourcesSharedCount': FieldValue.increment(-1),
+      await _firestore.collection('notes').doc(noteId).update({
+        'status': 'removed',
+        'removalReason': reason,
+        'removedBy': adminId,
+        'removedAt': FieldValue.serverTimestamp(),
       });
+
+      final authorId = noteDoc.data()?['authorId'];
+      if (authorId != null && (authorId as String).isNotEmpty) {
+        await _firestore.collection('users').doc(authorId).update({
+          'resourcesSharedCount': FieldValue.increment(-1),
+        });
+      }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 

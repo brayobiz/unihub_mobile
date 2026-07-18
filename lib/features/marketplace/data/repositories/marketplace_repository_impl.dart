@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:unihub_mobile/core/error/error_handler.dart';
 import 'package:unihub_mobile/core/utils/app_logger.dart';
 import '../../domain/models/listing.dart';
 import '../../domain/models/offer.dart';
@@ -448,56 +449,72 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
   @override
   Future<void> createCollection(String userId, String name) async {
     if (userId.isEmpty || name.isEmpty) return;
-    await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('collections')
-        .doc(name)
-        .set({'createdAt': FieldValue.serverTimestamp()});
+    try {
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('collections')
+          .doc(name)
+          .set({'createdAt': FieldValue.serverTimestamp()});
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
   Future<void> deleteCollection(String userId, String name) async {
     if (userId.isEmpty || name.isEmpty) return;
     
-    final batch = _firestore.batch();
-    final collectionRef = _firestore.collection('users').doc(userId).collection('collections').doc(name);
-    
-    final items = await collectionRef.collection('listings').get();
-    for (var doc in items.docs) {
-      batch.delete(doc.reference);
+    try {
+      final batch = _firestore.batch();
+      final collectionRef = _firestore.collection('users').doc(userId).collection('collections').doc(name);
+      
+      final items = await collectionRef.collection('listings').get();
+      for (var doc in items.docs) {
+        batch.delete(doc.reference);
+      }
+      
+      batch.delete(collectionRef);
+      await batch.commit();
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
-    
-    batch.delete(collectionRef);
-    await batch.commit();
   }
 
   @override
   Future<void> addToCollection(String userId, String collectionName, String listingId) async {
     if (userId.isEmpty || collectionName.isEmpty || listingId.isEmpty) return;
     
-    await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('collections')
-        .doc(collectionName)
-        .collection('listings')
-        .doc(listingId)
-        .set({'addedAt': FieldValue.serverTimestamp()});
+    try {
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('collections')
+          .doc(collectionName)
+          .collection('listings')
+          .doc(listingId)
+          .set({'addedAt': FieldValue.serverTimestamp()});
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
   Future<void> removeFromCollection(String userId, String collectionName, String listingId) async {
     if (userId.isEmpty || collectionName.isEmpty || listingId.isEmpty) return;
     
-    await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('collections')
-        .doc(collectionName)
-        .collection('listings')
-        .doc(listingId)
-        .delete();
+    try {
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('collections')
+          .doc(collectionName)
+          .collection('listings')
+          .doc(listingId)
+          .delete();
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
@@ -562,81 +579,85 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       AppLogger.info('Offer ${offer.id} created for listing ${offer.listingId}', 'MARKETPLACE');
     } catch (e, st) {
       AppLogger.error('Failed to make offer', e, st, 'MARKETPLACE');
-      rethrow;
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
   @override
   Future<void> respondToOffer(String offerId, OfferStatus status, {double? counterAmount, String? sellerMessage}) async {
-    final offerDoc = await _firestore.collection('offers').doc(offerId).get();
-    if (!offerDoc.exists) return;
-    
-    final offer = Offer.fromJson(offerDoc.data() as Map<String, dynamic>);
-    final batch = _firestore.batch();
-    
-    batch.update(_firestore.collection('offers').doc(offerId), {
-      'status': status.name,
-      if (counterAmount != null) 'counterAmount': counterAmount,
-      if (sellerMessage != null) 'sellerMessage': sellerMessage,
-    });
-    
-    if (status == OfferStatus.accepted) {
-      batch.update(_firestore.collection('listings').doc(offer.listingId), {
-        'status': ListingStatus.sold.name,
+    try {
+      final offerDoc = await _firestore.collection('offers').doc(offerId).get();
+      if (!offerDoc.exists) return;
+      
+      final offer = Offer.fromJson(offerDoc.data() as Map<String, dynamic>);
+      final batch = _firestore.batch();
+      
+      batch.update(_firestore.collection('offers').doc(offerId), {
+        'status': status.name,
+        if (counterAmount != null) 'counterAmount': counterAmount,
+        if (sellerMessage != null) 'sellerMessage': sellerMessage,
       });
       
-      final userRef = _firestore.collection('users').doc(offer.sellerId);
-      batch.update(userRef, {
-        'completedSalesCount': FieldValue.increment(1),
-        'activeListingsCount': FieldValue.increment(-1),
-        'trustScore': FieldValue.increment(10.0),
-      });
-    }
-    
-    await batch.commit();
+      if (status == OfferStatus.accepted) {
+        batch.update(_firestore.collection('listings').doc(offer.listingId), {
+          'status': ListingStatus.sold.name,
+        });
+        
+        final userRef = _firestore.collection('users').doc(offer.sellerId);
+        batch.update(userRef, {
+          'completedSalesCount': FieldValue.increment(1),
+          'activeListingsCount': FieldValue.increment(-1),
+          'trustScore': FieldValue.increment(10.0),
+        });
+      }
+      
+      await batch.commit();
 
-    if (_notificationSender != null) {
-      String title = '';
-      String body = '';
-      final listing = await getListingById(offer.listingId);
-      final listingTitle = listing?.title ?? 'your item';
-      
-      switch (status) {
-        case OfferStatus.accepted:
-          title = 'Offer Accepted! 🎉';
-          body = sellerMessage != null && sellerMessage.isNotEmpty 
-              ? '$sellerMessage. Tap to message the seller!'
-              : 'Your offer for "$listingTitle" was accepted. Tap to message the seller!';
-          break;
-        case OfferStatus.rejected:
-          title = 'Offer Rejected';
-          body = sellerMessage != null && sellerMessage.isNotEmpty
-              ? sellerMessage
-              : 'Your offer for "$listingTitle" was declined.';
-          break;
-        case OfferStatus.countered:
-          title = 'Counter-Offer Received';
-          body = 'The seller countered your offer for "$listingTitle" with KES $counterAmount.';
-          break;
-        default: break;
+      if (_notificationSender != null) {
+        String title = '';
+        String body = '';
+        final listing = await getListingById(offer.listingId);
+        final listingTitle = listing?.title ?? 'your item';
+        
+        switch (status) {
+          case OfferStatus.accepted:
+            title = 'Offer Accepted! 🎉';
+            body = sellerMessage != null && sellerMessage.isNotEmpty 
+                ? '$sellerMessage. Tap to message the seller!'
+                : 'Your offer for "$listingTitle" was accepted. Tap to message the seller!';
+            break;
+          case OfferStatus.rejected:
+            title = 'Offer Rejected';
+            body = sellerMessage != null && sellerMessage.isNotEmpty
+                ? sellerMessage
+                : 'Your offer for "$listingTitle" was declined.';
+            break;
+          case OfferStatus.countered:
+            title = 'Counter-Offer Received';
+            body = 'The seller countered your offer for "$listingTitle" with KES $counterAmount.';
+            break;
+          default: break;
+        }
+        
+        if (title.isNotEmpty) {
+          await _notificationSender.sendNotification(
+            recipientId: offer.buyerId,
+            actorId: offer.sellerId,
+            title: title,
+            body: body,
+            type: NotificationType.marketplace,
+            targetId: offer.listingId,
+            targetType: 'marketplace',
+            metadata: {
+              'offerId': offer.id,
+              'status': status.name,
+              if (sellerMessage != null) 'sellerMessage': sellerMessage,
+            },
+          );
+        }
       }
-      
-      if (title.isNotEmpty) {
-        await _notificationSender.sendNotification(
-          recipientId: offer.buyerId,
-          actorId: offer.sellerId,
-          title: title,
-          body: body,
-          type: NotificationType.marketplace,
-          targetId: offer.listingId,
-          targetType: 'marketplace',
-          metadata: {
-            'offerId': offer.id,
-            'status': status.name,
-            if (sellerMessage != null) 'sellerMessage': sellerMessage,
-          },
-        );
-      }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -795,22 +816,30 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
 
   @override
   Future<void> saveSearch(SavedSearch search) async {
-    await _firestore
-        .collection('users')
-        .doc(search.userId)
-        .collection('saved_searches')
-        .doc(search.id)
-        .set(search.toJson());
+    try {
+      await _firestore
+          .collection('users')
+          .doc(search.userId)
+          .collection('saved_searches')
+          .doc(search.id)
+          .set(search.toJson());
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
   Future<void> deleteSavedSearch(String userId, String searchId) async {
-    await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('saved_searches')
-        .doc(searchId)
-        .delete();
+    try {
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('saved_searches')
+          .doc(searchId)
+          .delete();
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
@@ -829,12 +858,16 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
 
   @override
   Future<void> updateSavedSearchNotification(String userId, String searchId, bool enabled) async {
-    await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('saved_searches')
-        .doc(searchId)
-        .update({'notificationsEnabled': enabled});
+    try {
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('saved_searches')
+          .doc(searchId)
+          .update({'notificationsEnabled': enabled});
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
@@ -909,24 +942,28 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
 
   @override
   Future<void> createListing(Listing listing) async {
-    if (listing.id.isEmpty) throw Exception('Listing ID cannot be empty');
-    
-    final listingRef = _firestore.collection('listings').doc(listing.id);
-    final doc = await listingRef.get();
-    final isNew = !doc.exists;
+    try {
+      if (listing.id.isEmpty) throw Exception('Listing ID cannot be empty');
+      
+      final listingRef = _firestore.collection('listings').doc(listing.id);
+      final doc = await listingRef.get();
+      final isNew = !doc.exists;
 
-    final batch = _firestore.batch();
-    batch.set(listingRef, listing.toJson(), SetOptions(merge: true));
-    
-    if (isNew && listing.sellerId.isNotEmpty) {
-      final userRef = _firestore.collection('users').doc(listing.sellerId);
-      batch.update(userRef, {
-        'activeListingsCount': FieldValue.increment(1),
-        'trustScore': FieldValue.increment(2.0),
-      });
+      final batch = _firestore.batch();
+      batch.set(listingRef, listing.toJson(), SetOptions(merge: true));
+      
+      if (isNew && listing.sellerId.isNotEmpty) {
+        final userRef = _firestore.collection('users').doc(listing.sellerId);
+        batch.update(userRef, {
+          'activeListingsCount': FieldValue.increment(1),
+          'trustScore': FieldValue.increment(2.0),
+        });
+      }
+
+      await batch.commit();
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
-
-    await batch.commit();
   }
 
   @override
@@ -951,7 +988,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       AppLogger.info('Listing ${listing.id} updated', 'MARKETPLACE');
     } catch (e) {
       AppLogger.error('Failed to update listing ${listing.id}', e, null, 'MARKETPLACE');
-      rethrow;
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -981,7 +1018,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       AppLogger.info('Listing $id deleted by user $userId', 'MARKETPLACE');
     } catch (e) {
       AppLogger.error('Failed to delete listing $id', e, null, 'MARKETPLACE');
-      rethrow;
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -1024,74 +1061,95 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       }
     } catch (e) {
       AppLogger.error('Failed to toggle save for listing $listingId', e, null, 'MARKETPLACE');
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
   @override
   Future<void> recordSave(String listingId, bool isSaved) async {
     if (listingId.isEmpty) return;
-    await _firestore.collection('listings').doc(listingId).update({
-      'savesCount': FieldValue.increment(isSaved ? 1 : -1),
-    });
+    try {
+      await _firestore.collection('listings').doc(listingId).update({
+        'savesCount': FieldValue.increment(isSaved ? 1 : -1),
+      });
+    } catch (e) {
+      AppLogger.error('Failed to record save for listing $listingId', e, null, 'MARKETPLACE');
+    }
   }
 
   @override
   Future<void> recordChatStarted(String listingId) async {
     if (listingId.isEmpty) return;
-    await _firestore.collection('listings').doc(listingId).update({
-      'chatsStartedCount': FieldValue.increment(1),
-    });
+    try {
+      await _firestore.collection('listings').doc(listingId).update({
+        'chatsStartedCount': FieldValue.increment(1),
+      });
+    } catch (e) {
+      AppLogger.error('Failed to record chat started for listing $listingId', e, null, 'MARKETPLACE');
+    }
   }
 
   @override
   Future<void> boostListing(String listingId) async {
     if (listingId.isEmpty) return;
     
-    // Growth Phase: Allow verified users to boost for free
-    // In the future, this will be handled by the MonetizationRepository/Service
-    final doc = await _firestore.collection('listings').doc(listingId).get();
-    if (!doc.exists) return;
-    
-    final sellerId = doc.data()?['sellerId'];
-    if (sellerId == null) return;
+    try {
+      // Growth Phase: Allow verified users to boost for free
+      // In the future, this will be handled by the MonetizationRepository/Service
+      final doc = await _firestore.collection('listings').doc(listingId).get();
+      if (!doc.exists) return;
+      
+      final sellerId = doc.data()?['sellerId'];
+      if (sellerId == null) return;
 
-    // Check if user is verified (Optional: can be enforced here too)
-    
-    await _firestore.collection('listings').doc(listingId).update({
-      'lastBoostedAt': FieldValue.serverTimestamp(),
-      'boostCount': FieldValue.increment(1),
-    });
-    
-    AppLogger.info('Listing $listingId boosted (Free Growth Phase)', 'MARKETPLACE');
+      // Check if user is verified (Optional: can be enforced here too)
+      
+      await _firestore.collection('listings').doc(listingId).update({
+        'lastBoostedAt': FieldValue.serverTimestamp(),
+        'boostCount': FieldValue.increment(1),
+      });
+      
+      AppLogger.info('Listing $listingId boosted (Free Growth Phase)', 'MARKETPLACE');
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
   Future<void> featureListing(String listingId, String packageId, Duration duration) async {
     if (listingId.isEmpty) return;
-    final now = DateTime.now();
-    
-    // Growth Phase: Free for verified
-    await _firestore.collection('listings').doc(listingId).update({
-      'isFeatured': true,
-      'featuredAt': FieldValue.serverTimestamp(),
-      'featuredUntil': Timestamp.fromDate(now.add(duration)),
-      'featuredPackage': packageId,
-    });
-    
-    AppLogger.info('Listing $listingId featured for ${duration.inDays} days', 'MARKETPLACE');
+    try {
+      final now = DateTime.now();
+      
+      // Growth Phase: Free for verified
+      await _firestore.collection('listings').doc(listingId).update({
+        'isFeatured': true,
+        'featuredAt': FieldValue.serverTimestamp(),
+        'featuredUntil': Timestamp.fromDate(now.add(duration)),
+        'featuredPackage': packageId,
+      });
+      
+      AppLogger.info('Listing $listingId featured for ${duration.inDays} days', 'MARKETPLACE');
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
   Future<void> setSponsored(String listingId, Duration duration) async {
     if (listingId.isEmpty) return;
-    final now = DateTime.now();
-    
-    await _firestore.collection('listings').doc(listingId).update({
-      'isSponsored': true,
-      'sponsoredUntil': Timestamp.fromDate(now.add(duration)),
-    });
-    
-    AppLogger.info('Listing $listingId set as sponsored for ${duration.inDays} days', 'MARKETPLACE');
+    try {
+      final now = DateTime.now();
+      
+      await _firestore.collection('listings').doc(listingId).update({
+        'isSponsored': true,
+        'sponsoredUntil': Timestamp.fromDate(now.add(duration)),
+      });
+      
+      AppLogger.info('Listing $listingId set as sponsored for ${duration.inDays} days', 'MARKETPLACE');
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   // In-memory throttle for the current app session to prevent "running rising" views bug
@@ -1167,68 +1225,80 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
   @override
   Future<void> recordShare(String listingId) async {
     if (listingId.isEmpty) return;
-    await _firestore.collection('listings').doc(listingId).update({
-      'sharesCount': FieldValue.increment(1),
-    });
+    try {
+      await _firestore.collection('listings').doc(listingId).update({
+        'sharesCount': FieldValue.increment(1),
+      });
+    } catch (e) {
+      AppLogger.error('Failed to record share for listing $listingId', e, null, 'MARKETPLACE');
+    }
   }
 
   @override
   Future<void> updateListingStatus(String listingId, ListingStatus status, String userId) async {
     if (listingId.isEmpty) return;
     
-    final doc = await _firestore.collection('listings').doc(listingId).get();
-    if (!doc.exists) return;
-    
-    final currentStatus = doc.data()?['status'];
-    final sellerId = doc.data()?['sellerId'];
-    
-    if (sellerId != userId) {
-       throw Exception('Unauthorized: You do not own this listing');
-    }
-
-    final batch = _firestore.batch();
-    batch.update(_firestore.collection('listings').doc(listingId), {
-      'status': status.name,
-    });
-
-    if (status == ListingStatus.sold && currentStatus != ListingStatus.sold.name) {
-      if (sellerId != null && (sellerId as String).isNotEmpty) {
-        batch.update(_firestore.collection('users').doc(sellerId), {
-          'completedSalesCount': FieldValue.increment(1),
-          'activeListingsCount': FieldValue.increment(-1),
-          'trustScore': FieldValue.increment(5.0),
-        });
+    try {
+      final doc = await _firestore.collection('listings').doc(listingId).get();
+      if (!doc.exists) return;
+      
+      final currentStatus = doc.data()?['status'];
+      final sellerId = doc.data()?['sellerId'];
+      
+      if (sellerId != userId) {
+         throw Exception('Unauthorized: You do not own this listing');
       }
-    } else if (status == ListingStatus.active && currentStatus == ListingStatus.sold.name) {
-       if (sellerId != null && (sellerId as String).isNotEmpty) {
-        batch.update(_firestore.collection('users').doc(sellerId), {
-          'completedSalesCount': FieldValue.increment(-1),
-          'activeListingsCount': FieldValue.increment(1),
-        });
-      }
-    }
 
-    await batch.commit();
+      final batch = _firestore.batch();
+      batch.update(_firestore.collection('listings').doc(listingId), {
+        'status': status.name,
+      });
+
+      if (status == ListingStatus.sold && currentStatus != ListingStatus.sold.name) {
+        if (sellerId != null && (sellerId as String).isNotEmpty) {
+          batch.update(_firestore.collection('users').doc(sellerId), {
+            'completedSalesCount': FieldValue.increment(1),
+            'activeListingsCount': FieldValue.increment(-1),
+            'trustScore': FieldValue.increment(5.0),
+          });
+        }
+      } else if (status == ListingStatus.active && currentStatus == ListingStatus.sold.name) {
+         if (sellerId != null && (sellerId as String).isNotEmpty) {
+          batch.update(_firestore.collection('users').doc(sellerId), {
+            'completedSalesCount': FieldValue.increment(-1),
+            'activeListingsCount': FieldValue.increment(1),
+          });
+        }
+      }
+
+      await batch.commit();
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
   Future<void> updateListingPrice(String listingId, double newPrice, String userId) async {
-    final doc = await _firestore.collection('listings').doc(listingId).get();
-    if (!doc.exists) return;
-    
-    if (doc.data()?['sellerId'] != userId) {
-      throw Exception('Unauthorized: You do not own this listing');
-    }
+    try {
+      final doc = await _firestore.collection('listings').doc(listingId).get();
+      if (!doc.exists) return;
+      
+      if (doc.data()?['sellerId'] != userId) {
+        throw Exception('Unauthorized: You do not own this listing');
+      }
 
-    final oldPrice = (doc.data()?['price'] as num).toDouble();
-    if (oldPrice == newPrice) return;
-    
-    final history = PriceHistory(price: oldPrice, timestamp: DateTime.now());
-    
-    await _firestore.collection('listings').doc(listingId).update({
-      'price': newPrice,
-      'priceHistory': FieldValue.arrayUnion([history.toJson()]),
-    });
+      final oldPrice = (doc.data()?['price'] as num).toDouble();
+      if (oldPrice == newPrice) return;
+      
+      final history = PriceHistory(price: oldPrice, timestamp: DateTime.now());
+      
+      await _firestore.collection('listings').doc(listingId).update({
+        'price': newPrice,
+        'priceHistory': FieldValue.arrayUnion([history.toJson()]),
+      });
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
@@ -1238,21 +1308,25 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     required String reason,
   }) async {
     if (listingId.isEmpty) return;
-    await _firestore.collection('reports').add({
-      'type': 'listing',
-      'targetId': listingId,
-      'reporterId': reporterId,
-      'reason': reason,
-      'createdAt': FieldValue.serverTimestamp(),
-      'status': 'pending',
-    });
+    try {
+      await _firestore.collection('reports').add({
+        'type': 'listing',
+        'targetId': listingId,
+        'reporterId': reporterId,
+        'reason': reason,
+        'createdAt': FieldValue.serverTimestamp(),
+        'status': 'pending',
+      });
 
-    if (_notificationSender != null) {
-      await _notificationSender.notifyAdmins(
-        title: 'Marketplace Report 📦',
-        body: 'A listing has been reported for: $reason',
-        route: '/admin/reports',
-      );
+      if (_notificationSender != null) {
+        await _notificationSender.notifyAdmins(
+          title: 'Marketplace Report 📦',
+          body: 'A listing has been reported for: $reason',
+          route: '/admin/reports',
+        );
+      }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -1329,7 +1403,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       AppLogger.info('Review submitted for seller $sellerId on listing $listingId', 'MARKETPLACE');
     } catch (e, st) {
       AppLogger.error('Failed to submit review', e, st, 'MARKETPLACE');
-      rethrow;
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -1339,44 +1413,52 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     required String reason,
     String? adminNotes,
   }) async {
-    await _firestore.collection('listings').doc(listingId).update({
-      'flagged': true,
-      'flagReason': reason,
-      'flagAdminNotes': adminNotes,
-      'flaggedAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await _firestore.collection('listings').doc(listingId).update({
+        'flagged': true,
+        'flagReason': reason,
+        'flagAdminNotes': adminNotes,
+        'flaggedAt': FieldValue.serverTimestamp(),
+      });
 
-    final listingDoc = await _firestore.collection('listings').doc(listingId).get();
-    if (listingDoc.exists && _notificationSender != null) {
-      await _notificationSender.notifyAdmins(
-        title: 'Marketplace Listing Flagged 🚩',
-        body: 'Reason: $reason',
-        route: '/admin/flags/marketplace',
-      );
+      final listingDoc = await _firestore.collection('listings').doc(listingId).get();
+      if (listingDoc.exists && _notificationSender != null) {
+        await _notificationSender.notifyAdmins(
+          title: 'Marketplace Listing Flagged 🚩',
+          body: 'Reason: $reason',
+          route: '/admin/flags/marketplace',
+        );
+      }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
   @override
   Future<void> approveListing(String listingId) async {
-    final listingDoc = await _firestore.collection('listings').doc(listingId).get();
-    if (!listingDoc.exists) return;
+    try {
+      final listingDoc = await _firestore.collection('listings').doc(listingId).get();
+      if (!listingDoc.exists) return;
 
-    await _firestore.collection('listings').doc(listingId).update({
-      'status': ListingStatus.active.name,
-      'flagged': false,
-      'approvedAt': FieldValue.serverTimestamp(),
-    });
+      await _firestore.collection('listings').doc(listingId).update({
+        'status': ListingStatus.active.name,
+        'flagged': false,
+        'approvedAt': FieldValue.serverTimestamp(),
+      });
 
-    final sellerId = listingDoc.data()?['sellerId'];
-    if (sellerId != null && _notificationSender != null) {
-      await _notificationSender.sendNotification(
-        recipientId: sellerId,
-        title: 'Listing Approved! ✅',
-        body: 'Your listing "${listingDoc.data()?['title']}" has been approved and is now live.',
-        type: NotificationType.marketplace,
-        targetId: listingId,
-        targetType: 'marketplace',
-      );
+      final sellerId = listingDoc.data()?['sellerId'];
+      if (sellerId != null && _notificationSender != null) {
+        await _notificationSender.sendNotification(
+          recipientId: sellerId,
+          title: 'Listing Approved! ✅',
+          body: 'Your listing "${listingDoc.data()?['title']}" has been approved and is now live.',
+          type: NotificationType.marketplace,
+          targetId: listingId,
+          targetType: 'marketplace',
+        );
+      }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -1386,26 +1468,30 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     required String reason,
     required String adminId,
   }) async {
-    final listingDoc = await _firestore.collection('listings').doc(listingId).get();
-    if (!listingDoc.exists) return;
+    try {
+      final listingDoc = await _firestore.collection('listings').doc(listingId).get();
+      if (!listingDoc.exists) return;
 
-    await _firestore.collection('listings').doc(listingId).update({
-      'status': ListingStatus.archived.name,
-      'suspensionReason': reason,
-      'suspendedBy': adminId,
-      'suspendedAt': FieldValue.serverTimestamp(),
-    });
+      await _firestore.collection('listings').doc(listingId).update({
+        'status': ListingStatus.archived.name,
+        'suspensionReason': reason,
+        'suspendedBy': adminId,
+        'suspendedAt': FieldValue.serverTimestamp(),
+      });
 
-    final sellerId = listingDoc.data()?['sellerId'];
-    if (sellerId != null && _notificationSender != null) {
-      await _notificationSender.sendNotification(
-        recipientId: sellerId,
-        title: 'Listing Suspended',
-        body: 'Your listing "${listingDoc.data()?['title']}" has been suspended. Reason: $reason',
-        type: NotificationType.marketplace,
-        targetId: listingId,
-        targetType: 'marketplace',
-      );
+      final sellerId = listingDoc.data()?['sellerId'];
+      if (sellerId != null && _notificationSender != null) {
+        await _notificationSender.sendNotification(
+          recipientId: sellerId,
+          title: 'Listing Suspended',
+          body: 'Your listing "${listingDoc.data()?['title']}" has been suspended. Reason: $reason',
+          type: NotificationType.marketplace,
+          targetId: listingId,
+          targetType: 'marketplace',
+        );
+      }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -1415,32 +1501,36 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     required String reason,
     required String adminId,
   }) async {
-    final listingDoc = await _firestore.collection('listings').doc(listingId).get();
-    if (!listingDoc.exists) return;
+    try {
+      final listingDoc = await _firestore.collection('listings').doc(listingId).get();
+      if (!listingDoc.exists) return;
 
-    final sellerId = listingDoc.data()?['sellerId'];
-    final batch = _firestore.batch();
+      final sellerId = listingDoc.data()?['sellerId'];
+      final batch = _firestore.batch();
 
-    batch.delete(_firestore.collection('listings').doc(listingId));
-    
-    if (sellerId != null && (sellerId as String).isNotEmpty) {
-      batch.update(_firestore.collection('users').doc(sellerId), {
-        'activeListingsCount': FieldValue.increment(-1),
-      });
+      batch.delete(_firestore.collection('listings').doc(listingId));
+      
+      if (sellerId != null && (sellerId as String).isNotEmpty) {
+        batch.update(_firestore.collection('users').doc(sellerId), {
+          'activeListingsCount': FieldValue.increment(-1),
+        });
 
-      if (_notificationSender != null) {
-        await _notificationSender.sendNotification(
-          recipientId: sellerId,
-          title: 'Listing Removed',
-          body: 'Your listing "${listingDoc.data()?['title']}" has been removed. Reason: $reason',
-          type: NotificationType.marketplace,
-          targetId: listingId,
-          targetType: 'marketplace',
-        );
+        if (_notificationSender != null) {
+          await _notificationSender.sendNotification(
+            recipientId: sellerId,
+            title: 'Listing Removed',
+            body: 'Your listing "${listingDoc.data()?['title']}" has been removed. Reason: $reason',
+            type: NotificationType.marketplace,
+            targetId: listingId,
+            targetType: 'marketplace',
+          );
+        }
       }
-    }
 
-    await batch.commit();
+      await batch.commit();
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override

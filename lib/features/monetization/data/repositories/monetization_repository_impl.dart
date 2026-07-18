@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:unihub_mobile/core/error/error_handler.dart';
 import '../../domain/models/payment_record.dart';
 import '../../domain/models/subscription_record.dart';
 import '../../domain/repositories/monetization_repository.dart';
@@ -42,7 +43,7 @@ class MonetizationRepositoryImpl implements MonetizationRepository {
       return docRef.id;
     } catch (e) {
       AppLogger.error('Failed to initiate STK Push', e);
-      rethrow;
+      throw Exception(AppErrorHandler.mapError(e));
     }
   }
 
@@ -72,40 +73,44 @@ class MonetizationRepositoryImpl implements MonetizationRepository {
     required String businessCategory,
     required SubscriptionTier tier,
   }) async {
-    final userDoc = await _firestore.collection('users').doc(userId).get();
-    final isVerified = userDoc.data()?['isIdentityVerified'] == true || 
-                       userDoc.data()?['isStudentVerified'] == true ||
-                       userDoc.data()?['accountType'] == 'business';
+    try {
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      final isVerified = userDoc.data()?['isIdentityVerified'] == true || 
+                         userDoc.data()?['isStudentVerified'] == true ||
+                         userDoc.data()?['accountType'] == 'business';
 
-    final batch = _firestore.batch();
-    
-    // Update User Profile
-    final userRef = _firestore.collection('users').doc(userId);
-    batch.update(userRef, {
-      'accountType': 'business',
-      'businessName': businessName,
-      'businessCategory': businessCategory,
-      // If verified during growth phase, give them Pro tier for free
-      'tier': (isVerified || tier == SubscriptionTier.businessPremium) ? 'pro' : 'free',
-    });
+      final batch = _firestore.batch();
+      
+      // Update User Profile
+      final userRef = _firestore.collection('users').doc(userId);
+      batch.update(userRef, {
+        'accountType': 'business',
+        'businessName': businessName,
+        'businessCategory': businessCategory,
+        // If verified during growth phase, give them Pro tier for free
+        'tier': (isVerified || tier == SubscriptionTier.businessPremium) ? 'pro' : 'free',
+      });
 
-    // Create/Update Subscription Record
-    final subRef = _firestore.collection('subscriptions').doc(userId);
-    final now = DateTime.now();
-    final subscription = SubscriptionRecord(
-      id: userId,
-      userId: userId,
-      tier: tier,
-      status: SubscriptionStatus.active,
-      startDate: now,
-      endDate: now.add(const Duration(days: 30)),
-      createdAt: now,
-      updatedAt: now,
-    );
-    
-    batch.set(subRef, subscription.toJson());
-    
-    await batch.commit();
+      // Create/Update Subscription Record
+      final subRef = _firestore.collection('subscriptions').doc(userId);
+      final now = DateTime.now();
+      final subscription = SubscriptionRecord(
+        id: userId,
+        userId: userId,
+        tier: tier,
+        status: SubscriptionStatus.active,
+        startDate: now,
+        endDate: now.add(const Duration(days: 30)),
+        createdAt: now,
+        updatedAt: now,
+      );
+      
+      batch.set(subRef, subscription.toJson());
+      
+      await batch.commit();
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
   }
 
   @override
@@ -150,44 +155,48 @@ class MonetizationRepositoryImpl implements MonetizationRepository {
   Future<void> activateEntitlement(PaymentRecord payment) async {
     if (payment.status != PaymentStatus.completed && payment.amount > 0) return;
 
-    final batch = _firestore.batch();
-    final now = DateTime.now();
+    try {
+      final batch = _firestore.batch();
+      final now = DateTime.now();
 
-    switch (payment.type) {
-      case PaymentType.boost:
-        if (payment.itemId != null) {
-          batch.update(_firestore.collection('listings').doc(payment.itemId), {
-            'lastBoostedAt': FieldValue.serverTimestamp(),
-            'boostCount': FieldValue.increment(1),
-          });
-        }
-        break;
-      case PaymentType.feature:
-        if (payment.itemId != null) {
-          final durationDays = payment.metadata['durationDays'] ?? 7;
-          batch.update(_firestore.collection('listings').doc(payment.itemId), {
-            'isFeatured': true,
-            'featuredAt': FieldValue.serverTimestamp(),
-            'featuredUntil': Timestamp.fromDate(now.add(Duration(days: durationDays))),
-            'featuredPackage': payment.metadata['packageId'] ?? 'early_bird_free',
-          });
-        }
-        break;
-      case PaymentType.sponsoredSearch:
-        if (payment.itemId != null) {
-          final durationDays = payment.metadata['durationDays'] ?? 3;
-          batch.update(_firestore.collection('listings').doc(payment.itemId), {
-            'isSponsored': true,
-            'sponsoredUntil': Timestamp.fromDate(now.add(Duration(days: durationDays))),
-          });
-        }
-        break;
-      case PaymentType.subscription:
-        // Subscription handling logic
-        break;
+      switch (payment.type) {
+        case PaymentType.boost:
+          if (payment.itemId != null) {
+            batch.update(_firestore.collection('listings').doc(payment.itemId), {
+              'lastBoostedAt': FieldValue.serverTimestamp(),
+              'boostCount': FieldValue.increment(1),
+            });
+          }
+          break;
+        case PaymentType.feature:
+          if (payment.itemId != null) {
+            final durationDays = payment.metadata['durationDays'] ?? 7;
+            batch.update(_firestore.collection('listings').doc(payment.itemId), {
+              'isFeatured': true,
+              'featuredAt': FieldValue.serverTimestamp(),
+              'featuredUntil': Timestamp.fromDate(now.add(Duration(days: durationDays))),
+              'featuredPackage': payment.metadata['packageId'] ?? 'early_bird_free',
+            });
+          }
+          break;
+        case PaymentType.sponsoredSearch:
+          if (payment.itemId != null) {
+            final durationDays = payment.metadata['durationDays'] ?? 3;
+            batch.update(_firestore.collection('listings').doc(payment.itemId), {
+              'isSponsored': true,
+              'sponsoredUntil': Timestamp.fromDate(now.add(Duration(days: durationDays))),
+            });
+          }
+          break;
+        case PaymentType.subscription:
+          // Subscription handling logic
+          break;
+      }
+      
+      await batch.commit();
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
-    
-    await batch.commit();
   }
 
   @override
@@ -248,49 +257,53 @@ class MonetizationRepositoryImpl implements MonetizationRepository {
     required PaymentType type,
     Map<String, dynamic>? metadata,
   }) async {
-    final userDoc = await _firestore.collection('users').doc(userId).get();
-    final userData = userDoc.data();
-    final isVerified = userData?['isIdentityVerified'] == true || 
-                       userData?['isStudentVerified'] == true ||
-                       userData?['accountType'] == 'business';
+    try {
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      final userData = userDoc.data();
+      final isVerified = userData?['isIdentityVerified'] == true || 
+                         userData?['isStudentVerified'] == true ||
+                         userData?['accountType'] == 'business';
 
-    if (!isVerified) {
-       throw Exception('Verification required: Please verify your identity in the Trust Center to use premium features.');
-    }
-
-    final canUse = await canUsePremiumFeature(userId, type);
-    if (!canUse) {
-      if (type == PaymentType.boost) {
-        throw Exception('Boost unavailable: You can only boost your items once every 24 hours.');
-      } else if (type == PaymentType.feature) {
-        throw Exception('Feature limit reached: You can have a maximum of 3 featured listings at a time.');
+      if (!isVerified) {
+         throw Exception('Verification required: Please verify your identity in the Trust Center to use premium features.');
       }
-      throw Exception('Feature unavailable: Check cooldown limits.');
+
+      final canUse = await canUsePremiumFeature(userId, type);
+      if (!canUse) {
+        if (type == PaymentType.boost) {
+          throw Exception('Boost unavailable: You can only boost your items once every 24 hours.');
+        } else if (type == PaymentType.feature) {
+          throw Exception('Feature limit reached: You can have a maximum of 3 featured listings at a time.');
+        }
+        throw Exception('Feature unavailable: Check cooldown limits.');
+      }
+
+      // Record as a "Free" transaction for future data consistency
+      final docRef = _firestore.collection('payments').doc();
+      final payment = PaymentRecord(
+        id: docRef.id,
+        userId: userId,
+        itemId: itemId,
+        amount: 0.0,
+        currency: 'KES',
+        type: type,
+        gateway: PaymentGateway.manual,
+        status: PaymentStatus.completed,
+        metadata: {
+          ...(metadata ?? {}),
+          'promo': 'early_bird_free',
+          'activatedAt': DateTime.now().toIso8601String(),
+        },
+        createdAt: DateTime.now(),
+        completedAt: DateTime.now(),
+      );
+
+      await docRef.set(payment.toJson());
+      await activateEntitlement(payment);
+      
+      AppLogger.info('Free premium feature activated: ${type.name} for item $itemId');
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
     }
-
-    // Record as a "Free" transaction for future data consistency
-    final docRef = _firestore.collection('payments').doc();
-    final payment = PaymentRecord(
-      id: docRef.id,
-      userId: userId,
-      itemId: itemId,
-      amount: 0.0,
-      currency: 'KES',
-      type: type,
-      gateway: PaymentGateway.manual,
-      status: PaymentStatus.completed,
-      metadata: {
-        ...(metadata ?? {}),
-        'promo': 'early_bird_free',
-        'activatedAt': DateTime.now().toIso8601String(),
-      },
-      createdAt: DateTime.now(),
-      completedAt: DateTime.now(),
-    );
-
-    await docRef.set(payment.toJson());
-    await activateEntitlement(payment);
-    
-    AppLogger.info('Free premium feature activated: ${type.name} for item $itemId');
   }
 }

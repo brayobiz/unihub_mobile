@@ -1,10 +1,10 @@
-# Play Console Data Safety Form Guide - UniHub
+# Play Console Data Safety Form Guide - Ulify
 
-Use the following information to fill out the Data Safety section in the Google Play Console for UniHub.
+Use the following information to fill out the Data Safety section in the Google Play Console for Ulify.
 
 ## 1. Data Collection and Security
 - **Does your app collect or share any of the required user data types?** Yes
-- **Is all of the user data collected by your app encrypted in transit?** Yes (UniHub uses HTTPS/SSL for all communications via Firebase and Cloudinary)
+- **Is all of the user data collected by your app encrypted in transit?** Yes (Ulify uses HTTPS/SSL for all communications via Firebase and Cloudinary)
 - **Do you provide a way for users to request that their data is deleted?** Yes (Users can delete their account in Settings, which triggers data erasure)
 
 ## 2. Data Types Collected
@@ -37,7 +37,7 @@ Use the following information to fill out the Data Safety section in the Google 
 ## 3. Data Usage and Sharing
 
 ### Data Sharing
-UniHub **does not sell** user data to third parties. Data is shared with the following service providers to enable app functionality:
+Ulify **does not sell** user data to third parties. Data is shared with the following service providers to enable app functionality:
 - **Google (Firebase):** For authentication, database hosting, and notifications.
 - **Cloudinary:** For media storage.
 
@@ -49,7 +49,7 @@ For each data type listed above, the primary purposes are:
 - **Fraud prevention, security, and compliance:** Verifying student status and moderating content.
 
 ## 4. Age Requirements
-UniHub is restricted to users aged **18 and older** (University students). This is stated in the Terms of Service and verified during registration via a mandatory age confirmation checkbox.
+Ulify is restricted to users aged **18 and older** (University students). This is stated in the Terms of Service and verified during registration via a mandatory age confirmation checkbox.
 
 ---
 **Note:** Ensure your Privacy Policy URL (https://unihub-3663e.web.app/privacy) is correctly entered in the Play Console under "App Content".

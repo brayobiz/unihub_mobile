@@ -54,8 +54,8 @@ class OrganizerOnboardingScreen extends ConsumerWidget {
               const SizedBox(height: 16),
               Text(
                 isIdentityVerified 
-                  ? 'To publish events on UniHub, you\'ll first create an Organizer Profile. This helps keep campus events trustworthy by showing students who is hosting each event.'
-                  : 'To ensure campus safety and trust, all organizers must first complete UniHub Identity Verification. This process only takes a few minutes.',
+                  ? 'To publish events on Ulify, you\'ll first create an Organizer Profile. This helps keep campus events trustworthy by showing students who is hosting each event.'
+                  : 'To ensure campus safety and trust, all organizers must first complete Ulify Identity Verification. This process only takes a few minutes.',
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   height: 1.5,
@@ -84,7 +84,7 @@ class OrganizerOnboardingScreen extends ConsumerWidget {
                     Expanded(
                       child: Text(
                         isIdentityVerified
-                          ? 'Your application will be reviewed by UniHub administrators before you can publish events.'
+                          ? 'Your application will be reviewed by Ulify administrators before you can publish events.'
                           : 'You will need a valid student ID or Government-issued ID to complete this step.',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.bold,
