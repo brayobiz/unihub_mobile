@@ -439,20 +439,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
                   )
                 : null,
           ),
-          if (user.isVerified || isBusiness)
-            Positioned(
-              right: 2,
-              bottom: 2,
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                child: Icon(
-                  Icons.verified, 
-                  color: isBusiness ? AppColors.business : AppColors.success, 
-                  size: 24
-                ),
-              ),
-            ),
+          // Removed redundant verified badge from avatar as it is now more prominently placed next to the name
         ],
       ),
     );
@@ -474,6 +461,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
   }
 
   Widget _buildIdentityInfo(BuildContext context) {
+    final theme = Theme.of(context);
     final user = widget.user;
     final isBusiness = user.accountType == 'business';
 
@@ -496,7 +484,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
                 padding: const EdgeInsets.only(left: 6),
                 child: Icon(
                   Icons.verified_rounded, 
-                  color: isBusiness ? AppColors.businessGold : Colors.white, 
+                  color: isBusiness ? AppColors.businessGold : theme.colorScheme.primary,
                   size: 22
                 ),
               ),

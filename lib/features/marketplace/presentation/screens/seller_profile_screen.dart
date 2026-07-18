@@ -196,20 +196,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                   )
                 : null,
           ),
-          if (seller.isVerified || isBusiness)
-            Positioned(
-              right: 2,
-              bottom: 2,
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                child: Icon(
-                  Icons.verified, 
-                  color: isBusiness ? AppColors.business : AppColors.success, 
-                  size: 24
-                ),
-              ),
-            ),
+          // Removed redundant verified badge from avatar as it is now more prominently placed next to the name
         ],
       ),
     );
@@ -296,7 +283,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                 padding: const EdgeInsets.only(left: 6),
                 child: Icon(
                   Icons.verified_rounded, 
-                  color: isBusiness ? AppColors.businessGold : Colors.white, 
+                  color: isBusiness ? AppColors.businessGold : theme.colorScheme.primary,
                   size: 22
                 ),
               ),

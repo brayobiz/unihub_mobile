@@ -304,7 +304,8 @@ class _ConversationTile extends ConsumerWidget {
     // Always use 'Ulify Support' for support channels regardless of who is assigned.
     final String displayName = isSupport ? 'Ulify Support' : (otherUser?.fullName ?? 'User');
 
-    final String? photoUrl = isSupport ? null : otherUser?.photoUrl;
+    final bool isVerified = otherUser?.isVerified ?? false;
+    final bool isBusiness = otherUser?.accountType == 'business';
 
     return ListTile(
       tileColor: isHighlight ? theme.colorScheme.primary.withOpacity(0.03) : null,
@@ -318,11 +319,11 @@ class _ConversationTile extends ConsumerWidget {
       leading: CircleAvatar(
         radius: isSupport ? 24 : 20, // Reduced avatar size
         backgroundColor: isSupport ? theme.colorScheme.primary : theme.colorScheme.primary.withOpacity(0.1),
-        backgroundImage: (photoUrl != null && !isSupport) ? CachedNetworkImageProvider(photoUrl) : null,
-        onBackgroundImageError: photoUrl != null ? (exception, stackTrace) {
-          debugPrint('🖼️ Avatar: Failed to load $photoUrl: $exception');
+        backgroundImage: (otherUser?.photoUrl != null && !isSupport) ? CachedNetworkImageProvider(otherUser!.photoUrl!) : null,
+        onBackgroundImageError: otherUser?.photoUrl != null ? (exception, stackTrace) {
+          debugPrint('🖼️ Avatar: Failed to load ${otherUser!.photoUrl}: $exception');
         } : null,
-        child: (photoUrl == null || isSupport)
+        child: (otherUser?.photoUrl == null || isSupport)
             ? (isSupport
                 ? const Icon(Icons.support_agent_rounded, color: Colors.white, size: 24)
                 : Text(displayName[0].toUpperCase(),
@@ -331,7 +332,7 @@ class _ConversationTile extends ConsumerWidget {
       ),
       title: Row(
         children: [
-          Expanded(
+          Flexible(
             child: Text(
               displayName,
               style: theme.textTheme.titleSmall?.copyWith(
@@ -343,6 +344,21 @@ class _ConversationTile extends ConsumerWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          if (isSupport)
+             const Padding(
+               padding: EdgeInsets.only(left: 4),
+               child: Icon(Icons.verified_rounded, color: AppColors.primary, size: 14),
+             )
+          else if (isBusiness || isVerified)
+            Padding(
+               padding: const EdgeInsets.only(left: 4),
+               child: Icon(
+                 Icons.verified_rounded, 
+                 color: isBusiness ? AppColors.businessGold : theme.colorScheme.primary,
+                 size: 14
+               ),
+             ),
+          const SizedBox(width: 8),
           Text(
             _formatTime(conversation.lastMessageTime),
             style: TextStyle(
