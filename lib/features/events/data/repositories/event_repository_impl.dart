@@ -68,9 +68,17 @@ class EventRepositoryImpl implements EventRepository {
       
       // Perform in-memory filtering and sorting to bypass Firestore index limitations
       var filteredEvents = events;
+      final now = DateTime.now();
       
       if (after != null) {
-        filteredEvents = filteredEvents.where((e) => e.startAt.isAfter(after) || e.startAt.isAtSameMomentAs(after)).toList();
+        filteredEvents = filteredEvents.where((e) {
+          final isAfterStart = e.startAt.isAfter(after) || e.startAt.isAtSameMomentAs(after);
+          // AUTOMATIC LIFECYCLE: Hide events that have already ended from public discovery
+          return isAfterStart && e.endAt.isAfter(now);
+        }).toList();
+      } else {
+        // Even if no 'after' is specified, we usually only want active events in public queries
+        filteredEvents = filteredEvents.where((e) => e.endAt.isAfter(now)).toList();
       }
 
       // Sort by startAt ascending
@@ -234,7 +242,13 @@ class EventRepositoryImpl implements EventRepository {
       query = query.where('campusId', isEqualTo: campusId);
     }
 
-    return query.snapshots().map((s) => s.docs.map((d) => Event.fromFirestore(d)).toList());
+    return query.snapshots().map((s) {
+      final now = DateTime.now();
+      return s.docs
+          .map((d) => Event.fromFirestore(d))
+          .where((e) => e.endAt.isAfter(now))
+          .toList();
+    });
   }
 
   @override

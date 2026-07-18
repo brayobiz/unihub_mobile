@@ -32,6 +32,8 @@ class OrganizerDashboardScreen extends ConsumerWidget {
     final isApproved = organizerAsync.valueOrNull?.verificationStatus == OrganizerVerificationStatus.verified || 
                       organizerAsync.valueOrNull?.verificationStatus == OrganizerVerificationStatus.official;
 
+    final isSuspended = organizerAsync.valueOrNull?.verificationStatus == OrganizerVerificationStatus.suspended;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -78,7 +80,7 @@ class OrganizerDashboardScreen extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Team Members', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                      if (isManagement)
+                      if (isManagement && !isSuspended)
                         TextButton.icon(
                           onPressed: () => _showInviteDialog(context, ref),
                           icon: const Icon(Icons.person_add_outlined),
@@ -102,7 +104,7 @@ class OrganizerDashboardScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _buildEventsSummary(context, ref, organizerId, isManagement),
+                  _buildEventsSummary(context, ref, organizerId, isManagement, isSuspended),
                   
                   const SizedBox(height: 32),
                 ],
@@ -113,7 +115,7 @@ class OrganizerDashboardScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Error: $err')),
       ),
-      floatingActionButton: isManagement
+      floatingActionButton: isManagement && !isSuspended
           ? FloatingActionButton.extended(
               onPressed: () {
                 final organizer = organizerAsync.value;
@@ -461,10 +463,9 @@ class OrganizerDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildEventsSummary(BuildContext context, WidgetRef ref, String organizerId, bool isManagement) {
+  Widget _buildEventsSummary(BuildContext context, WidgetRef ref, String organizerId, bool isManagement, bool isSuspended) {
     final eventsAsync = ref.watch(organizerEventsProvider(organizerId));
     final theme = Theme.of(context);
-    final organizer = ref.watch(organizerProvider(organizerId)).valueOrNull;
 
     return eventsAsync.when(
       data: (events) {
@@ -491,7 +492,7 @@ class OrganizerDashboardScreen extends ConsumerWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey, fontSize: 13)
                 ),
-                if (isManagement) ...[
+                if (isManagement && !isSuspended) ...[
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
                     onPressed: () => context.push('/organizers/$organizerId/events/create'),
@@ -507,7 +508,10 @@ class OrganizerDashboardScreen extends ConsumerWidget {
           );
         }
         
-        final activeEvents = events.where((e) => e.status != EventStatus.ended && e.status != EventStatus.archived).toList();
+        final now = DateTime.now();
+        final upcomingEvents = events.where((e) => e.endAt.isAfter(now) && !e.isDeleted).toList();
+        final pastEvents = events.where((e) => e.endAt.isBefore(now) && !e.isDeleted).toList();
+        
         int totalGoing = 0;
         int totalSaved = 0;
         for (var e in events) {
@@ -526,9 +530,9 @@ class OrganizerDashboardScreen extends ConsumerWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildStatPill(context, 'Active', activeEvents.length.toString(), Colors.blue),
+                  _buildStatPill(context, 'Upcoming', upcomingEvents.length.toString(), Colors.blue),
+                  _buildStatPill(context, 'Past', pastEvents.length.toString(), Colors.grey),
                   _buildStatPill(context, 'Drafts', events.where((e) => e.status == EventStatus.draft).length.toString(), Colors.orange),
-                  _buildStatPill(context, 'Total', events.length.toString(), Colors.indigo),
                 ],
               ),
             ),

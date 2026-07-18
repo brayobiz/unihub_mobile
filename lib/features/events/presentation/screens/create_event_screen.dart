@@ -503,12 +503,12 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                         ref.read(adServiceProvider).showInterstitialAd(
                           ad,
                           onAdDismissed: () {
-                            if (mounted) _showEventSuccessDialog(context);
+                            if (mounted) _showEventSuccessDialog(context, state.isEditing);
                           },
                         );
                       },
                       onAdFailedToLoad: (_) {
-                        if (mounted) _showEventSuccessDialog(context);
+                        if (mounted) _showEventSuccessDialog(context, state.isEditing);
                       },
                     );
                   }
@@ -529,11 +529,18 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
     );
   }
 
-  void _showEventSuccessDialog(BuildContext context) {
+  void _showEventSuccessDialog(BuildContext context, bool isEditing) {
     CreationSuccessDialog.show(
       context,
-      title: 'Event Submitted!',
-      message: 'Your event has been sent for review. You\'ll be notified once it is approved and published.',
+      title: isEditing ? 'Changes Saved!' : 'Event Submitted!',
+      message: isEditing 
+        ? 'Your event has been updated successfully.'
+        : 'Your event has been sent for review. You\'ll be notified once it is approved and published.',
+      onDone: () {
+        if (context.mounted) {
+          context.pop(); 
+        }
+      },
     );
   }
 }

@@ -179,6 +179,11 @@ class EventService {
     final originalEvent = await _eventRepository.getEventById(updatedEvent.id);
     if (originalEvent == null) throw Exception('Event not found');
 
+    // Hardening: Cannot edit an event that has already ended
+    if (originalEvent.isExpired) {
+      throw Exception('This event has already ended and cannot be modified.');
+    }
+
     final isAuthorized = await _validateOrganizerPermission(updatedEvent.organizerId, userId);
     if (!isAuthorized) throw Exception('Unauthorized');
 
@@ -267,6 +272,25 @@ class EventService {
 
     await _eventRepository.updateEvent(event.copyWith(status: EventStatus.archived));
     AppLogger.info('Event Archived: $eventId by $userId', 'EVENT_SERVICE');
+  }
+
+  Future<void> deleteEvent(String eventId, String userId) async {
+    // DEFENSIVE: Validate parameters
+    if (eventId.isEmpty || eventId.trim().isEmpty) {
+      throw Exception('Event id cannot be empty');
+    }
+    if (userId.isEmpty || userId.trim().isEmpty) {
+      throw Exception('Invalid userId: cannot be empty');
+    }
+
+    final event = await _eventRepository.getEventById(eventId);
+    if (event == null) throw Exception('Event not found');
+
+    final isAuthorized = await _validateOrganizerPermission(event.organizerId, userId);
+    if (!isAuthorized) throw Exception('Unauthorized');
+
+    await _eventRepository.deleteEvent(eventId);
+    AppLogger.info('Event Deleted: $eventId by $userId', 'EVENT_SERVICE');
   }
 
   Future<void> broadcastMessage({

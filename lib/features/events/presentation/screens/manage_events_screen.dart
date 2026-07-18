@@ -19,127 +19,186 @@ class ManageEventsScreen extends ConsumerWidget {
     final organizerAsync = ref.watch(organizerProvider(organizerId));
     final eventsAsync = ref.watch(organizerEventsProvider(organizerId));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Manage Events', style: TextStyle(fontWeight: FontWeight.bold)),
-      ),
-      body: organizerAsync.when(
-        data: (organizer) {
-          if (organizer == null) return const Center(child: Text('Organizer not found'));
-          
-          return eventsAsync.when(
-            data: (events) {
-              if (events.isEmpty) {
-                return _buildEmptyState(context, organizer);
-              }
-              return ListView.separated(
-                padding: const EdgeInsets.all(24),
-                itemCount: events.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 16),
-                itemBuilder: (context, index) => _buildEventItem(context, ref, events[index]),
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (err, _) => Center(child: Text('Error: $err')),
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: $err')),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-              onPressed: () {
-                final organizer = organizerAsync.value;
-                if (organizer != null) {
-                  context.push(
-                    '/organizers/$organizerId/events/create',
-                    extra: {'campusId': organizer.campusId},
-                  );
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Manage Events', style: TextStyle(fontWeight: FontWeight.bold)),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Upcoming'),
+              Tab(text: 'Live'),
+              Tab(text: 'Past'),
+            ],
+            indicatorSize: TabBarIndicatorSize.tab,
+            labelStyle: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        body: organizerAsync.when(
+          data: (organizer) {
+            if (organizer == null) return const Center(child: Text('Organizer not found'));
+            
+            return eventsAsync.when(
+              data: (events) {
+                if (events.isEmpty) {
+                  return _buildEmptyState(context, organizer);
                 }
+
+                final now = DateTime.now();
+                final upcomingEvents = events.where((e) => e.startAt.isAfter(now)).toList();
+                final liveEvents = events.where((e) => e.startAt.isBefore(now) && e.endAt.isAfter(now)).toList();
+                final pastEvents = events.where((e) => e.endAt.isBefore(now)).toList();
+
+                return TabBarView(
+                  children: [
+                    _buildEventList(context, ref, upcomingEvents, organizer, isPast: false, emptyMessage: 'No upcoming events'),
+                    _buildEventList(context, ref, liveEvents, organizer, isPast: false, emptyMessage: 'No events are live right now'),
+                    _buildEventList(context, ref, pastEvents, organizer, isPast: true, emptyMessage: 'No past events'),
+                  ],
+                );
               },
-              label: const Text('New Event'),
-              icon: const Icon(Icons.add),
-            ),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, _) => Center(child: Text('Error: $err')),
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (err, _) => Center(child: Text('Error: $err')),
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () {
+            final organizer = organizerAsync.value;
+            if (organizer != null) {
+              context.push(
+                '/organizers/$organizerId/events/create',
+                extra: {'campusId': organizer.campusId},
+              );
+            }
+          },
+          label: const Text('New Event'),
+          icon: const Icon(Icons.add),
+        ),
+      ),
     );
   }
 
-  Widget _buildEventItem(BuildContext context, WidgetRef ref, Event event) {
+  Widget _buildEventList(BuildContext context, WidgetRef ref, List<Event> events, Organizer organizer, {required bool isPast, required String emptyMessage}) {
+    if (events.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isPast ? Icons.history_rounded : Icons.event_note_outlined, 
+              size: 64, 
+              color: Colors.grey.withOpacity(0.5)
+            ),
+            const SizedBox(height: 16),
+            Text(
+              emptyMessage,
+              style: const TextStyle(fontSize: 18, color: Colors.grey, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(24),
+      itemCount: events.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 16),
+      itemBuilder: (context, index) => _buildEventItem(context, ref, events[index], isPast: isPast),
+    );
+  }
+
+  Widget _buildEventItem(BuildContext context, WidgetRef ref, Event event, {required bool isPast}) {
     final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
-      ),
-      child: InkWell(
-        onTap: () => context.push('/events/${event.id}'),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  _buildStatusChip(event.status),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.edit_outlined, size: 20),
-                    onPressed: () => context.push('/organizers/$organizerId/events/edit', extra: event),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.more_vert, size: 20),
-                    onPressed: () => _showMoreOptions(context, ref, event),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                event.title,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.calendar_today_outlined, size: 14, color: Colors.grey),
-                  const SizedBox(width: 8),
-                  Text(
-                    DateFormat('MMM dd, HH:mm').format(event.startAt),
-                    style: const TextStyle(fontSize: 13, color: Colors.grey),
-                  ),
-                  const SizedBox(width: 16),
-                  const Icon(Icons.people_outline, size: 14, color: Colors.grey),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${event.currentAttendeeCount} RSVP',
-                    style: const TextStyle(fontSize: 13, color: Colors.grey),
-                  ),
-                ],
-              ),
-            ],
+    return Opacity(
+      opacity: isPast ? 0.7 : 1.0,
+      child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+        ),
+        child: InkWell(
+          onTap: () => context.push('/events/${event.id}'),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    _buildStatusChip(event.status, isExpired: event.isExpired),
+                    const Spacer(),
+                    if (!isPast)
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, size: 20),
+                        onPressed: () => context.push('/organizers/$organizerId/events/edit', extra: event),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.more_vert, size: 20),
+                      onPressed: () => _showMoreOptions(context, ref, event),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  event.title,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_today_outlined, size: 14, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Text(
+                      DateFormat('MMM dd, HH:mm').format(event.startAt),
+                      style: const TextStyle(fontSize: 13, color: Colors.grey),
+                    ),
+                    const SizedBox(width: 16),
+                    const Icon(Icons.people_outline, size: 14, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${event.currentAttendeeCount} RSVP',
+                      style: const TextStyle(fontSize: 13, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildStatusChip(EventStatus status) {
+  Widget _buildStatusChip(EventStatus status, {bool isExpired = false}) {
     Color color;
-    switch (status) {
-      case EventStatus.draft: color = Colors.grey; break;
-      case EventStatus.submitted: color = Colors.orange; break;
-      case EventStatus.approved: color = Colors.blue; break;
-      case EventStatus.scheduled: color = Colors.indigo; break;
-      case EventStatus.live: color = Colors.green; break;
-      case EventStatus.ended: color = Colors.black54; break;
-      case EventStatus.archived: color = Colors.brown; break;
-      case EventStatus.cancelled:
-      case EventStatus.removed:
-        color = AppColors.error; 
-        break;
+    String label = status.name.toUpperCase();
+    
+    if (isExpired && (status == EventStatus.approved || status == EventStatus.scheduled || status == EventStatus.live)) {
+      color = Colors.black54;
+      label = 'ENDED';
+    } else {
+      switch (status) {
+        case EventStatus.draft: color = Colors.grey; break;
+        case EventStatus.submitted: color = Colors.orange; break;
+        case EventStatus.approved: color = Colors.blue; break;
+        case EventStatus.scheduled: color = Colors.indigo; break;
+        case EventStatus.live: color = Colors.green; break;
+        case EventStatus.ended: color = Colors.black54; break;
+        case EventStatus.archived: color = Colors.brown; break;
+        case EventStatus.cancelled:
+        case EventStatus.removed:
+          color = AppColors.error; 
+          break;
+      }
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -148,7 +207,7 @@ class ManageEventsScreen extends ConsumerWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        status.name.toUpperCase(),
+        label,
         style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 0.5),
       ),
     );
@@ -256,6 +315,30 @@ class ManageEventsScreen extends ConsumerWidget {
                 onTap: () async {
                   Navigator.pop(context);
                   await service.archiveEvent(event.id, userId);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: AppColors.error),
+                title: const Text('Delete Permanently', style: TextStyle(color: AppColors.error)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Delete Event?'),
+                      content: const Text('This will permanently remove the event. This action cannot be undone.'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true), 
+                          child: const Text('Delete', style: TextStyle(color: AppColors.error))
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true) {
+                    await service.deleteEvent(event.id, userId);
+                  }
                 },
               ),
               ListTile(

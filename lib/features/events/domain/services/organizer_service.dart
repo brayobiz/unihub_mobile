@@ -122,10 +122,22 @@ class OrganizerService {
 
   // Membership Management
   Future<void> inviteMember(String organizerId, String emailOrUid, OrganizerRole role, String inviterId) async {
-    // 1. Authorization check
+    // 1. Authorization & Organization State check
+    final organizer = await _repository.getOrganizerById(organizerId);
+    if (organizer == null) throw Exception('Organizer not found.');
+
+    if (organizer.verificationStatus == OrganizerVerificationStatus.suspended) {
+      throw Exception('This organization is currently suspended and cannot add new members.');
+    }
+
     final inviter = await _getMember(organizerId, inviterId);
     if (inviter == null || (inviter.role != OrganizerRole.owner && inviter.role != OrganizerRole.administrator)) {
       throw Exception('Unauthorized: Only owners and administrators can invite members.');
+    }
+
+    // Security: Cannot invite someone to be the "Owner" (Ownership must be transferred)
+    if (role == OrganizerRole.owner) {
+      throw Exception('Cannot invite a new owner. Ownership can only be transferred by the current owner.');
     }
 
     // 2. Find User
@@ -145,13 +157,32 @@ class OrganizerService {
     final targetUserId = targetUserDoc.id;
     final targetData = targetUserDoc.data() as Map<String, dynamic>;
 
-    // 3. Check for existing membership
+    // 3. Trust & Security Checks
+    
+    // A. Safety Check: Cannot invite a banned user
+    if (targetData['isBanned'] == true) {
+      throw Exception('This user has been restricted by administrators and cannot join organization teams.');
+    }
+
+    // B. Must be a verified student to manage a campus organization
+    final isStudentVerified = targetData['isStudentVerified'] ?? false;
+    if (!isStudentVerified) {
+      throw Exception('This user is not a verified student. Only verified students can be added to organization teams for security reasons.');
+    }
+
+    // C. Must be from the same campus
+    final targetCampusId = targetData['university'] as String?;
+    if (targetCampusId != organizer.campusId) {
+      throw Exception('This user belongs to a different campus (${targetCampusId ?? "Unknown"}). Only students from ${organizer.campusId} can be added to this organization.');
+    }
+
+    // 4. Check for existing membership
     final existingMembers = await _repository.getOrganizerMembers(organizerId);
     if (existingMembers.any((m) => m.userId == targetUserId)) {
       throw Exception('User is already a member of this organization.');
     }
 
-    // 4. Create Membership
+    // 5. Create Membership
     final member = OrganizerMember(
       id: '${organizerId}_$targetUserId',
       organizerId: organizerId,
@@ -164,12 +195,11 @@ class OrganizerService {
     
     await _repository.addMember(member);
 
-    // 5. Notify User
-    final organizer = await _repository.getOrganizerById(organizerId);
+    // 6. Notify User
     await _notificationSender.sendNotification(
       recipientId: targetUserId,
       title: 'New Team Invitation 👥',
-      body: 'You have been added to "${organizer?.name ?? 'an organization'}" as an ${role.name}.',
+      body: 'You have been added to "${organizer.name}" as an ${role.name}.',
       type: NotificationType.events,
       targetId: organizerId,
       targetType: 'organizer',

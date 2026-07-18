@@ -39,6 +39,10 @@ class Event {
   final String createdBy;
   final bool isDeleted;
 
+  bool get isExpired => endAt.isBefore(DateTime.now());
+  bool get isUpcoming => startAt.isAfter(DateTime.now());
+  bool get isLive => startAt.isBefore(DateTime.now()) && endAt.isAfter(DateTime.now());
+
   Event({
     required this.id,
     required this.organizerId,

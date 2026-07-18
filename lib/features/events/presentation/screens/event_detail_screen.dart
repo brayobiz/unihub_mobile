@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -44,46 +45,85 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
       body: eventAsync.when(
         data: (event) {
           if (event == null) return const Center(child: Text('Event not found'));
+          
+          final currentUserId = ref.watch(appUserProvider).valueOrNull?.uid;
+          final membersAsync = ref.watch(organizerMembersProvider(event.organizerId));
+          final isOrganizer = membersAsync.valueOrNull?.any((m) => m.userId == currentUserId) ?? false;
+
           return Column(
             children: [
               Expanded(
-                child: _buildContent(context, event, theme),
+                child: RefreshIndicator(
+                  onRefresh: () async {
+                    ref.invalidate(eventProvider(widget.eventId));
+                    ref.invalidate(organizerProvider(event.organizerId));
+                    ref.invalidate(eventAttendanceProvider(event.id));
+                  },
+                  child: Stack(
+                    children: [
+                      _buildContent(context, event, theme, isOrganizer),
+                      _buildStickyHeader(context, event, theme, isOrganizer),
+                    ],
+                  ),
+                ),
               ),
-              _buildRegistrationBar(context, event, theme),
+              _buildRegistrationBar(context, event, theme, isOrganizer),
             ],
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: $err')),
+        error: (err, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 48),
+                const SizedBox(height: 16),
+                Text('Something went wrong: $err', textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => ref.invalidate(eventProvider(widget.eventId)),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildContent(BuildContext context, Event event, ThemeData theme) {
+  Widget _buildContent(BuildContext context, Event event, ThemeData theme, bool isOrganizer) {
     return CustomScrollView(
-      physics: const BouncingScrollPhysics(),
+      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
       slivers: [
         _buildSliverAppBar(context, event, theme),
         SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
+              if (event.status == EventStatus.cancelled) _buildStatusBanner(theme, 'This event has been cancelled.', Icons.cancel_outlined, AppColors.error),
+              if (event.status == EventStatus.archived) _buildStatusBanner(theme, 'This event is archived.', Icons.archive_outlined, Colors.grey),
+              if (event.isExpired && event.status != EventStatus.cancelled) _buildStatusBanner(theme, 'This event has already ended.', Icons.event_busy_rounded, theme.colorScheme.onSurfaceVariant),
+              
+              const SizedBox(height: 8),
               _buildHeader(event, theme),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               _buildOrganizerCard(context, event.organizerId, theme),
-              const SizedBox(height: 24),
-              _buildInfoCard(context, event, theme),
+              const SizedBox(height: 16),
+              _buildInfoCard(context, event, theme, isOrganizer),
               if (event.description.isNotEmpty) ...[
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
                 _buildAboutSection(event, theme),
               ],
               if (event.tags.isNotEmpty) ...[
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
                 _buildTags(event.tags, theme),
               ],
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               _buildMetaInfo(event, theme),
-              const SizedBox(height: 40),
+              const SizedBox(height: 32),
             ]),
           ),
         ),
@@ -91,16 +131,34 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     );
   }
 
+  Widget _buildStatusBanner(ThemeData theme, String message, IconData icon, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSliverAppBar(BuildContext context, Event event, ThemeData theme) {
-    final attendance = ref.watch(eventAttendanceProvider(event.id)).valueOrNull;
-    final isSaved = attendance?.status == AttendanceStatus.saved;
-    final currentUserId = ref.watch(appUserProvider).valueOrNull?.uid;
-
-    final membersAsync = ref.watch(organizerMembersProvider(event.organizerId));
-    final isOrganizer = membersAsync.valueOrNull?.any((m) => m.userId == currentUserId) ?? false;
-
+    final topPadding = MediaQuery.of(context).padding.top;
     return SliverAppBar(
-      expandedHeight: 380,
+      expandedHeight: 440,
       pinned: true,
       elevation: 0,
       stretch: true,
@@ -108,137 +166,166 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
       backgroundColor: Colors.transparent,
       flexibleSpace: FlexibleSpaceBar(
         stretchModes: const [StretchMode.zoomBackground],
-        background: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Hero Image Gallery
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
-              child: event.imageUrls.isNotEmpty
-                  ? PageView.builder(
-                      controller: _pageController,
-                      onPageChanged: (idx) => _currentPageNotifier.value = idx,
-                      itemCount: event.imageUrls.length,
-                      itemBuilder: (context, index) => CachedNetworkImage(
-                        imageUrl: event.imageUrls[index], 
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(color: theme.colorScheme.surfaceContainerHighest),
-                        errorWidget: (context, url, error) => Container(
-                          color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                          child: Icon(Icons.broken_image, size: 50, color: theme.colorScheme.primary),
+        background: Padding(
+          padding: EdgeInsets.fromLTRB(16, topPadding + 65, 16, 0),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Hero Image Gallery with all-around rounded corners
+              ClipRRect(
+                borderRadius: BorderRadius.circular(32),
+                child: event.imageUrls.isNotEmpty
+                    ? PageView.builder(
+                        controller: _pageController,
+                        onPageChanged: (idx) => _currentPageNotifier.value = idx,
+                        itemCount: event.imageUrls.length,
+                        itemBuilder: (context, index) => Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            // Background: Blurred version of the image to fill the container nicely
+                            CachedNetworkImage(
+                              imageUrl: event.imageUrls[index],
+                              fit: BoxFit.cover,
+                              errorWidget: (context, url, error) => const SizedBox.shrink(),
+                            ),
+                            // Blur overlay
+                            ClipRect(
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
+                                child: Container(
+                                  color: Colors.black.withOpacity(0.2),
+                                ),
+                              ),
+                            ),
+                            // Main Image: Contain fit ensures the entire graphic (poster) is visible
+                            CachedNetworkImage(
+                              imageUrl: event.imageUrls[index], 
+                              fit: BoxFit.contain,
+                              placeholder: (context, url) => Container(color: theme.colorScheme.surfaceContainerHighest),
+                              errorWidget: (context, url, error) => Container(
+                                color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                                child: Icon(Icons.broken_image, size: 50, color: theme.colorScheme.primary),
+                              ),
+                            ),
+                          ],
                         ),
+                      )
+                    : Container(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.1), 
+                        child: Icon(Icons.event, size: 100, color: theme.colorScheme.primary.withValues(alpha: 0.3))
                       ),
-                    )
-                  : Container(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.1), 
-                      child: Icon(Icons.event, size: 100, color: theme.colorScheme.primary.withValues(alpha: 0.3))
-                    ),
-            ),
-            
-            // Buttons Overlay
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 10,
-              left: 20,
-              right: 20,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildOverlayButton(
-                    context: context,
-                    icon: Icons.arrow_back,
-                    onTap: () => context.pop(),
-                  ),
-                  Row(
-                    children: [
-                      if (isOrganizer) ...[
-                        _buildOverlayButton(
-                          context: context,
-                          icon: Icons.edit_outlined,
-                          iconSize: 20,
-                          onTap: () => context.push('/organizers/${event.organizerId}/events/edit', extra: event),
-                        ),
-                        const SizedBox(width: 8),
-                        _buildOverlayButton(
-                          context: context,
-                          icon: Icons.more_vert_rounded,
-                          onTap: () => _showOrganizerMenu(context, event),
-                        ),
-                      ] else ...[
-                        _buildOverlayButton(
-                          context: context,
-                          icon: Icons.report_gmailerrorred_rounded,
-                          iconSize: 20,
-                          onTap: () => _showReportDialog(context, event),
-                        ),
-                      ],
-                      const SizedBox(width: 8),
-                      _buildOverlayButton(
-                        context: context,
-                        icon: Icons.share_outlined,
-                        onTap: () {
-                          final chatContext = ChatContext(
-                            type: 'event',
-                            id: event.id,
-                            title: event.title,
-                            thumbnail: event.imageUrls.isNotEmpty ? event.imageUrls.first : null,
-                            metadata: {'description': event.description},
-                          );
-                          context.push('/share-to-chat', extra: chatContext);
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      _buildOverlayButton(
-                        context: context,
-                        icon: isSaved ? Icons.favorite : Icons.favorite_border,
-                        iconColor: isSaved ? AppColors.error : theme.colorScheme.onSurface,
-                        onTap: (currentUserId == null || event.endAt.isBefore(DateTime.now())) ? null : () async {
-                          try {
-                            final newStatus = isSaved ? null : AttendanceStatus.saved;
-                            await ref.read(eventServiceProvider).setAttendance(currentUserId, event.id, newStatus);
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-                            }
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                ],
               ),
-            ),
-
-            // Image Counter
-            if (event.imageUrls.length > 1)
-              Positioned(
-                bottom: 24,
-                right: 24,
-                child: ValueListenableBuilder<int>(
-                  valueListenable: _currentPageNotifier,
-                  builder: (context, currentPage, _) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.image_outlined, color: Colors.white, size: 14),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${currentPage + 1}/${event.imageUrls.length}',
-                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
+              
+              // Image Counter (Moved up slightly to account for padding)
+              if (event.imageUrls.length > 1)
+                Positioned(
+                  bottom: 16,
+                  right: 16,
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: _currentPageNotifier,
+                    builder: (context, currentPage, _) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.image_outlined, color: Colors.white, size: 14),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${currentPage + 1}/${event.imageUrls.length}',
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildStickyHeader(BuildContext context, Event event, ThemeData theme, bool isOrganizer) {
+    final attendance = ref.watch(eventAttendanceProvider(event.id)).valueOrNull;
+    final isSaved = attendance?.status == AttendanceStatus.saved;
+    final currentUserId = ref.watch(appUserProvider).valueOrNull?.uid;
+
+    return Positioned(
+      top: MediaQuery.of(context).padding.top + 10,
+      left: 20,
+      right: 20,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          _buildOverlayButton(
+            context: context,
+            icon: Icons.arrow_back,
+            onTap: () => context.pop(),
+          ),
+          Row(
+            children: [
+              if (isOrganizer) ...[
+                _buildOverlayButton(
+                  context: context,
+                  icon: Icons.edit_outlined,
+                  iconSize: 20,
+                  onTap: event.isExpired ? null : () => context.push('/organizers/${event.organizerId}/events/edit', extra: event),
+                ),
+                const SizedBox(width: 8),
+                _buildOverlayButton(
+                  context: context,
+                  icon: Icons.more_vert_rounded,
+                  onTap: () => _showOrganizerMenu(context, event),
+                ),
+              ] else ...[
+                _buildOverlayButton(
+                  context: context,
+                  icon: Icons.report_gmailerrorred_rounded,
+                  iconSize: 20,
+                  onTap: () => _showReportDialog(context, event),
+                ),
+              ],
+              const SizedBox(width: 8),
+              _buildOverlayButton(
+                context: context,
+                icon: Icons.share_outlined,
+                onTap: () {
+                  final chatContext = ChatContext(
+                    type: 'event',
+                    id: event.id,
+                    title: event.title,
+                    thumbnail: event.imageUrls.isNotEmpty ? event.imageUrls.first : null,
+                    metadata: {'description': event.description},
+                  );
+                  context.push('/share-to-chat', extra: chatContext);
+                },
+              ),
+              const SizedBox(width: 8),
+              _buildOverlayButton(
+                context: context,
+                icon: isSaved ? Icons.favorite : Icons.favorite_border,
+                iconColor: isSaved ? AppColors.error : theme.colorScheme.onSurface,
+                onTap: (currentUserId == null || event.isExpired || event.status == EventStatus.cancelled) ? null : () async {
+                  try {
+                    final newStatus = isSaved ? null : AttendanceStatus.saved;
+                    await ref.read(eventServiceProvider).setAttendance(currentUserId, event.id, newStatus);
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                    }
+                  }
+                },
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -292,14 +379,14 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 if (org != null && (org.verificationStatus == OrganizerVerificationStatus.verified || org.verificationStatus == OrganizerVerificationStatus.official)) {
                   return Row(
                     children: [
-                      Icon(Icons.check_circle, color: theme.brightness == Brightness.light ? Colors.green[600] : AppColors.success, size: 16),
+                      Icon(Icons.check_circle, color: theme.brightness == Brightness.light ? Colors.green[600] : AppColors.success, size: 14),
                       const SizedBox(width: 4),
                       Text(
                         'Verified',
                         style: TextStyle(
                           color: theme.brightness == Brightness.light ? Colors.green[600] : AppColors.success, 
                           fontWeight: FontWeight.bold, 
-                          fontSize: 13,
+                          fontSize: 12,
                         ),
                       ),
                     ],
@@ -311,10 +398,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         Text(
           event.title, 
-          style: theme.textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w800, color: theme.colorScheme.onSurface),
+          style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800, color: theme.colorScheme.onSurface),
         ),
       ],
     );
@@ -326,14 +413,14 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
       data: (cats) {
         final cat = cats.firstWhere((c) => c.id == categoryId, orElse: () => EventCategory(id: '', label: 'General', icon: '📅'));
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
             color: theme.colorScheme.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
           ),
           child: Text(
             cat.label,
-            style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13),
+            style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 12),
           ),
         );
       },
@@ -351,7 +438,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         return Row(
           children: [
             CircleAvatar(
-              radius: 28,
+              radius: 24,
               backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
               backgroundImage: organizer.logoUrl != null ? CachedNetworkImageProvider(organizer.logoUrl!) : null,
               child: organizer.logoUrl == null ? Text(organizer.name[0], style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)) : null,
@@ -366,22 +453,22 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                       Flexible(
                         child: Text(
                           organizer.name,
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: theme.colorScheme.onSurface),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: theme.colorScheme.onSurface),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 4),
                       if (organizer.verificationStatus == OrganizerVerificationStatus.verified || 
                           organizer.verificationStatus == OrganizerVerificationStatus.official)
-                        Icon(Icons.verified, color: theme.colorScheme.primary, size: 16),
+                        Icon(Icons.verified, color: theme.colorScheme.primary, size: 14),
                     ],
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 1),
                   Text(
                     organizer.type == OrganizerType.officialClub || organizer.type == OrganizerType.department 
                         ? 'Official Organizer' 
                         : 'Verified Organizer',
-                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13),
+                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
                   ),
                 ],
               ),
@@ -390,12 +477,14 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               onPressed: () => context.push('/organizers/$organizerId'),
               style: OutlinedButton.styleFrom(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.5)),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.4)),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                minimumSize: const Size(0, 32),
+                visualDensity: VisualDensity.compact,
               ),
               child: Text(
-                'View Organizer', 
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+                'View', 
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
               ),
             ),
           ],
@@ -406,11 +495,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     );
   }
 
-  Widget _buildInfoCard(BuildContext context, Event event, ThemeData theme) {
-    final currentUserId = ref.watch(appUserProvider).valueOrNull?.uid;
-    final membersAsync = ref.watch(organizerMembersProvider(event.organizerId));
-    final isOrganizer = membersAsync.valueOrNull?.any((m) => m.userId == currentUserId) ?? false;
-
+  Widget _buildInfoCard(BuildContext context, Event event, ThemeData theme, bool isOrganizer) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -487,31 +572,31 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
           children: [
             Container(
-              height: 40,
-              width: 40,
+              height: 36,
+              width: 36,
               decoration: BoxDecoration(
                 color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(icon, color: theme.colorScheme.primary, size: 20),
+              child: Icon(icon, color: theme.colorScheme.primary, size: 18),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface)),
-                  const SizedBox(height: 2),
-                  Text(subtitle, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
+                  Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: theme.colorScheme.onSurface)),
+                  const SizedBox(height: 1),
+                  Text(subtitle, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
                 ],
               ),
             ),
             if (trailing != null) trailing,
-            if (showChevron) Icon(Icons.chevron_right_rounded, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4), size: 20),
+            if (showChevron) Icon(Icons.chevron_right_rounded, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4), size: 18),
           ],
         ),
       ),
@@ -590,15 +675,13 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     );
   }
 
-  Widget _buildRegistrationBar(BuildContext context, Event event, ThemeData theme) {
+  Widget _buildRegistrationBar(BuildContext context, Event event, ThemeData theme, bool isOrganizer) {
     final attendanceAsync = ref.watch(eventAttendanceProvider(event.id));
     final attendance = attendanceAsync.valueOrNull;
     final currentUserId = ref.watch(appUserProvider).valueOrNull?.uid;
 
-    final membersAsync = ref.watch(organizerMembersProvider(event.organizerId));
-    final isOrganizer = membersAsync.valueOrNull?.any((m) => m.userId == currentUserId) ?? false;
-    
-    final isPast = event.endAt.isBefore(DateTime.now());
+    final isPast = event.isExpired;
+    final isCancelled = event.status == EventStatus.cancelled;
     final isFull = event.maxCapacity != null && event.currentAttendeeCount >= event.maxCapacity!;
     final isGoing = attendance?.status == AttendanceStatus.going;
     final isSaved = attendance?.status == AttendanceStatus.saved;
@@ -621,7 +704,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           Expanded(
             flex: 1,
             child: OutlinedButton.icon(
-              onPressed: (currentUserId == null || isPast || isOrganizer) ? null : () async {
+              onPressed: (currentUserId == null || isPast || isOrganizer || isCancelled) ? null : () async {
                 try {
                   final newStatus = isSaved ? null : AttendanceStatus.saved;
                   await ref.read(eventServiceProvider).setAttendance(currentUserId, event.id, newStatus);
@@ -632,7 +715,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 }
               },
               icon: Icon(isSaved ? Icons.bookmark : Icons.bookmark_border_rounded, size: 20),
-              label: Text(isPast ? 'Event Ended' : (isOrganizer ? 'Organizer' : 'Save Event')),
+              label: Text(isCancelled ? 'Cancelled' : (isPast ? 'Event Ended' : (isOrganizer ? 'Organizer' : 'Save Event'))),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -648,8 +731,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           Expanded(
             flex: 1,
             child: ElevatedButton.icon(
-              onPressed: (currentUserId == null || isPast || (isFull && !isGoing && !isOrganizer)) 
-                ? null 
+              onPressed: (currentUserId == null || isPast || isCancelled || (isFull && !isGoing && !isOrganizer)) 
+                ? (isOrganizer ? () => context.push('/organizers/${event.organizerId}/dashboard') : null) 
                 : () async {
                   if (isOrganizer) {
                     context.push('/organizers/${event.organizerId}/dashboard');
@@ -658,8 +741,18 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
                   if (event.isRegistrationRequired && event.registrationUrl != null && event.registrationUrl!.isNotEmpty) {
                     final uri = Uri.tryParse(event.registrationUrl!);
-                    if (uri != null && await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    if (uri != null) {
+                      try {
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        } else {
+                          throw 'Could not launch registration link';
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                        }
+                      }
                     }
                   }
 
@@ -678,12 +771,12 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                     }
                   }
                 },
-              icon: Icon(isGoing ? Icons.check_circle_rounded : (isPast ? Icons.event_busy_rounded : (isOrganizer ? Icons.admin_panel_settings_outlined : Icons.check_circle_outline_rounded)), size: 20),
-              label: Text(isPast ? 'Past Event' : (isGoing ? "I'm Going" : (isOrganizer ? 'Manage Event' : (isFull ? 'Event Full' : 'Attend')))),
+              icon: Icon(isGoing ? Icons.check_circle_rounded : (isCancelled ? Icons.cancel_outlined : (isPast ? Icons.event_busy_rounded : (isOrganizer ? Icons.admin_panel_settings_outlined : Icons.check_circle_outline_rounded))), size: 20),
+              label: Text(isCancelled ? 'Cancelled' : (isPast ? 'Past Event' : (isGoing ? "I'm Going" : (isOrganizer ? 'Manage Event' : (isFull ? 'Event Full' : 'Attend'))))),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: isGoing ? AppColors.success : (isPast ? theme.colorScheme.surfaceContainerHighest : theme.colorScheme.primary),
-                foregroundColor: isPast ? theme.colorScheme.onSurfaceVariant : Colors.white,
+                backgroundColor: isGoing ? AppColors.success : ((isPast || isCancelled) ? theme.colorScheme.surfaceContainerHighest : theme.colorScheme.primary),
+                foregroundColor: (isPast || isCancelled) ? theme.colorScheme.onSurfaceVariant : Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 elevation: 0,
               ),

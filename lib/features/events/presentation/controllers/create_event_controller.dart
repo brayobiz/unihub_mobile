@@ -287,7 +287,9 @@ class CreateEventController extends StateNotifier<CreateEventState> {
         await _ref.read(eventServiceProvider).submitEvent(event.id, user.uid);
       }
 
-      state = state.copyWith(isLoading: false);
+      // We don't set isLoading to false here on success because the UI 
+      // will either show a success dialog or navigate away. 
+      // Keeping it true prevents double-submissions during transitions.
       return true;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());

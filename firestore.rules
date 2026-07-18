@@ -200,8 +200,10 @@ service cloud.firestore {
       allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewsCount', 'sharesCount', 'savesCount', 'currentAttendeeCount'])) ||
                     (isAdmin() || (
                       canManageOrganizer(resource.data.organizerId) && (
-                        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'isFeatured', 'isPromoted']) ||
-                        request.resource.data.status in ['draft', 'submitted', 'cancelled', 'archived']
+                        // Hardening: Prevent editing events that have already ended
+                        resource.data.endAt > request.time &&
+                        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'isFeatured', 'isPromoted']) ||
+                        request.resource.data.status in ['draft', 'submitted', 'cancelled', 'archived', 'ended'])
                       )
                     ));
 
@@ -254,7 +256,13 @@ service cloud.firestore {
 
       match /members/{memberId} {
         allow read: if isAuthenticated();
-        allow create: if canManageOrganizer(organizerId) ||
+        allow create: if (canManageOrganizer(organizerId) &&
+                         get(/databases/$(database)/documents/organizers/$(organizerId)).data.verificationStatus != 'suspended' &&
+                         request.resource.data.role != 'owner' &&
+                         getUserData(request.resource.data.userId).get('isBanned', false) == false &&
+                         getUserData(request.resource.data.userId).get('isStudentVerified', false) == true &&
+                         getUserData(request.resource.data.userId).get('university', '') == get(/databases/$(database)/documents/organizers/$(organizerId)).data.campusId
+                        ) ||
                       (isAuthenticated() && memberId == organizerId + "_" + request.auth.uid);
         allow update, delete: if canManageOrganizer(organizerId) || (
           isAuthenticated() && resource.data.userId == request.auth.uid
