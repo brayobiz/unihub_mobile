@@ -30,6 +30,8 @@ import '../announcements/presentation/widgets/announcement_display.dart';
 import '../campus_filter/presentation/widgets/campus_filter_selector.dart';
 import '../events/presentation/widgets/homepage_event_sections.dart';
 import '../ads/ads_module.dart';
+import '../../core/widgets/error_view.dart';
+import '../../core/widgets/empty_state.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -647,7 +649,13 @@ class _ActivityFeedSection extends ConsumerWidget {
           child: Center(child: CircularProgressIndicator()),
         ),
       ),
-      error: (_, __) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+      error: (err, __) => SliverToBoxAdapter(
+        child: ErrorView(
+          error: err,
+          onRetry: () => ref.invalidate(recentActivityProvider),
+          isFullPage: false,
+        ),
+      ),
     );
   }
 

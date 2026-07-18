@@ -1549,10 +1549,15 @@ class AdminRepository {
     String? assignedAdminId,
     String? searchQuery,
   }) {
+    // Default to ONLY active sessions if status is null or 'active'
+    // To see closed sessions, status must be explicitly 'resolved' or 'closed'
     Query query = _firestore.collection('conversations').where('isSupport', isEqualTo: true);
 
     if (status != null && status != 'all') {
       query = query.where('supportStatus', isEqualTo: status);
+    } else if (status == null || status == 'active') {
+       // Filter out resolved and closed by default for "Active" views
+       query = query.where('supportStatus', whereNotIn: ['resolved', 'closed']);
     }
     if (priority != null && priority != 'all') {
       query = query.where('supportPriority', isEqualTo: priority);

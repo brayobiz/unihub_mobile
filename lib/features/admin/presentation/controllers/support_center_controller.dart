@@ -46,34 +46,43 @@ class SupportCenterController extends StateNotifier<SupportCenterFilters> {
   }
 
   Future<String?> claimNext() async {
-    final conversations = _ref.read(supportConversationsProvider(_getFiltersForProvider(state))).valueOrNull;
-    if (conversations == null || conversations.isEmpty) return null;
-
     final currentUser = _ref.read(appUserProvider).valueOrNull;
     if (currentUser == null) return null;
 
-    // Find oldest ticket waiting for admin that is not assigned to someone else
-    final target = conversations
-        .where((c) => 
-            c.supportStatus == 'waiting_admin' && 
-            (c.assignedAdminId == null || c.assignedAdminId == currentUser.uid))
-        .toList();
+    // We fetch a fresh list of "waiting_admin" + "unassigned" tickets 
+    // specifically for the claim logic, ignoring current UI filters.
+    final conversations = await _ref.read(adminRepositoryProvider).watchSupportConversations(
+      status: 'waiting_admin',
+      assignedAdminId: 'unassigned',
+    ).first;
 
-    if (target.isEmpty) return null;
-
-    // Sort by oldest first
-    target.sort((a, b) => a.lastMessageTime.compareTo(b.lastMessageTime));
-    final oldest = target.first;
-
-    // Assign if not already assigned
-    if (oldest.assignedAdminId == null) {
-      await _ref.read(adminRepositoryProvider).assignSupportConversation(
-        oldest.id, 
-        currentUser.uid, 
-        adminName: currentUser.fullName, 
-        performingAdminId: currentUser.uid
-      );
+    if (conversations.isEmpty) {
+       // Check if I already have an active ticket assigned to me that I haven't resolved
+       final myActive = await _ref.read(adminRepositoryProvider).watchSupportConversations(
+         status: 'waiting_admin',
+         assignedAdminId: currentUser.uid,
+       ).first;
+       
+       if (myActive.isNotEmpty) {
+         // Sort by oldest first
+         myActive.sort((a, b) => a.lastMessageTime.compareTo(b.lastMessageTime));
+         return myActive.first.id;
+       }
+       return null;
     }
+
+    // Sort by oldest first to prioritize students who have been waiting longest
+    final available = List<Conversation>.from(conversations);
+    available.sort((a, b) => a.lastMessageTime.compareTo(b.lastMessageTime));
+    final oldest = available.first;
+
+    // Assign the ticket to me
+    await _ref.read(adminRepositoryProvider).assignSupportConversation(
+      oldest.id, 
+      currentUser.uid, 
+      adminName: currentUser.fullName, 
+      performingAdminId: currentUser.uid
+    );
 
     return oldest.id;
   }
@@ -112,5 +121,18 @@ final filteredSupportConversationsProvider = StreamProvider.autoDispose<List<Con
     priority: filters.priority,
     assignedAdminId: assignmentFilter,
     search: filters.search,
-  )).stream);
+  )).stream).map((conversations) {
+    if (currentUser == null) return conversations;
+
+    // Filter logic:
+    // 1. If explicitly filtering for 'me', only show mine (already handled by provider/repo usually, but we double check or refine here if 'all' is tricky)
+    // 2. If 'all', user wants "unassigned OR mine"
+    if (filters.assignment == 'all') {
+      return conversations.where((c) => 
+        c.assignedAdminId == null || c.assignedAdminId == currentUser.uid
+      ).toList();
+    }
+    
+    return conversations;
+  });
 });

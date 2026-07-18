@@ -81,4 +81,22 @@ class Conversation {
       expiresAt: (json['expiresAt'] as Timestamp?)?.toDate(),
     );
   }
+
+  /// Checks if a participant is currently typing, with a 15-second expiry.
+  bool isParticipantTyping(String userId) {
+    final dynamic timestamp = typing[userId];
+    if (timestamp == null) return false;
+    
+    DateTime? typingTime;
+    if (timestamp is Timestamp) {
+      typingTime = timestamp.toDate();
+    } else if (timestamp is DateTime) {
+      typingTime = timestamp;
+    }
+    
+    if (typingTime == null) return false;
+    
+    final diff = DateTime.now().difference(typingTime).inSeconds;
+    return diff >= 0 && diff < 15;
+  }
 }

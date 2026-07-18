@@ -42,6 +42,14 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
     final state = ref.watch(addListingControllerProvider(widget.listing));
     final controller = ref.read(addListingControllerProvider(widget.listing).notifier);
 
+    ref.listen<AddListingState>(addListingControllerProvider(widget.listing), (previous, next) {
+      if (next.error != null && next.error != previous?.error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(next.error!), backgroundColor: AppColors.error),
+        );
+      }
+    });
+
     final int currentStep = state.currentStep;
 
     return Scaffold(

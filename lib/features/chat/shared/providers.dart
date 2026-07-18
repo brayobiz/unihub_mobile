@@ -22,9 +22,13 @@ final conversationsProvider = StreamProvider.autoDispose.family<List<Conversatio
 
   return ref.watch(chatRepositoryProvider).watchConversations(userId).map((conversations) {
     if (isAdmin) {
-      // Filter out support conversations for admins in the regular list.
-      // Admins manage support through the dedicated Support Center.
-      return conversations.where((c) => !c.isSupport).toList();
+      // For admins, we only show support conversations in the regular list 
+      // if they are NOT the assigned admin (meaning they are likely the requester).
+      // This ensures that admins can see their own support requests in their main chat list.
+      return conversations.where((c) {
+        if (!c.isSupport) return true;
+        return c.assignedAdminId != userId;
+      }).toList();
     }
     return conversations;
   });

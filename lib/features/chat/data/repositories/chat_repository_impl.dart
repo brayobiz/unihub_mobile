@@ -69,7 +69,11 @@ class ChatRepositoryImpl implements ChatRepository {
             final otherParticipant = c.participants.firstWhere((id) => id != userId, orElse: () => '');
             final isNotBlocked = !blockedUids.contains(otherParticipant);
             
-            return isNotExpired && isNotBlocked;
+            // Filter 4: Hide resolved/closed support sessions from users
+            // These should only be visible to admins in the Support Center
+            final isInactiveSupport = c.isSupport && (c.supportStatus == 'resolved' || c.supportStatus == 'closed');
+            
+            return isNotExpired && isNotBlocked && !isInactiveSupport;
           })
           .toList();
       // Sort in-memory
@@ -425,12 +429,19 @@ class ChatRepositoryImpl implements ChatRepository {
       if (aiReply == null || aiReply.isEmpty) {
         AppLogger.warning('Ulify Assistant: No reply received from service.', 'AI_SERVICE');
         
+        // Handover to human automatically on AI failure to be safe
+        await _injectBotMessage(
+          conversationId, 
+          "I'm sorry, I'm having a bit of trouble connecting to my brain right now! 🤖 I've notified our human support team to assist you. Please wait a moment.",
+          isEscalating: true,
+        );
+
         // Fallback: If AI fails, ensure admins are notified so a human can step in
         _notificationSender.triggerPushNotification(
           recipientId: '',
           isBroadcast: true,
           title: '🤖 Assistant Unavailable',
-          body: 'A student is waiting and Ulify Assistant failed to respond. Please check the support queue.',
+          body: 'Ulify Assistant failed to respond to $userId. Human intervention requested.',
           data: {'route': '/admin/support/$conversationId', 'topic': 'admins'},
         );
       }
@@ -668,14 +679,16 @@ class ChatRepositoryImpl implements ChatRepository {
     final convRef = _firestore.collection('conversations').doc(conversationId);
     
     try {
-      final doc = await convRef.get();
+      // Optimized: Check server and cache for faster response
+      final doc = await convRef.get(const GetOptions(source: Source.serverAndCache)).timeout(const Duration(seconds: 5));
       if (doc.exists) {
         // If it exists, we update the context to the latest one being accessed
-        await convRef.update({'context': context.toJson()});
+        // We use unawaited/background update here for maximum speed
+        convRef.update({'context': context.toJson()}).catchError((e) => null);
         return conversationId;
       }
     } catch (e) {
-      // If get() fails due to permissions, it might not exist yet.
+      // If get() fails due to permissions or timeout, it might not exist yet.
       // We proceed to try and create it.
       debugPrint('ChatRepo: get() failed or doc missing, attempting create: $e');
     }
@@ -786,41 +799,40 @@ class ChatRepositoryImpl implements ChatRepository {
     if (userId.isEmpty) throw Exception('User ID cannot be empty');
 
     const adminId = 'ulify_admin';
-    final participantIds = [userId, adminId];
-    final conversationId = _getDeterministicConversationId(participantIds);
-    
-    final convRef = _firestore.collection('conversations').doc(conversationId);
 
     try {
-      final doc = await convRef.get();
+      // 1. Search for an EXISTING ACTIVE support session
+      // We query for all support sessions this user is in and filter for active ones in-memory
+      // to avoid complex composite index requirements while ensuring reliability.
+      final query = await _firestore
+          .collection('conversations')
+          .where('participants', arrayContains: userId)
+          .where('isSupport', isEqualTo: true)
+          .get(const GetOptions(source: Source.serverAndCache));
 
-      if (doc.exists) {
-        final data = doc.data()!;
-        final status = data['supportStatus'] as String?;
+      final activeDocs = query.docs.where((doc) {
+        final status = doc.data()['supportStatus'];
+        return status != 'resolved' && status != 'closed';
+      }).toList();
 
-        // If the session was resolved or closed, we RE-OPEN it for the new request
-        if (status == 'resolved' || status == 'closed') {
-          final now = DateTime.now();
-          await convRef.update({
-            'supportStatus': 'active', // Reset to active so AI can try again
-            'supportPriority': 'normal', // Reset priority to clear previous escalation
-            'assignedAdminId': FieldValue.delete(), // Clear previous admin
-            'lastMessage': 'Re-opened support request',
-            'lastMessageSenderId': userId,
-            'lastMessageTime': FieldValue.serverTimestamp(),
-            'expiresAt': Timestamp.fromDate(now.add(const Duration(hours: 48))),
-          });
-        }
-        return conversationId;
+      if (activeDocs.isNotEmpty) {
+        // Return the first active session found
+        return activeDocs.first.id;
       }
     } catch (e) {
-      debugPrint('ChatRepo: Support get() failed, attempting create: $e');
+      debugPrint('ChatRepo: Error searching for active support session: $e');
     }
+
+    // 2. Create a TRULY UNIQUE new support session
+    // We do NOT use deterministic IDs for support anymore to ensure history is preserved
+    // and every new request starts fresh.
+    final conversationId = 'support_${const Uuid().v4()}';
+    final convRef = _firestore.collection('conversations').doc(conversationId);
 
     final now = DateTime.now();
     final conversation = Conversation(
       id: conversationId,
-      participants: participantIds,
+      participants: [userId, adminId],
       context: ChatContext(
         type: 'support',
         id: 'support_$userId',

@@ -63,6 +63,7 @@ import '../../features/shared/global_search_screen.dart';
 import '../../features/shared/campus_pulse_screen.dart';
 import '../../features/shared/banned_screen.dart';
 import '../../features/shared/maintenance_screen.dart';
+import '../../features/shared/connection_error_screen.dart';
 import '../../features/community/community_screen.dart';
 import '../../features/gigs/gigs_screen.dart';
 import '../../features/confessions/confessions_screen.dart';
@@ -239,6 +240,11 @@ class RouterNotifier extends ChangeNotifier {
       return isSplash ? null : '/splash';
     }
 
+    if (appUserAsync.hasError) {
+      if (state.matchedLocation != '/connection-error') return '/connection-error';
+      return null;
+    }
+
     final isAdmin = appUser?.isAdmin ?? false;
     final settings = settingsAsync.valueOrNull;
 
@@ -363,6 +369,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/maintenance',
         builder: (context, state) => const MaintenanceScreen(),
+      ),
+      GoRoute(
+        path: '/connection-error',
+        builder: (context, state) => const ConnectionErrorScreen(),
       ),
       GoRoute(
         path: '/global-search',

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../app/theme/app_colors.dart';
+import '../../../../services/connectivity_service.dart';
+import '../../../../core/error/error_handler.dart';
 import '../controllers/auth_controller.dart';
 import '../widgets/auth_text_field.dart';
 import '../widgets/auth_button.dart';
@@ -23,9 +26,13 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   void _onResetPassword() async {
     final email = emailController.text.trim();
     if (email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your email')),
-      );
+      _showSnackBar('Please enter your email', isError: true);
+      return;
+    }
+
+    final connectivity = ref.read(connectivityServiceProvider);
+    if (connectivity == ConnectivityStatus.isDisconnected) {
+      _showSnackBar('No internet connection. Please check your network and try again.', isError: true);
       return;
     }
 
@@ -34,22 +41,33 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     if (mounted) {
       final state = ref.read(authControllerProvider);
       if (state.hasError) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(state.error.toString().replaceAll('Exception: ', '')),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showSnackBar(AppErrorHandler.mapError(state.error), isError: true);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Reset link sent to your email'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showSnackBar('Reset link sent to your email');
         Navigator.pop(context);
       }
     }
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded, 
+              color: Colors.white, 
+              size: 20
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: isError ? AppColors.error : AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override

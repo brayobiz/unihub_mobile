@@ -23,6 +23,8 @@ import '../../../chat/shared/providers.dart';
 import '../widgets/marketplace_card.dart';
 import '../../../../services/history_service.dart';
 import 'package:uuid/uuid.dart';
+import '../../../../core/widgets/error_view.dart';
+import '../../../../core/widgets/empty_state.dart';
 
 class ListingDetailScreen extends ConsumerWidget {
   final Listing? listing;
@@ -45,7 +47,12 @@ class ListingDetailScreen extends ConsumerWidget {
       data: (fetchedListing) {
         final currentListing = fetchedListing ?? listing;
         if (currentListing == null) {
-          return const Scaffold(body: Center(child: Text('Listing no longer available.')));
+          return const EmptyState(
+            title: 'Listing unavailable',
+            message: 'This item may have been removed or sold.',
+            icon: Icons.shopping_bag_outlined,
+            isFullPage: true,
+          );
         }
 
         return _ListingDetailContent(
@@ -62,7 +69,10 @@ class ListingDetailScreen extends ConsumerWidget {
               isLoading: true,
             )
           : const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
+      error: (e, _) => ErrorView(
+        error: e,
+        onRetry: () => ref.invalidate(listingProvider(listingId)),
+      ),
     );
   }
 }

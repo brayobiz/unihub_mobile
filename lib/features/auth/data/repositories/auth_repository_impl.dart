@@ -42,12 +42,9 @@ class AuthRepositoryImpl implements AuthRepository {
       }
 
       AppLogger.info('Auth: Sign in successful', 'AUTH');
-    } on FirebaseAuthException catch (e) {
-      AppLogger.warning('Auth: FirebaseAuthException: ${e.code}', 'AUTH');
-      throw Exception(AppErrorHandler.mapError(e));
-    } catch (e) {
-      AppLogger.error('Auth: General Exception', e, StackTrace.current, 'AUTH');
-      throw Exception(AppErrorHandler.mapError(e));
+    } catch (e, st) {
+      AppLogger.error('Auth: Sign in failed', e, st, 'AUTH');
+      throw Exception(AppErrorHandler.mapError(e, st));
     }
   }
 
@@ -74,12 +71,9 @@ class AuthRepositoryImpl implements AuthRepository {
         // Self-healing: Ensure search fields exist for the logged-in user
         await _updateSearchFields(user.uid);
       }
-    } on FirebaseAuthException catch (e) {
-      AppLogger.warning('Auth: Google Sign-in Firebase Error: ${e.code}', 'AUTH');
-      throw Exception(AppErrorHandler.mapError(e));
-    } catch (e) {
-      AppLogger.error('Auth: Google Sign-in General Error', e, StackTrace.current, 'AUTH');
-      throw Exception(AppErrorHandler.mapError(e));
+    } catch (e, st) {
+      AppLogger.error('Auth: Google Sign-in failed', e, st, 'AUTH');
+      throw Exception(AppErrorHandler.mapError(e, st));
     }
   }
 

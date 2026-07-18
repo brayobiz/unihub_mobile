@@ -1,11 +1,18 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart';
 import '../utils/app_logger.dart';
 
 class AppErrorHandler {
   /// Maps any caught exception to a user-friendly string message.
-  static String mapError(dynamic error) {
+  static String mapError(dynamic error, [StackTrace? stackTrace]) {
+    if (kReleaseMode && error != null) {
+      FirebaseCrashlytics.instance.recordError(error, stackTrace, fatal: false).catchError((_) => null);
+    }
+
     if (error is FirebaseAuthException) {
       return _handleAuthException(error);
     }
@@ -19,21 +26,32 @@ class AppErrorHandler {
     }
 
     if (error is HttpException) {
-      return 'Server error. Please try again later.';
+      return 'Unable to reach the server. Please try again later.';
+    }
+
+    if (error is TimeoutException) {
+      return 'The request timed out. Please check your connection and try again.';
     }
 
     // Handle generic exceptions that might have been thrown manually
     final errorString = error.toString().toLowerCase();
+    
     if (errorString.contains('exception: ')) {
-      return error.toString().replaceAll('Exception: ', '');
+      final msg = error.toString().replaceAll('Exception: ', '').replaceAll('exception: ', '');
+      if (msg.isNotEmpty) return msg;
     }
 
-    if (errorString.contains('network error') || errorString.contains('connection reset')) {
-      return 'Network error: Please check your internet connection.';
+    if (errorString.contains('network error') || 
+        errorString.contains('connection reset') || 
+        errorString.contains('unavailable') ||
+        errorString.contains('network_error')) {
+      return 'Network error: Please check your internet connection and try again.';
     }
 
-    if (errorString.contains('permission denied')) {
-      return 'You don\'t have permission to perform this action.';
+    if (errorString.contains('permission denied') || 
+        errorString.contains('permission-denied') ||
+        errorString.contains('insufficient permissions')) {
+      return 'Access Denied: You don\'t have the required permissions for this action.';
     }
 
     return 'Something went wrong. Please try again.';

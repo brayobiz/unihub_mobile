@@ -25,6 +25,8 @@ import '../../../../features/housing/domain/models/housing_listing.dart';
 import '../../../../features/marketplace/shared/providers.dart';
 import '../../../../features/housing/shared/providers.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
+import '../../../../core/widgets/error_view.dart';
+import '../../../../core/widgets/empty_state.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String conversationId;
@@ -271,7 +273,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             String? typingUserId;
             if (conversation != null) {
               for (final uid in conversation.participants) {
-                if (uid != currentUser?.uid && (conversation.typing[uid] != null)) {
+                if (uid != currentUser?.uid && conversation.isParticipantTyping(uid)) {
                   typingUserId = uid;
                   break;
                 }
@@ -299,8 +301,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               children: [
                 if (isSupportSession)
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         colors: [Color(0xFF8E8FFA), Color(0xFF6C63FF)],
@@ -312,11 +314,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         BoxShadow(color: const Color(0xFF6C63FF).withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))
                       ],
                     ),
-                    child: const Icon(Icons.headset_mic_rounded, size: 22, color: Colors.white),
+                    child: const Icon(Icons.headset_mic_rounded, size: 20, color: Colors.white),
                   )
                 else
                   CircleAvatar(
-                    radius: 20,
+                    radius: 18,
                     backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
                     backgroundImage: otherUser?.photoUrl != null ? CachedNetworkImageProvider(otherUser!.photoUrl!) : null,
                     onBackgroundImageError: otherUser?.photoUrl != null ? (exception, stackTrace) {
@@ -325,7 +327,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     child: otherUser?.photoUrl == null
                         ? Text(
                             widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : 'U',
-                            style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
+                            style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13),
                           )
                         : null,
                   ),
@@ -455,7 +457,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 );
               },
               loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
-              error: (err, stack) => Center(child: Text('Error: $err')),
+              error: (err, stack) => ErrorView(
+                error: err,
+                onRetry: () => ref.invalidate(messagesStreamProvider(widget.conversationId)),
+                isFullPage: false,
+              ),
             ),
           ),
           
@@ -653,19 +659,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _buildEmptyState(BuildContext context) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.chat_bubble_outline_rounded, size: 48, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.2)),
-          const SizedBox(height: 16),
-          Text(
-            'Say hello to ${widget.otherUserName}!',
-            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14),
-          ),
-        ],
-      ),
+    return EmptyState(
+      title: 'No messages yet',
+      message: 'Say hello to ${widget.otherUserName}!',
+      icon: Icons.chat_bubble_outline_rounded,
     );
   }
 
@@ -947,8 +944,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     final sender = ref.watch(publicUserProvider(message.senderId)).valueOrNull;
                     return Container(
                       margin: const EdgeInsets.only(bottom: 2),
-                      width: 28,
-                      height: 28,
+                      width: 24,
+                      height: 24,
                       decoration: BoxDecoration(
                         color: theme.colorScheme.surface,
                         shape: BoxShape.circle,
@@ -965,8 +962,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       ),
                       child: (!isAi && sender?.photoUrl == null)
                         ? Icon(isAi ? Icons.smart_toy_rounded : Icons.person_rounded, 
-                               size: 16, color: isAi ? const Color(0xFF6C63FF) : Colors.grey)
-                        : (isAi ? const Icon(Icons.smart_toy_rounded, size: 16, color: Color(0xFF6C63FF)) : null),
+                               size: 14, color: isAi ? const Color(0xFF6C63FF) : Colors.grey)
+                        : (isAi ? const Icon(Icons.smart_toy_rounded, size: 14, color: Color(0xFF6C63FF)) : null),
                     );
                   }
                 ),

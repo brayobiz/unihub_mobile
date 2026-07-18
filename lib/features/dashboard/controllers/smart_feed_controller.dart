@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unihub_mobile/features/marketplace/domain/models/listing_filter.dart';
 import '../../marketplace/shared/providers.dart';
@@ -128,9 +129,15 @@ final smartFeedProvider = Provider.autoDispose<AsyncValue<List<SmartFeedItem>>>(
 
   // Stable sorting by timestamp instead of shuffle for better UI reliability
   allItems.sort((a, b) {
-    final dateA = a.originalData?.createdAt as DateTime? ?? DateTime(2000);
-    final dateB = b.originalData?.createdAt as DateTime? ?? DateTime(2000);
-    return dateB.compareTo(dateA);
+    DateTime getDateTime(dynamic data) {
+      if (data == null) return DateTime(2000);
+      final createdAt = data.createdAt;
+      if (createdAt is DateTime) return createdAt;
+      if (createdAt is Timestamp) return createdAt.toDate();
+      return DateTime(2000);
+    }
+    
+    return getDateTime(b.originalData).compareTo(getDateTime(a.originalData));
   });
 
   return AsyncValue.data(allItems);
@@ -257,7 +264,14 @@ final newItemsSummaryProvider = Provider.autoDispose<AsyncValue<Map<String, int>
 
   int countNew(List<dynamic> items) {
     return items.where((item) {
-      final createdAt = item.createdAt as DateTime;
+      DateTime? createdAt;
+      if (item.createdAt is DateTime) {
+        createdAt = item.createdAt;
+      } else if (item.createdAt is Timestamp) {
+        createdAt = (item.createdAt as Timestamp).toDate();
+      }
+      
+      if (createdAt == null) return false;
       return createdAt.isAfter(lastVisit);
     }).length;
   }
@@ -279,9 +293,14 @@ final recentActivityProvider = Provider.autoDispose<AsyncValue<List<SmartFeedIte
   return allFeedAsync.whenData((items) {
     final sorted = List<SmartFeedItem>.from(items);
     sorted.sort((a, b) {
-      final dateA = a.originalData?.createdAt as DateTime? ?? DateTime(2000);
-      final dateB = b.originalData?.createdAt as DateTime? ?? DateTime(2000);
-      return dateB.compareTo(dateA);
+      DateTime getDateTime(dynamic data) {
+        if (data == null) return DateTime(2000);
+        final createdAt = data.createdAt;
+        if (createdAt is DateTime) return createdAt;
+        if (createdAt is Timestamp) return createdAt.toDate();
+        return DateTime(2000);
+      }
+      return getDateTime(b.originalData).compareTo(getDateTime(a.originalData));
     });
     return sorted.take(10).toList();
   });

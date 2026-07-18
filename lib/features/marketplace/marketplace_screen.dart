@@ -28,6 +28,8 @@ import 'package:unihub_mobile/features/announcements/presentation/widgets/announ
 import 'package:unihub_mobile/features/ads/ads_module.dart';
 
 import 'presentation/controllers/paginated_listings_controller.dart';
+import '../../core/widgets/error_view.dart';
+import '../../core/widgets/empty_state.dart';
 
 class MarketplaceScreen extends ConsumerStatefulWidget {
   const MarketplaceScreen({super.key});
@@ -740,32 +742,10 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
     if (paginatedState.hasError && paginatedState.items.isEmpty) {
       return SliverFillRemaining(
         hasScrollBody: false,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(40),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.cloud_off_rounded, size: 64, color: AppColors.error),
-                const SizedBox(height: 24),
-                Text(
-                  'Connection lost',
-                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'We couldn\'t load the items. Please check your network and try again.',
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-                FilledButton.icon(
-                  onPressed: () => ref.read(paginatedListingsProvider(filter).notifier).retry(),
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Try Again'),
-                ),
-              ],
-            ),
-          ),
+        child: ErrorView(
+          error: paginatedState.error,
+          onRetry: () => ref.read(paginatedListingsProvider(filter).notifier).retry(),
+          isFullPage: false,
         ),
       );
     }
@@ -775,72 +755,27 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
     if (listings.isEmpty) {
       return SliverFillRemaining(
         hasScrollBody: false,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(40),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    CategoryUtils.getIcon(FeedType.marketplace), 
-                    size: 56, 
-                    color: theme.colorScheme.primary.withValues(alpha: 0.5)
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'No items match your search',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Try switching to "All Campuses" or explore another category to find what you\'re looking for.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant.withOpacity(0.8), 
-                    fontSize: 14,
-                    height: 1.5,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: () => controller.resetFilters(),
-                      icon: const Icon(Icons.refresh_rounded, size: 18),
-                      label: const Text('Clear Filters'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    FilledButton(
-                      onPressed: () {
-                        controller.resetFilters();
-                        ref.read(browsingScopeProvider.notifier).reset();
-                      },
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text('Explore All'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+        child: EmptyState(
+          title: 'No items match your search',
+          message: 'Try switching to "All Campuses" or explore another category to find what you\'re looking for.',
+          icon: CategoryUtils.getIcon(FeedType.marketplace),
+          action: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => controller.resetFilters(),
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Clear Filters'),
+              ),
+              const SizedBox(width: 12),
+              FilledButton(
+                onPressed: () {
+                  controller.resetFilters();
+                  ref.read(browsingScopeProvider.notifier).reset();
+                },
+                child: const Text('Explore All'),
+              ),
+            ],
           ),
         ),
       );

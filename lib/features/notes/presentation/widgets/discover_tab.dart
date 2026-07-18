@@ -11,6 +11,8 @@ import '../../domain/models/note.dart';
 import '../../../campus_filter/shared/providers.dart';
 import '../../../campus_filter/domain/models/browsing_scope.dart';
 import 'package:unihub_mobile/features/ads/ads_module.dart';
+import '../../../../core/widgets/error_view.dart';
+import '../../../../core/widgets/empty_state.dart';
 
 class DiscoverTab extends ConsumerStatefulWidget {
   const DiscoverTab({super.key});
@@ -154,7 +156,11 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
               child: Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
             ),
             error: (err, stack) => SliverFillRemaining(
-              child: Center(child: Text('Error: $err')),
+              child: ErrorView(
+                error: err,
+                onRetry: () => ref.invalidate(notesListingsProvider),
+                isFullPage: false,
+              ),
             ),
           ),
           
@@ -266,44 +272,23 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
   }
 
   Widget _buildEmptyState(BuildContext context) {
-    final theme = Theme.of(context);
     final query = ref.read(notesSearchQueryProvider);
     final category = ref.read(notesCategoryFilterProvider);
     
-    return Padding(
-      padding: const EdgeInsets.all(32.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.search_off_rounded, size: 80, color: theme.colorScheme.primary.withOpacity(0.2)),
-          const SizedBox(height: 24),
-          Text(
-            category == 'All' 
-              ? 'No resources found' 
-              : 'No $category notes yet',
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontSize: 18, 
-              fontWeight: FontWeight.bold, 
-              color: theme.colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            query.isNotEmpty
-              ? 'We couldn\'t find anything matching "$query". Try a different keyword.'
-              : 'Be the first to share resources for this category and help your fellow students!',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, height: 1.6),
-          ),
-          const SizedBox(height: 32),
-          if (query.isNotEmpty || category != 'All' || ref.read(browsingScopeProvider).type != BrowsingScopeType.all)
-            Row(
+    return EmptyState(
+      title: category == 'All' ? 'No resources found' : 'No $category notes yet',
+      message: query.isNotEmpty
+          ? 'We couldn\'t find anything matching "$query". Try a different keyword.'
+          : 'Be the first to share resources for this category and help your fellow students!',
+      icon: Icons.search_off_rounded,
+      action: (query.isNotEmpty || category != 'All' || ref.read(browsingScopeProvider).type != BrowsingScopeType.all)
+          ? Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 TextButton.icon(
                   onPressed: _resetFilters,
-                  icon: Icon(Icons.refresh, color: theme.colorScheme.primary),
-                  label: Text('Clear Filters', style: TextStyle(color: theme.colorScheme.primary)),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Clear Filters'),
                 ),
                 const SizedBox(width: 12),
                 FilledButton.icon(
@@ -313,14 +298,10 @@ class _DiscoverTabState extends ConsumerState<DiscoverTab> {
                   },
                   icon: const Icon(Icons.public, size: 18),
                   label: const Text('Explore All'),
-                  style: FilledButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
                 ),
               ],
-            ),
-        ],
-      ),
+            )
+          : null,
     );
   }
 

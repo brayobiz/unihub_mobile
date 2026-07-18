@@ -23,6 +23,7 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:unihub_mobile/core/utils/app_logger.dart';
 import 'dart:ui';
 import 'services/app_lifecycle_service.dart';
+import 'core/widgets/app_error_boundary.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -32,6 +33,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 Future<void> main() async {
   try {
     WidgetsFlutterBinding.ensureInitialized();
+    
+    // Set up global error handler for UI errors
+    ErrorWidget.builder = buildGlobalErrorWidget;
     
     // RC-Investigate: Moving diagnostic initialization AFTER Firebase init.
     // Accessing FirebaseCrashlytics.instance before Firebase.initializeApp() 

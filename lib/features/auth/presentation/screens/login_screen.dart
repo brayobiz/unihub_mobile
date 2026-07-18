@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/error/error_handler.dart';
 import '../controllers/auth_controller.dart';
+import '../../../../services/connectivity_service.dart';
 import '../widgets/auth_button.dart';
 import '../widgets/auth_text_field.dart';
 import '../widgets/divider_text.dart';
@@ -50,9 +51,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final password = passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
-      );
+      _showErrorSnackBar('Please fill in all fields');
+      return;
+    }
+
+    // Check connectivity before attempting sign in
+    final connectivity = ref.read(connectivityServiceProvider);
+    if (connectivity == ConnectivityStatus.isDisconnected) {
+      _showErrorSnackBar('No internet connection. Please check your network and try again.');
       return;
     }
 
@@ -61,14 +67,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (mounted) {
       final state = ref.read(authControllerProvider);
       if (state.hasError) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppErrorHandler.mapError(state.error)),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showErrorSnackBar(AppErrorHandler.mapError(state.error));
       }
     }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: AppColors.error, // Use error color for errors
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -253,16 +271,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                   GoogleSignInButton(
                     onPressed: isLoading ? null : () async {
+                      final connectivity = ref.read(connectivityServiceProvider);
+                      if (connectivity == ConnectivityStatus.isDisconnected) {
+                        _showErrorSnackBar('No internet connection. Please check your network and try again.');
+                        return;
+                      }
+
                       await ref.read(authControllerProvider.notifier).signInWithGoogle();
                       if (mounted) {
                         final state = ref.read(authControllerProvider);
                         if (state.hasError) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(AppErrorHandler.mapError(state.error)),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
+                          _showErrorSnackBar(AppErrorHandler.mapError(state.error));
                         }
                       }
                     },

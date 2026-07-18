@@ -13,6 +13,8 @@ import '../../shared/providers.dart';
 import '../../../../widgets/skeleton_loader.dart';
 import '../../../../widgets/notification_badge.dart';
 import '../../../../widgets/app_drawer.dart';
+import '../../../../core/widgets/error_view.dart';
+import '../../../../core/widgets/empty_state.dart';
 
 class ConversationsListScreen extends ConsumerStatefulWidget {
   const ConversationsListScreen({super.key});
@@ -126,31 +128,25 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
                   return _buildEmptyState(context);
                 }
 
-                // Separate Support sessions from regular chats for better visibility
-                final supportSessions = filtered.where((c) => c.isSupport && c.supportStatus != 'closed' && c.supportStatus != 'resolved').toList();
-                final regularChats = filtered.where((c) => !c.isSupport || c.supportStatus == 'closed' || c.supportStatus == 'resolved').toList();
-
                 return RefreshIndicator(
                   onRefresh: () async {
                     ref.invalidate(conversationsProvider(user.uid));
                   },
-                  child: ListView(
-                    children: [
-                      if (supportSessions.isNotEmpty && _searchQuery.isEmpty) ...[
-                        _buildSectionHeader(context, 'Open Support Sessions', Icons.support_agent_rounded),
-                        ...supportSessions.map((conv) => _ConversationTile(
-                          conversation: conv,
-                          currentUserId: user.uid,
-                          isHighlight: true,
-                        )),
-                        const Divider(height: 1),
-                        _buildSectionHeader(context, 'Recent Messages', Icons.history_rounded),
-                      ],
-                      ...regularChats.map((conv) => _ConversationTile(
+                  child: ListView.builder(
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      final conv = filtered[index];
+                      // Highlight open support sessions within the normal list
+                      final bool isOpenSupport = conv.isSupport && 
+                                               conv.supportStatus != 'closed' && 
+                                               conv.supportStatus != 'resolved';
+                      
+                      return _ConversationTile(
                         conversation: conv,
                         currentUserId: user.uid,
-                      )),
-                    ],
+                        isHighlight: isOpenSupport,
+                      );
+                    },
                   ),
                 );
               },
@@ -158,7 +154,11 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
                 itemCount: 8,
                 itemBuilder: (context, index) => const _ConversationLoadingTile(),
               ),
-              error: (err, stack) => Center(child: Text('Error: $err')),
+              error: (err, stack) => ErrorView(
+                error: err,
+                onRetry: () => ref.invalidate(conversationsProvider(user.uid)),
+                isFullPage: false,
+              ),
             ),
           ),
         ],
@@ -251,32 +251,10 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
   }
 
   Widget _buildEmptyState(BuildContext context) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.chat_bubble_outline_rounded, size: 64, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.2)),
-          const SizedBox(height: 16),
-          Text(
-            'No conversations yet',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Messages from marketplace, housing,\nand support will appear here.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
+    return EmptyState(
+      title: 'No conversations yet',
+      message: 'Messages from marketplace, housing, and support will appear here.',
+      icon: Icons.chat_bubble_outline_rounded,
     );
   }
 }
@@ -338,7 +316,7 @@ class _ConversationTile extends ConsumerWidget {
         });
       },
       leading: CircleAvatar(
-        radius: isSupport ? 28 : 24, // Slightly reduced avatar for personal chats
+        radius: isSupport ? 24 : 20, // Reduced avatar size
         backgroundColor: isSupport ? theme.colorScheme.primary : theme.colorScheme.primary.withOpacity(0.1),
         backgroundImage: (photoUrl != null && !isSupport) ? CachedNetworkImageProvider(photoUrl) : null,
         onBackgroundImageError: photoUrl != null ? (exception, stackTrace) {
@@ -427,15 +405,42 @@ class _ConversationTile extends ConsumerWidget {
                       const SizedBox(width: 4),
                     ],
                     Expanded(
-                      child: Text(
-                        conversation.lastMessage ?? 'No messages yet',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: unreadCount > 0 ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant,
-                          fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: Builder(
+                        builder: (context) {
+                          // Check if other participant is typing
+                          String? typingUserId;
+                          for (final uid in conversation.participants) {
+                            if (uid != currentUserId && conversation.isParticipantTyping(uid)) {
+                              typingUserId = uid;
+                              break;
+                            }
+                          }
+                          
+                          if (typingUserId != null) {
+                            return Text(
+                              (typingUserId == 'ulify_admin') ? 'Ulify Assistant is typing...' : 'typing...',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                                fontStyle: FontStyle.italic,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            );
+                          }
+
+                          return Text(
+                            conversation.lastMessage ?? 'No messages yet',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: unreadCount > 0 ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant,
+                              fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          );
+                        }
                       ),
                     ),
                   ],
@@ -518,7 +523,7 @@ class _ConversationLoadingTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return ListTile(
-      leading: SkeletonLoader(width: 56, height: 56, borderRadius: 28, color: theme.colorScheme.surfaceVariant),
+      leading: SkeletonLoader(width: 40, height: 40, borderRadius: 20, color: theme.colorScheme.surfaceVariant),
       title: SkeletonLoader(width: 120, height: 16, color: theme.colorScheme.surfaceVariant),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 8.0),

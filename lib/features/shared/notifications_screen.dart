@@ -13,6 +13,8 @@ import 'package:unihub_mobile/features/housing/shared/providers.dart';
 import 'package:unihub_mobile/features/notes/shared/providers.dart';
 import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
 import 'package:unihub_mobile/features/chat/shared/providers.dart';
+import '../../core/widgets/error_view.dart';
+import '../../core/widgets/empty_state.dart';
 import 'feed_repository.dart';
 
 class NotificationsScreen extends ConsumerWidget {
@@ -61,39 +63,31 @@ class NotificationsScreen extends ConsumerWidget {
       body: notificationsAsync.when(
         data: (notifications) => notifications.isEmpty
             ? _buildEmptyState(context)
-            : ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: notifications.length,
-                itemBuilder: (context, index) => _NotificationTile(
-                  notification: notifications[index],
-                  userId: user?.uid ?? '',
+            : RefreshIndicator(
+                onRefresh: () async => ref.invalidate(notificationsProvider(module)),
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: notifications.length,
+                  itemBuilder: (context, index) => _NotificationTile(
+                    notification: notifications[index],
+                    userId: user?.uid ?? '',
+                  ),
                 ),
               ),
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error loading notifications: $err')),
+        error: (err, stack) => ErrorView(
+          error: err,
+          onRetry: () => ref.invalidate(notificationsProvider(module)),
+        ),
       ),
     );
   }
 
   Widget _buildEmptyState(BuildContext context) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.notifications_off_outlined, size: 64, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.2)),
-          const SizedBox(height: 16),
-          Text(
-            'All caught up!',
-            style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'No new notifications for now.',
-            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-        ],
-      ),
+    return const EmptyState(
+      title: 'All caught up!',
+      message: 'No new notifications for now.',
+      icon: Icons.notifications_off_outlined,
     );
   }
 }

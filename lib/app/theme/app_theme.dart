@@ -38,6 +38,7 @@ class AppTheme {
       cardTheme: _cardThemeLight,
       elevatedButtonTheme: _elevatedButtonTheme,
       inputDecorationTheme: _inputDecorationTheme,
+      snackBarTheme: _snackBarTheme,
       iconTheme: _iconThemeLight,
       dividerTheme: const DividerThemeData(color: AppColors.grey200),
     );
@@ -64,9 +65,18 @@ class AppTheme {
       cardTheme: _cardThemeDark,
       elevatedButtonTheme: _elevatedButtonTheme,
       inputDecorationTheme: _inputDecorationThemeDark,
+      snackBarTheme: _snackBarTheme,
       dividerTheme: DividerThemeData(color: AppColors.grey.withOpacity(0.2)),
     );
   }
+
+  static SnackBarThemeData get _snackBarTheme => SnackBarThemeData(
+    backgroundColor: AppColors.primary,
+    contentTextStyle: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+    behavior: SnackBarBehavior.floating,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    elevation: 4,
+  );
 
   static AppBarTheme get _appBarThemeLight => AppBarTheme(
     backgroundColor: AppColors.white,

@@ -26,6 +26,8 @@ import 'package:unihub_mobile/core/constants/campus_constants.dart';
 
 import '../controllers/paginated_housing_controller.dart';
 import '../../../../core/models/paginated_state.dart';
+import '../../../../core/widgets/error_view.dart';
+import '../../../../core/widgets/empty_state.dart';
 
 class HousingScreen extends ConsumerStatefulWidget {
   const HousingScreen({super.key});
@@ -893,32 +895,10 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
     if (paginatedState.hasError && paginatedState.items.isEmpty) {
       return SliverFillRemaining(
         hasScrollBody: false,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(40),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.wifi_off_rounded, size: 64, color: AppColors.error),
-                const SizedBox(height: 24),
-                Text(
-                  'Connection lost',
-                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'We couldn\'t load the properties. Please check your network and try again.',
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-                FilledButton.icon(
-                  onPressed: () => ref.read(paginatedHousingProvider(filter).notifier).retry(),
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Try Again'),
-                ),
-              ],
-            ),
-          ),
+        child: ErrorView(
+          error: paginatedState.error,
+          onRetry: () => ref.read(paginatedHousingProvider(filter).notifier).retry(),
+          isFullPage: false,
         ),
       );
     }
@@ -1026,70 +1006,49 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
   Widget _buildEmptyState(String? locationFilter) {
     final theme = Theme.of(context);
 
-    return Center(
-      child: Column(
+    return EmptyState(
+      title: 'No listings found',
+      message: 'Try adjusting your search or filters',
+      icon: Icons.house_siding_rounded,
+      action: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox(height: 60),
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.house_siding_rounded, size: 64, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+          OutlinedButton.icon(
+            onPressed: () async {
+              final user = ref.read(appUserProvider).valueOrNull;
+              if (user == null) return;
+              
+              final search = HousingSavedSearch(
+                id: const Uuid().v4(),
+                userId: user.uid,
+                name: 'Alert: ${locationFilter ?? "Search Result"}',
+                location: locationFilter,
+                type: ref.read(housingTypeFilterProvider),
+                maxRent: ref.read(housingMaxRentFilterProvider),
+                genderRestriction: ref.read(housingGenderFilterProvider),
+                createdAt: DateTime.now(),
+              );
+              await ref.read(housingRepositoryProvider).saveHousingSearch(search);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Search alert saved! We will notify you of new matches.')),
+                );
+              }
+            },
+            icon: const Icon(Icons.notifications_active_outlined, size: 18),
+            label: const Text('Notify Me'),
           ),
-          const SizedBox(height: 24),
-          Text('No listings found', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: theme.colorScheme.onSurface)),
-          const SizedBox(height: 8),
-          Text('Try adjusting your search or filters', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              OutlinedButton.icon(
-                onPressed: () async {
-                  final user = ref.read(appUserProvider).valueOrNull;
-                  if (user == null) return;
-                  
-                  final search = HousingSavedSearch(
-                    id: const Uuid().v4(),
-                    userId: user.uid,
-                    name: 'Alert: ${locationFilter ?? "Search Result"}',
-                    location: locationFilter,
-                    type: ref.read(housingTypeFilterProvider),
-                    maxRent: ref.read(housingMaxRentFilterProvider),
-                    genderRestriction: ref.read(housingGenderFilterProvider),
-                    createdAt: DateTime.now(),
-                  );
-                  await ref.read(housingRepositoryProvider).saveHousingSearch(search);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Search alert saved! We will notify you of new matches.')),
-                    );
-                  }
-                },
-                icon: const Icon(Icons.notifications_active_outlined, size: 18),
-                style: OutlinedButton.styleFrom(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                label: const Text('Notify Me'),
-              ),
-              const SizedBox(width: 12),
-              FilledButton(
-                onPressed: () {
-                  _searchController.clear();
-                  ref.read(housingLocationFilterProvider.notifier).state = null;
-                  ref.read(housingTypeFilterProvider.notifier).state = null;
-                  ref.read(housingGenderFilterProvider.notifier).state = null;
-                  ref.read(browsingScopeProvider.notifier).reset();
-                  setState(() {});
-                },
-                style: FilledButton.styleFrom(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Explore All'),
-              ),
-            ],
+          const SizedBox(width: 12),
+          FilledButton(
+            onPressed: () {
+              _searchController.clear();
+              ref.read(housingLocationFilterProvider.notifier).state = null;
+              ref.read(housingTypeFilterProvider.notifier).state = null;
+              ref.read(housingGenderFilterProvider.notifier).state = null;
+              ref.read(browsingScopeProvider.notifier).reset();
+              setState(() {});
+            },
+            child: const Text('Explore All'),
           ),
         ],
       ),

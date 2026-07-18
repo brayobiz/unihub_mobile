@@ -10,6 +10,7 @@ import '../../domain/models/listing.dart';
 import 'package:unihub_mobile/features/marketplace/shared/providers.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import 'package:unihub_mobile/features/shared/storage_repository.dart';
+import '../../../../core/error/error_handler.dart';
 
 class AddListingState {
   final String id;
@@ -475,8 +476,8 @@ class AddListingController extends StateNotifier<AddListingState> {
 
       state = state.copyWith(isLoading: false);
       return true;
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+    } catch (e, st) {
+      state = state.copyWith(isLoading: false, error: AppErrorHandler.mapError(e, st));
       return false;
     }
   }

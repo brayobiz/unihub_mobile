@@ -14,6 +14,7 @@ import 'package:unihub_mobile/app/theme/theme_provider.dart';
 import 'package:unihub_mobile/services/data_export_service.dart';
 import '../admin/shared/providers.dart';
 import '../admin/domain/models/system_settings.dart';
+import '../../core/widgets/error_view.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -62,7 +63,11 @@ class SettingsScreen extends ConsumerWidget {
           body: userAsync.when(
             data: (user) => _buildBody(context, ref, user, themeMode, settingsAsync),
             loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
-            error: (err, _) => Center(child: Text('Error: $err')),
+            error: (err, _) => ErrorView(
+              error: err,
+              onRetry: () => ref.invalidate(appUserProvider),
+              isFullPage: false,
+            ),
           ),
         ),
         if (authState.isLoading)

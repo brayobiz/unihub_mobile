@@ -10,6 +10,7 @@ import 'package:unihub_mobile/features/auth/presentation/controllers/auth_contro
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import 'package:unihub_mobile/features/events/shared/providers.dart';
 import 'package:unihub_mobile/features/events/domain/models/organizer.dart';
+import '../../core/widgets/error_view.dart';
 
 import '../../../../core/constants/campus_constants.dart';
 
@@ -63,7 +64,11 @@ class ProfileScreen extends ConsumerWidget {
               return _ProfileContent(user: user);
             },
             loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
-            error: (err, stack) => Center(child: Text('Live Sync Error: $err')),
+            error: (err, stack) => ErrorView(
+              error: err,
+              onRetry: () => ref.invalidate(appUserProvider),
+              isFullPage: false,
+            ),
           ),
         ),
         if (authState.isLoading)
