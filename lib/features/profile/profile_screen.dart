@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -42,15 +43,15 @@ class ProfileScreen extends ConsumerWidget {
           backgroundColor: theme.colorScheme.surface,
           drawer: const AppDrawer(),
           appBar: AppBar(
-            backgroundColor: const Color(0xFF0F172A), // Matches start of gradient
+            backgroundColor: theme.colorScheme.surface,
             elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+              icon: Icon(Icons.arrow_back_rounded, color: theme.colorScheme.onSurface),
               onPressed: () => context.pop(),
             ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.edit_rounded, color: Colors.white),
+                icon: Icon(Icons.edit_rounded, color: theme.colorScheme.onSurface),
                 onPressed: () => context.push('/edit-profile'),
               ),
               const SizedBox(width: 8),
@@ -126,7 +127,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          const Color(0xFF0F172A),
+                          theme.colorScheme.surface,
                           theme.colorScheme.primary,
                           const Color(0xFF19D3C5),
                         ],
@@ -414,7 +415,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: isBusiness ? AppColors.businessGold : Colors.white, 
+          color: isBusiness ? AppColors.businessGold : theme.colorScheme.surface, 
           width: 4
         ),
         boxShadow: [
@@ -446,6 +447,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
   }
 
   Widget _buildEditButton(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.15),
@@ -453,7 +455,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
         border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
       ),
       child: IconButton(
-        icon: const Icon(Icons.edit_rounded, color: Colors.white, size: 20),
+        icon: Icon(Icons.edit_rounded, color: theme.colorScheme.onSurface, size: 20),
         onPressed: () => context.push('/edit-profile'),
         visualDensity: VisualDensity.compact,
       ),
@@ -474,7 +476,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
             Flexible(
               child: Text(
                 isBusiness ? (user.businessName ?? user.fullName) : user.fullName,
-                style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.8),
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface, letterSpacing: -0.8),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -482,17 +484,21 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
             if (user.isVerified || isBusiness)
               Padding(
                 padding: const EdgeInsets.only(left: 6),
-                child: Icon(
-                  Icons.verified_rounded, 
-                  color: isBusiness ? AppColors.businessGold : theme.colorScheme.primary,
-                  size: 22
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(color: theme.colorScheme.surface, shape: BoxShape.circle),
+                  child: Icon(
+                    Icons.verified_rounded, 
+                    color: isBusiness ? AppColors.businessGold : theme.colorScheme.primary,
+                    size: 18
+                  ),
                 ),
               ),
           ],
         ),
         Text(
           isBusiness ? '${user.businessCategory ?? 'Business'} • @${user.username}' : '@${user.username ?? 'ulify_user'}',
-          style: TextStyle(fontSize: 15, color: Colors.white.withValues(alpha: 0.8), fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: 15, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8), fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 12),
         SingleChildScrollView(
@@ -539,11 +545,11 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
       decoration: BoxDecoration(
         color: isVerified 
             ? (verifiedColor ?? AppColors.success).withValues(alpha: 0.1)
-            : theme.colorScheme.surfaceVariant.withValues(alpha: 0.5),
+            : theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(100),
         border: isVerified 
             ? Border.all(color: (verifiedColor ?? AppColors.success).withValues(alpha: 0.2))
-            : null,
+            : Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -558,7 +564,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
             label, 
             style: TextStyle(
               fontSize: 12, 
-              color: isVerified ? (verifiedColor ?? AppColors.success) : theme.colorScheme.onSurface, 
+              color: isVerified ? (verifiedColor ?? AppColors.success) : theme.colorScheme.onSurface,
               fontWeight: FontWeight.w700
             )
           ),

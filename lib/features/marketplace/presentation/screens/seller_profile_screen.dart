@@ -42,10 +42,10 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.colorScheme.onSurface, size: 18),
           onPressed: () => context.pop(),
         ),
         actions: [
@@ -57,7 +57,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
           const SizedBox(width: 8),
           sellerAsync.when(
             data: (seller) => seller != null ? IconButton(
-              icon: const Icon(Icons.share_outlined, color: Colors.white, size: 20),
+              icon: Icon(Icons.share_outlined, color: theme.colorScheme.onSurface, size: 20),
               onPressed: () => _showShareMenu(context, seller),
             ) : const SizedBox.shrink(),
             loading: () => const SizedBox.shrink(),
@@ -89,7 +89,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
-                                    const Color(0xFF0F172A),
+                                    theme.colorScheme.surface,
                                     theme.colorScheme.primary,
                                     const Color(0xFF19D3C5),
                                   ],
@@ -171,7 +171,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: isBusiness ? AppColors.businessGold : Colors.white, 
+          color: isBusiness ? AppColors.businessGold : theme.colorScheme.surface, 
           width: 4
         ),
         boxShadow: [
@@ -203,6 +203,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
   }
 
   Widget _buildBlockButton(AppUser seller) {
+    final theme = Theme.of(context);
     final currentUser = ref.watch(appUserProvider).valueOrNull;
     if (currentUser == null || currentUser.uid == seller.uid) return const SizedBox.shrink();
     
@@ -212,12 +213,12 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+        border: Border.all(color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
       ),
       child: IconButton(
         icon: Icon(
           isBlocked ? Icons.check_circle_outline_rounded : Icons.block_flipped, 
-          color: isBlocked ? Colors.greenAccent : Colors.white, 
+          color: isBlocked ? Colors.greenAccent : theme.colorScheme.onSurface, 
           size: 20
         ),
         onPressed: () {
@@ -268,10 +269,10 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
             Flexible(
               child: Text(
                 isBusiness ? (seller.businessName ?? seller.fullName) : seller.fullName,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w900,
-                  color: Colors.white,
+                  color: theme.colorScheme.onSurface,
                   letterSpacing: -0.8,
                 ),
                 maxLines: 1,
@@ -281,10 +282,14 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
             if (seller.isVerified || isBusiness)
               Padding(
                 padding: const EdgeInsets.only(left: 6),
-                child: Icon(
-                  Icons.verified_rounded, 
-                  color: isBusiness ? AppColors.businessGold : theme.colorScheme.primary,
-                  size: 22
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(color: theme.colorScheme.surface, shape: BoxShape.circle),
+                  child: Icon(
+                    Icons.verified_rounded, 
+                    color: isBusiness ? AppColors.businessGold : theme.colorScheme.primary,
+                    size: 18
+                  ),
                 ),
               ),
           ],
@@ -295,7 +300,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
             isBusiness ? '${seller.businessCategory ?? 'Business'} • @${seller.username}' : '@${seller.username ?? 'ulify_seller'}',
             style: TextStyle(
               fontSize: 15,
-              color: Colors.white.withOpacity(0.8),
+              color: theme.colorScheme.onSurfaceVariant.withOpacity(0.8),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -386,11 +391,11 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
       decoration: BoxDecoration(
         color: isVerified 
             ? AppColors.success.withOpacity(0.1)
-            : theme.colorScheme.surfaceVariant.withOpacity(0.5),
+            : theme.colorScheme.surfaceVariant.withOpacity(0.3),
         borderRadius: BorderRadius.circular(100),
         border: isVerified 
             ? Border.all(color: AppColors.success.withOpacity(0.2))
-            : null,
+            : Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -405,7 +410,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
             label,
             style: TextStyle(
               fontSize: 12, 
-              color: isVerified ? AppColors.success : theme.colorScheme.onSurface, 
+              color: isVerified ? AppColors.success : theme.colorScheme.onSurface,
               fontWeight: FontWeight.w700
             ),
           ),
