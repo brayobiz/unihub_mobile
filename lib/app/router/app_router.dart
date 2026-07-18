@@ -845,13 +845,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/organizers/:id/events/create',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          // We need campus ID, but for MVP we can grab it from user or organizer
-          // Ideally passed or fetched.
-          // Let's assume we can fetch it or it's provided in extra
           final extra = state.extra as Map<String, dynamic>?;
           return CreateEventScreen(
             organizerId: id,
-            campusId: extra?['campusId'] ?? 'uon_main', // Fallback for routing
+            campusId: extra?['campusId'] ?? 'uon_main',
+            event: extra?['duplicateEvent'] as Event?,
+            isDuplicating: extra?['duplicateEvent'] != null,
           );
         },
       ),

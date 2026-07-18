@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unihub_mobile/core/location/models/location_data.dart';
+import 'package:unihub_mobile/core/utils/app_logger.dart';
 import '../../domain/models/event.dart';
 import '../../shared/providers.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
@@ -104,10 +105,10 @@ class CreateEventState {
 class CreateEventController extends StateNotifier<CreateEventState> {
   final Ref _ref;
 
-  CreateEventController(this._ref, {Event? initialEvent, required String organizerId, required String campusId})
-      : super(_createInitialState(initialEvent, organizerId, campusId));
+  CreateEventController(this._ref, {Event? initialEvent, required String organizerId, required String campusId, bool isDuplicating = false})
+      : super(_createInitialState(initialEvent, organizerId, campusId, isDuplicating));
 
-  static CreateEventState _createInitialState(Event? event, String organizerId, String campusId) {
+  static CreateEventState _createInitialState(Event? event, String organizerId, String campusId, bool isDuplicating) {
     if (event == null) {
       return CreateEventState(
         id: const Uuid().v4(),
@@ -115,6 +116,28 @@ class CreateEventController extends StateNotifier<CreateEventState> {
         campusId: campusId,
       );
     }
+
+    if (isDuplicating) {
+      return CreateEventState(
+        id: const Uuid().v4(), // New ID for duplication
+        organizerId: organizerId,
+        campusId: campusId,
+        title: '${event.title} (Copy)',
+        description: event.description,
+        categoryId: event.categoryId,
+        existingImageUrls: event.imageUrls,
+        venue: event.venue,
+        venueRoom: event.venueRoom,
+        startAt: event.startAt.isAfter(DateTime.now()) ? event.startAt : null, // Clear if past
+        endAt: event.endAt.isAfter(DateTime.now()) ? event.endAt : null, // Clear if past
+        visibility: event.visibility,
+        isRegistrationRequired: event.isRegistrationRequired,
+        registrationUrl: event.registrationUrl,
+        maxCapacity: event.maxCapacity,
+        isEditing: false, // It's a new event
+      );
+    }
+
     return CreateEventState(
       id: event.id,
       organizerId: event.organizerId,
@@ -244,7 +267,7 @@ class CreateEventController extends StateNotifier<CreateEventState> {
       // If some images failed, warn user
       if (failedImages.isNotEmpty) {
         // Log warning but continue with successful uploads
-        print('⚠️ WARNING: ${failedImages.length} images failed to upload, but ${uploadedUrls.length} succeeded.');
+        AppLogger.warning('${failedImages.length} images failed to upload, but ${uploadedUrls.length} succeeded.', 'CREATE_EVENT');
       }
 
       final imageUrls = [...state.existingImageUrls, ...uploadedUrls];
@@ -299,6 +322,6 @@ class CreateEventController extends StateNotifier<CreateEventState> {
 }
 
 final createEventControllerProvider =
-    StateNotifierProvider.family<CreateEventController, CreateEventState, ({Event? event, String organizerId, String campusId})>((ref, args) {
-  return CreateEventController(ref, initialEvent: args.event, organizerId: args.organizerId, campusId: args.campusId);
+    StateNotifierProvider.family<CreateEventController, CreateEventState, ({Event? event, String organizerId, String campusId, bool isDuplicating})>((ref, args) {
+  return CreateEventController(ref, initialEvent: args.event, organizerId: args.organizerId, campusId: args.campusId, isDuplicating: args.isDuplicating);
 });

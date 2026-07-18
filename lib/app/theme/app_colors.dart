@@ -6,7 +6,7 @@ class AppColors {
 
   // Primary Palette
   static const Color primary = Color(0xFF3B82F6);    // Blue
-  static const Color primaryGradientStart = Color(0xFF283593); // Indigo 800
+  static const Color primaryGradientStart = Color(0xFF0A0E14); // Matches Brand Logo Background
   static const Color primaryGradientEnd = Color(0xFF3F51B5);   // Indigo 500
   static const Color secondary = Color(0xFF6366F1);  // Indigo
   static const Color secondaryDark = Color(0xFF312E81); // Indigo 900

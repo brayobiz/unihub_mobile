@@ -19,12 +19,14 @@ class CreateEventScreen extends ConsumerStatefulWidget {
   final Event? event;
   final String organizerId;
   final String campusId;
+  final bool isDuplicating;
 
   const CreateEventScreen({
     super.key,
     this.event,
     required this.organizerId,
     required this.campusId,
+    this.isDuplicating = false,
   });
 
   @override
@@ -49,7 +51,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final args = (event: widget.event, organizerId: widget.organizerId, campusId: widget.campusId);
+    final args = (event: widget.event, organizerId: widget.organizerId, campusId: widget.campusId, isDuplicating: widget.isDuplicating);
     final state = ref.watch(createEventControllerProvider(args));
     final controller = ref.read(createEventControllerProvider(args).notifier);
 

@@ -22,8 +22,8 @@ class AdConfig {
   static const double bannerVerticalPadding = 24.0;
 
   /// Whether to show ad-related logs in the console.
-  /// Set to false for cleaner logs, but true is recommended for development.
-  static const bool enableLogging = true;
+  /// Set to false for cleaner logs.
+  static const bool enableLogging = false;
 
   /// Future: Frequency for interstitial ads (e.g., show after 5 screen transitions).
   static const int interstitialFrequency = 5;

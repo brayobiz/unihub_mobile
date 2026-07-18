@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/core/constants/campus_constants.dart';
+import 'package:unihub_mobile/core/utils/app_logger.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import '../../shared/providers.dart';
 import '../../domain/models/event.dart';
@@ -80,11 +81,27 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               children: [
                 const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 48),
                 const SizedBox(height: 16),
-                Text('Something went wrong: $err', textAlign: TextAlign.center),
-                const SizedBox(height: 16),
-                ElevatedButton(
+                const Text(
+                  'Unable to load event details',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  err.toString().contains('Permission denied') 
+                    ? 'You do not have permission to view this event.'
+                    : 'Please check your connection and try again.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
                   onPressed: () => ref.invalidate(eventProvider(widget.eventId)),
-                  child: const Text('Retry'),
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Retry'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
               ],
             ),
@@ -377,19 +394,34 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             organizerAsync.maybeWhen(
               data: (org) {
                 if (org != null && (org.verificationStatus == OrganizerVerificationStatus.verified || org.verificationStatus == OrganizerVerificationStatus.official)) {
-                  return Row(
-                    children: [
-                      Icon(Icons.check_circle, color: theme.brightness == Brightness.light ? Colors.green[600] : AppColors.success, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Verified',
-                        style: TextStyle(
-                          color: theme.brightness == Brightness.light ? Colors.green[600] : AppColors.success, 
-                          fontWeight: FontWeight.bold, 
-                          fontSize: 12,
-                        ),
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: (theme.brightness == Brightness.light ? Colors.green[600] : AppColors.success)!.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: (theme.brightness == Brightness.light ? Colors.green[600] : AppColors.success)!.withValues(alpha: 0.2),
                       ),
-                    ],
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.verified_rounded, 
+                          color: theme.brightness == Brightness.light ? Colors.green[600] : AppColors.success, 
+                          size: 14,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Verified',
+                          style: TextStyle(
+                            color: theme.brightness == Brightness.light ? Colors.green[600] : AppColors.success, 
+                            fontWeight: FontWeight.bold, 
+                            fontSize: 11,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                 }
                 return const SizedBox.shrink();
@@ -799,45 +831,85 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: theme.colorScheme.surface,
-        title: Text('Report Event', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: reasons.map((reason) => ListTile(
-            title: Text(reason, style: TextStyle(color: theme.colorScheme.onSurface)),
-            trailing: const Icon(Icons.chevron_right_rounded, size: 20),
-            onTap: () async {
-              final user = ref.read(appUserProvider).valueOrNull;
-              if (user != null) {
-                try {
-                  await ref.read(eventRepositoryProvider).reportEvent(
-                    eventId: event.id,
-                    reporterId: user.uid,
-                    reason: reason,
-                  );
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Report submitted. Thank you for keeping Ulify safe!'),
-                        backgroundColor: AppColors.success,
+      builder: (context) {
+        String? selectedReason;
+        final controller = TextEditingController();
+
+        return StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            backgroundColor: theme.colorScheme.surface,
+            title: Text('Report Event', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ...reasons.map((reason) => RadioListTile<String>(
+                    title: Text(reason, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14)),
+                    value: reason,
+                    groupValue: selectedReason,
+                    onChanged: (val) => setState(() => selectedReason = val),
+                    contentPadding: EdgeInsets.zero,
+                    activeColor: theme.colorScheme.primary,
+                  )),
+                  if (selectedReason == 'Other') ...[
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: controller,
+                      decoration: InputDecoration(
+                        hintText: 'Please specify...',
+                        hintStyle: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                  }
-                }
-              }
-            },
-          )).toList(),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        ],
-      ),
+                      maxLines: 3,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: selectedReason == null || (selectedReason == 'Other' && controller.text.trim().isEmpty)
+                  ? null
+                  : () async {
+                      final user = ref.read(appUserProvider).valueOrNull;
+                      if (user != null) {
+                        try {
+                          final finalReason = selectedReason == 'Other' ? 'Other: ${controller.text.trim()}' : selectedReason!;
+                          await ref.read(eventRepositoryProvider).reportEvent(
+                            eventId: event.id,
+                            reporterId: user.uid,
+                            reason: finalReason,
+                          );
+                          if (context.mounted) {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Report submitted. Thank you for keeping Ulify safe!'),
+                                backgroundColor: AppColors.success,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                            AppLogger.info('Event Reported: ${event.id} for $finalReason', 'EVENT_DETAIL');
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Failed to submit report. Please try again later.')),
+                            );
+                            AppLogger.error('Report Event Failed', e, null, 'EVENT_DETAIL');
+                          }
+                        }
+                      }
+                    },
+                child: const Text('Submit Report'),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -883,8 +955,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               title: const Text('Duplicate Event'),
               onTap: () {
                 Navigator.pop(context);
-                // Implementation for duplicating an event could go here
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Feature coming soon: Duplicate Event')));
+                context.push(
+                  '/organizers/${event.organizerId}/events/create',
+                  extra: {'duplicateEvent': event, 'campusId': event.campusId},
+                );
               },
             ),
             ListTile(
