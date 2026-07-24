@@ -49,6 +49,7 @@ ios/Runner/GoogleService-Info.plist
 # Local configuration
 android/local.properties
 android/key.properties
+env_config.json
 android/app/*.jks
 android/app/*.keystore
 
