@@ -114,5 +114,8 @@ class PaginatedListingsController extends StateNotifier<PaginatedState<Listing>>
 }
 
 final paginatedListingsProvider = StateNotifierProvider.family<PaginatedListingsController, PaginatedState<Listing>, ListingFilter>((ref, filter) {
+  // Watch the repository to ensure the controller is recreated and data is re-fetched
+  // whenever the campus filter (which influences the repository) changes.
+  ref.watch(marketplaceRepositoryProvider);
   return PaginatedListingsController(ref, filter);
 });

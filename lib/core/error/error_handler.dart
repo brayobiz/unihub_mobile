@@ -48,10 +48,18 @@ class AppErrorHandler {
       return 'Network error: Please check your internet connection and try again.';
     }
 
+    if (errorString.contains('cloudinary') || errorString.contains('upload failed')) {
+      return 'Image upload failed. Please check your internet connection or try a different photo.';
+    }
+
     if (errorString.contains('permission denied') || 
         errorString.contains('permission-denied') ||
         errorString.contains('insufficient permissions')) {
       return 'Access Denied: You don\'t have the required permissions for this action.';
+    }
+
+    if (errorString.contains('null') && errorString.contains('firestore')) {
+      return 'Connection lost. Please pull down to refresh the page.';
     }
 
     return 'Something went wrong. Please try again.';

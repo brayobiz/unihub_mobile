@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:unihub_mobile/features/shared/notification_repository.dart';
 import 'package:unihub_mobile/features/navigation/navigation_providers.dart';
 import '../../services/notification_service.dart';
@@ -30,7 +31,6 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(notificationServiceProvider).requestPermission();
-      // Presence init is now handled globally in UniHubApp
     });
   }
 
@@ -45,18 +45,21 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     final currentIndex = ref.watch(mainNavigationIndexProvider);
-    final user = ref.watch(authStateProvider).valueOrNull;
+    
+    // Optimization: watch specific auth properties to prevent unnecessary rebuilds
+    final authState = ref.watch(authStateProvider);
+    final user = authState.valueOrNull;
+    final userId = user?.uid;
+    final isEmailVerified = user?.emailVerified ?? true;
 
     // GLOBAL DELIVERY TRACKER:
-    // Marks incoming messages as 'delivered' (2 grey checks)
-    // as long as the user has the app open anywhere.
-    if (user != null) {
-      ref.listen(conversationsProvider(user.uid), (previous, next) {
+    if (userId != null) {
+      ref.listen(conversationsProvider(userId), (previous, next) {
         if (next.hasValue) {
           for (final conv in next.value!) {
-            if (conv.lastMessageSenderId != user.uid &&
+            if (conv.lastMessageSenderId != userId &&
                 conv.lastMessageStatus == MessageStatus.sent) {
-              ref.read(chatRepositoryProvider).markAsDelivered(conv.id, user.uid);
+              ref.read(chatRepositoryProvider).markAsDelivered(conv.id, userId);
             }
           }
         }
@@ -66,18 +69,26 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
     return Stack(
       children: [
         Scaffold(
-          drawer: AppDrawer(),
-          body: IndexedStack(
-            index: currentIndex,
-            children: pages,
+          drawer: const AppDrawer(),
+          body: Column(
+            children: [
+              if (user != null && !isEmailVerified)
+                _buildVerificationBanner(context),
+              Expanded(
+                child: IndexedStack(
+                  index: currentIndex,
+                  children: pages,
+                ),
+              ),
+            ],
           ),
           bottomNavigationBar: Consumer(
             builder: (context, ref, child) {
-              final userId = ref.watch(authStateProvider).valueOrNull?.uid ?? '';
+              final currentUserId = ref.watch(authStateProvider).valueOrNull?.uid ?? '';
               final unreadCount = ref.watch(unreadNotificationsCountProvider(null)).valueOrNull ?? 0;
               final marketplaceUnreadCount = ref.watch(unreadNotificationsCountProvider('marketplace')).valueOrNull ?? 0;
               final housingUnreadCount = ref.watch(unreadNotificationsCountProvider('housing')).valueOrNull ?? 0;
-              final chatUnreadCount = ref.watch(totalUnreadChatCountProvider(userId)).valueOrNull ?? 0;
+              final chatUnreadCount = ref.watch(totalUnreadChatCountProvider(currentUserId)).valueOrNull ?? 0;
               final notesUnreadCount = ref.watch(unreadNotificationsCountProvider('notes')).valueOrNull ?? 0;
 
               return Semantics(
@@ -172,8 +183,8 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
         ),
         Consumer(
           builder: (context, ref, child) {
-            final authState = ref.watch(authControllerProvider);
-            if (authState.isLoading) {
+            final authControllerState = ref.watch(authControllerProvider);
+            if (authControllerState.isLoading) {
               return Container(
                 color: Colors.black45,
                 child: const Center(
@@ -185,6 +196,44 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildVerificationBanner(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.primaryContainer,
+      child: InkWell(
+        onTap: () => context.push('/verify-email'),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: SafeArea(
+            bottom: false,
+            child: Row(
+              children: [
+                Icon(Icons.mark_email_unread_rounded, size: 20, color: theme.colorScheme.primary),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Email Not Verified',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      Text(
+                        'Verify to enable posting and chatting.',
+                        style: TextStyle(fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: theme.colorScheme.primary),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

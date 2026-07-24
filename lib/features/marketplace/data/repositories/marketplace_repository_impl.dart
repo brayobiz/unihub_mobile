@@ -264,49 +264,64 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
     );
   }
 
+  double _calculateListingScore(Listing l) {
+    double score = 0;
+
+    // 1. Premium Weights (Monetization)
+    if (l.isSponsored) score += 150.0;
+    if (l.isFeatured) score += 100.0;
+    
+    // Boost Handling (2 points per hour remaining in 24h window)
+    if (l.lastBoostedAt != null) {
+      final hoursSinceBoost = DateTime.now().difference(l.lastBoostedAt!).inHours;
+      if (hoursSinceBoost < 24) {
+        score += (24 - hoursSinceBoost) * 2.0;
+      }
+    }
+
+    // 2. Engagement Weights (Social Proof)
+    score += (l.viewsCount * 1.0);
+    score += (l.savesCount * 5.0);
+    
+    // Stability bonus for trust
+    if (l.sellerTrustScore >= 90.0) {
+      score += 10.0;
+    }
+
+    // 3. Freshness Decay
+    final ageHours = DateTime.now().difference(l.createdAt).inHours;
+    if (ageHours < 48) {
+      score += 40.0; // Early bird bonus
+    }
+    
+    // Penalty: -2 points per day
+    final ageDays = ageHours / 24;
+    score -= (ageDays * 2.0);
+
+    return score;
+  }
+
   @override
   Stream<List<Listing>> watchTrendingListings({int limit = 10}) {
-    return _firestore.collection('listings')
-        .where('status', isEqualTo: ListingStatus.active.name)
-        .orderBy('viewsCount', descending: true)
-        .limit(limit * 10)
+    Query query = _firestore.collection('listings')
+        .where('status', isEqualTo: ListingStatus.active.name);
+
+    // CAMPUS SYNC: Ensure we filter by campus at the DB level for trending items
+    if (_browsingCampus != null && _browsingCampus.isNotEmpty) {
+      query = query.where('sellerUniversity', isEqualTo: _browsingCampus);
+    }
+
+    return query
+        .orderBy('viewsCount', descending: true) // Primary filter
+        .limit(limit * 5) // Get a healthy candidate set for weighted sorting
         .snapshots()
         .map((snapshot) {
           var items = snapshot.docs
               .map((doc) => Listing.fromJson(doc.data() as Map<String, dynamic>))
               .toList();
 
-          if (_browsingCampus != null && _browsingCampus.isNotEmpty) {
-            items = items.where((l) => l.sellerUniversity == _browsingCampus).toList();
-          }
-
-          items.sort((a, b) {
-            double aScore = a.viewsCount.toDouble();
-            aScore += a.savesCount * 2.0;
-            if (a.isFeatured) aScore += 100.0;
-            if (a.isSponsored) aScore += 150.0;
-            if (a.lastBoostedAt != null) {
-              final hoursSinceBoost = DateTime.now().difference(a.lastBoostedAt!).inHours;
-              if (hoursSinceBoost < 24) aScore += (24 - hoursSinceBoost) * 2.0;
-            }
-            
-            final aAgeDays = DateTime.now().difference(a.createdAt).inDays;
-            if (aAgeDays <= 3) aScore += (3 - aAgeDays) * 10.0;
-
-            double bScore = b.viewsCount.toDouble();
-            bScore += b.savesCount * 2.0;
-            if (b.isFeatured) bScore += 100.0;
-            if (b.isSponsored) bScore += 150.0;
-            if (b.lastBoostedAt != null) {
-              final hoursSinceBoost = DateTime.now().difference(b.lastBoostedAt!).inHours;
-              if (hoursSinceBoost < 24) bScore += (24 - hoursSinceBoost) * 2.0;
-            }
-            
-            final bAgeDays = DateTime.now().difference(b.createdAt).inDays;
-            if (bAgeDays <= 3) bScore += (3 - bAgeDays) * 10.0;
-
-            return bScore.compareTo(aScore);
-          });
+          // Sort by the Weighted Multi-Factor Algorithm (Premium + Engagement)
+          items.sort((a, b) => _calculateListingScore(b).compareTo(_calculateListingScore(a)));
           
           return items.take(limit).toList();
         });
@@ -325,6 +340,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       final interests = List<String>.from(data['interests'] ?? []);
       final university = data['university'] as String?;
 
+      // Get last 5 recently viewed categories for session affinity
       final recentSnapshot = await _firestore.collection('users').doc(userId)
           .collection('recently_viewed').orderBy('viewedAt', descending: true).limit(5).get();
       
@@ -332,7 +348,7 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       if (recentSnapshot.docs.isNotEmpty) {
         final recentIds = recentSnapshot.docs.map((d) => d.id).toList();
         final listingsSnapshot = await _firestore.collection('listings')
-            .where(FieldPath.documentId, whereIn: recentIds).get();
+            .where(FieldPath.documentId, whereIn: chunkIds(recentIds)).get();
         
         for (var doc in listingsSnapshot.docs) {
           final cat = doc.data()['category'] as String?;
@@ -348,48 +364,26 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
         query = query.where('sellerUniversity', isEqualTo: _browsingCampus);
       }
 
-      final snapshot = await query.limit(limit * 4).get();
+      final snapshot = await query.limit(limit * 5).get();
 
       var listings = snapshot.docs
           .map((doc) => Listing.fromJson(doc.data() as Map<String, dynamic>))
           .toList();
 
       listings.sort((a, b) {
-        double aScore = 0;
-        double bScore = 0;
+        // Base score from weighted algorithm
+        double aScore = _calculateListingScore(a);
+        double bScore = _calculateListingScore(b);
 
-        if (interests.contains(a.category)) aScore += 20;
-        if (interests.contains(b.category)) bScore += 20;
+        // Personalized Affinity Boosts
+        if (interests.contains(a.category)) aScore += 50; // High match for user interests
+        if (interests.contains(b.category)) bScore += 50;
         
-        if (recentCategories.contains(a.category)) aScore += 15;
-        if (recentCategories.contains(b.category)) bScore += 15;
+        if (recentCategories.contains(a.category)) aScore += 30; // session match
+        if (recentCategories.contains(b.category)) bScore += 30;
 
-        if (university != null && a.sellerUniversity == university) aScore += 12;
-        if (university != null && b.sellerUniversity == university) bScore += 12;
-
-        if (a.isFeatured) aScore += 20;
-        if (b.isFeatured) bScore += 20;
-        
-        if (a.isSponsored) aScore += 30;
-        if (b.isSponsored) bScore += 30;
-
-        if (a.lastBoostedAt != null) {
-          final hoursSinceBoost = DateTime.now().difference(a.lastBoostedAt!).inHours;
-          if (hoursSinceBoost < 24) aScore += (24 - hoursSinceBoost) / 2;
-        }
-        if (b.lastBoostedAt != null) {
-          final hoursSinceBoost = DateTime.now().difference(b.lastBoostedAt!).inHours;
-          if (hoursSinceBoost < 24) bScore += (24 - hoursSinceBoost) / 2;
-        }
-
-        aScore += (a.viewsCount / 100).clamp(0.0, 5.0);
-        bScore += (b.viewsCount / 100).clamp(0.0, 5.0);
-
-        final aAgeHours = DateTime.now().difference(a.createdAt).inHours;
-        if (aAgeHours < 48) aScore += (48 - aAgeHours) / 4.0;
-        
-        final bAgeHours = DateTime.now().difference(b.createdAt).inHours;
-        if (bAgeHours < 48) bScore += (48 - bAgeHours) / 4.0;
+        if (university != null && a.sellerUniversity == university) aScore += 10;
+        if (university != null && b.sellerUniversity == university) bScore += 10;
 
         return bScore.compareTo(aScore);
       });
@@ -397,6 +391,8 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       return listings.take(limit).toList();
     });
   }
+
+  List<String> chunkIds(List<String> ids) => ids.take(30).toList(); // Simple helper for whereIn limit
 
   @override
   Stream<List<Listing>> watchSimilarListings(Listing listing, {int limit = 6}) {

@@ -225,14 +225,11 @@ class RouterNotifier extends ChangeNotifier {
       return null;
     }
 
-    // 4. Email Verification Guard (Hardening) - MUST BE FIRST AFTER AUTH
-    // Only enforce if the user signed up via email/password (Google is usually pre-verified)
-    final isEmailPasswordUser = firebaseUser.providerData.any(
-      (p) => p.providerId == 'password',
-    );
-    if (isEmailPasswordUser && !firebaseUser.emailVerified) {
-      if (state.matchedLocation != '/verify-email') return '/verify-email';
-      return null;
+    // 4. Email Verification Guard (Softened)
+    // We no longer block the whole app. We'll show a banner instead.
+    // However, if the user is on the verify-email page and JUST verified, we let them through.
+    if (state.matchedLocation == '/verify-email' && firebaseUser.emailVerified) {
+      return '/main';
     }
 
     // 5. Authenticated - Profile Data Loading
@@ -298,7 +295,6 @@ class RouterNotifier extends ChangeNotifier {
         state.matchedLocation == '/welcome' ||
         state.matchedLocation == '/complete-profile' ||
         state.matchedLocation == '/onboarding' ||
-        state.matchedLocation == '/verify-email' ||
         isSplash;
 
     if (isAuthRoute) {

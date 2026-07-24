@@ -90,8 +90,18 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
           ),
         ),
         actions: [
+          // 1. New "Sell" Action in AppBar
+          TextButton.icon(
+            onPressed: () => context.push('/add-listing'),
+            icon: const Icon(Icons.add_circle_outline_rounded, size: 20, color: AppColors.secondary),
+            label: const Text(
+              'Sell', 
+              style: TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+          ),
+          const SizedBox(width: 4),
           IconButton(
-            icon: const Icon(Icons.bookmarks_outlined),
+            icon: const Icon(Icons.bookmarks_outlined, size: 22),
             tooltip: 'Saved Searches',
             onPressed: () => context.push('/saved-searches'),
           ),
@@ -147,14 +157,6 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'marketplace_fab',
-        onPressed: () => context.push('/add-listing'),
-        icon: const Icon(Icons.add_shopping_cart_rounded),
-        label: const Text('Create Listing'),
-        backgroundColor: AppColors.secondary,
-        foregroundColor: Colors.white,
-      ),
       body: TabBarView(
         controller: _tabController,
         children: [
@@ -168,13 +170,18 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
   Widget _buildDiscoverTab() {
     final filterState = ref.watch(marketplaceControllerProvider);
     final controller = ref.read(marketplaceControllerProvider.notifier);
-    final user = ref.watch(appUserProvider).valueOrNull;
+    
+    // Optimization: avoid watching full user object
+    final userId = ref.watch(appUserProvider.select((u) => u.valueOrNull?.uid));
 
     final bool isDiscoveryMode = filterState.searchQuery.isEmpty && 
                                  filterState.selectedCategory == null &&
                                  filterState.selectedConditions.isEmpty &&
                                  filterState.priceRange == null &&
                                  filterState.sortBy == ListingSortType.newest;
+
+    // DE-DUPLICATION: We'll collect displayed IDs as we build the horizontal sections
+    final Set<String> displayedIds = {};
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -210,67 +217,50 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
             ),
 
           if (isDiscoveryMode)
-            SliverToBoxAdapter(
-              child: _buildDiscoveryContent(),
-            ),
-
-          // Growth Phase: Featured Section in Main Feed
-          if (isDiscoveryMode)
-            ref.watch(listingsProvider(ListingFilter(isFeaturedOnly: true, itemsLimit: 10))).when(
-              data: (featured) {
-                if (featured.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
-                final theme = Theme.of(context);
-                return SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 32),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.auto_awesome, color: Colors.orange, size: 20),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Featured Listings',
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        height: 260,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          itemCount: featured.length,
-                          itemBuilder: (context, index) => Padding(
-                            padding: const EdgeInsets.only(right: 16),
-                            child: SizedBox(
-                              width: 170,
-                              child: MarketplaceCard(
-                                listing: featured[index], 
-                                index: index,
-                                heroTag: 'hero_featured_${featured[index].id}',
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-              loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
-              error: (_, __) => const SliverToBoxAdapter(child: SizedBox.shrink()),
-            ),
+            _buildDiscoveryContentSliver(displayedIds),
 
           _buildListingsGrid(isDiscoveryMode ? ListingFilter() : filterState),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDiscoveryContentSliver(Set<String> displayedIds) {
+    return SliverToBoxAdapter(
+      child: Column(
+        children: [
+          // 1. Personalized \"Featured for You\" (AI-driven)
+          _buildDiscoverySection(
+            'Featured for You', 
+            recommendedListingsProvider, 
+            displayedIds
+          ),
+          
+          // 2. Paid \"Featured Listings\" (Monetization)
+          _buildDiscoverySection(
+            'Featured Listings', 
+            listingsProvider(ListingFilter(isFeaturedOnly: true, itemsLimit: 10)), 
+            displayedIds
+          ),
+
+          // Divider before the main \"Infinite\" grid
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 40, 20, 8),
+            child: Row(
+              children: [
+                Text(
+                  'Explore All Items',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const Spacer(),
+                const Icon(Icons.sort_rounded, size: 16, color: Colors.grey),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -280,7 +270,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
@@ -295,115 +285,95 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSearchBar(controller, filterState),
-          const SizedBox(height: 20),
-          const CampusFilterSelector(),
-          const SizedBox(height: 28),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Explore Categories',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              TextButton(
-                onPressed: () => _showAllCategoriesSheet(context),
-                style: TextButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                ),
-                child: Text(
-                  'View All', 
-                  style: TextStyle(
-                    color: theme.colorScheme.primary, 
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ],
-          ),
           const SizedBox(height: 16),
-          _buildModernCategoryGrid(),
+          const CampusFilterSelector(),
+          const SizedBox(height: 20),
+          _buildCompactCategoryList(),
         ],
       ),
     );
   }
 
-  Widget _buildModernCategoryGrid() {
+  Widget _buildCompactCategoryList() {
     final theme = Theme.of(context);
     final categories = MarketplaceCategories.mainFilters.where((c) => c != 'All').toList();
     
     return SizedBox(
-      height: 180,
-      child: GridView.builder(
+      height: 90,
+      child: ListView.builder(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         padding: EdgeInsets.zero,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.15,
-        ),
-        itemCount: categories.length,
+        itemCount: categories.length + 1, // +1 for \"View All\"
         itemBuilder: (context, index) {
+          if (index == categories.length) {
+            return _buildCategoryItem(
+              label: 'All',
+              icon: Icons.grid_view_rounded,
+              onTap: () => _showAllCategoriesSheet(context),
+              isLast: true,
+            );
+          }
+
           final cat = categories[index];
-          return Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => context.push('/category-discovery/$cat'),
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                margin: const EdgeInsets.only(right: 8),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surface,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        MarketplaceCategories.getIcon(cat),
-                        style: const TextStyle(fontSize: 22),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: 70,
-                      child: Text(
-                        cat,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: theme.colorScheme.onSurface,
-                          height: 1.1,
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          return _buildCategoryItem(
+            label: cat,
+            icon: MarketplaceCategories.getIcon(cat),
+            onTap: () => context.push('/category-discovery/$cat'),
+            isLast: false,
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildCategoryItem({
+    required String label,
+    required dynamic icon,
+    required VoidCallback onTap,
+    required bool isLast,
+  }) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: EdgeInsets.only(right: isLast ? 0 : 20),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+                border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4)),
+              ),
+              alignment: Alignment.center,
+              child: icon is IconData 
+                ? Icon(icon, color: theme.colorScheme.primary, size: 24)
+                : Text(icon.toString(), style: const TextStyle(fontSize: 24)),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: theme.colorScheme.onSurface,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -477,7 +447,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                             border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
                           ),
                           alignment: Alignment.center,
-                          child: Text(MarketplaceCategories.getIcon(cat), style: const TextStyle(fontSize: 32)),
+                          child: (MarketplaceCategories.getIcon(cat) is IconData)
+                              ? Icon(MarketplaceCategories.getIcon(cat) as IconData, color: theme.colorScheme.primary, size: 32)
+                              : Text(MarketplaceCategories.getIcon(cat).toString(), style: const TextStyle(fontSize: 32)),
                         ),
                         const SizedBox(height: 12),
                         Text(
@@ -650,72 +622,6 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
     );
   }
 
-  Widget _buildDiscoveryContent() {
-    // Optimization: watch specific user properties
-    final userData = ref.watch(appUserProvider.select((u) {
-      final user = u.valueOrNull;
-      if (user == null) return null;
-      return (university: user.university);
-    }));
-    
-    final scope = ref.watch(browsingScopeProvider);
-
-    String trendingTitle = 'Trending';
-    String recentlyPostedTitle = 'Recently Posted';
-    
-    if (scope.type == BrowsingScopeType.myCampus) {
-      final uniName = CampusConstants.getDisplayName(
-        CampusConstants.resolveToId(userData?.university) ?? userData?.university
-      );
-      trendingTitle = 'Trending in $uniName';
-      recentlyPostedTitle = 'New in $uniName';
-    } else if (scope.type == BrowsingScopeType.specific) {
-      final campusName = CampusConstants.getDisplayName(scope.campusId);
-      trendingTitle = 'Trending in $campusName';
-      recentlyPostedTitle = 'New in $campusName';
-    }
-
-    return Column(
-      children: [
-        _DiscoverySection(
-          title: 'Continue Browsing',
-          provider: recentlyViewedProvider,
-          scrollController: _scrollController,
-          onClear: () => ref.read(marketplaceControllerProvider.notifier).clearRecentlyViewed(),
-        ),
-        _DiscoverySection(
-          title: 'Recommended For You',
-          provider: recommendedListingsProvider,
-          scrollController: _scrollController,
-        ),
-        _DiscoverySection(
-          title: recentlyPostedTitle,
-          provider: listingsProvider(ListingFilter(sortBy: ListingSortType.newest, itemsLimit: 10)),
-          scrollController: _scrollController,
-        ),
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 20),
-          child: BannerAdWidget(),
-        ),
-        _DiscoverySection(
-          title: 'Most Saved',
-          provider: listingsProvider(ListingFilter(sortBy: ListingSortType.mostSaved, itemsLimit: 10)),
-          scrollController: _scrollController,
-        ),
-        _DiscoverySection(
-          title: 'Popular This Week',
-          provider: listingsProvider(ListingFilter(sortBy: ListingSortType.mostViewed, itemsLimit: 10)),
-          scrollController: _scrollController,
-        ),
-        _DiscoverySection(
-          title: trendingTitle,
-          provider: trendingListingsProvider,
-          scrollController: _scrollController,
-        ),
-      ],
-    );
-  }
-
   Widget _buildListingsGrid(ListingFilter filter) {
     final theme = Theme.of(context);
     final paginatedState = ref.watch(paginatedListingsProvider(filter));
@@ -757,7 +663,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
         hasScrollBody: false,
         child: EmptyState(
           title: 'No items match your search',
-          message: 'Try switching to "All Campuses" or explore another category to find what you\'re looking for.',
+          message: 'Try switching to \"All Campuses\" or explore another category to find what you\'re looking for.',
           icon: CategoryUtils.getIcon(FeedType.marketplace),
           action: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -836,7 +742,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                       Expanded(
                         child: Text(
                           filter.searchQuery.isNotEmpty 
-                            ? 'Results for "${filter.searchQuery}"'
+                            ? 'Results for \"${filter.searchQuery}\"'
                             : (filter.selectedCategory != null 
                                 ? 'Browsing ${filter.selectedCategory}'
                                 : 'Sorted by ${filter.sortBy.name}'),
@@ -1507,104 +1413,126 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
       ),
     );
   }
+
+  Widget _buildDiscoverySection(String title, ProviderListenable<AsyncValue<List<Listing>>> provider, Set<String> displayedIds) {
+    final listingsAsync = ref.watch(provider);
+    
+    return listingsAsync.when(
+      data: (listings) {
+        final filtered = listings.where((l) => !displayedIds.contains(l.id)).toList();
+        if (filtered.isEmpty) return const SizedBox.shrink();
+        
+        for (var l in filtered) displayedIds.add(l.id);
+        
+        return _DiscoverySectionStatic(
+          title: title,
+          items: filtered,
+          scrollController: _scrollController,
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
 }
 
-class _DiscoverySection extends ConsumerWidget {
+class _DiscoverySectionStatic extends StatelessWidget {
   final String title;
-  final ProviderListenable<AsyncValue<List<Listing>>> provider;
+  final List<Listing> items;
   final ScrollController scrollController;
   final VoidCallback? onClear;
 
-  const _DiscoverySection({
+  const _DiscoverySectionStatic({
     required this.title,
-    required this.provider,
+    required this.items,
     required this.scrollController,
     this.onClear,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final listingsAsync = ref.watch(provider);
+  Widget build(BuildContext context) {
+    if (items.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
     final sectionPrefix = title.replaceAll(' ', '_').toLowerCase();
 
-    return listingsAsync.when(
-      data: (listings) {
-        if (listings.isEmpty) return const SizedBox.shrink();
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 32),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  if (onClear != null)
-                    TextButton(
-                      onPressed: onClear,
-                      child: Text('Clear', style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold, fontSize: 13)),
-                    )
-                  else
-                    TextButton(
-                      onPressed: () {
-                        final controller = ref.read(marketplaceControllerProvider.notifier);
-                        if (title.contains('Trending')) {
-                          controller.setSortBy(ListingSortType.mostViewed);
-                        } else if (title.contains('Recently Posted') || title.contains('New in')) {
-                           scrollController.animateTo(
-                             scrollController.position.maxScrollExtent,
-                             duration: const Duration(milliseconds: 500),
-                             curve: Curves.easeInOut,
-                           );
-                        } else if (title == 'Most Saved') {
-                          controller.setSortBy(ListingSortType.mostSaved);
-                        } else if (title == 'Popular This Week') {
-                          controller.setSortBy(ListingSortType.mostViewed);
-                        }
-                      },
-                      child: Text(
-                        (title.contains('Recently Posted') || title.contains('New in')) ? 'See Grid' : 'See All', 
-                        style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13)
-                      ),
-                    ),
-                ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 32),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 260,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: listings.length,
-                itemBuilder: (context, index) => Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: SizedBox(
-                    width: 170,
-                    child: MarketplaceCard(
-                      listing: listings[index], 
-                      index: index,
-                      heroTag: 'hero_${sectionPrefix}_${listings[index].id}',
+              if (onClear != null)
+                TextButton(
+                  onPressed: onClear,
+                  child: Text('Clear', style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold, fontSize: 13)),
+                )
+              else
+                Consumer(
+                  builder: (context, ref, _) => TextButton(
+                    onPressed: () {
+                      final controller = ref.read(marketplaceControllerProvider.notifier);
+                      
+                      if (title == 'Featured Listings') {
+                        // Switch to a filtered view of only featured items
+                        controller.applyFilter(ListingFilter(isFeaturedOnly: true));
+                      } else if (title == 'Featured for You') {
+                        // Scroll down to the main "Explore All Items" grid
+                        scrollController.animateTo(
+                          400, // Approximate height of top sections
+                          duration: const Duration(milliseconds: 600),
+                          curve: Curves.easeOut,
+                        );
+                      } else if (title.contains('Trending') || title == 'Popular This Week') {
+                        controller.setSortBy(ListingSortType.mostViewed);
+                      } else if (title.contains('Recently Posted') || title.contains('New in')) {
+                         // Reset filters to show the newest items at the top of the grid
+                         controller.resetFilters();
+                      } else if (title == 'Most Saved') {
+                        controller.setSortBy(ListingSortType.mostSaved);
+                      }
+                    },
+                    child: Text(
+                      (title.contains('Recently Posted') || title.contains('New in')) ? 'See Grid' : 'See All', 
+                      style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13)
                     ),
                   ),
                 ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 260,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: items.length,
+            itemBuilder: (context, index) => Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: SizedBox(
+                width: 170,
+                child: MarketplaceCard(
+                  listing: items[index], 
+                  index: index,
+                  heroTag: 'hero_${sectionPrefix}_${items[index].id}',
+                ),
               ),
             ),
-          ],
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (e, _) => const SizedBox.shrink(),
+          ),
+        ),
+      ],
     );
   }
 }

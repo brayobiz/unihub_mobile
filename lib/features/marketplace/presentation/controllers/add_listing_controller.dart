@@ -369,6 +369,10 @@ class AddListingController extends StateNotifier<AddListingState> {
     }
   }
 
+  void reset() {
+    state = AddListingState(id: const Uuid().v4(), isEditing: false);
+  }
+
   Future<void> clearDraft() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -475,6 +479,7 @@ class AddListingController extends StateNotifier<AddListingState> {
       }
 
       state = state.copyWith(isLoading: false);
+      reset(); // HARDENING: Clear local state immediately after success
       return true;
     } catch (e, st) {
       state = state.copyWith(isLoading: false, error: AppErrorHandler.mapError(e, st));
@@ -484,6 +489,6 @@ class AddListingController extends StateNotifier<AddListingState> {
 }
 
 final addListingControllerProvider = 
-    StateNotifierProvider.family<AddListingController, AddListingState, Listing?>((ref, listing) {
+    StateNotifierProvider.autoDispose.family<AddListingController, AddListingState, Listing?>((ref, listing) {
   return AddListingController(ref, listing);
 });

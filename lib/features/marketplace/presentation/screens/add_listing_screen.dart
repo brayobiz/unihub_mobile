@@ -402,7 +402,9 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(MarketplaceCategories.getIcon(cat), style: const TextStyle(fontSize: 24)),
+                (MarketplaceCategories.getIcon(cat) is IconData)
+                    ? Icon(MarketplaceCategories.getIcon(cat) as IconData, color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant, size: 24)
+                    : Text(MarketplaceCategories.getIcon(cat).toString(), style: const TextStyle(fontSize: 24)),
                 const SizedBox(height: 8),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -990,6 +992,11 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
       message: widget.listing == null
           ? 'Your item is now live on UniHub! Interested students can now view and make offers.'
           : 'Your listing has been successfully updated.',
+      onDone: () {
+        if (mounted) {
+          context.pop(); // Go back to the marketplace/previous screen
+        }
+      },
     );
   }
 }

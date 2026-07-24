@@ -1239,6 +1239,16 @@ class _SavedItemsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    // Optimization: watch specific user properties to prevent unnecessary rebuilds
+    final userData = ref.watch(appUserProvider.select((u) {
+      final user = u.valueOrNull;
+      if (user == null) return null;
+      return (
+        uid: user.uid,
+        accountType: user.accountType,
+      );
+    }));
+
     final allSavedListings = ref.watch(savedListingsProvider).valueOrNull ?? [];
     final savedListings = allSavedListings.where((l) => l.status == ListingStatus.active).toList();
     final savedHousing = ref.watch(savedHousingProvider).valueOrNull ?? [];
