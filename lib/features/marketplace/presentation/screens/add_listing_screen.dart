@@ -267,78 +267,44 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
           const SizedBox(height: 24),
           _buildSectionHeader(context, 'Growth Phase: Free Promotions', Icons.rocket_launch_outlined),
           const SizedBox(height: 8),
-          if (isVerified)
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline_rounded, size: 20, color: theme.colorScheme.primary),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'As a verified user, you get premium visibility for free during our Early Bird phase!',
-                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimaryContainer, fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            InkWell(
-              onTap: () => context.push('/trust-center'),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.lock_outline_rounded, size: 20, color: theme.colorScheme.primary),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Premium Visibility Locked',
-                            style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
-                          ),
-                          Text(
-                            'Verify your identity to unlock Boost, Feature, and Sponsored slots for free!',
-                            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.chevron_right_rounded, color: theme.colorScheme.primary),
-                  ],
-                ),
-              ),
+          // Growth Phase: All users get free promotions
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(12),
             ),
+            child: Row(
+              children: [
+                Icon(Icons.rocket_launch_rounded, size: 20, color: theme.colorScheme.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Growth Phase Benefit: You get premium visibility for free! Enjoy Boosts and Featured slots at no cost.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimaryContainer, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 16),
           _buildPromotionToggle(
             title: 'Feature Listing',
             subtitle: 'Place your item in the "Featured" section for 7 days.',
             value: state.promoteAsFeatured,
-            onChanged: isVerified ? (val) => controller.togglePromoteFeatured(val) : null,
+            onChanged: (val) => controller.togglePromoteFeatured(val),
           ),
           _buildPromotionToggle(
             title: 'Sponsored Slot',
             subtitle: 'Keep your item at the top of search results for 3 days.',
             value: state.promoteAsSponsored,
-            onChanged: isVerified ? (val) => controller.togglePromoteSponsored(val) : null,
+            onChanged: (val) => controller.togglePromoteSponsored(val),
           ),
           _buildPromotionToggle(
             title: 'Instant Boost',
             subtitle: 'Push your listing to the top of the "Recently Added" feed.',
             value: state.applyBoost,
-            onChanged: isVerified ? (val) => controller.toggleApplyBoost(val) : null,
+            onChanged: (val) => controller.toggleApplyBoost(val),
           ),
           const SizedBox(height: 24),
           _buildTextField(
@@ -374,57 +340,150 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
 
   Widget _buildCategoryGrid(AddListingState state, AddListingController controller) {
     final theme = Theme.of(context);
-    const categories = MarketplaceCategories.all;
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 0.9,
-      ),
-      itemCount: categories.length,
-      itemBuilder: (context, index) {
-        final cat = categories[index];
-        final bool isSelected = state.category == cat;
-        return GestureDetector(
-          onTap: () => controller.updateCategory(cat),
-          child: Container(
-            decoration: BoxDecoration(
-              color: isSelected ? theme.colorScheme.primary.withValues(alpha: 0.05) : theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isSelected ? theme.colorScheme.primary : Colors.transparent,
-                width: 2,
-              ),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                (MarketplaceCategories.getIcon(cat) is IconData)
-                    ? Icon(MarketplaceCategories.getIcon(cat) as IconData, color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant, size: 24)
-                    : Text(MarketplaceCategories.getIcon(cat).toString(), style: const TextStyle(fontSize: 24)),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Text(
-                    cat,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                      color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+    final bool isSelectedCategoryInTop = MarketplaceCategories.topListingCategories.contains(state.category);
+    
+    final List<String> categoriesToShow = [...MarketplaceCategories.topListingCategories];
+    if (!isSelectedCategoryInTop && state.category != 'Electronics') {
+       categoriesToShow.add(state.category);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 4, // Increased to 4 for smaller items
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+            childAspectRatio: 1.0,
+          ),
+          itemCount: categoriesToShow.length,
+          itemBuilder: (context, index) {
+            final cat = categoriesToShow[index];
+            final bool isSelected = state.category == cat;
+            return GestureDetector(
+              onTap: () => controller.updateCategory(cat),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isSelected ? theme.colorScheme.primary.withValues(alpha: 0.05) : theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isSelected ? theme.colorScheme.primary : Colors.transparent,
+                    width: 1.5,
                   ),
                 ),
-              ],
-            ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    (MarketplaceCategories.getIcon(cat) is IconData)
+                        ? Icon(
+                            MarketplaceCategories.getIcon(cat) as IconData, 
+                            color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant, 
+                            size: 20, // Reduced from 24
+                          )
+                        : Text(
+                            MarketplaceCategories.getIcon(cat).toString(), 
+                            style: const TextStyle(fontSize: 20), // Reduced from 24
+                          ),
+                    const SizedBox(height: 4),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: Text(
+                        cat,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 9, // Reduced from 10
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                          color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        Center(
+          child: TextButton.icon(
+            onPressed: () => _showAllCategoriesPicker(context, controller, state),
+            icon: const Icon(Icons.apps_rounded, size: 18),
+            label: const Text('More Categories', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
           ),
-        );
-      },
+        ),
+      ],
+    );
+  }
+
+  void _showAllCategoriesPicker(BuildContext context, AddListingController controller, AddListingState state) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        maxChildSize: 0.9,
+        minChildSize: 0.4,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(color: theme.colorScheme.outlineVariant, borderRadius: BorderRadius.circular(2)),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'Select Category',
+                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                controller: scrollController,
+                itemCount: MarketplaceCategories.all.length,
+                itemBuilder: (context, index) {
+                  final cat = MarketplaceCategories.all[index];
+                  final isSelected = state.category == cat;
+                  return ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? theme.colorScheme.primary.withOpacity(0.1) : theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                        shape: BoxShape.circle,
+                      ),
+                      child: (MarketplaceCategories.getIcon(cat) is IconData)
+                          ? Icon(MarketplaceCategories.getIcon(cat) as IconData, color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant, size: 20)
+                          : Text(MarketplaceCategories.getIcon(cat).toString(), style: const TextStyle(fontSize: 20)),
+                    ),
+                    title: Text(
+                      cat,
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    trailing: isSelected ? Icon(Icons.check_circle_rounded, color: theme.colorScheme.primary) : null,
+                    onTap: () {
+                      controller.updateCategory(cat);
+                      Navigator.pop(context);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

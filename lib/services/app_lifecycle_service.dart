@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unihub_mobile/core/utils/app_logger.dart';
 
+/// Provides the current application lifecycle state.
+/// Centralizes lifecycle tracking to prevent redundant WidgetsBindingObservers.
+final appLifecycleStateProvider = StateProvider<AppLifecycleState>((ref) => AppLifecycleState.resumed);
+
 final appLifecycleServiceProvider = Provider((ref) {
   final service = AppLifecycleService(ref);
   return service;
@@ -17,16 +21,21 @@ class AppLifecycleService with WidgetsBindingObserver {
     if (_isInitialized) return;
     WidgetsBinding.instance.addObserver(this);
     _isInitialized = true;
-    AppLogger.info('AppLifecycleService Initialized', 'LIFECYCLE');
+    AppLogger.info('🚀 AppLifecycleService Initialized', 'LIFECYCLE');
   }
 
   void dispose() {
+    if (!_isInitialized) return;
     WidgetsBinding.instance.removeObserver(this);
+    _isInitialized = false;
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    AppLogger.info('App Lifecycle State Changed: ${state.name}', 'LIFECYCLE');
+    // Update the global provider so other services can react
+    _ref.read(appLifecycleStateProvider.notifier).state = state;
+    
+    AppLogger.info('📱 App Lifecycle State: ${state.name.toUpperCase()}', 'LIFECYCLE');
     
     switch (state) {
       case AppLifecycleState.resumed:
@@ -44,10 +53,9 @@ class AppLifecycleService with WidgetsBindingObserver {
 
   void _handleResumed() {
     // Perform any necessary refresh logic when app returns to foreground
-    // e.g. checking for forced updates, refreshing critical session data, etc.
   }
 
   void _handlePaused() {
-    // Perform any necessary cleanup or save state logic when app goes to background
+    // Perform any necessary cleanup when app goes to background
   }
 }

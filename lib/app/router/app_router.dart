@@ -201,7 +201,9 @@ class RouterNotifier extends ChangeNotifier {
     }
 
     // 2. Auth Loading State
-    if (authState.isLoading || authState.isRefreshing) {
+    // Optimization: Only show splash if we don't have a user value yet.
+    // This prevents "flickering" during token refreshes.
+    if ((authState.isLoading || authState.isRefreshing) && !authState.hasValue) {
       return isSplash ? null : '/splash';
     }
 
@@ -233,7 +235,9 @@ class RouterNotifier extends ChangeNotifier {
     }
 
     // 5. Authenticated - Profile Data Loading
-    if (appUserAsync.isLoading || appUserAsync.isRefreshing) {
+    // Optimization: Don't jump to splash if we already have profile data in memory.
+    // This prevents reloads when presence updates trigger background refreshes.
+    if ((appUserAsync.isLoading || appUserAsync.isRefreshing) && !appUserAsync.hasValue) {
       return isSplash ? null : '/splash';
     }
 

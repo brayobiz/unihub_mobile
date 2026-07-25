@@ -371,9 +371,9 @@ class _WhatsNewSection extends ConsumerWidget {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.highlightOrangeBg,
+              color: AppColors.highlightAmberBg,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.highlightOrangeBorder),
+              border: Border.all(color: AppColors.highlightAmberBorder),
             ),
             child: Row(
               children: [
@@ -787,12 +787,12 @@ class _CampusPulseSection extends ConsumerWidget {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [AppColors.highlightIndigoBg, Theme.of(context).colorScheme.surface],
+              colors: [AppColors.highlightTealBg, Theme.of(context).colorScheme.surface],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.highlightIndigoBorder.withOpacity(0.5)),
+            border: Border.all(color: AppColors.highlightTealBorder.withOpacity(0.5)),
           ),
           child: Column(
             children: [
@@ -800,7 +800,7 @@ class _CampusPulseSection extends ConsumerWidget {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(color: AppColors.highlightIndigoBorder, shape: BoxShape.circle),
+                    decoration: const BoxDecoration(color: AppColors.highlightTealBorder, shape: BoxShape.circle),
                     child: const Icon(Icons.bolt_rounded, color: AppColors.secondaryDark, size: 18),
                   ),
                   const SizedBox(width: 12),
@@ -856,7 +856,7 @@ class _CampusPulseSection extends ConsumerWidget {
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
-                        side: const BorderSide(color: AppColors.highlightIndigoBorder),
+                        side: const BorderSide(color: AppColors.highlightTealBorder),
                       ),
                       textStyle: theme.textTheme.labelLarge?.copyWith(fontSize: 11.5, fontWeight: FontWeight.w700),
                     ),
@@ -1079,7 +1079,7 @@ class _ContinueReadingSection extends ConsumerWidget {
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              color: AppColors.highlightIndigoBg,
+                              color: AppColors.highlightTealBg,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: const Icon(Icons.description_rounded, color: AppColors.secondary, size: 22),

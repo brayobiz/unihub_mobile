@@ -98,8 +98,8 @@ service cloud.firestore {
            request.resource.data.get('isDeleted', false) == false
           ) ||
 
-          // Case 3: Verified user upgrading to business account (Growth Phase)
-          ((resource.data.get("isIdentityVerified", false) == true || resource.data.get("isStudentVerified", false) == true) &&
+          // Case 3: Upgrade to business account (Growth Phase - Unlimited)
+          (isAuthenticated() &&
            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['accountType', 'businessName', 'businessCategory', 'tier']) &&
            request.resource.data.get("accountType", "student") == 'business'
           ) ||
@@ -171,15 +171,15 @@ service cloud.firestore {
                          (resource.data.status != 'userSuspended' || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']))
                         ) ||
 
-                        // Case C: Verified user using "Early Bird" free premium features
-                        (isVerified() &&
+                        // Case C: User using "Early Bird" free premium features (Growth Phase - Unlimited)
+                        (isAuthenticated() &&
                          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['flagged', 'flagReason', 'flagAdminNotes', 'originalStatus', 'moderationReason', 'suspendedBy', 'suspendedAt', 'suspensionReason', 'approvedAt']) &&
                          (resource.data.status != 'userSuspended' || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status'])) &&
                          // Basic sanity: only enforce limits if the fields are actually being changed
                          (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['featuredUntil']) ||
-                          request.resource.data.get('featuredUntil', request.time) <= request.time + duration.value(40, 'd')) &&
+                          request.resource.data.get('featuredUntil', request.time) <= request.time + duration.value(60, 'd')) &&
                          (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['sponsoredUntil']) ||
-                          request.resource.data.get('sponsoredUntil', request.time) <= request.time + duration.value(40, 'd'))
+                          request.resource.data.get('sponsoredUntil', request.time) <= request.time + duration.value(60, 'd'))
                         )
                       ))
                     ));
@@ -229,8 +229,7 @@ service cloud.firestore {
                    canManageOrganizer(get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.get("organizerId", ""));
 
       allow create: if isAuthenticated() &&
-                      request.resource.data.userId == request.auth.uid &&
-                      (request.resource.data.status != "going" || isIdentityVerified());
+                      request.resource.data.userId == request.auth.uid; // Growth Phase: All can join events
       allow update: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
       allow delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
     }
@@ -242,7 +241,7 @@ service cloud.firestore {
 
     match /organizers/{organizerId} {
       allow read: if true;
-      allow create: if isAuthenticated() && isIdentityVerified();
+      allow create: if isAuthenticated(); // Growth Phase: Open creation
 
       allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followerCount', 'sharesCount'])) ||
                     (isAdmin() || (
@@ -456,7 +455,7 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid);
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && (
         request.resource.data.status == 'pending' ||
-        (request.resource.data.status == 'completed' && (request.resource.data.amount == 0 || request.resource.data.amount == 0.0) && isVerified())
+        (request.resource.data.status == 'completed' && (request.resource.data.amount == 0 || request.resource.data.amount == 0.0)) // Growth Phase: Free for all
       );
       allow update: if isAdmin();
       allow delete: if isAdmin();

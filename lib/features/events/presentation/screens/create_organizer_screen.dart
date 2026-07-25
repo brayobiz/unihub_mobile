@@ -40,14 +40,14 @@ class _CreateOrganizerScreenState extends ConsumerState<CreateOrganizerScreen> {
     final controller = ref.read(createOrganizerControllerProvider(widget.organizer).notifier);
     final appUser = ref.watch(appUserProvider).valueOrNull;
 
-    // Safety Guard 1: Identity Verification Check
-    if (appUser != null && !appUser.isIdentityVerified && !state.isEditing) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          context.goNamed('organizer-onboarding'); 
-        }
-      });
-    }
+    // Safety Guard 1: Identity Verification Check (Growth Phase - Optional)
+    // if (appUser != null && !appUser.isIdentityVerified && !state.isEditing) {
+    //   WidgetsBinding.instance.addPostFrameCallback((_) {
+    //     if (mounted) {
+    //       context.goNamed('organizer-onboarding'); 
+    //     }
+    //   });
+    // }
     
     // Safety Guard 2: If user already has an application and this isn't an edit, redirect
     if (!state.isEditing && widget.organizer == null && appUser != null) {

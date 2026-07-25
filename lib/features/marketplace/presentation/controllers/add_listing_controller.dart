@@ -489,6 +489,6 @@ class AddListingController extends StateNotifier<AddListingState> {
 }
 
 final addListingControllerProvider = 
-    StateNotifierProvider.autoDispose.family<AddListingController, AddListingState, Listing?>((ref, listing) {
+    StateNotifierProvider.family<AddListingController, AddListingState, Listing?>((ref, listing) {
   return AddListingController(ref, listing);
 });

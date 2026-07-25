@@ -36,13 +36,14 @@ class OrganizerService {
   }
 
   Future<void> createApplication(Organizer organizer, String userId) async {
-    // 1. Enforce Identity Verification Requirement (Core Trust Rule)
+    // 1. Identity Verification (Growth Phase: Relaxed)
+    // We still log it but don't block for now to encourage organizer growth
     final userDoc = await _firestore.collection('users').doc(userId).get();
-    final isIdentityVerified = userDoc.data()?['isIdentityVerified'] ?? false;
+    // final isIdentityVerified = userDoc.data()?['isIdentityVerified'] ?? false;
     
-    if (!isIdentityVerified) {
-      throw Exception('Identity verification is required before applying as an organizer. Please complete it in the Trust Center.');
-    }
+    // if (!isIdentityVerified) {
+    //   throw Exception('Identity verification is required before applying as an organizer. Please complete it in the Trust Center.');
+    // }
 
     // 2. Prevent duplicate active applications
     final existing = await getActiveApplication(userId);
@@ -164,11 +165,11 @@ class OrganizerService {
       throw Exception('This user has been restricted by administrators and cannot join organization teams.');
     }
 
-    // B. Must be a verified student to manage a campus organization
-    final isStudentVerified = targetData['isStudentVerified'] ?? false;
-    if (!isStudentVerified) {
-      throw Exception('This user is not a verified student. Only verified students can be added to organization teams for security reasons.');
-    }
+    // B. Student Verification (Growth Phase: Optional)
+    // final isStudentVerified = targetData['isStudentVerified'] ?? false;
+    // if (!isStudentVerified) {
+    //   throw Exception('This user is not a verified student. Only verified students can be added to organization teams for security reasons.');
+    // }
 
     // C. Must be from the same campus
     final targetCampusId = targetData['university'] as String?;

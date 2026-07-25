@@ -340,7 +340,7 @@ class _ListingDetailContentState extends ConsumerState<_ListingDetailContent> {
                             }
                           },
                           style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.marketplaceBlue,
+                            backgroundColor: AppColors.primary,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           ),
                           child: isLoading 
@@ -405,7 +405,7 @@ class _ListingDetailContentState extends ConsumerState<_ListingDetailContent> {
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 26, 
                             fontWeight: FontWeight.w900, 
-                            color: AppColors.marketplaceBlue,
+                            color: AppColors.primary,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -762,14 +762,14 @@ class _PriceBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: isNegotiable 
-            ? AppColors.marketplaceBlue.withOpacity(0.1) 
+            ? AppColors.primary.withOpacity(0.1) 
             : theme.colorScheme.onSurface.withOpacity(0.05),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         isNegotiable ? 'Negotiable' : 'Fixed Price',
         style: TextStyle(
-          color: isNegotiable ? AppColors.marketplaceBlue : theme.colorScheme.onSurfaceVariant, 
+          color: isNegotiable ? AppColors.primary : theme.colorScheme.onSurfaceVariant, 
           fontSize: 12, 
           fontWeight: FontWeight.bold
         ),
@@ -1016,7 +1016,7 @@ class _ExpandableDescriptionState extends State<_ExpandableDescription> {
           onTap: () => setState(() => _isExpanded = !_isExpanded),
           child: Text(
             _isExpanded ? 'Read Less' : '... Read More',
-            style: const TextStyle(color: AppColors.marketplaceBlue, fontWeight: FontWeight.bold),
+            style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
           ),
         ),
       ],
@@ -1112,7 +1112,7 @@ class _SellerCard extends ConsumerWidget {
                               const SizedBox(width: 4),
                               Icon(
                                 Icons.verified, 
-                                color: isBusiness ? AppColors.businessGold : AppColors.marketplaceBlue, 
+                                color: isBusiness ? AppColors.businessGold : AppColors.primary, 
                                 size: 16
                               ),
                             ],
@@ -1712,7 +1712,7 @@ class _SafetyBanner extends StatelessWidget {
               child: FilledButton(
                 onPressed: () => Navigator.pop(context),
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.marketplaceBlue,
+                  backgroundColor: AppColors.primary,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
                 child: const Text('I Understand', style: TextStyle(fontWeight: FontWeight.w900)),
@@ -1734,8 +1734,8 @@ class _SafetyBanner extends StatelessWidget {
         children: [
           Container(
             padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: AppColors.marketplaceBlue.withOpacity(0.1), shape: BoxShape.circle),
-            child: Icon(icon, color: AppColors.marketplaceBlue, size: 20),
+            decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), shape: BoxShape.circle),
+            child: Icon(icon, color: AppColors.primary, size: 20),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -1860,7 +1860,7 @@ class _StickyActionBar extends StatelessWidget {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : IconButton(
-                      icon: Icon(Icons.chat_bubble_outline_rounded, color: isSold ? AppColors.grey : AppColors.marketplaceBlue),
+                      icon: Icon(Icons.chat_bubble_outline_rounded, color: isSold ? AppColors.grey : AppColors.primary),
                       onPressed: (isOwner || isSold) ? null : onStartChat,
                       tooltip: 'Chat with seller',
                     ),
@@ -1872,7 +1872,7 @@ class _StickyActionBar extends StatelessWidget {
                   child: FilledButton(
                     onPressed: (isOwner || isSold || isStartingChat) ? null : onMakeOffer,
                     style: FilledButton.styleFrom(
-                      backgroundColor: isSold ? AppColors.grey : AppColors.marketplaceBlue,
+                      backgroundColor: isSold ? AppColors.grey : AppColors.primary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       elevation: 0,

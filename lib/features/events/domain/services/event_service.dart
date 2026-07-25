@@ -324,7 +324,9 @@ class EventService {
   // --- Attendance Business Logic ---
 
   Future<void> setAttendance(String userId, String eventId, AttendanceStatus? status) async {
-    // 1. Core Trust Rule: Identity verification required for "Going"
+    // 1. Identity verification (Growth Phase - Relaxed)
+    // We encourage attendance during the growth phase
+    /*
     if (status == AttendanceStatus.going) {
       final userDoc = await _firestore.collection('users').doc(userId).get();
       final isVerified = userDoc.data()?['isIdentityVerified'] ?? false;
@@ -332,6 +334,7 @@ class EventService {
         throw Exception('Identity verification is required to reserve a spot for events.');
       }
     }
+    */
 
     // 2. Event State Rule: Can only attend approved/scheduled/live events
     final event = await _eventRepository.getEventById(eventId);

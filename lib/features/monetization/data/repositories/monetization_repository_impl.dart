@@ -75,9 +75,8 @@ class MonetizationRepositoryImpl implements MonetizationRepository {
   }) async {
     try {
       final userDoc = await _firestore.collection('users').doc(userId).get();
-      final isVerified = userDoc.data()?['isIdentityVerified'] == true || 
-                         userDoc.data()?['isStudentVerified'] == true ||
-                         userDoc.data()?['accountType'] == 'business';
+      // Growth Phase: All business upgrades get Pro tier for free
+      final isGrowthPhase = true; 
 
       final batch = _firestore.batch();
       
@@ -87,8 +86,7 @@ class MonetizationRepositoryImpl implements MonetizationRepository {
         'accountType': 'business',
         'businessName': businessName,
         'businessCategory': businessCategory,
-        // If verified during growth phase, give them Pro tier for free
-        'tier': (isVerified || tier == SubscriptionTier.businessPremium) ? 'pro' : 'free',
+        'tier': (isGrowthPhase || tier == SubscriptionTier.businessPremium) ? 'pro' : 'free',
       });
 
       // Create/Update Subscription Record
@@ -201,20 +199,10 @@ class MonetizationRepositoryImpl implements MonetizationRepository {
 
   @override
   Future<bool> canUsePremiumFeature(String userId, PaymentType featureType) async {
-    // 1. Check user verification (Verified Students or Business Accounts)
+    // Growth Phase: Open to all authenticated users
     final userDoc = await _firestore.collection('users').doc(userId).get();
     if (!userDoc.exists) return false;
     
-    final data = userDoc.data();
-    final isVerified = data?['isIdentityVerified'] == true || 
-                       data?['isStudentVerified'] == true ||
-                       data?['accountType'] == 'business';
-    
-    if (!isVerified) {
-      AppLogger.warning('Premium feature access denied: User $userId not verified.', 'MONETIZATION');
-      return false;
-    }
-
     // 2. Check for cooldowns/limits to prevent abuse during free phase
     if (featureType == PaymentType.boost) {
       // Limit: One successful boost every 24 hours per user
@@ -258,15 +246,7 @@ class MonetizationRepositoryImpl implements MonetizationRepository {
     Map<String, dynamic>? metadata,
   }) async {
     try {
-      final userDoc = await _firestore.collection('users').doc(userId).get();
-      final userData = userDoc.data();
-      final isVerified = userData?['isIdentityVerified'] == true || 
-                         userData?['isStudentVerified'] == true ||
-                         userData?['accountType'] == 'business';
-
-      if (!isVerified) {
-         throw Exception('Verification required: Please verify your identity in the Trust Center to use premium features.');
-      }
+      // Growth Phase: Remove verification requirement
 
       final canUse = await canUsePremiumFeature(userId, type);
       if (!canUse) {

@@ -404,7 +404,7 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
                 Text(
                   isVerified
                       ? 'Your platform identity is verified. You are eligible to complete your professional housing profile.'
-                      : 'To ensure student safety and platform integrity, all professional service providers must complete UniHub Identity Verification before joining the network.',
+                      : 'Growth Phase: We are currently allowing all students to build their professional profiles while they complete verification.',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
@@ -442,9 +442,7 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
             width: double.infinity,
             height: 58,
             child: FilledButton(
-              onPressed: isVerified 
-                ? _nextPage 
-                : (identityPending ? null : () => context.push('/trust-center')),
+              onPressed: _nextPage, // Growth Phase: Allow all to proceed
               style: FilledButton.styleFrom(
                 backgroundColor: theme.colorScheme.primary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -457,9 +455,7 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
                     const SizedBox(width: 12),
                   ],
                   Text(
-                    identityPending 
-                        ? 'Verification in Progress...' 
-                        : (isVerified ? 'Continue to Professional Profile' : 'Start Housing Plug Journey'),
+                    'Continue to Professional Profile',
                     style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
                   ),
                 ],

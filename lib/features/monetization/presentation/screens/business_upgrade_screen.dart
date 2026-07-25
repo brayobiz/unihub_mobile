@@ -251,47 +251,7 @@ class _BusinessUpgradeScreenState extends ConsumerState<BusinessUpgradeScreen> {
   Widget _buildUpgradeButton(BuildContext context, bool isVerified) {
     final theme = Theme.of(context);
     
-    if (!isVerified) {
-      return Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.orange.withOpacity(0.3)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.lock_outline_rounded, color: Colors.orange),
-                const SizedBox(width: 16),
-                const Expanded(
-                  child: Text(
-                    'Verification required to upgrade to a Business Account.',
-                    style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton(
-              onPressed: () => context.push('/trust-center'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-              child: const Text('Go to Trust Center', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ),
-        ],
-      );
-    }
-
+    // Growth Phase: No longer requiring verification to upgrade
     return Column(
       children: [
         Container(
@@ -325,7 +285,7 @@ class _BusinessUpgradeScreenState extends ConsumerState<BusinessUpgradeScreen> {
             ),
             child: _isLoading
                 ? const CircularProgressIndicator(color: Colors.white)
-                : const Text('Active Business Account', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                : const Text('Activate Business Account', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ),
         ),
       ],

@@ -41,6 +41,18 @@ class MarketplaceCategories {
     other,
   ];
 
+  /// The most common categories for student listings to reduce UI clutter
+  static const List<String> topListingCategories = [
+    phones,
+    computers,
+    books,
+    fashion,
+    shoes,
+    electronics,
+    furniture,
+    homeEssentials,
+  ];
+
   static const List<String> mainFilters = ['All', ...all];
 
   // Helper to get official icon for category (dynamic to allow emoji for shoe)
