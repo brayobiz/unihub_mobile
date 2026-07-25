@@ -246,17 +246,13 @@ class TrustCenterScreen extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1677F2), Color(0xFF19D3C5)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: const Color(0xFF1677F2),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1677F2).withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: const Color(0xFF1677F2).withOpacity(0.15),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),

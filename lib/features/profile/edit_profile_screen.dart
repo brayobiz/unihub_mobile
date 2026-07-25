@@ -278,19 +278,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   Widget _buildBlob(double size, Color color) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [
-            color,
-            color.withValues(alpha: 0),
-          ],
-        ),
-      ),
-    );
+    return const SizedBox.shrink(); // Blob decoration removed for professional design
   }
 
   Widget _buildGlassSection({required BuildContext context, required String title, required IconData icon, required List<Widget> children}) {
@@ -350,17 +338,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [const Color(0xFF0F172A), theme.colorScheme.primary, const Color(0xFF19D3C5)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: theme.colorScheme.primary,
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
@@ -535,17 +519,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       width: double.infinity,
       height: 58,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [const Color(0xFF0F172A), theme.colorScheme.primary, const Color(0xFF19D3C5)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: theme.colorScheme.primary,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: theme.colorScheme.primary.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: theme.colorScheme.primary.withValues(alpha: 0.15),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           )
         ],
       ),

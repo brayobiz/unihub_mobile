@@ -304,14 +304,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF8E8FFA), Color(0xFF6C63FF)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: AppColors.primary,
                       shape: BoxShape.circle,
                       boxShadow: [
-                        BoxShadow(color: const Color(0xFF6C63FF).withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))
+                        BoxShadow(color: AppColors.primary.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2))
                       ],
                     ),
                     child: const Icon(Icons.headset_mic_rounded, size: 20, color: Colors.white),

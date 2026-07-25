@@ -214,37 +214,33 @@ class _AnnouncementItemState extends ConsumerState<_AnnouncementItem> with Ticke
     final isCritical = a.priority == AnnouncementPriority.critical;
     final isHigh = a.priority == AnnouncementPriority.high;
 
-    List<Color> gradientColors;
+    Color backgroundColor;
     IconData icon;
     String tagText = 'UPDATE';
 
     if (isCritical) {
-      gradientColors = [const Color(0xFFDC2626), const Color(0xFF991B1B)];
+      backgroundColor = const Color(0xFFDC2626);
       icon = Icons.bolt_rounded;
       tagText = 'URGENT';
     } else if (isHigh) {
-      gradientColors = [const Color(0xFFF59E0B), const Color(0xFFD97706)];
+      backgroundColor = const Color(0xFFF59E0B);
       icon = Icons.campaign_rounded;
       tagText = 'IMPORTANT';
     } else {
-      gradientColors = [AppColors.primary, AppColors.secondary];
+      backgroundColor = AppColors.primary;
       icon = Icons.info_rounded;
     }
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: gradientColors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: gradientColors.first.withOpacity(0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
+            color: backgroundColor.withOpacity(0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -265,30 +261,8 @@ class _AnnouncementItemState extends ConsumerState<_AnnouncementItem> with Ticke
               ),
             ),
             
-            AnimatedBuilder(
-              animation: _attentionController,
-              builder: (context, child) {
-                return Positioned.fill(
-                  child: FractionallySizedBox(
-                    widthFactor: 0.3,
-                    alignment: Alignment(_shimmerAnimation.value, 0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Colors.white.withOpacity(0.0),
-                            Colors.white.withOpacity(0.2),
-                            Colors.white.withOpacity(0.0),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
+            // Shimmer effect removed for professional design consistency
+            const SizedBox.shrink(),
 
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),

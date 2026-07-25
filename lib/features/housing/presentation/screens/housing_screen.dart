@@ -297,21 +297,17 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isRejected 
-              ? [AppColors.error, AppColors.error.withOpacity(0.8)]
-              : hasPendingApp 
-                  ? [theme.colorScheme.secondary, theme.colorScheme.secondary.withOpacity(0.8)]
-                  : [theme.colorScheme.primary, const Color(0xFF19D3C5)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: isRejected 
+            ? AppColors.error
+            : hasPendingApp 
+                ? theme.colorScheme.secondary
+                : theme.colorScheme.primary,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: (isRejected ? AppColors.error : theme.colorScheme.primary).withOpacity(0.2), 
-            blurRadius: 20, 
-            offset: const Offset(0, 10)
+            color: (isRejected ? AppColors.error : theme.colorScheme.primary).withOpacity(0.1), 
+            blurRadius: 10, 
+            offset: const Offset(0, 4)
           )
         ],
       ),
@@ -714,12 +710,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
               ),
               Container(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black.withOpacity(0.9)],
-                    stops: const [0.5, 1.0],
-                  ),
+                  color: Colors.black.withOpacity(0.3),
                 ),
                 padding: const EdgeInsets.all(20),
                 child: Column(

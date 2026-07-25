@@ -221,17 +221,13 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [theme.colorScheme.primary, theme.colorScheme.primary.withOpacity(0.8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: theme.colorScheme.primary,
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: theme.colorScheme.primary.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: theme.colorScheme.primary.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),

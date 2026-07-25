@@ -169,11 +169,7 @@ class _DashboardContent extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [theme.colorScheme.primaryContainer, theme.colorScheme.surface],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: theme.colorScheme.primaryContainer.withOpacity(0.5),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
       ),
@@ -360,11 +356,7 @@ class _DashboardContent extends ConsumerWidget {
       return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [AppColors.business, AppColors.secondary],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: AppColors.business,
           borderRadius: BorderRadius.circular(24),
         ),
         child: Column(

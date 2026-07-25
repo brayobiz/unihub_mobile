@@ -204,11 +204,7 @@ class _DashboardAppBar extends ConsumerWidget {
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppColors.primaryGradientStart, AppColors.primaryGradientEnd],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: AppColors.primary,
           ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
@@ -786,11 +782,7 @@ class _CampusPulseSection extends ConsumerWidget {
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppColors.highlightTealBg, Theme.of(context).colorScheme.surface],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: AppColors.highlightTealBg,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.highlightTealBorder.withOpacity(0.5)),
           ),

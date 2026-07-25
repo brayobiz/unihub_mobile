@@ -272,14 +272,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            theme.colorScheme.surface,
-            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
-          ],
-        ),
+        color: theme.colorScheme.surface,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

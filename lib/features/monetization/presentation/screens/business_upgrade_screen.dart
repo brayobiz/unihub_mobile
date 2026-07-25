@@ -149,11 +149,7 @@ class _BusinessUpgradeScreenState extends ConsumerState<BusinessUpgradeScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [theme.colorScheme.primary, const Color(0xFF19D3C5)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: theme.colorScheme.primary,
         borderRadius: BorderRadius.circular(24),
       ),
       child: Column(

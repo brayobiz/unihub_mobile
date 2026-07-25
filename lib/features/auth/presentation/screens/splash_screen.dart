@@ -52,43 +52,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         width: double.infinity,
         height: double.infinity,
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.primaryGradientStart,
-              AppColors.primaryGradientEnd,
-            ],
-          ),
+          color: AppColors.primary,
         ),
         child: Stack(
           children: [
-            // Decorative background patterns
-            Positioned(
-              top: -100,
-              right: -100,
-              child: Container(
-                width: 300,
-                height: 300,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.05),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: -50,
-              left: -50,
-              child: Container(
-                width: 200,
-                height: 200,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.03),
-                ),
-              ),
-            ),
-            
             Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -107,16 +74,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     },
                     child: Container(
                       padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.1),
+                      decoration: const BoxDecoration(
+                        color: Colors.white10,
                         shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
-                            blurRadius: 30,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
                       ),
                       child: Image.asset(
                         'assets/icon/campus_icon.png',
@@ -143,13 +103,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       fontWeight: FontWeight.w900,
                       color: Colors.white,
                       letterSpacing: -1.5,
-                      shadows: [
-                        Shadow(
-                          color: Colors.black.withValues(alpha: 0.2),
-                          offset: const Offset(0, 4),
-                          blurRadius: 8,
-                        ),
-                      ],
                     ),
                   ),
                   

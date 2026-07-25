@@ -36,15 +36,8 @@ class AppDrawer extends ConsumerWidget {
               20,
               20,
             ),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  theme.colorScheme.primary,
-                  theme.colorScheme.primary.withOpacity(0.8),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+            decoration: const BoxDecoration(
+              color: AppColors.primary,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

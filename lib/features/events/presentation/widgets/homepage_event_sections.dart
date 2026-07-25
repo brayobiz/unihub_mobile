@@ -58,15 +58,13 @@ class _UpcomingReminder extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [theme.colorScheme.primary, theme.colorScheme.primary.withValues(alpha: 0.8)],
-            ),
+            color: theme.colorScheme.primary,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
+                color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
               ),
             ],
           ),

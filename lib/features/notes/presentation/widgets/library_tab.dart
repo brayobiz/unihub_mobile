@@ -193,14 +193,10 @@ class _LibraryTabState extends ConsumerState<LibraryTab> {
         margin: const EdgeInsets.only(left: 4, right: 12, bottom: 8),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [theme.colorScheme.primary, theme.colorScheme.primary.withValues(alpha: 0.8)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: theme.colorScheme.primary,
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
-            BoxShadow(color: theme.colorScheme.primary.withValues(alpha: 0.3), blurRadius: 15, offset: const Offset(0, 8))
+            BoxShadow(color: theme.colorScheme.primary.withValues(alpha: 0.15), blurRadius: 10, offset: const Offset(0, 4))
           ],
         ),
         child: Column(

@@ -87,15 +87,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                             child: Container(
                               height: 160,
                               decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    theme.colorScheme.surface,
-                                    theme.colorScheme.primary,
-                                    const Color(0xFF19D3C5),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
+                                color: theme.colorScheme.primary,
                               ),
                             ),
                           ),

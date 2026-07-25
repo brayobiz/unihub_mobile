@@ -80,15 +80,7 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
                             child: Container(
                               height: 160,
                               decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    const Color(0xFF0F172A),
-                                    theme.colorScheme.primary,
-                                    const Color(0xFF19D3C5),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
+                                color: theme.colorScheme.primary,
                               ),
                             ),
                           ),

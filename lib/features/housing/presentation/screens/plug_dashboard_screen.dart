@@ -331,14 +331,10 @@ class PlugDashboardScreen extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [theme.colorScheme.primary, AppColors.backgroundDark],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: theme.colorScheme.primary,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
-            BoxShadow(color: theme.colorScheme.primary.withOpacity(0.2), blurRadius: 20, offset: const Offset(0, 10))
+            BoxShadow(color: theme.colorScheme.primary.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))
           ],
         ),
         child: Row(

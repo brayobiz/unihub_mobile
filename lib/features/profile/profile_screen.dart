@@ -125,15 +125,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
                   child: Container(
                     height: 160,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          theme.colorScheme.surface,
-                          theme.colorScheme.primary,
-                          const Color(0xFF19D3C5),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: theme.colorScheme.primary,
                     ),
                   ),
                 ),
@@ -772,17 +764,13 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [theme.colorScheme.primary, const Color(0xFF19D3C5)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: theme.colorScheme.primary,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: theme.colorScheme.primary.withValues(alpha: 0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
+            color: theme.colorScheme.primary.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),

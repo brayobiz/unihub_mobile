@@ -122,15 +122,13 @@ class EventsBrowseScreen extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [theme.colorScheme.primary, theme.colorScheme.primary.withValues(alpha: 0.8)],
-          ),
+          color: theme.colorScheme.primary,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: theme.colorScheme.primary.withOpacity(0.2),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
+              color: theme.colorScheme.primary.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),

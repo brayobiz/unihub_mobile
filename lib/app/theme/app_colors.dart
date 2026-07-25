@@ -8,8 +8,6 @@ class AppColors {
   // Primary Palette (Modern Teal)
   static const Color primary = Color(0xFF14B8A6);    // Teal 500
   static const Color primaryDark = Color(0xFF0F766E); // Teal 700
-  static const Color primaryGradientStart = Color(0xFF14B8A6); 
-  static const Color primaryGradientEnd = Color(0xFF0D9488);   // Teal 600
   
   // Secondary & Accents
   static const Color secondary = Color(0xFF0F766E);  // Dark Teal

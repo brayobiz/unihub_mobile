@@ -179,15 +179,7 @@ class _OrganizerProfileScreenState extends ConsumerState<OrganizerProfileScreen>
       child: Container(
         height: 220,
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              theme.brightness == Brightness.dark ? const Color(0xFF0F172A) : const Color(0xFF1e293b),
-              theme.colorScheme.primary,
-              const Color(0xFF19D3C5),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: theme.colorScheme.primary,
         ),
         child: organizer.bannerUrl != null
             ? CachedNetworkImage(
