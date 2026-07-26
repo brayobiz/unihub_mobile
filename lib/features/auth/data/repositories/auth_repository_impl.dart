@@ -39,6 +39,8 @@ class AuthRepositoryImpl implements AuthRepository {
       final user = _firebaseAuth.currentUser;
       if (user != null) {
         await _updateSearchFields(user.uid);
+        // Self-healing: ensure onboarding flag is set for returning users
+        await _ensureOnboardingFlagForReturningUser(user.uid);
       }
 
       AppLogger.info('Auth: Sign in successful', 'AUTH');
@@ -109,10 +111,19 @@ class AuthRepositoryImpl implements AuthRepository {
         
         await docRef.set(userData);
       } else {
-        // Optional: Update last seen or FCM token if needed
-        await docRef.update({
-          'lastSeen': FieldValue.serverTimestamp(),
-        }).catchError((_) => null);
+        // Self-healing: Ensure existing users have the onboarding flag set
+        // to avoid being caught in the onboarding flow unexpectedly.
+        final data = doc.data() as Map<String, dynamic>;
+        if (data['isOnboardingCompleted'] == null || data['isOnboardingCompleted'] == false) {
+          await docRef.update({
+            'isOnboardingCompleted': true,
+            'lastSeen': FieldValue.serverTimestamp(),
+          }).catchError((_) => null);
+        } else {
+          await docRef.update({
+            'lastSeen': FieldValue.serverTimestamp(),
+          }).catchError((_) => null);
+        }
       }
     } catch (e) {
       AppLogger.error('Auth: Error ensuring user document exists', e, null, 'AUTH');
@@ -376,6 +387,25 @@ class AuthRepositoryImpl implements AuthRepository {
     await _firestore.collection('users').doc(uid).set({
       'isOnboardingCompleted': completed,
     }, SetOptions(merge: true));
+  }
+
+  /// Self-healing helper to ensure returning users are marked as onboarded.
+  Future<void> _ensureOnboardingFlagForReturningUser(String uid) async {
+    try {
+      final docRef = _firestore.collection('users').doc(uid);
+      final doc = await docRef.get();
+      if (doc.exists) {
+        final data = doc.data();
+        if (data != null && (data['isOnboardingCompleted'] == null || data['isOnboardingCompleted'] == false)) {
+          // If profile is already complete, assume they've onboarded before
+          if (data['university'] != null && data['course'] != null) {
+             await docRef.update({'isOnboardingCompleted': true}).catchError((_) => null);
+          }
+        }
+      }
+    } catch (e) {
+      // Best effort, don't throw
+    }
   }
 
   @override

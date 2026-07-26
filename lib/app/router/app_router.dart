@@ -129,6 +129,9 @@ import '../../features/events/presentation/screens/event_attendees_screen.dart';
 class RouterNotifier extends ChangeNotifier {
   final Ref _ref;
   bool _isDisposed = false;
+  
+  // To track when we entered splash to ensure minimum visibility for smooth transitions
+  DateTime? _splashEntryTime;
 
   RouterNotifier(this._ref) {
     // Consolidate listeners to avoid redundant rebuilds
@@ -185,24 +188,39 @@ class RouterNotifier extends ChangeNotifier {
     final settingsAsync = _ref.read(systemSettingsProvider);
     final isAccountDeleted = _ref.read(accountDeletedProvider);
 
-    final isSplash = state.matchedLocation == '/splash';
+    final String matchedLocation = state.matchedLocation;
+    final bool isSplash = matchedLocation == '/splash';
+    
+    // Track splash entry for transition stabilization
+    if (isSplash && _splashEntryTime == null) {
+      _splashEntryTime = DateTime.now();
+    } else if (!isSplash) {
+      _splashEntryTime = null;
+    }
 
     final firebaseUser = authState.valueOrNull;
     final appUser = appUserAsync.valueOrNull;
     final isDeleted = appUser?.isDeleted ?? false;
 
+    // Common check for auth-related routes
+    final isAuthRoute =
+        matchedLocation == '/login' ||
+        matchedLocation == '/register' ||
+        matchedLocation == '/welcome' ||
+        matchedLocation == '/complete-profile' ||
+        matchedLocation == '/onboarding' ||
+        isSplash;
+
     // 1. Account Deletion State (Highest Priority)
     if (isAccountDeleted || isDeleted) {
-      if (state.matchedLocation != '/account-deleted' &&
-          state.matchedLocation != '/login') {
+      if (matchedLocation != '/account-deleted' &&
+          matchedLocation != '/login') {
         return '/account-deleted';
       }
       return null;
     }
 
     // 2. Auth Loading State
-    // Optimization: Only show splash if we don't have a user value yet.
-    // This prevents "flickering" during token refreshes.
     if ((authState.isLoading || authState.isRefreshing) && !authState.hasValue) {
       return isSplash ? null : '/splash';
     }
@@ -212,37 +230,59 @@ class RouterNotifier extends ChangeNotifier {
     // 3. Unauthenticated Flow
     if (!isLoggedIn) {
       if (!isDeviceOnboardingDone) {
-        if (state.matchedLocation != '/onboarding') return '/onboarding';
+        if (matchedLocation != '/onboarding') return '/onboarding';
         return null;
       }
 
-      final isAuthRoute =
-          state.matchedLocation == '/login' ||
-          state.matchedLocation == '/register' ||
-          state.matchedLocation == '/welcome' ||
-          state.matchedLocation == '/forgot-password' ||
-          state.matchedLocation == '/account-deleted';
+      final bool isPublicAuthRoute = 
+          matchedLocation == '/login' ||
+          matchedLocation == '/register' ||
+          matchedLocation == '/welcome' ||
+          matchedLocation == '/forgot-password' ||
+          matchedLocation == '/account-deleted';
 
-      if (isSplash || !isAuthRoute) return '/welcome';
+      if (isSplash || !isPublicAuthRoute) return '/welcome';
       return null;
     }
 
     // 4. Email Verification Guard (Softened)
-    // We no longer block the whole app. We'll show a banner instead.
-    // However, if the user is on the verify-email page and JUST verified, we let them through.
-    if (state.matchedLocation == '/verify-email' && firebaseUser.emailVerified) {
+    if (matchedLocation == '/verify-email' && firebaseUser.emailVerified) {
       return '/main';
     }
 
-    // 5. Authenticated - Profile Data Loading
-    // Optimization: Don't jump to splash if we already have profile data in memory.
-    // This prevents reloads when presence updates trigger background refreshes.
-    if ((appUserAsync.isLoading || appUserAsync.isRefreshing) && !appUserAsync.hasValue) {
-      return isSplash ? null : '/splash';
+    // 5. Authenticated - Profile Data Loading & Transition Stabilizer
+    if (isLoggedIn) {
+      final bool isProfileMissing = appUser == null;
+      final bool isProfileFetching = appUserAsync.isLoading || appUserAsync.isRefreshing;
+      
+      // If we are on an auth route but logged in, we MUST route through splash
+      // to hide the data fetch and provide a premium transition.
+      if (isAuthRoute && !isSplash) {
+        return '/splash';
+      }
+
+      // If we are on Splash, hold until:
+      // 1. Profile data is fetched
+      // 2. Minimum transition duration (400ms) has passed to prevent "flicker"
+      if (isSplash) {
+        final now = DateTime.now();
+        final elapsed = _splashEntryTime != null 
+            ? now.difference(_splashEntryTime!).inMilliseconds 
+            : 0;
+            
+        if (isProfileFetching || isProfileMissing || elapsed < 400) {
+          // If data is ready but we're just waiting on the timer, 
+          // we trigger a re-notify after the remaining time.
+          if (!isProfileFetching && !isProfileMissing && elapsed < 400) {
+            Future.delayed(Duration(milliseconds: 405 - elapsed), () => _safeNotify());
+          }
+          return null;
+        }
+      }
     }
 
     if (appUserAsync.hasError) {
-      if (state.matchedLocation != '/connection-error') return '/connection-error';
+      if (matchedLocation != '/connection-error') return '/connection-error';
       return null;
     }
 
@@ -251,27 +291,29 @@ class RouterNotifier extends ChangeNotifier {
 
     // 6. Maintenance Mode Check
     if (settings?.maintenanceMode == true && !isAdmin) {
-      if (state.matchedLocation != '/maintenance') return '/maintenance';
+      if (matchedLocation != '/maintenance') return '/maintenance';
       return null;
     }
 
     // 7. Authenticated - Missing Document
     if (appUser == null) {
-      if (state.matchedLocation != '/complete-profile')
+      if (matchedLocation != '/complete-profile')
         return '/complete-profile';
       return null;
     }
 
     // 8. Restriction Check (Banned/Suspended)
     if (appUser.isRestricted) {
-      if (state.matchedLocation != '/banned') return '/banned';
+      if (matchedLocation != '/banned') return '/banned';
       return null;
     }
 
     // 9. Profile Completion Guard (Identity & Data)
     // Forced check: Even old users must have a real name and campus data.
     final name = appUser.fullName.trim().toLowerCase();
-    final isDefaultName = name == 'ulify user' || name == 'ulifyuser' || name == 'a student';
+    final isDefaultName = name == 'ulify user' || name == 'ulifyuser' || 
+                          name == 'unihub user' || name == 'unihubuser' ||
+                          name == 'a student';
     
     final isProfileIncomplete =
         appUser.university == null || 
@@ -280,27 +322,29 @@ class RouterNotifier extends ChangeNotifier {
         appUser.fullName.length < 3;
 
     if (isProfileIncomplete) {
-      if (state.matchedLocation != '/complete-profile') {
+      // If we are currently refreshing, don't jump to complete-profile yet
+      if (appUserAsync.isLoading || appUserAsync.isRefreshing) {
+        return isSplash ? null : '/splash';
+      }
+
+      if (matchedLocation != '/complete-profile') {
         return '/complete-profile';
       }
       return null;
     }
 
     // 10. User Onboarding Guard
-    if (!appUser.isOnboardingCompleted) {
-      if (state.matchedLocation != '/onboarding') return '/onboarding';
+    // A returning user is someone whose account was created more than a few minutes ago.
+    // If createdAt is null, it's an old legacy account, also considered returning.
+    final bool isReturningUser = appUser.createdAt == null || 
+        DateTime.now().difference(appUser.createdAt!).inMinutes > 2;
+
+    if (!appUser.isOnboardingCompleted && !isReturningUser) {
+      if (matchedLocation != '/onboarding') return '/onboarding';
       return null;
     }
 
     // 11. Already Logged In - Redirect away from Auth routes
-    final isAuthRoute =
-        state.matchedLocation == '/login' ||
-        state.matchedLocation == '/register' ||
-        state.matchedLocation == '/welcome' ||
-        state.matchedLocation == '/complete-profile' ||
-        state.matchedLocation == '/onboarding' ||
-        isSplash;
-
     if (isAuthRoute) {
       return '/main';
     }
@@ -331,48 +375,111 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/splash',
-        builder: (context, state) => const SplashScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const SplashScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) => 
+              FadeTransition(opacity: animation, child: child),
+        ),
       ),
       GoRoute(
         path: '/onboarding',
-        builder: (context, state) => const OnboardingScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const OnboardingScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) => 
+              FadeTransition(opacity: animation, child: child),
+        ),
       ),
       GoRoute(
         path: '/welcome',
-        builder: (context, state) => const WelcomeScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const WelcomeScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) => 
+              FadeTransition(opacity: animation, child: child),
+        ),
       ),
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/login', 
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const LoginScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) => 
+              FadeTransition(opacity: animation, child: child),
+        ),
+      ),
       GoRoute(
         path: '/register',
-        builder: (context, state) => const RegisterScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const RegisterScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) => 
+              FadeTransition(opacity: animation, child: child),
+        ),
       ),
       GoRoute(
         path: '/forgot-password',
-        builder: (context, state) => const ForgotPasswordScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const ForgotPasswordScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) => 
+              FadeTransition(opacity: animation, child: child),
+        ),
       ),
       GoRoute(
         path: '/verify-email',
-        builder: (context, state) => const VerifyEmailScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const VerifyEmailScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) => 
+              FadeTransition(opacity: animation, child: child),
+        ),
       ),
       GoRoute(
         path: '/complete-profile',
-        builder: (context, state) => const CompleteProfileScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const CompleteProfileScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) => 
+              FadeTransition(opacity: animation, child: child),
+        ),
       ),
       GoRoute(
         path: '/account-deleted',
-        builder: (context, state) => const AccountDeletedScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const AccountDeletedScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) => 
+              FadeTransition(opacity: animation, child: child),
+        ),
       ),
       GoRoute(
         path: '/banned',
-        builder: (context, state) => const BannedScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const BannedScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) => 
+              FadeTransition(opacity: animation, child: child),
+        ),
       ),
       GoRoute(
         path: '/maintenance',
-        builder: (context, state) => const MaintenanceScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const MaintenanceScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) => 
+              FadeTransition(opacity: animation, child: child),
+        ),
       ),
       GoRoute(
         path: '/connection-error',
-        builder: (context, state) => const ConnectionErrorScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const ConnectionErrorScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) => 
+              FadeTransition(opacity: animation, child: child),
+        ),
       ),
       GoRoute(
         path: '/global-search',
@@ -392,7 +499,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/main',
-        builder: (context, state) => const MainNavigationScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const MainNavigationScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) => 
+              FadeTransition(opacity: animation, child: child),
+        ),
       ),
       GoRoute(
         path: '/add-listing',
