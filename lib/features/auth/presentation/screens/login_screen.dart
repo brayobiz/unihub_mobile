@@ -323,7 +323,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       TextButton(
                         onPressed: isLoading ? null : () {
-                          context.push('/register');
+                          context.pushReplacement('/register');
                         },
                         child: Text(
                           'Create Account',

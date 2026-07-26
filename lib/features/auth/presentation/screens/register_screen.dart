@@ -374,7 +374,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             ),
                             TextButton(
                               onPressed: isLoading ? null : () {
-                                context.push('/login');
+                                context.pushReplacement('/login');
                               },
                               child: Text(
                                 'Sign In',
