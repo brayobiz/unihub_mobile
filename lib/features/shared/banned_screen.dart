@@ -15,7 +15,7 @@ class BannedScreen extends ConsumerWidget {
 
     final isPermanent = user.isBanned;
     final message = isPermanent 
-      ? 'Your account has been permanently banned for violating UniHub community standards.'
+      ? 'Your account has been permanently banned for violating Ulify community standards.'
       : 'Your account is temporarily suspended until ${DateFormat('MMM dd, yyyy').format(user.suspendedUntil ?? DateTime.now())}.';
 
     return Scaffold(
@@ -52,7 +52,7 @@ class BannedScreen extends ConsumerWidget {
             ],
             const SizedBox(height: 48),
             const Text(
-              'If you believe this is a mistake, please contact support via the official UniHub support form.',
+              'If you believe this is a mistake, please contact support via the official Ulify support form.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.grey600),
             ),

@@ -54,7 +54,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
           ),
         ),
         title: Text(
-          'UniHub Study',
+          'Ulify Study',
           style: theme.textTheme.titleLarge?.copyWith(
             color: theme.colorScheme.onSurface,
             fontWeight: FontWeight.bold,

@@ -344,7 +344,7 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'You\'re about to join UniHub\'s community of trusted housing specialists. Let\'s build your professional profile to help students find you.',
+            'You\'re about to join Ulify\'s community of trusted housing specialists. Let\'s build your professional profile to help students find you.',
             style: TextStyle(
               fontSize: 16,
               color: theme.colorScheme.onSurfaceVariant,
@@ -630,7 +630,7 @@ class _BecomePlugScreenState extends ConsumerState<BecomePlugScreen> {
           const SizedBox(height: 16),
           _buildChoiceTile(
             title: 'In-App Chat',
-            subtitle: 'Receive messages directly through UniHub Messenger.',
+            subtitle: 'Receive messages directly through Ulify Messenger.',
             icon: Icons.chat_bubble_outline_rounded,
             isSelected: state.preferredContact == 'In-App Chat',
             onTap: () => notifier.setPreferredContact('In-App Chat'),

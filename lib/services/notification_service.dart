@@ -66,14 +66,14 @@ class NotificationService implements NotificationSender {
 
     const channel = AndroidNotificationChannel(
       'unihub_main_channel',
-      'UniHub Notifications',
-      description: 'Main channel for all UniHub notifications',
+      'Ulify Notifications',
+      description: 'Main channel for all Ulify notifications',
       importance: Importance.max,
     );
 
     const downloadChannel = AndroidNotificationChannel(
       'unihub_downloads',
-      'UniHub Downloads',
+      'Ulify Downloads',
       description: 'Progress of material downloads',
       importance: Importance.low, // Lower importance for progress bars
       showBadge: false,
@@ -258,7 +258,7 @@ class NotificationService implements NotificationSender {
           } else {
             router.push('/chat', extra: {
               'conversationId': n.targetId,
-              'otherUserName': n.actorName ?? (n.type == NotificationType.support ? 'UniHub Support' : 'Message'),
+              'otherUserName': n.actorName ?? (n.type == NotificationType.support ? 'Ulify Support' : 'Message'),
             });
           }
           break;
@@ -595,7 +595,7 @@ class NotificationService implements NotificationSender {
           'body': 'Fresh items just landed in the marketplace. See what you can find today!',
         },
         {
-          'title': 'UniHub Marketplace 🎓',
+          'title': 'Ulify Marketplace 🎓',
           'body': 'Looking for something specific? Your campus mates might be selling exactly what you need!',
         },
         {

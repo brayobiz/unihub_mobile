@@ -43,7 +43,7 @@ class MaintenanceScreen extends ConsumerWidget {
                 ),
                 loading: () => const CircularProgressIndicator(),
                 error: (_, __) => const Text(
-                  'UniHub is currently under maintenance. We\'ll be back shortly!',
+                  'Ulify is currently under maintenance. We\'ll be back shortly!',
                   textAlign: TextAlign.center,
                 ),
               ),

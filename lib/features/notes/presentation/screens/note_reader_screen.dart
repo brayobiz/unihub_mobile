@@ -122,7 +122,7 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
       AppLogger.error('❌ Reader: PDF Init Error', e, stack, 'NoteReader');
       setState(() {
         _isError = true;
-        _errorMessage = 'UniHub cannot render this specific document internally. It might be too large or uses a complex format.';
+        _errorMessage = 'Ulify cannot render this specific document internally. It might be too large or uses a complex format.';
       });
     }
   }

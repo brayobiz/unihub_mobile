@@ -42,7 +42,7 @@ class OrganizerProfileController extends StateNotifier<AsyncValue<void>> {
         scheme: 'mailto',
         path: organizer.contactEmail,
         query: _encodeQueryParameters(<String, String>{
-          'subject': 'Inquiry from UniHub student',
+          'subject': 'Inquiry from Ulify student',
         }),
       );
       if (await canLaunchUrl(emailLaunchUri)) {

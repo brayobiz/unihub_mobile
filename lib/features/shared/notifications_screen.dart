@@ -273,7 +273,7 @@ class _NotificationTile extends ConsumerWidget {
           } else {
             context.push('/chat', extra: {
               'conversationId': n.targetId,
-              'otherUserName': n.actorName ?? (n.type == NotificationType.support ? 'UniHub Support' : 'Message'),
+              'otherUserName': n.actorName ?? (n.type == NotificationType.support ? 'Ulify Support' : 'Message'),
             });
           }
           break;

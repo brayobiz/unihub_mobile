@@ -143,7 +143,7 @@ exports.scheduledMarketplaceReminder = onSchedule("0 10 * * *", async (event) =>
       body: "Fresh items just landed in the marketplace. See what you can find today!",
     },
     {
-      title: "UniHub Marketplace 🎓",
+      title: "Ulify Marketplace 🎓",
       body: "Looking for something specific? Your campus mates might be selling exactly what you need!",
     },
     {

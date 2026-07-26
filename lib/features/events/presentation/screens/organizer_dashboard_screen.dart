@@ -160,7 +160,7 @@ class OrganizerDashboardScreen extends ConsumerWidget {
               title: const Text('Share Profile'),
               onTap: () {
                 Navigator.pop(context);
-                final profileUrl = 'https://unihub.edu/organizers/${organizer.id}';
+                final profileUrl = 'https://ulify.app/organizers/${organizer.id}';
                 Clipboard.setData(ClipboardData(text: profileUrl));
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(

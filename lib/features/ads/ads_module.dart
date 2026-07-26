@@ -1,4 +1,4 @@
-/// The Ads module for UniHub.
+/// The Ads module for Ulify.
 /// This module provides centralized management for all advertising-related
 /// functionality, ensuring a clean separation from the rest of the application.
 /// 

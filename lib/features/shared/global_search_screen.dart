@@ -464,7 +464,7 @@ class _UserSearchCard extends ConsumerWidget {
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
           ),
           subtitle: Text(
-            '${user.username != null ? '@${user.username} • ' : ''}${user.university ?? 'UniHub Student'}',
+            '${user.username != null ? '@${user.username} • ' : ''}${user.university ?? 'Ulify Student'}',
             style: const TextStyle(fontSize: 12),
           ),
           trailing: Container(
