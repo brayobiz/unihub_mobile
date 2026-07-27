@@ -13,7 +13,7 @@ class VerifyEmailScreen extends ConsumerStatefulWidget {
   ConsumerState<VerifyEmailScreen> createState() => _VerifyEmailScreenState();
 }
 
-class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
+class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> with WidgetsBindingObserver {
   bool _isResending = false;
   Timer? _timer;
   int _resendCountdown = 0;
@@ -22,7 +22,8 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   @override
   void initState() {
     super.initState();
-    // Clean Journey: Background timer to check status every 5 seconds
+    WidgetsBinding.instance.addObserver(this);
+    // Background timer to check status every 5 seconds
     _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
       ref.read(authControllerProvider.notifier).checkVerificationStatus();
     });
@@ -30,9 +31,18 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _countdownTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Check immediately when user returns to app
+      ref.read(authControllerProvider.notifier).checkVerificationStatus();
+    }
   }
 
   void _startResendCountdown() {
@@ -48,20 +58,32 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   }
 
   Future<void> _checkVerificationStatus() async {
-    setState(() => _isResending = true);
-    await ref.read(authControllerProvider.notifier).checkVerificationStatus();
-    
-    if (mounted) {
-      final user = ref.read(firebaseAuthProvider).currentUser;
-      if (user != null && !user.emailVerified) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Verification pending. Please check your email or try again in a moment.'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+    // Check silently without changing UI state to 'loading'
+    try {
+      await ref.read(authControllerProvider.notifier).checkVerificationStatus();
+      
+      if (mounted) {
+        final user = ref.read(firebaseAuthProvider).currentUser;
+        if (user != null && user.emailVerified) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Email verified successfully!'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } else {
+          // Only show message if they manually clicked, otherwise it's annoying
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Still waiting for verification... Please click the link in your email.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
-      setState(() => _isResending = false);
+    } catch (e) {
+      // Silent fail for polling
     }
   }
 
@@ -69,24 +91,28 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
     if (_resendCountdown > 0) return;
 
     setState(() => _isResending = true);
-    await ref.read(authControllerProvider.notifier).sendEmailVerification();
-    
-    if (mounted) {
-      final state = ref.read(authControllerProvider);
-      if (state.hasError) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${state.error.toString()}')),
-        );
-      } else {
-        _startResendCountdown();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Verification email resent! Please check your inbox.'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+    try {
+      await ref.read(authControllerProvider.notifier).sendEmailVerification();
+      if (mounted) {
+        final state = ref.read(authControllerProvider);
+        if (state.hasError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: ${state.error.toString()}')),
+          );
+        } else {
+          _startResendCountdown();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Verification email resent! Please check your inbox.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
-      setState(() => _isResending = false);
+    } finally {
+      if (mounted) {
+        setState(() => _isResending = false);
+      }
     }
   }
 
@@ -194,10 +220,8 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                 width: double.infinity,
                 height: 56,
                 child: FilledButton.icon(
-                  onPressed: (_isResending || _resendCountdown > 0) ? null : _checkVerificationStatus,
-                  icon: _isResending 
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.verified_user_rounded),
+                  onPressed: _checkVerificationStatus,
+                  icon: const Icon(Icons.verified_user_rounded),
                   label: const Text('I Have Verified', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                   style: FilledButton.styleFrom(
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),

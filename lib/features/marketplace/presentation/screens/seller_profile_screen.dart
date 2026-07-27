@@ -969,7 +969,7 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                   _buildShareOption(
                     context,
                     Icons.chat_bubble_outline_rounded,
-                    'Ulify Chat',
+                    'Share to Ulify Chat',
                     () {
                       Navigator.pop(context);
                       final chatContext = ChatContext(
@@ -980,20 +980,6 @@ class _SellerProfileScreenState extends ConsumerState<SellerProfileScreen> {
                         metadata: {'bio': seller.bio},
                       );
                       context.push('/share-to-chat', extra: chatContext);
-                    },
-                  ),
-                  _buildShareOption(
-                    context,
-                    Icons.share_rounded,
-                    'External Apps',
-                    () {
-                      Navigator.pop(context);
-                      Share.share(
-                        'Check out ${seller.fullName}\'s profile on Ulify Marketplace!\n\n'
-                        '${seller.bio ?? ''}\n'
-                        'Download Ulify to see their listings.',
-                        subject: '${seller.fullName} on Ulify',
-                      );
                     },
                   ),
                 ],

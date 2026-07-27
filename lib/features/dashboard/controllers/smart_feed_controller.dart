@@ -35,8 +35,12 @@ final smartFeedProvider = Provider.autoDispose<AsyncValue<List<SmartFeedItem>>>(
   final communityAsync = ref.watch(communityFeedProvider);
   final roommatesAsync = ref.watch(roommateProfilesProvider);
 
-  if (marketplaceAsync.isLoading || housingAsync.isLoading || notesAsync.isLoading || 
-      gigsAsync.isLoading || communityAsync.isLoading || roommatesAsync.isLoading) {
+  // Harden for Production: Only return loading if we have NO data yet.
+  // This prevents UI shifts/flickers when background providers refresh on app resume.
+  final allProviders = [marketplaceAsync, housingAsync, notesAsync, gigsAsync, communityAsync, roommatesAsync];
+  final isInitialLoading = allProviders.any((p) => p.isLoading && !p.hasValue);
+
+  if (isInitialLoading) {
     return const AsyncValue.loading();
   }
 
@@ -149,7 +153,8 @@ final campusPulseProvider = Provider.autoDispose<AsyncValue<Map<String, int>>>((
   final notesAsync = ref.watch(notesListingsProvider(20));
   final gigsAsync = ref.watch(gigsFeedProvider);
 
-  if (marketplaceAsync.isLoading || housingAsync.isLoading || notesAsync.isLoading || gigsAsync.isLoading) {
+  final allProviders = [marketplaceAsync, housingAsync, notesAsync, gigsAsync];
+  if (allProviders.any((p) => p.isLoading && !p.hasValue)) {
     return const AsyncValue.loading();
   }
 
@@ -258,7 +263,8 @@ final newItemsSummaryProvider = Provider.autoDispose<AsyncValue<Map<String, int>
   final notesAsync = ref.watch(notesListingsProvider(50));
   final gigsAsync = ref.watch(gigsFeedProvider);
 
-  if (marketplaceAsync.isLoading || housingAsync.isLoading || notesAsync.isLoading || gigsAsync.isLoading) {
+  final allProviders = [marketplaceAsync, housingAsync, notesAsync, gigsAsync];
+  if (allProviders.any((p) => p.isLoading && !p.hasValue)) {
     return const AsyncValue.loading();
   }
 

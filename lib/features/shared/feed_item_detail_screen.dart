@@ -3,9 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:go_router/go_router.dart';
 import '../../app/theme/app_colors.dart';
+import '../chat/domain/models/chat_context.dart';
 import '../auth/shared/providers.dart';
 import 'feed_repository.dart';
 import '../../models/feed_type.dart';
@@ -225,10 +226,17 @@ class _ConfessionDetailView extends ConsumerWidget {
                       icon: const Icon(Icons.share_outlined, size: 20),
                       onPressed: () {
                         ref.read(feedRepositoryProvider).incrementShareCount(item.id);
-                        Share.share(
-                          'Check out this confession on Ulify:\n\n"${item.subtitle}"\n\nJoin the campus community on Ulify!',
-                          subject: 'Campus Confession',
+                        final chatContext = ChatContext(
+                          type: item.type == FeedType.gig ? 'gig' : 'feed',
+                          id: item.id,
+                          title: item.title.isEmpty ? 'Confession' : item.title,
+                          thumbnail: item.images.isNotEmpty ? item.images.first : null,
+                          metadata: {
+                            'subtitle': item.subtitle,
+                            'authorName': 'Anonymous',
+                          },
                         );
+                        context.push('/share-to-chat', extra: chatContext);
                       },
                       color: theme.colorScheme.onSurfaceVariant,
                     ),

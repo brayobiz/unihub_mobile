@@ -239,11 +239,7 @@ class FeedCard extends ConsumerWidget {
                   color: theme.colorScheme.onSurfaceVariant,
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    ref.read(feedRepositoryProvider).incrementShareCount(item.id);
-                    Share.share(
-                      'Check out this post on Ulify:\n\n"${item.title.isNotEmpty ? item.title : item.subtitle}"\n\nJoin the campus community on Ulify!',
-                      subject: item.title.isNotEmpty ? item.title : 'Campus Post',
-                    );
+                    _shareItem(context, ref);
                   },
                 ),
                 const Spacer(),
@@ -294,7 +290,9 @@ class FeedCard extends ConsumerWidget {
     final chatContext = ChatContext(
       type: item.type == FeedType.gig ? 'gig' : 'feed',
       id: item.id,
-      title: item.title,
+      title: item.title.isEmpty 
+          ? (item.type == FeedType.confession ? 'Confession' : (item.type == FeedType.gig ? 'Gig' : 'Community Post'))
+          : item.title,
       thumbnail: item.images.isNotEmpty ? item.images.first : null,
       metadata: {
         'subtitle': item.subtitle,

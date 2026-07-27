@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unihub_mobile/core/constants/campus_constants.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
@@ -15,7 +14,6 @@ import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
 import 'package:unihub_mobile/features/chat/shared/providers.dart';
 import '../../../../core/widgets/authorization_guard.dart';
 import '../../../../core/services/authorization_service.dart';
-import 'package:open_filex/open_filex.dart';
 
 class NoteDetailScreen extends ConsumerStatefulWidget {
   final NoteListing? note;
@@ -106,9 +104,9 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
                         children: currentNote.tags.map((tag) => Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+                            border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
                           ),
                           child: Text(
                             '#$tag', 
@@ -201,7 +199,24 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
   }
 
   void _confirmDeletion(BuildContext context, WidgetRef ref, NoteListing note) {
-    // ... existing code ...
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Resource?'),
+        content: const Text('Are you sure you want to permanently remove this study material? This action cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await ref.read(notesRepositoryProvider).deleteNote(note.id);
+              if (context.mounted) context.pop();
+            },
+            child: const Text('Delete', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _shareNote(BuildContext context, NoteListing note) {

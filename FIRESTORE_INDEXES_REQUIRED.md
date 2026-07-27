@@ -24,6 +24,11 @@ To ensure the app functions correctly in production, the following composite ind
 | `status` (Asc), `savesCount` (Desc) | Marketplace browse (Most Saved) |
 | `status` (Asc), `category` (Asc), `createdAt` (Desc) | Category browsing |
 | `status` (Asc), `sellerUniversity` (Asc), `createdAt` (Desc) | Campus browsing |
+| `status` (Asc), `category` (Asc), `price` (Asc) | Category browse (Lowest Price) |
+| `status` (Asc), `category` (Asc), `price` (Desc) | Category browse (Highest Price) |
+| `status` (Asc), `category` (Asc), `viewsCount` (Desc) | Category browse (Most Viewed) |
+| `status` (Asc), `sellerUniversity` (Asc), `price` (Asc) | Campus browse (Lowest Price) |
+| `status` (Asc), `sellerUniversity` (Asc), `price` (Desc) | Campus browse (Highest Price) |
 | `status` (Asc), `category` (Asc), `sellerUniversity` (Asc), `createdAt` (Desc) | Filtered campus & category browsing |
 | `sellerId` (Asc), `status` (Asc) | Seller inventory management |
 | `flagged` (Asc), `createdAt` (Desc) | Admin flag queue |

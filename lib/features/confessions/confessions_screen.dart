@@ -5,8 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
+import '../chat/domain/models/chat_context.dart';
 import '../../models/feed_type.dart';
 import '../shared/feed_repository.dart';
 import '../auth/shared/providers.dart';
@@ -616,10 +616,17 @@ class _ConfessionCardState extends ConsumerState<_ConfessionCard> with SingleTic
                   _ActionButton(
                     onTap: () {
                        ref.read(feedRepositoryProvider).incrementShareCount(widget.item.id);
-                       Share.share(
-                         'Anonymous Confession on Ulify:\n\n"${widget.item.subtitle}"\n\nJoin the campus community on Ulify!',
-                         subject: 'Campus Confession',
+                       final chatContext = ChatContext(
+                         type: 'feed',
+                         id: widget.item.id,
+                         title: widget.item.title.isEmpty ? 'Confession' : widget.item.title,
+                         thumbnail: widget.item.images.isNotEmpty ? widget.item.images.first : null,
+                         metadata: {
+                           'subtitle': widget.item.subtitle,
+                           'authorName': 'Anonymous',
+                         },
                        );
+                       context.push('/share-to-chat', extra: chatContext);
                     },
                     child: Row(
                       children: [

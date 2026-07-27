@@ -486,6 +486,7 @@ class _AnnouncementEditDialogState extends ConsumerState<_AnnouncementEditDialog
                   Expanded(
                     child: DropdownButtonFormField<AnnouncementDisplayStyle>(
                       value: _displayStyle,
+                      isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Display Style'),
                       items: AnnouncementDisplayStyle.values.map((s) => DropdownMenuItem(value: s, child: Text(s.name.toUpperCase()))).toList(),
                       onChanged: (val) => setState(() => _displayStyle = val!),
@@ -495,6 +496,7 @@ class _AnnouncementEditDialogState extends ConsumerState<_AnnouncementEditDialog
                   Expanded(
                     child: DropdownButtonFormField<AnnouncementPriority>(
                       value: _priority,
+                      isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Priority'),
                       items: AnnouncementPriority.values.map((p) => DropdownMenuItem(value: p, child: Text(p.name.toUpperCase()))).toList(),
                       onChanged: (val) => setState(() => _priority = val!),
@@ -512,6 +514,7 @@ class _AnnouncementEditDialogState extends ConsumerState<_AnnouncementEditDialog
               ),
               DropdownButtonFormField<String>(
                 value: _university,
+                isExpanded: true,
                 decoration: const InputDecoration(labelText: 'University'),
                 items: [
                   const DropdownMenuItem(value: 'All', child: Text('All Campuses')),
@@ -524,6 +527,7 @@ class _AnnouncementEditDialogState extends ConsumerState<_AnnouncementEditDialog
               const Divider(),
               DropdownButtonFormField<AnnouncementStatus>(
                 value: _status,
+                isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Status'),
                 items: AnnouncementStatus.values.map((s) => DropdownMenuItem(value: s, child: Text(s.name.toUpperCase()))).toList(),
                 onChanged: (val) => setState(() => _status = val!),

@@ -79,7 +79,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      drawer: AppDrawer(),
+      drawer: const AppDrawer(),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(smartFeedProvider);
@@ -125,6 +125,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             const SliverToBoxAdapter(child: _TrendingSection()),
             const SliverToBoxAdapter(child: _HousingPreviewSection()),
             const SliverToBoxAdapter(child: _SavedItemsSection()),
+            const _DashboardSmartFeed(),
             const _ActivityFeedSection(),
             const SliverToBoxAdapter(child: SizedBox(height: 40)),
           ],
@@ -438,7 +439,7 @@ class _ActionItem extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(icon, color: color, size: 24),
@@ -538,153 +539,161 @@ class _TrendingSection extends ConsumerWidget {
     final theme = Theme.of(context);
     final trendingAsync = ref.watch(trendingFeedProvider);
 
-    return trendingAsync.when(
+    return trendingAsync.maybeWhen(
       data: (items) {
         if (items.isEmpty) return const SizedBox.shrink();
+        return _buildTrendingContent(context, theme, items);
+      },
+      orElse: () {
+        // If we have data from a previous state (refreshing), keep showing it
+        if (trendingAsync.hasValue && trendingAsync.value!.isNotEmpty) {
+          return _buildTrendingContent(context, theme, trendingAsync.value!);
+        }
+        return const SizedBox.shrink();
+      },
+    );
+  }
 
-        return Padding(
-          padding: const EdgeInsets.only(top: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                child: Row(
-                  children: [
-                    Text(
-                      'Trending Now',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.local_fire_department_rounded, size: 11, color: Colors.red.shade700),
-                          const SizedBox(width: 4),
-                          Text(
-                            'HOT',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              fontSize: 8.5,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.red.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+  Widget _buildTrendingContent(BuildContext context, ThemeData theme, List<SmartFeedItem> items) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+            child: Row(
+              children: [
+                Text(
+                  'Trending Now',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  ),
                 ),
-              ),
-              SizedBox(
-                height: 190,
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: items.take(5).length,
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    final imageUrl = _getImageUrl(item);
-
-                    return GestureDetector(
-                      onTap: () => _handleItemTap(context, item),
-                      child: Container(
-                        width: 155,
-                        margin: const EdgeInsets.only(right: 14),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: theme.colorScheme.outlineVariant),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.local_fire_department_rounded, size: 11, color: Colors.red.shade700),
+                      const SizedBox(width: 4),
+                      Text(
+                        'HOT',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.red.shade700,
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            ClipRRect(
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                              child: Stack(
-                                children: [
-                                  OptimizedImage(
-                                    imageUrl: imageUrl ?? CategoryUtils.getPlaceholder(item.model.type),
-                                    height: 95,
-                                    width: 155,
-                                  ),
-                                  Positioned(
-                                    top: 8,
-                                    left: 8,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.9),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Icon(
-                                        CategoryUtils.getIcon(item.model.type),
-                                        size: 11,
-                                        color: CategoryUtils.getColor(item.model.type),
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 190,
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: items.take(5).length,
+              itemBuilder: (context, index) {
+                final item = items[index];
+                final imageUrl = _getImageUrl(item);
+
+                return GestureDetector(
+                  onTap: () => _handleItemTap(context, item),
+                  child: Container(
+                    width: 155,
+                    margin: const EdgeInsets.only(right: 14),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: theme.colorScheme.outlineVariant),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                          child: Stack(
+                            children: [
+                              OptimizedImage(
+                                imageUrl: imageUrl ?? CategoryUtils.getPlaceholder(item.model.type),
+                                height: 95,
+                                width: 155,
                               ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(10),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    item.model.title,
-                                    style: theme.textTheme.titleSmall?.copyWith(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
+                              Positioned(
+                                top: 8,
+                                left: 8,
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                  const SizedBox(height: 3),
+                                  child: Icon(
+                                    CategoryUtils.getIcon(item.model.type),
+                                    size: 11,
+                                    color: CategoryUtils.getColor(item.model.type),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                item.model.title,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 3),
                                   Text(
                                     item.model.subtitle,
                                     style: theme.textTheme.bodySmall?.copyWith(
                                       fontSize: 10,
-                                      color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
+                                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                                       fontWeight: FontWeight.w500,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                ],
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+        ],
+      ),
     );
   }
 
@@ -812,7 +821,7 @@ class _ActivityItem extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: CategoryUtils.getColor(item.model.type).withOpacity(0.1),
+                  color: CategoryUtils.getColor(item.model.type).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
@@ -863,7 +872,7 @@ class _ActivityItem extends StatelessWidget {
                       '${item.model.subtitle} • $timeAgo',
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontSize: 12,
-                        color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
+                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                         fontWeight: FontWeight.w500,
                       ),
                       maxLines: 1,
@@ -898,7 +907,7 @@ class _CampusPulseSection extends ConsumerWidget {
           decoration: BoxDecoration(
             color: AppColors.highlightTealBg,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.highlightTealBorder.withOpacity(0.5)),
+            border: Border.all(color: AppColors.highlightTealBorder.withValues(alpha: 0.5)),
           ),
           child: Column(
             children: [
@@ -1053,14 +1062,14 @@ class _HousingPreviewSection extends ConsumerWidget {
   }
 }
 
-class _SmartFeedSection extends ConsumerWidget {
-  const _SmartFeedSection();
+class _DashboardSmartFeed extends ConsumerWidget {
+  const _DashboardSmartFeed();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final feedAsync = ref.watch(personalizedRecommendationsProvider);
 
-    return feedAsync.when(
+    return feedAsync.maybeWhen(
       data: (items) {
         if (items.isEmpty) {
           return const SliverToBoxAdapter(
@@ -1070,32 +1079,41 @@ class _SmartFeedSection extends ConsumerWidget {
             ),
           );
         }
+        return _buildFeedList(items);
+      },
+      orElse: () {
+        if (feedAsync.hasValue && feedAsync.value!.isNotEmpty) {
+          return _buildFeedList(feedAsync.value!);
+        }
+        
         return SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final item = items[index];
-                return FeedItemCard(
-                  item: item.model,
-                  onTap: () => _handleItemTap(context, item),
-                );
-              },
-              childCount: items.length,
+              (context, index) => const SkeletonFeedItem(),
+              childCount: 5,
             ),
           ),
         );
       },
-      loading: () => SliverPadding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        sliver: SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, index) => const SkeletonFeedItem(),
-            childCount: 5,
-          ),
+    );
+  }
+
+  Widget _buildFeedList(List<SmartFeedItem> items) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final item = items[index];
+            return FeedItemCard(
+              item: item.model,
+              onTap: () => _handleItemTap(context, item),
+            );
+          },
+          childCount: items.length,
         ),
       ),
-      error: (err, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
     );
   }
 }
@@ -1173,7 +1191,7 @@ class _ContinueReadingSection extends ConsumerWidget {
                         border: Border.all(color: theme.colorScheme.outlineVariant),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
+                            color: Colors.black.withValues(alpha: 0.04),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -1207,7 +1225,7 @@ class _ContinueReadingSection extends ConsumerWidget {
                                 Text(
                                   '${note.unitCode} • Page ${recent.lastPage + 1}',
                                   style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
+                                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                                     fontSize: 12.5
                                   ),
                                 ),
@@ -1430,10 +1448,10 @@ class _SavedItemCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.02),
+              color: Colors.black.withValues(alpha: 0.02),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -1456,7 +1474,7 @@ class _SavedItemCard extends StatelessWidget {
                     height: 95, 
                     width: 135, 
                     color: theme.colorScheme.surfaceContainerHighest, 
-                    child: Icon(Icons.image_outlined, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5), size: 20)
+                    child: Icon(Icons.image_outlined, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), size: 20)
                   ),
             ),
             Padding(

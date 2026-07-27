@@ -93,6 +93,21 @@ class AppErrorHandler {
 
   static String _handleFirestoreException(FirebaseException e) {
     AppLogger.warning('🛑 Firestore Error Code: ${e.code}', 'ERROR_HANDLER');
+    
+    // Check for missing index errors specifically
+    if (e.code == 'failed-precondition' && (e.message?.contains('index') ?? false)) {
+      // Print very loudly to terminal for the developer
+      debugPrint('\n' + '='*80);
+      debugPrint('🚀 FIRESTORE INDEX REQUIRED!');
+      debugPrint('The current query needs a composite index to work.');
+      debugPrint('Click this link to create it:');
+      debugPrint(e.message);
+      debugPrint('='*80 + '\n');
+      
+      AppLogger.error('MISSING INDEX', e.message, null, 'FIRESTORE');
+      return 'This query requires a database index. Check the terminal for the link.';
+    }
+
     switch (e.code) {
       case 'permission-denied':
         return 'You don\'t have permission to perform this action.';

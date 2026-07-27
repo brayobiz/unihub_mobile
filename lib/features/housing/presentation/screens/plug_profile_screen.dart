@@ -931,7 +931,7 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
                   _buildShareOption(
                     context,
                     Icons.chat_bubble_outline_rounded,
-                    'Ulify Chat',
+                    'Share to Ulify Chat',
                     () {
                       Navigator.pop(context);
                       final chatContext = ChatContext(
@@ -942,20 +942,6 @@ class _PlugProfileScreenState extends ConsumerState<PlugProfileScreen> {
                         metadata: {'bio': plug.bio},
                       );
                       context.push('/share-to-chat', extra: chatContext);
-                    },
-                  ),
-                  _buildShareOption(
-                    context,
-                    Icons.share_rounded,
-                    'External Apps',
-                    () {
-                      Navigator.pop(context);
-                      Share.share(
-                        'Check out ${plug.fullName}, a Housing Plug on Ulify!\n\n'
-                        '${plug.bio ?? ''}\n'
-                        'Download Ulify to see their listings.',
-                        subject: '${plug.fullName} on Ulify',
-                      );
                     },
                   ),
                 ],

@@ -34,14 +34,25 @@ class AppLifecycleService with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Update the global provider so other services can react
+    // Audit Note: Opening the notification shade triggers 'inactive'. 
+    // We only want to notify the rest of the app if there's a significant change
+    // to avoid UI flickers and redundant refreshes.
+    final previousState = _ref.read(appLifecycleStateProvider);
+    if (previousState == state) return;
+
+    // Update the global provider
     _ref.read(appLifecycleStateProvider.notifier).state = state;
     
     AppLogger.info('📱 App Lifecycle State: ${state.name.toUpperCase()}', 'LIFECYCLE');
     
     switch (state) {
       case AppLifecycleState.resumed:
-        _handleResumed();
+        if (previousState == AppLifecycleState.inactive) {
+          // Returning from notification shade/overlay. Usually no refresh needed.
+          AppLogger.info('App Resumed from Inactive (Overlay closed)', 'LIFECYCLE');
+        } else {
+          _handleResumed();
+        }
         break;
       case AppLifecycleState.paused:
         _handlePaused();

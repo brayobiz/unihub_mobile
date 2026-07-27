@@ -54,8 +54,9 @@ class NotesRepositoryImpl implements NotesRepository {
           .map((doc) => NoteListing.fromJson(doc.data() as Map<String, dynamic>))
           .toList();
 
-      // 2. Sorting is newest first by default in the list
-      
+      // Sort newest first in-memory to avoid composite index requirements
+      items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
       if (yearOfStudy != null && yearOfStudy != 'All') {
         items = items.where((n) => n.yearOfStudy == yearOfStudy).toList();
       }

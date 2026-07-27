@@ -1,13 +1,10 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdfx/pdfx.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'package:path/path.dart' as p;
 import 'package:open_filex/open_filex.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/core/utils/app_logger.dart';
@@ -78,7 +75,9 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
     
     // Most resources on UniHub are PDFs. If it's not explicitly something else, try PDF.
     if (url.contains('.docx') || url.contains('.doc') || 
-        url.contains('.pptx') || url.contains('.ppt')) return false;
+        url.contains('.pptx') || url.contains('.ppt')) {
+      return false;
+    }
         
     if (url.contains('.pdf') || path.contains('.pdf')) return true;
     
@@ -149,15 +148,16 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
       final fileName = '$safeTitle$ext';
       final downloadService = ref.read(downloadServiceProvider);
       
-      AppLogger.info('🚩 Reader: Generated Filename: $fileName', 'NoteReader');
-
-      if (_isError) {
-        final path = await downloadService.getSavePath(fileName);
-        final file = File(path);
-        if (file.existsSync()) {
-          AppLogger.info('🚩 Reader: Deleting existing failed file', 'NoteReader');
-          await file.delete();
+      // Persistence Guard: Check if we already have it before network request
+      final isExisting = await downloadService.isFileDownloaded(fileName);
+      if (isExisting) {
+        _localPath = await downloadService.getSavePath(fileName);
+        AppLogger.info('🚩 Reader: Found existing local file at $_localPath', 'NoteReader');
+        if (mounted) {
+          setState(() => _isDownloading = false);
+          _isPdf ? _initPdfController() : _initWebView();
         }
+        return;
       }
 
       AppLogger.info('🚩 Reader: Calling downloadService.downloadFile', 'NoteReader');
@@ -231,13 +231,11 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
   }
 
   void _onPageChanged(int page) {
-    setState(() {
-      _currentPage = page - 1;
-    });
+    _currentPage = page - 1;
 
     _debounce?.cancel();
-    _debounce = Timer(const Duration(seconds: 1), () {
-      if (_totalPages > 0) {
+    _debounce = Timer(const Duration(seconds: 2), () {
+      if (_totalPages > 0 && mounted) {
         final progress = page / _totalPages;
         ref.read(studyControllerProvider).updateProgress(
           widget.note.id,
@@ -255,11 +253,27 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
     });
   }
 
+  Future<void> _openExternally() async {
+    if (_localPath == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please wait for the file to finish preparing.')),
+      );
+      return;
+    }
+    try {
+      await OpenFilex.open(_localPath!);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not find an app to open this file. Please install Word or a PDF reader.')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final progressAsync = ref.watch(noteProgressProvider(widget.note.id));
-    final isBookmarked = progressAsync.valueOrNull?.isBookmarked ?? false;
 
     return Scaffold(
       backgroundColor: _isPdf ? const Color(0xFF1A1A1A) : theme.colorScheme.surface,
@@ -272,111 +286,101 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
       ),
       body: Stack(
         children: [
-          // Main Reader Content
-          GestureDetector(
-            onTap: _toggleUI,
-            child: _isError 
-              ? _buildErrorView(context)
-              : _isDownloading 
-                ? _buildDownloadView(context) 
-                : (_isPdf ? _buildPdfView() : _buildWebView()),
+          // Main Reader Content - Wrapped in a RepaintBoundary for performance
+          RepaintBoundary(
+            child: GestureDetector(
+              onTap: _toggleUI,
+              child: _isError 
+                ? _buildErrorView(context)
+                : _isDownloading 
+                  ? _buildDownloadView(context) 
+                  : (_isPdf ? _buildPdfView() : _buildWebView()),
+            ),
           ),
 
           // Header (AppBar)
           AnimatedPositioned(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
-            top: _showUI ? 0 : -100,
+            top: _showUI ? 0 : -110,
             left: 0,
             right: 0,
-            child: _buildHeader(context, isBookmarked),
+            child: _buildHeader(context),
           ),
-
-          // Footer (Progress Controls)
-          if (_isPdf && _totalPages > 0)
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-              bottom: _showUI ? 0 : -120,
-              left: 0,
-              right: 0,
-              child: _buildFooter(context),
-            ),
-
-          // Permanent slim progress indicator at the bottom
-          if (_isPdf && _totalPages > 0 && !_showUI)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: LinearProgressIndicator(
-                value: (_currentPage + 1) / _totalPages,
-                backgroundColor: Colors.transparent,
-                valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary.withOpacity(0.5)),
-                minHeight: 3,
-              ),
-            ),
         ],
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool isBookmarked) {
+  Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top, bottom: 8),
       decoration: BoxDecoration(
-        color: _isPdf ? Colors.black.withOpacity(0.85) : theme.colorScheme.primary,
+        color: _isPdf ? Colors.black.withValues(alpha: 0.85) : theme.colorScheme.primary,
         boxShadow: [
-          if (_showUI) BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10)
+          if (_showUI) BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10)
         ],
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+          Padding(
+            padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top, bottom: 4),
+            child: Row(
               children: [
-                Text(
-                  widget.note.title,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontSize: 15, 
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
                 ),
-                if (_isPdf && _totalPages > 0)
-                  Text(
-                    'Page ${_currentPage + 1} of $_totalPages',
-                    style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.7)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        widget.note.title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontSize: 15, 
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (_isPdf)
+                        ValueListenableBuilder<int>(
+                          valueListenable: _pdfController!.pageListenable,
+                          builder: (context, page, child) {
+                            return Text(
+                              'Page $page of $_totalPages',
+                              style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.7)),
+                            );
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+                _BookmarkButton(noteId: widget.note.id),
+                if (!_isPdf)
+                  IconButton(
+                    icon: const Icon(Icons.open_in_new_rounded, color: Colors.white, size: 20),
+                    tooltip: 'Open with native app',
+                    onPressed: _openExternally,
                   ),
               ],
             ),
           ),
-          IconButton(
-            icon: Icon(
-              isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-              color: isBookmarked ? Colors.amber : Colors.white,
-            ),
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              ref.read(studyControllerProvider).toggleBookmark(widget.note.id);
-            },
-          ),
+          // Reading progress bar at the bottom edge of the app bar
           if (_isPdf)
-            IconButton(
-              icon: const Icon(Icons.grid_view_rounded, color: Colors.white, size: 20),
-              onPressed: () {
-                // Future: Thumbnail view
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Thumbnail view coming soon'), duration: Duration(seconds: 1)),
+            ValueListenableBuilder<int>(
+              valueListenable: _pdfController!.pageListenable,
+              builder: (context, page, child) {
+                if (_totalPages == 0) return const SizedBox.shrink();
+                return LinearProgressIndicator(
+                  value: page / _totalPages,
+                  backgroundColor: Colors.white.withValues(alpha: 0.1),
+                  valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
+                  minHeight: 2,
                 );
               },
             ),
@@ -385,96 +389,25 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
     );
   }
 
-  Widget _buildFooter(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.85),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Progress',
-                style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-              Text(
-                '${((_currentPage + 1) / _totalPages * 100).toInt()}%',
-                style: TextStyle(color: theme.colorScheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _buildPageNavButton(Icons.chevron_left, () {
-                if (_currentPage > 0) _pdfController?.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
-              }),
-              Expanded(
-                child: SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: 4,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
-                    activeTrackColor: theme.colorScheme.primary,
-                    inactiveTrackColor: Colors.white24,
-                    thumbColor: Colors.white,
-                  ),
-                  child: Slider(
-                    value: _currentPage.toDouble(),
-                    min: 0,
-                    max: (_totalPages - 1).toDouble(),
-                    onChanged: (val) {
-                      _pdfController?.jumpToPage(val.toInt() + 1);
-                    },
-                  ),
-                ),
-              ),
-              _buildPageNavButton(Icons.chevron_right, () {
-                if (_currentPage < _totalPages - 1) _pdfController?.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
-              }),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPageNavButton(IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: Colors.white, size: 20),
-      ),
-    );
-  }
-
   Widget _buildPdfView() {
     if (_pdfController == null) return const SizedBox.shrink();
     return PdfViewPinch(
       controller: _pdfController!,
+      scrollDirection: Axis.vertical,
+      builders: PdfViewPinchBuilders<DefaultBuilderOptions>(
+        options: const DefaultBuilderOptions(),
+        documentLoaderBuilder: (_) => const Center(child: CircularProgressIndicator()),
+        pageLoaderBuilder: (_) => const Center(child: CircularProgressIndicator()),
+        errorBuilder: (_, error) => Center(child: Text(error.toString())),
+      ),
       onDocumentLoaded: (document) {
-        setState(() {
-          _totalPages = document.pagesCount;
-        });
+        if (mounted) {
+          setState(() {
+            _totalPages = document.pagesCount;
+          });
+        }
       },
       onPageChanged: _onPageChanged,
-      onDocumentError: (error) {
-        setState(() {
-          _isError = true;
-          _errorMessage = 'Error opening PDF: $error';
-        });
-      },
     );
   }
 
@@ -496,7 +429,7 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
             child: Container(
               padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.1),
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(Icons.auto_stories, size: 64, color: theme.colorScheme.primary),
@@ -601,6 +534,28 @@ class _NoteReaderScreenState extends ConsumerState<NoteReaderScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _BookmarkButton extends ConsumerWidget {
+  final String noteId;
+  const _BookmarkButton({required this.noteId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final progressAsync = ref.watch(noteProgressProvider(noteId));
+    final isBookmarked = progressAsync.valueOrNull?.isBookmarked ?? false;
+
+    return IconButton(
+      icon: Icon(
+        isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+        color: isBookmarked ? Colors.amber : Colors.white,
+      ),
+      onPressed: () {
+        HapticFeedback.lightImpact();
+        ref.read(studyControllerProvider).toggleBookmark(noteId);
+      },
     );
   }
 }
