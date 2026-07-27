@@ -88,7 +88,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
           'Marketplace',
           style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.bold,
-            fontSize: 22,
+            fontSize: 15,
           ),
         ),
         actions: [
@@ -216,8 +216,8 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                 child: Column(
                   children: [
                     _buildSearchBar(controller, filterState),
-                    const SizedBox(height: 12),
-                    _buildCategoryChips(filterState, controller),
+                    const SizedBox(height: 16),
+                    _buildCategoryDropdown(filterState, controller),
                   ],
                 ),
               ),
@@ -277,7 +277,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
       ),
@@ -286,188 +286,95 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
         children: [
           _buildSearchBar(controller, filterState),
           const SizedBox(height: 16),
-          const CampusFilterSelector(),
-          const SizedBox(height: 20),
-          _buildCompactCategoryList(),
+          Row(
+            children: [
+              const Expanded(
+                flex: 3,
+                child: CampusFilterSelector(),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 4,
+                child: _buildCategoryDropdown(filterState, controller, isDiscovery: true),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildCompactCategoryList() {
+  Widget _buildCategoryDropdown(ListingFilter filterState, MarketplaceController controller, {bool isDiscovery = false}) {
     final theme = Theme.of(context);
-    final categories = MarketplaceCategories.mainFilters.where((c) => c != 'All').toList();
-    
-    return SizedBox(
-      height: 90,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: EdgeInsets.zero,
-        itemCount: categories.length + 1, // +1 for \"View All\"
-        itemBuilder: (context, index) {
-          if (index == categories.length) {
-            return _buildCategoryItem(
-              label: 'All',
-              icon: Icons.grid_view_rounded,
-              onTap: () => _showAllCategoriesSheet(context),
-              isLast: true,
-            );
-          }
+    const categories = MarketplaceCategories.mainFilters;
+    final selectedCat = filterState.selectedCategory ?? 'All';
 
-          final cat = categories[index];
-          return _buildCategoryItem(
-            label: cat,
-            icon: MarketplaceCategories.getIcon(cat),
-            onTap: () => context.push('/category-discovery/$cat'),
-            isLast: false,
-          );
-        },
+    return Container(
+      height: isDiscovery ? 44 : 52,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
-    );
-  }
-
-  Widget _buildCategoryItem({
-    required String label,
-    required dynamic icon,
-    required VoidCallback onTap,
-    required bool isLast,
-  }) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: EdgeInsets.only(right: isLast ? 0 : 20),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Column(
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-                border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4)),
-              ),
-              alignment: Alignment.center,
-              child: icon is IconData 
-                ? Icon(icon, color: theme.colorScheme.primary, size: 24)
-                : Text(icon.toString(), style: const TextStyle(fontSize: 24)),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: theme.textTheme.labelSmall?.copyWith(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: theme.colorScheme.onSurface,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showAllCategoriesSheet(BuildContext context) {
-    final theme = Theme.of(context);
-    final categories = MarketplaceCategories.mainFilters.where((c) => c != 'All').toList();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: theme.colorScheme.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        maxChildSize: 0.9,
-        minChildSize: 0.5,
-        expand: false,
-        builder: (context, scrollController) => Column(
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(color: theme.colorScheme.outlineVariant, borderRadius: BorderRadius.circular(2)),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(24),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: categories.contains(selectedCat) ? selectedCat : 'All',
+          icon: Icon(Icons.keyboard_arrow_down_rounded, color: theme.colorScheme.primary, size: 20),
+          isExpanded: true,
+          borderRadius: BorderRadius.circular(16),
+          dropdownColor: theme.colorScheme.surface,
+          menuMaxHeight: 400,
+          elevation: 4,
+          items: categories.map((String category) {
+            final isAll = category == 'All';
+            final isCurrent = category == selectedCat || (isAll && selectedCat == 'All');
+            final displayText = isAll ? 'Categories' : category;
+            
+            return DropdownMenuItem<String>(
+              value: category,
               child: Row(
                 children: [
-                  Text(
-                    'All Categories',
-                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-                  ),
-                  const Spacer(),
-                  IconButton.filledTonal(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded, size: 20),
+                  Builder(builder: (context) {
+                    final icon = MarketplaceCategories.getIcon(category);
+                    if (icon is IconData) {
+                      return Icon(icon, size: 16, color: isCurrent ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant);
+                    } else {
+                      return Text(icon.toString(), style: const TextStyle(fontSize: 16));
+                    }
+                  }),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      displayText,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: isCurrent ? FontWeight.w900 : FontWeight.w600,
+                        color: isCurrent ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                        fontSize: 12,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
-            ),
-            Expanded(
-              child: GridView.builder(
-                controller: scrollController,
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 40),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  mainAxisSpacing: 24,
-                  crossAxisSpacing: 16,
-                  childAspectRatio: 0.85,
-                ),
-                itemCount: categories.length,
-                itemBuilder: (context, index) {
-                  final cat = categories[index];
-                  return InkWell(
-                    onTap: () {
-                      Navigator.pop(context);
-                      context.push('/category-discovery/$cat');
-                    },
-                    borderRadius: BorderRadius.circular(20),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 72,
-                          height: 72,
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                          ),
-                          alignment: Alignment.center,
-                          child: (MarketplaceCategories.getIcon(cat) is IconData)
-                              ? Icon(MarketplaceCategories.getIcon(cat) as IconData, color: theme.colorScheme.primary, size: 32)
-                              : Text(MarketplaceCategories.getIcon(cat).toString(), style: const TextStyle(fontSize: 32)),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          cat,
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                          maxLines: 2,
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+            );
+          }).toList(),
+          onChanged: (String? newValue) {
+            if (newValue != null) {
+              if (isDiscovery && newValue != 'All') {
+                context.push('/category-discovery/$newValue');
+              } else {
+                controller.setCategory(newValue == 'All' ? null : newValue);
+              }
+            }
+          },
         ),
       ),
     );
@@ -571,54 +478,6 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
           ],
         ),
       ],
-    );
-  }
-
-  Widget _buildCategoryChips(ListingFilter filterState, MarketplaceController controller) {
-    final theme = Theme.of(context);
-    const categories = MarketplaceCategories.mainFilters;
-    return SizedBox(
-      height: 44,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: categories.length,
-        itemBuilder: (context, index) {
-          final cat = categories[index];
-          final isSelected = filterState.selectedCategory == cat || (cat == 'All' && filterState.selectedCategory == null);
-          
-          return Padding(
-            padding: const EdgeInsets.only(right: 10),
-            child: ChoiceChip(
-              label: Text(
-                cat,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontSize: 13,
-                  color: isSelected ? Colors.white : theme.colorScheme.onSurface,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
-              selected: isSelected,
-              onSelected: (selected) {
-                if (selected) {
-                  controller.setCategory(cat);
-                }
-              },
-              backgroundColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-              selectedColor: AppColors.secondary,
-              showCheckmark: false,
-              pressElevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(
-                  color: isSelected ? AppColors.secondary : theme.colorScheme.outlineVariant,
-                ),
-              ),
-            ),
-          );
-        },
-      ),
     );
   }
 
@@ -1065,71 +924,144 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
     final isRolePending = app?.status == VerificationStatus.pending;
     final isRoleRejected = app?.status == VerificationStatus.rejected;
 
-    final bool showIdentityIssue = !isVerified || isIdentityPending || isIdentityRejected;
-
     final theme = Theme.of(context);
+    
+    // Professional Banner Configuration
+    Color baseColor = theme.colorScheme.primary;
+    IconData icon = Icons.verified_user_rounded;
+    String title = 'Join Trusted Sellers';
+    String message = 'Get a verification badge to build community trust and sell faster.';
+    String buttonText = 'Apply Now';
+    
+    if (isIdentityRejected) {
+      baseColor = theme.colorScheme.error;
+      icon = Icons.error_outline_rounded;
+      title = 'Identity Rejected';
+      message = 'Your platform identity was not approved. Please update it to continue.';
+      buttonText = 'Trust Center';
+    } else if (isRoleRejected) {
+      baseColor = theme.colorScheme.error;
+      icon = Icons.gavel_rounded;
+      title = 'Application Update';
+      message = 'Your seller application was not approved. Review the guidelines and try again.';
+      buttonText = 'Re-apply';
+    } else if (isIdentityPending || isRolePending) {
+      baseColor = Colors.orange;
+      icon = Icons.auto_awesome_rounded;
+      title = 'Verification Pending';
+      message = 'Our team is reviewing your profile. You\'ll receive a notification once approved.';
+      buttonText = ''; // Hide button during pending state
+    } else if (!isVerified) {
+      baseColor = theme.colorScheme.primary;
+      icon = Icons.security_rounded;
+      title = 'Identity Required';
+      message = 'Verify your platform identity to unlock professional seller tools.';
+      buttonText = 'Verify Identity';
+    }
+
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: (isRoleRejected || isIdentityRejected) ? theme.colorScheme.errorContainer : theme.colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: (isRoleRejected || isIdentityRejected) ? theme.colorScheme.error : theme.colorScheme.primary.withOpacity(0.2)),
+        gradient: LinearGradient(
+          colors: [baseColor, baseColor.withValues(alpha: 0.8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: baseColor.withValues(alpha: 0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
         children: [
-          Row(
-            children: [
-              Icon(
-                (isRoleRejected || isIdentityRejected) ? Icons.error_outline : ((isRolePending || isIdentityPending) ? Icons.access_time : Icons.verified_user_outlined),
-                color: (isRoleRejected || isIdentityRejected) ? theme.colorScheme.error : theme.colorScheme.primary,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                showIdentityIssue 
-                  ? (isIdentityRejected ? 'Identity Rejected' : (isIdentityPending ? 'Identity Reviewing' : 'Identity Required'))
-                  : (isRoleRejected ? 'Seller Application Rejected' : (isRolePending ? 'Review Pending' : 'Apply as Trusted Seller')),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: (isRoleRejected || isIdentityRejected) ? theme.colorScheme.onErrorContainer : theme.colorScheme.onPrimaryContainer,
-                  fontSize: 16,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            showIdentityIssue
-                ? (isIdentityRejected 
-                    ? 'Your identity verification was not approved. Please update it in the Trust Center.' 
-                    : (isIdentityPending 
-                        ? 'We are currently verifying your platform identity. You can apply as a seller once approved.' 
-                        : 'You must verify your platform identity before applying for a seller badge.'))
-                : (isRoleRejected
-                    ? 'Your seller application was not approved. Review the guidelines and try again.'
-                    : (isRolePending 
-                        ? 'Our team is reviewing your application. You\'ll get a badge once approved.'
-                        : 'Get a verification badge next to your items and build trust with buyers.')),
-            style: TextStyle(
-              fontSize: 13,
-              color: (isRoleRejected || isIdentityRejected) ? theme.colorScheme.onErrorContainer.withOpacity(0.8) : theme.colorScheme.onPrimaryContainer.withOpacity(0.8),
+          // Background Decorative Icon
+          Positioned(
+            right: -15,
+            bottom: -15,
+            child: Icon(
+              icon,
+              size: 100,
+              color: Colors.white.withValues(alpha: 0.1),
             ),
           ),
-          if (!isRolePending && !isIdentityPending) ...[
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () => context.push(isVerified ? '/verify-professional/seller' : (isIdentityRejected ? '/trust-center' : '/verify-identity')),
-                style: FilledButton.styleFrom(
-                  backgroundColor: (isRoleRejected || isIdentityRejected) ? theme.colorScheme.error : theme.colorScheme.primary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(icon, color: Colors.white, size: 20),
+                          const SizedBox(width: 10),
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 30),
+                        child: Text(
+                          message,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                      if (buttonText.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 30),
+                          child: ElevatedButton(
+                            onPressed: () => context.push(isVerified ? '/verify-professional/seller' : (isIdentityRejected ? '/trust-center' : '/verify-identity')),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: baseColor,
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              elevation: 0,
+                            ),
+                            child: Text(
+                              buttonText, 
+                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-                child: Text(showIdentityIssue ? (isIdentityRejected ? 'Go to Trust Center' : 'Verify Identity') : (isRoleRejected ? 'Re-apply Now' : 'Apply Now')),
-              ),
+                if (buttonText.isEmpty) 
+                  const Padding(
+                    padding: EdgeInsets.only(left: 12),
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                    ),
+                  ),
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -1458,7 +1390,7 @@ class _DiscoverySectionStatic extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 32),
+        const SizedBox(height: 12),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
