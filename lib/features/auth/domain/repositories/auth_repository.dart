@@ -3,6 +3,7 @@ import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 
 abstract class AuthRepository {
   Stream<User?> get authStateChanges;
+  Stream<User?> get userChanges;
   User? get currentUser;
   Future<void> signInWithEmailAndPassword(String email, String password);
   Future<void> signInWithGoogle();
@@ -38,6 +39,7 @@ abstract class AuthRepository {
     Map<String, bool>? notificationSettings,
   });
   Future<void> updateOnboardingStatus(String uid, bool completed);
+  Future<void> updateVerificationStatus(String uid, {bool? emailVerified, bool? phoneVerified});
   Future<void> deleteAccount();
   Future<void> checkAndRestoreRestrictedContent(String uid);
 

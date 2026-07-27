@@ -33,30 +33,24 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 Future<void> main() async {
   try {
     WidgetsFlutterBinding.ensureInitialized();
-    
-    // Set up global error handler for UI errors
     ErrorWidget.builder = buildGlobalErrorWidget;
     
-    // RC-Investigate: Moving diagnostic initialization AFTER Firebase init.
-    // Accessing FirebaseCrashlytics.instance before Firebase.initializeApp() 
-    // can cause a deadlock/hang in release builds.
-    
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    ).timeout(const Duration(seconds: 15));
+    // Audit Phase 3.5: Parallel Initialization of core dependencies
+    final results = await Future.wait([
+      Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
+      SharedPreferences.getInstance(),
+    ]).timeout(const Duration(seconds: 15));
 
-    // Initialize diagnostics only after Firebase is ready
-    _initProductionDiagnostics();
+    final SharedPreferences sharedPreferences = results[1] as SharedPreferences;
 
-    // Enable offline persistence for better network resilience (Scenario 7)
+    // Optimized Firebase configuration
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: true,
       cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
     );
 
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-    final sharedPreferences = await SharedPreferences.getInstance();
+    _initProductionDiagnostics();
 
     final container = ProviderContainer(
       overrides: [
@@ -64,29 +58,23 @@ Future<void> main() async {
       ],
     );
 
-    // Initialize global services IN BACKGROUND to prevent startup hang
-    // Note: unawaited requires 'import dart:async'
-    unawaited(container.read(notificationServiceProvider).init().catchError((e) {
-      AppLogger.error('Main: Notification Service init failed', e);
-    }));
+    // Parallelize background service initialization
+    container.read(appLifecycleServiceProvider).init();
+    await container.read(notificationServiceProvider).init().catchError((e) {
+      AppLogger.error('Main: Background service init failed', e);
+    });
 
-    // Configure Ulify Assistant (Gemini 1.5 Flash)
     container.read(aiAssistantServiceProvider).config(
       apiKey: EnvConfig.aiApiKey,
       useMock: EnvConfig.useMockAi,
     );
     
-    container.read(appLifecycleServiceProvider).init();
-
-    // Initialize Ads asynchronously in background
-    container.read(adInitializationProvider.future).catchError((e) {
-      AppLogger.error('Main: Ad initialization failed in background', e);
-    });
+    unawaited(container.read(adInitializationProvider.future));
 
     runApp(
       UncontrolledProviderScope(
         container: container,
-        child: const UlifyApp(),
+        child: const AppErrorBoundary(child: UlifyApp()),
       ),
     );
   } catch (e, stack) {

@@ -10,6 +10,8 @@ import '../../widgets/notification_badge.dart';
 import '../campus_filter/presentation/widgets/campus_filter_selector.dart';
 import 'package:unihub_mobile/core/utils/category_utils.dart';
 import 'package:unihub_mobile/features/announcements/presentation/widgets/announcement_display.dart';
+import 'package:unihub_mobile/core/widgets/authorization_guard.dart';
+import 'package:unihub_mobile/core/services/authorization_service.dart';
 import 'package:unihub_mobile/features/ads/ads_module.dart';
 import 'shared/providers.dart';
 
@@ -87,7 +89,12 @@ class CommunityScreen extends ConsumerWidget {
                             ),
                             const SizedBox(height: 32),
                             FilledButton.icon(
-                              onPressed: () => context.push('/add-feed-item', extra: FeedType.community),
+                              onPressed: () => AuthorizationGuard.run(
+                                context, 
+                                ref, 
+                                feature: UlifyFeature.communityPost, 
+                                action: () => context.push('/add-feed-item', extra: FeedType.community),
+                              ),
                               icon: const Icon(Icons.add_rounded),
                               label: const Text('Start Discussion'),
                               style: FilledButton.styleFrom(
@@ -143,7 +150,12 @@ class CommunityScreen extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'community_fab',
-        onPressed: () => context.push('/add-feed-item', extra: FeedType.community),
+        onPressed: () => AuthorizationGuard.run(
+          context, 
+          ref, 
+          feature: UlifyFeature.communityPost, 
+          action: () => context.push('/add-feed-item', extra: FeedType.community),
+        ),
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: Colors.white,
         child: const Icon(Icons.add),

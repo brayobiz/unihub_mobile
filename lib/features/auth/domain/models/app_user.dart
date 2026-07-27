@@ -162,6 +162,7 @@ class AppUser {
        _isAdmin = isAdmin;
 
   bool get isHousingPlug => roles.contains('housing_plug');
+  bool get isClassRep => roles.contains('class_rep');
   bool get isVerifiedPlug => verifiedRoles.contains('housePlug');
   bool get isVerifiedSeller => verifiedRoles.contains('seller');
   bool get isAnyRoleVerified => verifiedRoles.isNotEmpty;

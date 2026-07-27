@@ -1,9 +1,10 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../shared/providers.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../../../services/notification_service.dart';
+import '../../../../services/presence_service.dart';
 import '../../../../core/utils/app_logger.dart';
+import '../../../../app/providers/app_restart_provider.dart';
 
 import '../../../../core/constants/campus_constants.dart';
 
@@ -65,22 +66,29 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
   Future<void> signOut() async {
     state = const AsyncValue.loading();
     try {
-      // 1. Attempt token cleanup
-      // We do this before sign-out while the user is still authenticated
+      // 1. Audit Phase 3.3: Immediate Background Cleanup
+      // Stop presence tracking before auth is gone
+      _ref.read(presenceServiceProvider).dispose();
+      
+      // 2. Notification Cleanup (Revoke token & unsubscribe while still authorized)
       await _ref.read(notificationServiceProvider).deleteToken();
     } catch (e) {
-      AppLogger.warning('SignOut: Notification token cleanup failed: $e', 'AUTH');
+      AppLogger.warning('SignOut Cleanup: Partial failure during background cleanup: $e', 'AUTH');
     }
 
-    // 2. Perform actual sign out from repositories
+    // 3. Perform actual sign out from repositories
     final result = await AsyncValue.guard(() async {
       await _authRepository.signOut();
+      
+      // 4. Reset AI context if exists
+      // (Future check: does AI service need explicit reset?)
+      
+      // 5. Trigger full app state reset to clear in-memory caches
+      _ref.read(appRestartProvider.notifier).state++;
     });
 
     if (mounted) {
       state = result;
-      // Note: RouterNotifier will pick up the auth state change and redirect.
-      // We don't need a manual delay or resetState here if the router is robust.
       if (!result.hasError) {
         resetState();
       }
@@ -101,18 +109,23 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
   }
 
   Future<void> checkVerificationStatus() async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      final user = _ref.read(firebaseAuthProvider).currentUser;
-      if (user != null) {
-        await user.reload();
-        // Force refresh the auth state provider to ensure the new verified status is propagated
+    final user = _ref.read(firebaseAuthProvider).currentUser;
+    if (user == null || user.emailVerified) return;
+
+    // Use a lighter operation if we're polling
+    await AsyncValue.guard(() async {
+      await user.reload();
+      final updatedUser = _ref.read(firebaseAuthProvider).currentUser;
+      
+      if (updatedUser?.emailVerified == true) {
+        // Sync to Firestore for security rules and global state
+        await _authRepository.updateVerificationStatus(updatedUser!.uid, emailVerified: true);
+        
+        // No need to invalidate authStateProvider manually if we use userChanges stream,
+        // but it doesn't hurt and ensures immediate UI update.
         _ref.invalidate(authStateProvider);
       }
     });
-    if (!state.hasError) {
-      resetState();
-    }
   }
 
   Future<void> updateProfile({

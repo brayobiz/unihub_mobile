@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
+import '../../../../core/widgets/optimized_image.dart';
 import '../../../../core/location/controllers/campus_maps_controller.dart';
 import '../../../../core/location/models/landmark.dart';
 import '../../../../core/location/models/map_marker.dart';
@@ -432,7 +433,7 @@ class _CampusMapsScreenState extends ConsumerState<CampusMapsScreen> {
         child: Column(
           children: [
             if (landmark.photos.isNotEmpty)
-              Image.network(landmark.photos.first, height: 200, width: double.infinity, fit: BoxFit.cover),
+              OptimizedImage(imageUrl: landmark.photos.first, height: 200, width: double.infinity),
             Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -518,7 +519,7 @@ class _CampusMapsScreenState extends ConsumerState<CampusMapsScreen> {
         child: Column(
           children: [
             if (event.imageUrls.isNotEmpty)
-              Image.network(event.imageUrls.first, height: 200, width: double.infinity, fit: BoxFit.cover),
+              OptimizedImage(imageUrl: event.imageUrls.first, height: 200, width: double.infinity),
             Padding(
               padding: const EdgeInsets.all(20),
               child: Column(

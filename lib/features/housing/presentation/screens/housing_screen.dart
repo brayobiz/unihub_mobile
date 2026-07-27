@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:unihub_mobile/core/location/controllers/campus_maps_controller.dart';
-import 'package:unihub_mobile/core/location/repositories/campus_repository.dart';
 import 'package:go_router/go_router.dart';
+import 'package:unihub_mobile/core/location/repositories/campus_repository.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/widgets/app_drawer.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
@@ -20,12 +19,9 @@ import 'package:uuid/uuid.dart';
 import 'package:unihub_mobile/features/announcements/presentation/widgets/announcement_display.dart';
 import 'package:unihub_mobile/features/campus_filter/presentation/widgets/campus_filter_selector.dart';
 import 'package:unihub_mobile/features/campus_filter/shared/providers.dart';
-import 'package:unihub_mobile/features/campus_filter/domain/models/browsing_scope.dart';
 import 'package:unihub_mobile/features/ads/ads_module.dart';
-import 'package:unihub_mobile/core/constants/campus_constants.dart';
 
 import '../controllers/paginated_housing_controller.dart';
-import '../../../../core/models/paginated_state.dart';
 import '../../../../core/widgets/error_view.dart';
 import '../../../../core/widgets/empty_state.dart';
 
@@ -78,18 +74,6 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
     });
   }
 
-  Future<void> _saveSearch(String query) async {
-    if (query.isEmpty) return;
-    final prefs = ref.read(sharedPreferencesProvider);
-    final searches = prefs.getStringList('recent_housing_searches') ?? <String>[];
-    if (!searches.contains(query)) {
-      searches.insert(0, query);
-      if (searches.length > 5) searches.removeLast();
-      await prefs.setStringList('recent_housing_searches', searches);
-      setState(() => _recentSearches = searches);
-    }
-  }
-
   Future<void> _clearRecentSearches() async {
     final prefs = ref.read(sharedPreferencesProvider);
     await prefs.remove('recent_housing_searches');
@@ -109,7 +93,6 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
     // Optimization: only watch necessary user properties
     final userData = ref.watch(appUserProvider.select((u) {
       final user = u.valueOrNull;
@@ -133,7 +116,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
-      drawer: AppDrawer(),
+      drawer: const AppDrawer(),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(topHousingProvider);
@@ -148,42 +131,59 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildSearchBar(),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     const CampusFilterSelector(),
                     if (_searchController.text.isEmpty && _recentSearches.isNotEmpty) ...[
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
                       _buildRecentSearches(),
                     ],
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
                     if (!isVerifiedPlug) ...[
                       applicationAsync.when(
                         data: (application) => _buildBecomePlugCTA(application),
-                        loading: () => SkeletonLoader(width: double.infinity, height: 150, borderRadius: 24, color: theme.colorScheme.surfaceVariant),
+                        loading: () => SkeletonLoader(width: double.infinity, height: 120, borderRadius: 20, color: theme.colorScheme.surfaceVariant),
                         error: (_, __) => _buildBecomePlugCTA(null),
                       ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(child: _buildCompactActionCTA(
+                            icon: Icons.add_business_rounded,
+                            title: 'Report Vacancy',
+                            onTap: () => context.push('/submit-vacancy'),
+                            color: theme.colorScheme.primary,
+                          )),
+                          const SizedBox(width: 10),
+                          Expanded(child: _buildCompactActionCTA(
+                            icon: Icons.people_outline_rounded,
+                            title: 'Find Roommate',
+                            onTap: () => context.push('/roommates'),
+                            color: theme.colorScheme.secondary,
+                          )),
+                        ],
+                      ),
                       const SizedBox(height: 16),
-                      _buildReportVacancyCTA(),
+                    ] else ...[
+                      _buildPlugDashboardQuickCTA(),
                       const SizedBox(height: 16),
-                      _buildRoommateFinderCTA(),
-                      const SizedBox(height: 24),
                     ],
                     _buildCategorySelector(),
                     if (hasActiveFilters) ...[
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
                       _buildActiveFiltersRow(),
                     ],
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
                     if (locationFilter == null || locationFilter.isEmpty) ...[
                       _buildNearbyAreas(),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
                       _buildFeaturedSection(),
                       const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 24),
+                        padding: EdgeInsets.symmetric(vertical: 16),
                         child: BannerAdWidget(),
                       ),
                     ],
@@ -196,26 +196,19 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
           ],
         ),
       ),
-      floatingActionButton: isVerifiedPlug ? FloatingActionButton.extended(
-        heroTag: 'housing_fab',
-        onPressed: () => context.push('/add-housing'),
-        backgroundColor: theme.colorScheme.primary,
-        elevation: 4,
-        icon: const Icon(Icons.add_home_work_rounded, color: Colors.white),
-        label: const Text('Create Vacancy', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-      ) : null,
+      floatingActionButton: null,
     );
   }
 
-  Widget _buildSliverAppBar(bool isPlug) {
+  Widget _buildSliverAppBar(bool isVerifiedPlug) {
     final theme = Theme.of(context);
     return SliverAppBar(
-      expandedHeight: 100,
       floating: true,
       pinned: true,
       elevation: 0,
       backgroundColor: theme.colorScheme.surface,
       surfaceTintColor: Colors.transparent,
+      centerTitle: false,
       leading: Builder(
         builder: (context) => IconButton(
           icon: Icon(Icons.menu_rounded, color: theme.colorScheme.onSurface),
@@ -287,6 +280,42 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
     );
   }
 
+  Widget _buildPlugDashboardQuickCTA() {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: () => context.push('/plug-dashboard'),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(color: theme.colorScheme.primary, shape: BoxShape.circle),
+              child: const Icon(Icons.dashboard_customize_rounded, color: Colors.white, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Plug Dashboard', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: theme.colorScheme.primary)),
+                  Text('Manage your vacancies and viewing requests', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios_rounded, size: 12, color: theme.colorScheme.primary),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildBecomePlugCTA(VerificationApplication? application) {
     final theme = Theme.of(context);
     final user = ref.watch(appUserProvider).valueOrNull;
@@ -295,7 +324,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
     final isRejected = application?.status == VerificationStatus.rejected;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isRejected 
             ? AppColors.error
@@ -303,56 +332,39 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
                 ? theme.colorScheme.secondary
                 : theme.colorScheme.primary,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: (isRejected ? AppColors.error : theme.colorScheme.primary).withOpacity(0.1), 
-            blurRadius: 10, 
-            offset: const Offset(0, 4)
-          )
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            !isVerified ? 'Verification Required' : (isRejected ? 'Application Update' : (hasPendingApp ? 'Application Pending' : 'Helping students find houses?')),
-            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
+            !isVerified ? 'Verification Required' : (isRejected ? 'Application Update' : (hasPendingApp ? 'Application Pending' : 'Join Plug Network')),
+            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
             !isVerified 
-                ? 'You must verify your platform identity before joining the Plug Network.'
+                ? 'Verify identity to join.'
                 : (isRejected
-                    ? 'Your application was not approved. You can review our guidelines and try again.'
+                    ? 'Application not approved. Tap to review.'
                     : (hasPendingApp
-                        ? 'Your application to join the Plug Network is currently under review. We\'ll notify you soon.'
-                        : 'List hostels and houses, manage enquiries and build your reputation as a trusted Housing Plug.')),
-            style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13, height: 1.4),
+                        ? 'Your application is under review.'
+                        : 'List hostels and houses as a trusted Housing Plug.')),
+            style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 12, height: 1.3),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           ElevatedButton(
             onPressed: hasPendingApp ? null : () => context.push('/become-plug'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white,
-              disabledBackgroundColor: Colors.white.withOpacity(0.8),
               foregroundColor: isRejected ? AppColors.error : theme.colorScheme.primary,
-              disabledForegroundColor: theme.colorScheme.primary.withOpacity(0.6),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (hasPendingApp) ...[
-                  const Icon(Icons.hourglass_empty_rounded, size: 16),
-                  const SizedBox(width: 10),
-                ],
-                Text(
-                  hasPendingApp ? 'Application Under Review' : (isRejected ? 'Review Application' : 'Become a Housing Plug'),
-                  style: const TextStyle(fontWeight: FontWeight.w900)
-                ),
-              ],
+            child: Text(
+              hasPendingApp ? 'Pending' : (isRejected ? 'Review' : 'Get Started'),
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)
             ),
           ),
         ],
@@ -360,92 +372,37 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
     );
   }
 
-  Widget _buildReportVacancyCTA() {
+  Widget _buildCompactActionCTA({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    required Color color,
+  }) {
     final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
-              shape: BoxShape.circle,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: theme.colorScheme.onSurface),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            child: Icon(Icons.add_business_rounded, color: theme.colorScheme.primary, size: 24),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Know an available room?',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: theme.colorScheme.onSurface),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Report it here and help a fellow student find a home.',
-                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, height: 1.3),
-                ),
-              ],
-            ),
-          ),
-          TextButton(
-            onPressed: () => context.push('/submit-vacancy'),
-            child: Text('Report', style: TextStyle(fontWeight: FontWeight.w800, color: theme.colorScheme.primary)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRoommateFinderCTA() {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.secondaryContainer.withOpacity(0.4),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.secondary.withOpacity(0.2)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.secondary.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.people_outline_rounded, color: theme.colorScheme.secondary, size: 24),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Looking for a Roommate?',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: theme.colorScheme.onSurface),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Find fellow students to share housing costs with.',
-                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, height: 1.3),
-                ),
-              ],
-            ),
-          ),
-          TextButton(
-            onPressed: () => context.push('/roommates'),
-            child: Text('Find', style: TextStyle(fontWeight: FontWeight.w800, color: theme.colorScheme.secondary)),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -632,25 +589,22 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
     return GestureDetector(
       onTap: () => ref.read(housingTypeFilterProvider.notifier).state = type,
       child: Container(
-        margin: const EdgeInsets.only(right: 14),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        margin: const EdgeInsets.only(right: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? theme.colorScheme.primary : theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
-            width: 1.5,
+            width: 1,
           ),
-          boxShadow: isSelected ? [
-            BoxShadow(color: theme.colorScheme.primary.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4))
-          ] : null,
         ),
         child: Text(
           label,
           style: TextStyle(
             color: isSelected ? Colors.white : theme.colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w800,
-            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
           ),
         ),
       ),
@@ -690,12 +644,12 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
     return GestureDetector(
       onTap: () => context.push('/housing-detail/${listing.id}', extra: listing),
       child: Container(
-        width: 300,
-        margin: const EdgeInsets.only(right: 14),
+        width: 260,
+        margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))
+            BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 4))
           ],
         ),
         child: ClipRRect(
@@ -704,94 +658,61 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
             children: [
               OptimizedImage(
                 imageUrl: listing.images.isNotEmpty ? listing.images.first : 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=2070&auto=format&fit=crop',
-                width: 300,
+                width: 260,
                 height: double.infinity,
                 fit: BoxFit.cover,
               ),
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.3),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+                  ),
                 ),
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.end,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: theme.colorScheme.primary,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Text('FEATURED', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w900)),
                     ),
-                    if (listing.videoUrl != null) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.play_circle_fill_rounded, color: theme.colorScheme.primary, size: 10),
-                            const SizedBox(width: 4),
-                            Text('VIRTUAL TOUR', style: TextStyle(color: theme.colorScheme.primary, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-                          ],
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Text(
                       listing.title,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Row(
                       children: [
-                        const Icon(Icons.location_on_rounded, size: 12, color: Colors.white70),
+                        const Icon(Icons.location_on_rounded, size: 10, color: Colors.white70),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            '${CampusConstants.getDisplayName(listing.university)} • ${listing.location}',
-                            style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.w500),
+                            listing.location,
+                            style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 10, fontWeight: FontWeight.w500),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        if (listing.previousRent != null && listing.previousRent! > listing.rent)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: Text(
-                              'KES ${listing.previousRent!.toInt()}',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.5),
-                                decoration: TextDecoration.lineThrough,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        Text(
-                          'KES ${listing.rent.toInt()}/mo',
-                          style: TextStyle(
-                            color: (listing.previousRent != null && listing.previousRent! > listing.rent)
-                                ? AppColors.success
-                                : AppColors.success, // Keeping it green for featured? Actually featured was already success color.
-                            fontWeight: FontWeight.w900,
-                            fontSize: 18,
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 8),
+                    Text(
+                      'KES ${listing.rent.toInt()}/mo',
+                      style: const TextStyle(
+                        color: AppColors.success,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                      ),
                     ),
                   ],
                 ),
@@ -804,9 +725,9 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
   }
 
   Widget _buildNearbyAreas() {
-    final theme = Theme.of(context);
     return Consumer(
       builder: (context, ref, _) {
+        final theme = Theme.of(context);
         final locations = ref.watch(housingUniqueLocationsProvider);
         if (locations.isEmpty) return const SizedBox.shrink();
         
@@ -870,7 +791,6 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
   }
 
   Widget _buildListingsSliver(String? locationFilter) {
-    final theme = Theme.of(context);
     final filter = _getCurrentFilter();
     final paginatedState = ref.watch(paginatedHousingProvider(filter));
     
@@ -951,9 +871,6 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
             // An ad appears after every adInterval listings
             // Position of ads: adInterval, (2*adInterval + 1), (3*adInterval + 2)...
             
-            int listingsBefore = 0;
-            int currentPos = 0;
-            
             // Simplified logic for interleaved ads in a builder:
             // Every (adInterval + 1) index is an ad, starting from index = adInterval
             if ((index + 1) % (adInterval + 1) == 0) {
@@ -995,8 +912,6 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
   }
 
   Widget _buildEmptyState(String? locationFilter) {
-    final theme = Theme.of(context);
-
     return EmptyState(
       title: 'No listings found',
       message: 'Try adjusting your search or filters',
@@ -1353,7 +1268,6 @@ class HousingSearchDelegate extends SearchDelegate<String?> {
 
   @override
   Widget buildSuggestions(BuildContext context) {
-    final theme = Theme.of(context);
     final prefs = ref.watch(sharedPreferencesProvider);
     final recentSearches = prefs.getStringList('recent_housing_searches') ?? [];
 

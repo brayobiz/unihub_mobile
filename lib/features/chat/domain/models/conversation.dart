@@ -61,24 +61,37 @@ class Conversation {
   }
 
   factory Conversation.fromJson(Map<String, dynamic> json) {
+    // Audit Phase 4.9: Robust Parsing to prevent crashes from malformed data
+    DateTime parseDate(dynamic value) {
+      if (value is Timestamp) return value.toDate();
+      if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+      if (value is String) return DateTime.tryParse(value) ?? DateTime.now();
+      return DateTime.now();
+    }
+
     return Conversation(
-      id: json['id'] ?? '',
-      participants: List<String>.from(json['participants'] ?? []),
-      context: json['context'] != null ? ChatContext.fromJson(json['context']) : null,
-      lastMessage: json['lastMessage'],
-      lastMessageSenderId: json['lastMessageSenderId'],
+      id: json['id']?.toString() ?? '',
+      participants: (json['participants'] as List?)?.map((e) => e.toString()).toList() ?? <String>[],
+      context: json['context'] != null ? ChatContext.fromJson(json['context'] as Map<String, dynamic>) : null,
+      lastMessage: json['lastMessage']?.toString(),
+      lastMessageSenderId: json['lastMessageSenderId']?.toString(),
       lastMessageStatus: json['lastMessageStatus'] != null 
-          ? MessageStatus.values.firstWhere((e) => e.name == json['lastMessageStatus'], orElse: () => MessageStatus.sent)
+          ? MessageStatus.values.firstWhere(
+              (e) => e.name == json['lastMessageStatus'].toString(), 
+              orElse: () => MessageStatus.sent
+            )
           : null,
-      lastMessageTime: (json['lastMessageTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      unreadCounts: Map<String, int>.from(json['unreadCounts'] ?? {}),
-      typing: Map<String, dynamic>.from(json['typing'] ?? {}),
-      isSupport: json['isSupport'] ?? false,
-      supportStatus: json['supportStatus'],
-      supportPriority: json['supportPriority'],
-      assignedAdminId: json['assignedAdminId'],
-      supportAdminNotes: List<Map<String, dynamic>>.from(json['supportAdminNotes'] ?? []),
-      expiresAt: (json['expiresAt'] as Timestamp?)?.toDate(),
+      lastMessageTime: parseDate(json['lastMessageTime']),
+      unreadCounts: Map<String, int>.from(
+        (json['unreadCounts'] as Map?)?.map((k, v) => MapEntry(k.toString(), v is int ? v : 0)) ?? {}
+      ),
+      typing: Map<String, dynamic>.from(json['typing'] as Map? ?? {}),
+      isSupport: json['isSupport'] == true,
+      supportStatus: json['supportStatus']?.toString(),
+      supportPriority: json['supportPriority']?.toString(),
+      assignedAdminId: json['assignedAdminId']?.toString(),
+      supportAdminNotes: (json['supportAdminNotes'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [],
+      expiresAt: json['expiresAt'] != null ? parseDate(json['expiresAt']) : null,
     );
   }
 

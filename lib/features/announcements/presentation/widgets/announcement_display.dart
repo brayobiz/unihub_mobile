@@ -19,8 +19,13 @@ class RelevantAnnouncementsWidget extends ConsumerWidget {
         final announcements = ref.watch(relevantAnnouncementsProvider(feature));
         final dismissed = ref.watch(dismissedAnnouncementsProvider);
         
-        // Filter out dismissed announcements
-        final visible = announcements.where((a) => !dismissed.contains(a.id)).toList();
+        // Filter out dismissed and non-inline announcements
+        // Note: modals are now handled exclusively by AnnouncementModalOrchestrator
+        final visible = announcements.where((a) => 
+          !dismissed.contains(a.id) && 
+          a.displayStyle != AnnouncementDisplayStyle.modal
+        ).toList();
+
         if (visible.isEmpty) return const SizedBox.shrink();
 
         // Sort by priority and then by date
@@ -30,25 +35,6 @@ class RelevantAnnouncementsWidget extends ConsumerWidget {
           if (priorityDiff != 0) return priorityDiff;
           return b.publishAt.compareTo(a.publishAt);
         });
-
-        // Modal Logic: Find first modal announcement that hasn't been shown in session yet
-        final sessionShown = ref.watch(sessionShownModalsProvider);
-        
-        final pendingModals = sorted.where((a) => 
-          a.displayStyle == AnnouncementDisplayStyle.modal && 
-          !dismissed.contains(a.id) &&
-          !sessionShown.contains(a.id)
-        ).toList();
-
-        if (pendingModals.isNotEmpty) {
-          final targetModal = pendingModals.first;
-          
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            // Mark as shown in session immediately to avoid duplicate triggers
-            ref.read(sessionShownModalsProvider.notifier).update((s) => {...s, targetModal.id});
-            _showFullModal(context, ref, targetModal);
-          });
-        }
 
         return Padding(
           padding: const EdgeInsets.only(top: 12),
@@ -65,33 +51,6 @@ class RelevantAnnouncementsWidget extends ConsumerWidget {
         }
         return const SizedBox.shrink();
       },
-    );
-  }
-
-  void _showFullModal(BuildContext context, WidgetRef ref, Announcement a) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Row(
-          children: [
-            const Icon(Icons.campaign_rounded, color: Colors.orange, size: 28),
-            const SizedBox(width: 12),
-            Expanded(child: Text(a.title, style: const TextStyle(fontWeight: FontWeight.w900))),
-          ],
-        ),
-        content: Text(a.content, style: const TextStyle(fontSize: 15, height: 1.5)),
-        actions: [
-          TextButton(
-            onPressed: () {
-              ref.read(dismissedAnnouncementsProvider.notifier).dismiss(a.id);
-              Navigator.pop(context);
-            },
-            child: const Text('Close & Don\'t show again', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
     );
   }
 }

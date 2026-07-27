@@ -19,6 +19,8 @@ import '../../../chat/shared/providers.dart';
 import '../../../chat/domain/models/chat_context.dart';
 import '../../../../services/history_service.dart';
 import '../widgets/housing_card.dart';
+import '../../../../core/widgets/authorization_guard.dart';
+import '../../../../core/services/authorization_service.dart';
 import '../../../../core/location/controllers/campus_maps_controller.dart';
 import '../../../../core/constants/campus_constants.dart';
 
@@ -1711,7 +1713,7 @@ class _SimilarProperties extends ConsumerWidget {
   }
 }
 
-class _StickyActionBar extends StatelessWidget {
+class _StickyActionBar extends ConsumerWidget {
   final HousingListing listing;
   final bool isStartingChat;
   final VoidCallback onCall;
@@ -1727,7 +1729,7 @@ class _StickyActionBar extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isTaken = listing.status == HousingStatus.taken;
     
@@ -1766,7 +1768,12 @@ class _StickyActionBar extends StatelessWidget {
                 ),
                 child: IconButton(
                   icon: Icon(Icons.call_outlined, color: isStartingChat ? AppColors.grey : theme.colorScheme.primary),
-                  onPressed: isStartingChat ? null : onCall,
+                  onPressed: isStartingChat ? null : () => AuthorizationGuard.run(
+                    context, 
+                    ref, 
+                    feature: UlifyFeature.housingContact, 
+                    action: onCall,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1784,7 +1791,12 @@ class _StickyActionBar extends StatelessWidget {
                     )
                   : IconButton(
                       icon: Icon(Icons.chat_bubble_outline, color: theme.colorScheme.primary),
-                      onPressed: onChat,
+                      onPressed: () => AuthorizationGuard.run(
+                        context, 
+                        ref, 
+                        feature: UlifyFeature.housingContact, 
+                        action: onChat,
+                      ),
                     ),
               ),
               const SizedBox(width: 12),
@@ -1792,7 +1804,12 @@ class _StickyActionBar extends StatelessWidget {
                 child: SizedBox(
                   height: 56,
                   child: FilledButton.icon(
-                    onPressed: (isTaken || isStartingChat) ? null : onBook,
+                    onPressed: (isTaken || isStartingChat) ? null : () => AuthorizationGuard.run(
+                      context, 
+                      ref, 
+                      feature: UlifyFeature.housingContact, 
+                      action: onBook,
+                    ),
                     icon: const Icon(Icons.event_available),
                     style: FilledButton.styleFrom(
                       backgroundColor: theme.colorScheme.primary,

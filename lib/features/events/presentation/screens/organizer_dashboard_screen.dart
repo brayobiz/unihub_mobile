@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
+import 'package:unihub_mobile/core/widgets/authorization_guard.dart';
+import 'package:unihub_mobile/core/services/authorization_service.dart';
 import 'package:unihub_mobile/features/auth/shared/providers.dart';
 import '../../shared/providers.dart';
 import '../../domain/models/organizer.dart';
@@ -117,15 +119,20 @@ class OrganizerDashboardScreen extends ConsumerWidget {
       ),
       floatingActionButton: isManagement && !isSuspended
           ? FloatingActionButton.extended(
-              onPressed: () {
-                final organizer = organizerAsync.value;
-                if (organizer != null) {
-                  context.push(
-                    '/organizers/$organizerId/events/create',
-                    extra: {'campusId': organizer.campusId},
-                  );
-                }
-              },
+              onPressed: () => AuthorizationGuard.run(
+                context, 
+                ref, 
+                feature: UlifyFeature.eventsOrganize, 
+                action: () {
+                  final organizer = organizerAsync.value;
+                  if (organizer != null) {
+                    context.push(
+                      '/organizers/$organizerId/events/create',
+                      extra: {'campusId': organizer.campusId},
+                    );
+                  }
+                },
+              ),
               label: const Text('New Event'),
               icon: const Icon(Icons.add),
             )

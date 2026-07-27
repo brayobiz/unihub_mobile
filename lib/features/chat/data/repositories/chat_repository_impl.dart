@@ -31,9 +31,21 @@ class ChatRepositoryImpl implements ChatRepository {
   // Debounce timers for each conversation to batch messages
   final Map<String, Timer> _botDebouncers = {};
   
-  // Tracking usage to prevent quota abuse (Simple in-memory for now)
-  // Note: todayKey is computed dynamically in sendMessage to handle midnight transitions
-  final Map<String, int> _userDailyAiCount = {};
+  // Audit Phase 4.4: Memory Leak Prevention
+  // Added capacity limits and periodic pruning to in-memory caches.
+  static const int _maxCacheSize = 100;
+
+  void _pruneCache(Map cache) {
+    if (cache.length > _maxCacheSize) {
+      cache.remove(cache.keys.first);
+    }
+  }
+
+  void _pruneSet(Set set) {
+    if (set.length > _maxCacheSize) {
+      set.remove(set.first);
+    }
+  }
 
   ChatRepositoryImpl(this._firestore, this._notificationSender, this._ref);
 
@@ -46,12 +58,13 @@ class ChatRepositoryImpl implements ChatRepository {
         .asyncMap((snapshot) async {
       final now = DateTime.now();
       
-      // Fetch user's blocked list (using local cache or serverAndCache to save reads)
+      // Fetch user's blocked list
       List<String> blockedUids = _blockedCache[userId] ?? [];
       if (blockedUids.isEmpty) {
         final userDoc = await _firestore.collection('users').doc(userId).get(const GetOptions(source: Source.serverAndCache));
         blockedUids = List<String>.from(userDoc.data()?['blockedUids'] ?? []);
         _blockedCache[userId] = blockedUids;
+        _pruneCache(_blockedCache);
       }
 
       final items = snapshot.docs
@@ -291,9 +304,8 @@ class ChatRepositoryImpl implements ChatRepository {
           _botDebouncers[conversationId]?.cancel();
           _botDebouncers[conversationId] = Timer(const Duration(seconds: 3), () async {
             if (!_processedMessageIds.contains(message.id)) {
-              // Limit size of processed IDs set
-              if (_processedMessageIds.length > 100) _processedMessageIds.remove(_processedMessageIds.first);
               _processedMessageIds.add(message.id);
+              _pruneSet(_processedMessageIds);
 
               // Increment persistent counter before processing to prevent race condition abuse
               try {
@@ -305,15 +317,15 @@ class ChatRepositoryImpl implements ChatRepository {
                     .set({todayKey: FieldValue.increment(1)}, SetOptions(merge: true));
               } catch (e) {
                 AppLogger.warning('Ulify Assistant: Failed to increment usage counter: $e', 'AI_SERVICE');
-                // We proceed anyway to ensure the user gets a reply even if quota tracking fails
               }
 
-              // Escalation check: Status must be waiting_admin AND priority must be high
+              // Escalation check
               final bool isEscalated = data['supportStatus'] == 'waiting_admin' && data['supportPriority'] == 'high';
               _triggerUlifyAssistantReply(conversationId, message.content, currentUid, isEscalated: isEscalated);
             }
             _botDebouncers.remove(conversationId);
           });
+          _pruneCache(_botDebouncers);
         } catch (e) {
           AppLogger.warning('Ulify Assistant: Usage check failed, skipping reply to be safe: $e', 'AI_SERVICE');
         }
@@ -911,6 +923,7 @@ class ChatRepositoryImpl implements ChatRepository {
 
     try {
       _localTypingStatus[cacheKey] = isTyping;
+      _pruneCache(_localTypingStatus);
       await _firestore.collection('conversations').doc(conversationId).update({
         'typing.$userId': isTyping ? FieldValue.serverTimestamp() : FieldValue.delete(),
       });

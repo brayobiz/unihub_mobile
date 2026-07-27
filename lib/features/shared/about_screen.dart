@@ -75,7 +75,7 @@ class AboutScreen extends StatelessWidget {
               Icons.shopping_bag_outlined,
               'Marketplace',
               'Buy and sell smart with verified students.',
-              'The student marketplace where smart shopping meets verified trust. List items from your dorm: old furniture, textbooks, phones, accessories: and reach thousands of students looking for quality secondhand goods. Incoming students save money, graduating students clear their rooms, and everyone benefits. Built-in messaging means you negotiate prices and arrange pickups without leaving the app.',
+              'The student marketplace where smart shopping meets verified trust. List items from your hostel: old furniture, textbooks, phones, accessories: and reach thousands of students looking for quality secondhand goods. Incoming students save money, graduating students clear their rooms, and everyone benefits. Built-in messaging means you negotiate prices and arrange pickups without leaving the app.',
             ),
 
             _buildFeatureSection(
@@ -138,7 +138,7 @@ class AboutScreen extends StatelessWidget {
             _buildSimpleSection(
               context,
               '🎓 Built by Students, for Students',
-              'Every feature started with a real problem from campus life. We listened to first-years struggling to find housing, watched seniors scramble to clear their dorms, saw entrepreneurs looking for ways to earn money, and noticed students isolated without proper campus connections. Ulify isn\'t built on assumptions: it\'s built on the lived experiences of thousands of students like you. From day one to graduation day, we\'re here to make campus life simpler, safer, and more connected.',
+              'Every feature started with a real problem from campus life. We listened to first-years struggling to find housing, watched seniors scramble to clear their hostels, saw entrepreneurs looking for ways to earn money, and noticed students isolated without proper campus connections. Ulify isn\'t built on assumptions: it\'s built on the lived experiences of thousands of students like you. From day one to graduation day, we\'re here to make campus life simpler, safer, and more connected.',
             ),
 
             _buildSimpleSection(

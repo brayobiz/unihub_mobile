@@ -14,6 +14,8 @@ import '../../domain/models/event.dart';
 import '../../domain/models/event_category.dart';
 import '../../domain/models/organizer.dart';
 import '../../domain/models/attendance.dart';
+import 'package:unihub_mobile/core/widgets/authorization_guard.dart';
+import 'package:unihub_mobile/core/services/authorization_service.dart';
 import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
 
 class EventDetailScreen extends ConsumerStatefulWidget {
@@ -765,44 +767,49 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             child: ElevatedButton.icon(
               onPressed: (currentUserId == null || isPast || isCancelled || (isFull && !isGoing && !isOrganizer)) 
                 ? (isOrganizer ? () => context.push('/organizers/${event.organizerId}/dashboard') : null) 
-                : () async {
-                  if (isOrganizer) {
-                    context.push('/organizers/${event.organizerId}/dashboard');
-                    return;
-                  }
+                : () => AuthorizationGuard.run(
+                  context, 
+                  ref, 
+                  feature: UlifyFeature.eventsRSVP, 
+                  action: () async {
+                    if (isOrganizer) {
+                      context.push('/organizers/${event.organizerId}/dashboard');
+                      return;
+                    }
 
-                  if (event.isRegistrationRequired && event.registrationUrl != null && event.registrationUrl!.isNotEmpty) {
-                    final uri = Uri.tryParse(event.registrationUrl!);
-                    if (uri != null) {
-                      try {
-                        if (await canLaunchUrl(uri)) {
-                          await launchUrl(uri, mode: LaunchMode.externalApplication);
-                        } else {
-                          throw 'Could not launch registration link';
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                    if (event.isRegistrationRequired && event.registrationUrl != null && event.registrationUrl!.isNotEmpty) {
+                      final uri = Uri.tryParse(event.registrationUrl!);
+                      if (uri != null) {
+                        try {
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          } else {
+                            throw 'Could not launch registration link';
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                          }
                         }
                       }
                     }
-                  }
 
-                  try {
-                    final newStatus = isGoing ? null : AttendanceStatus.going;
-                    await ref.read(eventServiceProvider).setAttendance(currentUserId!, event.id, newStatus);
-                    
-                    if (context.mounted && newStatus == AttendanceStatus.going) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('You\'re going! This event has been added to your hub.')),
-                      );
+                    try {
+                      final newStatus = isGoing ? null : AttendanceStatus.going;
+                      await ref.read(eventServiceProvider).setAttendance(currentUserId!, event.id, newStatus);
+                      
+                      if (context.mounted && newStatus == AttendanceStatus.going) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('You\'re going! This event has been added to your hub.')),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                      }
                     }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-                    }
-                  }
-                },
+                  },
+                ),
               icon: Icon(isGoing ? Icons.check_circle_rounded : (isCancelled ? Icons.cancel_outlined : (isPast ? Icons.event_busy_rounded : (isOrganizer ? Icons.admin_panel_settings_outlined : Icons.check_circle_outline_rounded))), size: 20),
               label: Text(isCancelled ? 'Cancelled' : (isPast ? 'Past Event' : (isGoing ? "I'm Going" : (isOrganizer ? 'Manage Event' : (isFull ? 'Event Full' : 'Attend'))))),
               style: ElevatedButton.styleFrom(

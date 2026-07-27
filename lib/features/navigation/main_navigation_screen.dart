@@ -16,6 +16,7 @@ import '../chat/presentation/screens/conversations_list_screen.dart';
 import '../chat/shared/providers.dart';
 import '../auth/shared/providers.dart';
 import '../auth/presentation/controllers/auth_controller.dart';
+import '../announcements/presentation/widgets/announcement_modal_orchestrator.dart';
 import '../../widgets/app_drawer.dart';
 
 class MainNavigationScreen extends ConsumerStatefulWidget {
@@ -70,16 +71,13 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
       children: [
         Scaffold(
           drawer: const AppDrawer(),
-          body: Column(
+          body: Stack(
             children: [
-              if (user != null && !isEmailVerified)
-                _buildVerificationBanner(context),
-              Expanded(
-                child: IndexedStack(
-                  index: currentIndex,
-                  children: pages,
-                ),
+              IndexedStack(
+                index: currentIndex,
+                children: pages,
               ),
+              const AnnouncementModalOrchestrator(),
             ],
           ),
           bottomNavigationBar: Consumer(
@@ -196,44 +194,6 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
           },
         ),
       ],
-    );
-  }
-
-  Widget _buildVerificationBanner(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: theme.colorScheme.primaryContainer,
-      child: InkWell(
-        onTap: () => context.push('/verify-email'),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: SafeArea(
-            bottom: false,
-            child: Row(
-              children: [
-                Icon(Icons.mark_email_unread_rounded, size: 20, color: theme.colorScheme.primary),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Email Not Verified',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      Text(
-                        'Verify to enable posting and chatting.',
-                        style: TextStyle(fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(Icons.chevron_right_rounded, color: theme.colorScheme.primary),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

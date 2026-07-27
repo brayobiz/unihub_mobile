@@ -11,6 +11,7 @@ import '../../domain/models/moderation_content.dart';
 import '../../domain/models/audit_log.dart';
 import '../../shared/providers.dart';
 import '../../../../services/notification_service.dart';
+import '../../../../core/widgets/optimized_image.dart';
 
 class FeatureModerationScreen extends ConsumerStatefulWidget {
   final ContentType contentType;
@@ -294,10 +295,12 @@ class _FeatureModerationScreenState extends ConsumerState<FeatureModerationScree
 
   Widget _buildThumbnail(ModeratedContent item) {
     if (item.imageUrls.isNotEmpty) {
-      return ClipRRect(
+      return OptimizedImage(
+        imageUrl: item.imageUrls.first,
+        width: 60,
+        height: 60,
         borderRadius: BorderRadius.circular(8),
-        child: Image.network(item.imageUrls.first, width: 60, height: 60, fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _placeholderIcon()),
+        thumbnailWidth: 120,
       );
     }
     return _placeholderIcon();

@@ -9,6 +9,8 @@ import 'presentation/widgets/library_tab.dart';
 import '../../widgets/app_drawer.dart';
 import '../../widgets/notification_badge.dart';
 import 'package:unihub_mobile/features/announcements/presentation/widgets/announcement_display.dart';
+import 'package:unihub_mobile/core/widgets/authorization_guard.dart';
+import 'package:unihub_mobile/core/services/authorization_service.dart';
 import 'package:unihub_mobile/features/campus_filter/presentation/widgets/campus_filter_selector.dart';
 
 class NotesScreen extends ConsumerStatefulWidget {
@@ -126,21 +128,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> with SingleTickerProv
           const SizedBox(width: 16),
         ],
       ),
-      floatingActionButton: Consumer(
-        builder: (context, ref, _) {
-          // Optimization: only watch isAdmin
-          final isAdmin = ref.watch(appUserProvider.select((user) => user.valueOrNull?.isAdmin)) ?? false;
-          if (!isAdmin) return const SizedBox.shrink();
-          
-          return FloatingActionButton.extended(
-            heroTag: 'notes_fab',
-            onPressed: () => context.push('/add-note'),
-            backgroundColor: theme.colorScheme.primary,
-            label: const Text('Upload Notes', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-            icon: const Icon(Icons.add, color: Colors.white),
-          );
-        },
-      ),
+      floatingActionButton: null,
       body: Column(
         children: [
           const RelevantAnnouncementsWidget(feature: 'notes'),

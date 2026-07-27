@@ -255,6 +255,55 @@ exports.cleanupExpiredConversations = onSchedule("0 * * * *", async (event) => {
 });
 
 /**
+ * Cloud Function to aggregate user reviews and update Trust Score.
+ * Triggered when a new review is created in a user's 'reviews' subcollection.
+ * Hardening Phase 3.4: Replaces client-side aggregation to prevent race conditions and manipulation.
+ */
+exports.aggregateUserReviews = onDocumentCreated("users/{userId}/reviews/{reviewId}", async (event) => {
+  const userId = event.params.userId;
+  const db = getFirestore();
+
+  console.log(`⭐ Aggregating new review for user: ${userId}`);
+
+  try {
+    // 1. Get all reviews for this user
+    const reviewsSnap = await db.collection("users").doc(userId).collection("reviews").get();
+
+    if (reviewsSnap.empty) return null;
+
+    let totalRating = 0;
+    const count = reviewsSnap.size;
+    let trustBonus = 0;
+
+    reviewsSnap.docs.forEach((doc) => {
+      const data = doc.data();
+      totalRating += data.rating || 0;
+      // High ratings (> 4) boost trust, low ratings (< 2) penalize it
+      if (data.rating >= 4) trustBonus += 2;
+      if (data.rating <= 2) trustBonus -= 2;
+    });
+
+    const average = totalRating / count;
+
+    // 2. Update the user document with summarized data
+    await db.collection("users").doc(userId).update({
+      averageRating: parseFloat(average.toFixed(1)),
+      ratingsCount: count,
+      // trustScore is capped at 100 in the model, but we aggregate increments here
+      trustScore: FieldValue.increment(trustBonus > 0 ? 2.0 : -1.0),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    // 3. Mark review as aggregated
+    await event.data.ref.update({ status: "aggregated" });
+
+    console.log(`✅ User ${userId} updated: Avg ${average.toFixed(1)}, Count ${count}`);
+  } catch (error) {
+    console.error(`❌ Error aggregating reviews for ${userId}:`, error);
+  }
+});
+
+/**
  * Cloud Function to clean up all data associated with a user when their account is deleted.
  * Triggered when a user document in the 'users' collection is deleted.
  */

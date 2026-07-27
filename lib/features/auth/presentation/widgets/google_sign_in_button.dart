@@ -3,22 +3,24 @@ import 'package:google_fonts/google_fonts.dart';
 
 class GoogleSignInButton extends StatelessWidget {
   final VoidCallback? onPressed;
+  final bool isLoading;
 
   const GoogleSignInButton({
     super.key,
     this.onPressed,
+    this.isLoading = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bool isEnabled = onPressed != null;
+    final bool isEnabled = onPressed != null && !isLoading;
     
     return SizedBox(
       width: double.infinity,
       height: 58,
       child: OutlinedButton(
-        onPressed: onPressed,
+        onPressed: isEnabled ? onPressed : null,
         style: OutlinedButton.styleFrom(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           side: BorderSide(
@@ -26,28 +28,34 @@ class GoogleSignInButton extends StatelessWidget {
                 ? theme.dividerColor.withValues(alpha: 0.5) 
                 : theme.dividerColor.withValues(alpha: 0.2),
           ),
-          backgroundColor: isEnabled ? theme.cardColor : theme.colorScheme.surfaceVariant.withValues(alpha: 0.2),
+          backgroundColor: isEnabled ? theme.cardColor : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
           elevation: 0,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.login_rounded, 
-              size: 20, 
-              color: isEnabled ? theme.colorScheme.onSurface : theme.colorScheme.onSurface.withValues(alpha: 0.3),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              "Continue with Google",
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: isEnabled ? theme.colorScheme.onSurface : theme.colorScheme.onSurface.withValues(alpha: 0.3),
+        child: isLoading
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.login_rounded, 
+                    size: 20, 
+                    color: isEnabled ? theme.colorScheme.onSurface : theme.colorScheme.onSurface.withValues(alpha: 0.3),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    "Continue with Google",
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: isEnabled ? theme.colorScheme.onSurface : theme.colorScheme.onSurface.withValues(alpha: 0.3),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
       ),
     );
   }

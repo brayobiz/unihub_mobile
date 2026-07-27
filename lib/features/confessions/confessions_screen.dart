@@ -8,6 +8,8 @@ import '../auth/shared/providers.dart';
 import '../shared/add_feed_item_screen.dart';
 import '../../widgets/notification_badge.dart';
 import '../campus_filter/presentation/widgets/campus_filter_selector.dart';
+import 'package:unihub_mobile/core/widgets/authorization_guard.dart';
+import 'package:unihub_mobile/core/services/authorization_service.dart';
 import 'package:unihub_mobile/features/announcements/presentation/widgets/announcement_display.dart';
 
 final confessionsFeedProvider = StreamProvider<List<FeedItem>>((ref) {
@@ -84,7 +86,12 @@ class ConfessionsScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 32),
                           FilledButton.icon(
-                            onPressed: () => context.push('/add-feed-item', extra: FeedType.confession),
+                            onPressed: () => AuthorizationGuard.run(
+                              context, 
+                              ref, 
+                              feature: UlifyFeature.confessionsPost, 
+                              action: () => context.push('/add-feed-item', extra: FeedType.confession),
+                            ),
                             icon: const Icon(Icons.favorite_outline_rounded),
                             label: const Text('Post Confession'),
                             style: FilledButton.styleFrom(
@@ -131,7 +138,12 @@ class ConfessionsScreen extends ConsumerWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/add-feed-item', extra: FeedType.confession),
+        onPressed: () => AuthorizationGuard.run(
+          context, 
+          ref, 
+          feature: UlifyFeature.confessionsPost, 
+          action: () => context.push('/add-feed-item', extra: FeedType.confession),
+        ),
         label: const Text('Confess'),
         icon: const Icon(Icons.favorite_border),
         backgroundColor: Colors.red.shade400,

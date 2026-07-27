@@ -244,11 +244,20 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
 
     return userAsync.when(
       data: (user) {
-        if (user == null || !user.isAdmin) {
+        final bool canUpload = user != null && (user.isAdmin || user.roles.contains('class_rep'));
+        
+        if (!canUpload) {
           return Scaffold(
             appBar: AppBar(title: const Text('Access Denied')),
             body: const Center(
-              child: Text('Only administrators can upload study materials to the global library.'),
+              child: Padding(
+                padding: EdgeInsets.all(24.0),
+                child: Text(
+                  'Only Class Representatives and Administrators can upload study materials to the global library.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+              ),
             ),
           );
         }

@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unihub_mobile/core/error/error_handler.dart';
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
@@ -25,12 +24,15 @@ class AuthRepositoryImpl implements AuthRepository {
   Stream<User?> get authStateChanges => _firebaseAuth.authStateChanges();
 
   @override
+  Stream<User?> get userChanges => _firebaseAuth.userChanges();
+
+  @override
   User? get currentUser => _firebaseAuth.currentUser;
 
   @override
   Future<void> signInWithEmailAndPassword(String email, String password) async {
     try {
-      AppLogger.info('Auth: Attempting sign in for ${email.split('@').first}@...', 'AUTH');
+      AppLogger.info('🔑 Auth: Attempting sign in for ${email.split('@').first}@...', 'AUTH');
       await _firebaseAuth.signInWithEmailAndPassword(
         email: email,
         password: password,
@@ -38,14 +40,14 @@ class AuthRepositoryImpl implements AuthRepository {
       
       final user = _firebaseAuth.currentUser;
       if (user != null) {
+        // Hardening Phase 3.2: Consolidate profile checking/creation
+        await _ensureUserDocumentExists(user);
         await _updateSearchFields(user.uid);
-        // Self-healing: ensure onboarding flag is set for returning users
-        await _ensureOnboardingFlagForReturningUser(user.uid);
       }
 
-      AppLogger.info('Auth: Sign in successful', 'AUTH');
+      AppLogger.info('✅ Auth: Sign in successful', 'AUTH');
     } catch (e, st) {
-      AppLogger.error('Auth: Sign in failed', e, st, 'AUTH');
+      AppLogger.error('❌ Auth: Sign in failed', e, st, 'AUTH');
       throw Exception(AppErrorHandler.mapError(e, st));
     }
   }
@@ -53,9 +55,11 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> signInWithGoogle() async {
     try {
+      AppLogger.info('🌐 Auth: Launching Google Sign-In...', 'AUTH');
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
-        return; // User canceled the sign-in flow
+        AppLogger.info('🚫 Auth: Google Sign-in canceled by user', 'AUTH');
+        return; 
       }
 
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
@@ -68,13 +72,12 @@ class AuthRepositoryImpl implements AuthRepository {
       final User? user = userCredential.user;
 
       if (user != null) {
-        // Use a more robust check and creation logic
         await _ensureUserDocumentExists(user);
-        // Self-healing: Ensure search fields exist for the logged-in user
         await _updateSearchFields(user.uid);
+        AppLogger.info('✅ Auth: Google Sign-in successful for ${user.uid}', 'AUTH');
       }
     } catch (e, st) {
-      AppLogger.error('Auth: Google Sign-in failed', e, st, 'AUTH');
+      AppLogger.error('❌ Auth: Google Sign-in failed', e, st, 'AUTH');
       throw Exception(AppErrorHandler.mapError(e, st));
     }
   }
@@ -112,17 +115,24 @@ class AuthRepositoryImpl implements AuthRepository {
         await docRef.set(userData);
       } else {
         // Self-healing: Ensure existing users have the onboarding flag set
-        // to avoid being caught in the onboarding flow unexpectedly.
+        // Audit Phase 3.5: Reduced redundant writes by checking existing state
         final data = doc.data() as Map<String, dynamic>;
-        if (data['isOnboardingCompleted'] == null || data['isOnboardingCompleted'] == false) {
+        final bool alreadyOnboarded = data['isOnboardingCompleted'] == true;
+        
+        // Only update if missing or false
+        if (!alreadyOnboarded) {
           await docRef.update({
             'isOnboardingCompleted': true,
             'lastSeen': FieldValue.serverTimestamp(),
           }).catchError((_) => null);
         } else {
-          await docRef.update({
-            'lastSeen': FieldValue.serverTimestamp(),
-          }).catchError((_) => null);
+          // Just update lastSeen if more than 5 minutes have passed
+          final lastSeen = (data['lastSeen'] as Timestamp?)?.toDate();
+          if (lastSeen == null || DateTime.now().difference(lastSeen).inMinutes > 5) {
+            await docRef.update({
+              'lastSeen': FieldValue.serverTimestamp(),
+            }).catchError((_) => null);
+          }
         }
       }
     } catch (e) {
@@ -389,22 +399,14 @@ class AuthRepositoryImpl implements AuthRepository {
     }, SetOptions(merge: true));
   }
 
-  /// Self-healing helper to ensure returning users are marked as onboarded.
-  Future<void> _ensureOnboardingFlagForReturningUser(String uid) async {
-    try {
-      final docRef = _firestore.collection('users').doc(uid);
-      final doc = await docRef.get();
-      if (doc.exists) {
-        final data = doc.data();
-        if (data != null && (data['isOnboardingCompleted'] == null || data['isOnboardingCompleted'] == false)) {
-          // If profile is already complete, assume they've onboarded before
-          if (data['university'] != null && data['course'] != null) {
-             await docRef.update({'isOnboardingCompleted': true}).catchError((_) => null);
-          }
-        }
-      }
-    } catch (e) {
-      // Best effort, don't throw
+  @override
+  Future<void> updateVerificationStatus(String uid, {bool? emailVerified, bool? phoneVerified}) async {
+    final Map<String, dynamic> data = {};
+    if (emailVerified != null) data['isEmailVerified'] = emailVerified;
+    if (phoneVerified != null) data['isPhoneVerified'] = phoneVerified;
+    
+    if (data.isNotEmpty) {
+      await _firestore.collection('users').doc(uid).update(data).catchError((_) => null);
     }
   }
 
@@ -668,57 +670,43 @@ class AuthRepositoryImpl implements AuthRepository {
     required String reviewerName,
     required String listingId,
   }) async {
-    final batch = _firestore.batch();
-    
-    final reviewRef = _firestore.collection('users').doc(targetUid).collection('reviews').doc();
-    batch.set(reviewRef, {
-      'reviewerId': reviewerId,
-      'reviewerName': reviewerName,
-      'rating': rating,
-      'comment': comment,
-      'listingId': listingId,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-    
-    final userRef = _firestore.collection('users').doc(targetUid);
-    final userDoc = await userRef.get();
-    final currentAvg = (userDoc.data()?['averageRating'] ?? 0.0).toDouble();
-    final currentCount = (userDoc.data()?['ratingsCount'] ?? 0).toInt();
-    
-    final newCount = currentCount + 1;
-    final newAvg = ((currentAvg * currentCount) + rating) / newCount;
-    
-    batch.update(userRef, {
-      'averageRating': newAvg,
-      'ratingsCount': newCount,
-      'trustScore': FieldValue.increment(rating >= 4 ? 2.0 : -1.0),
-    });
+    // Audit Phase 3.6 Hardening: Switched to a Firestore Transaction.
+    // This prevents race conditions where multiple concurrent ratings 
+    // would result in mathematically incorrect averages/counts.
+    await _firestore.runTransaction((transaction) async {
+      final userRef = _firestore.collection('users').doc(targetUid);
+      final userDoc = await transaction.get(userRef);
+      
+      final reviewRef = userRef.collection('reviews').doc();
+      
+      if (userDoc.exists) {
+        final data = userDoc.data()!;
+        final double currentAvg = (data['averageRating'] ?? 0.0).toDouble();
+        final int currentCount = (data['ratingsCount'] ?? 0).toInt();
+        
+        final newCount = currentCount + 1;
+        final newAvg = ((currentAvg * currentCount) + rating) / newCount;
+        
+        // Update user stats
+        transaction.update(userRef, {
+          'averageRating': double.parse(newAvg.toStringAsFixed(1)),
+          'ratingsCount': newCount,
+          'trustScore': FieldValue.increment(rating >= 4 ? 2.0 : -1.0),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
 
-    await batch.commit();
-  }
-
-  Exception _handleAuthException(FirebaseAuthException e) {
-    AppLogger.warning('🛑 Auth Error Code: ${e.code}', 'AUTH');
-    switch (e.code) {
-      case 'user-not-found':
-      case 'user-disabled':
-      case 'invalid-email':
-      case 'wrong-password':
-      case 'invalid-credential':
-        return Exception('Invalid email or password. Please try again.');
-      case 'email-already-in-use':
-        return Exception('This email is already registered. Please sign in instead.');
-      case 'operation-not-allowed':
-        return Exception('This authentication method is currently disabled.');
-      case 'weak-password':
-        return Exception('The password provided is too weak.');
-      case 'network-request-failed':
-        return Exception('No internet connection. Please check your network and try again.');
-      case 'too-many-requests':
-        return Exception('Too many attempts. Please try again in a few minutes.');
-      default:
-        return Exception(e.message ?? 'An unexpected authentication error occurred. Please try again.');
-    }
+        // Write the review
+        transaction.set(reviewRef, {
+          'reviewerId': reviewerId,
+          'reviewerName': reviewerName,
+          'rating': rating,
+          'comment': comment,
+          'listingId': listingId,
+          'createdAt': FieldValue.serverTimestamp(),
+          'status': 'aggregated', // Transactional write is final
+        });
+      }
+    });
   }
 }
 

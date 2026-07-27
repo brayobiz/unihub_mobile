@@ -1,8 +1,6 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:path/path.dart' as p;
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import '../../shared/providers.dart';
@@ -10,6 +8,8 @@ import '../../../auth/shared/providers.dart';
 import '../../domain/models/study_progress.dart';
 import '../../domain/models/note.dart';
 import '../../../../services/download_service.dart';
+import '../../../../core/widgets/authorization_guard.dart';
+import '../../../../core/services/authorization_service.dart';
 import '../widgets/note_card.dart';
 
 class LibraryTab extends ConsumerStatefulWidget {
@@ -42,6 +42,72 @@ class _LibraryTabState extends ConsumerState<LibraryTab> {
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 20),
       children: [
+        // Contributor Action Card
+        ref.watch(appUserProvider).when(
+          data: (user) {
+            final bool isContributor = user != null && (user.isAdmin || user.roles.contains('class_rep'));
+            if (!isContributor) return const SizedBox.shrink();
+            
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              child: InkWell(
+                onTap: () => AuthorizationGuard.run(
+                  context, 
+                  ref, 
+                  feature: UlifyFeature.notesUpload, 
+                  action: () => context.push('/add-note'),
+                ),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(Icons.upload_file_rounded, color: Colors.white, size: 24),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Upload New Material',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                            Text(
+                              'Share notes with your campus community',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.add_circle_outline_rounded, color: AppColors.primary),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+        ),
+
         continueReading.when(
           data: (data) => data.isEmpty 
             ? const SizedBox.shrink()
@@ -60,7 +126,8 @@ class _LibraryTabState extends ConsumerState<LibraryTab> {
 
         ref.watch(appUserProvider).when(
           data: (user) {
-            if (user == null || !user.isAdmin) return const SizedBox.shrink();
+            final bool isContributor = user != null && (user.isAdmin || user.roles.contains('class_rep'));
+            if (!isContributor) return const SizedBox.shrink();
             return uploads.when(
               data: (data) => data.isEmpty
                 ? const SizedBox.shrink()

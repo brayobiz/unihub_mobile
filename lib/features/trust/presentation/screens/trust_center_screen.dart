@@ -91,6 +91,8 @@ class TrustCenterScreen extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Column(
                     children: [
+                      _buildEmailVerificationCard(context, user),
+                      const SizedBox(height: 12),
                       studentVerificationAsync.when(
                         data: (v) => _buildStudentVerificationCard(context, user, v),
                         loading: () => const Padding(
@@ -763,6 +765,90 @@ class TrustCenterScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildEmailVerificationCard(BuildContext context, AppUser user) {
+    final theme = Theme.of(context);
+    final bool isVerified = user.isEmailVerified;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isVerified ? const Color(0xFF10B981) : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: (isVerified ? const Color(0xFF10B981) : theme.colorScheme.primary).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  isVerified ? Icons.mark_email_read_rounded : Icons.alternate_email_rounded,
+                  color: isVerified ? const Color(0xFF10B981) : theme.colorScheme.primary,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Email Verification',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    Text(
+                      isVerified 
+                        ? 'Email address confirmed' 
+                        : 'Confirm your email to unlock all features',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isVerified)
+                const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981))
+              else
+                _buildStatusBadge(context, 'Action Required', Colors.orange)
+            ],
+          ),
+          if (!isVerified) ...[
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => context.push('/verify-email'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Complete Verification', style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   void _showTrustBreakdown(BuildContext context, dynamic user) {
     final theme = Theme.of(context);
     showModalBottomSheet(
@@ -781,6 +867,8 @@ class TrustCenterScreen extends ConsumerWidget {
             Text('Your score is a deterministic reflection of your verified milestones and platform activity.', 
               style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14)),
             const SizedBox(height: 32),
+            _buildBreakdownItem(context, Icons.alternate_email_rounded, 'Email Verification', user.isEmailVerified ? 'Confirmed (Requirement)' : 'Not Verified', user.isEmailVerified),
+            Divider(height: 32, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
             _buildBreakdownItem(context, Icons.badge_rounded, 'Identity Verification', user.isIdentityVerified ? 'Confirmed (+30%)' : 'Not Verified', user.isIdentityVerified),
             Divider(height: 32, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
             _buildBreakdownItem(context, Icons.school_rounded, 'Student Verification', user.isStudentVerified ? 'Verified (+20%)' : 'Not Verified', user.isStudentVerified),

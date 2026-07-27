@@ -14,6 +14,7 @@ import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/welcome_screen.dart';
 import '../../features/auth/shared/providers.dart';
 import '../../features/auth/presentation/controllers/auth_controller.dart';
+import '../providers/app_restart_provider.dart';
 import '../../features/navigation/main_navigation_screen.dart';
 
 import '../../features/marketplace/presentation/screens/add_listing_screen.dart';
@@ -141,6 +142,8 @@ class RouterNotifier extends ChangeNotifier {
     _ref.listen(authStateProvider, (_, __) => _safeNotify());
 
     // 2. Listen to App User (Profile Data)
+    // Audit Phase 4.10: Optimized selection to prevent redundant redirects on presence updates.
+    // Presence updates (isOnline, lastSeen) change often but shouldn't trigger routing logic.
     _ref.listen(
       appUserProvider.select((asyncUser) {
         final user = asyncUser.valueOrNull;
@@ -154,6 +157,8 @@ class RouterNotifier extends ChangeNotifier {
           isOnboardingCompleted: user.isOnboardingCompleted,
           isAdmin: user.isAdmin,
           isDeleted: user.isDeleted,
+          fullName: user.fullName, // Included for profile incomplete check
+          createdAt: user.createdAt, // Included for onboarding guard
         );
       }),
       (_, __) => _safeNotify(),
@@ -164,6 +169,7 @@ class RouterNotifier extends ChangeNotifier {
     _ref.listen(deviceOnboardingCompletedProvider, (_, __) => _safeNotify());
     _ref.listen(accountDeletedProvider, (_, __) => _safeNotify());
     _ref.listen(authControllerProvider, (_, __) => _safeNotify());
+    _ref.listen(appRestartProvider, (_, __) => _safeNotify());
   }
 
   void _safeNotify() {
@@ -184,7 +190,7 @@ class RouterNotifier extends ChangeNotifier {
   /// - Ensured single navigation event per state change.
   /// - Optimized transition stabilizer for "instant" feel.
   String? redirect(BuildContext context, GoRouterState state) {
-    // 1. Collect required application state from Providers
+    // Audit Phase 3.5: Use local caching for redirect state to avoid repeated provider reads
     final authState = _ref.read(authStateProvider);
     final appUserAsync = _ref.read(appUserProvider);
     final isDeviceOnboardingDone = _ref.read(deviceOnboardingCompletedProvider);
@@ -194,7 +200,7 @@ class RouterNotifier extends ChangeNotifier {
     final String matchedLocation = state.matchedLocation;
     final bool isSplash = matchedLocation == '/splash';
     
-    // Stabilize Splash visibility to prevent flickering during rapid transitions
+    // Stabilize Splash visibility
     if (isSplash && _splashEntryTime == null) {
       _splashEntryTime = DateTime.now();
     } else if (!isSplash) {
@@ -205,19 +211,6 @@ class RouterNotifier extends ChangeNotifier {
     final appUser = appUserAsync.valueOrNull;
     final isDeleted = appUser?.isDeleted ?? false;
 
-    // Route category flags for streamlined logic
-    final isAuthRoute =
-        matchedLocation == '/login' ||
-        matchedLocation == '/register' ||
-        matchedLocation == '/welcome' ||
-        matchedLocation == '/complete-profile' ||
-        matchedLocation == '/onboarding' ||
-        isSplash;
-
-    // =========================================================================
-    // STARTUP & AUTHENTICATION JOURNEY LOGIC
-    // =========================================================================
-
     // A. PRIORITY 1: GLOBAL INTERRUPTS (Deletion/Banned)
     if (isAccountDeleted || isDeleted) {
       if (matchedLocation != '/account-deleted') return '/account-deleted';
@@ -225,22 +218,25 @@ class RouterNotifier extends ChangeNotifier {
     }
 
     // B. PRIORITY 2: AUTHENTICATION STATE
-    // Wait for the Firebase Auth session to restore (Scenario 3 & 4)
+    if (authState.hasError) {
+       return isSplash ? '/welcome' : null;
+    }
+
     if ((authState.isLoading || authState.isRefreshing) && !authState.hasValue) {
       return isSplash ? null : '/splash';
     }
 
     final isLoggedIn = firebaseUser != null;
 
-    // C. PATHWAY: UNAUTHENTICATED (Scenario 1 & 5)
+    // C. PATHWAY: UNAUTHENTICATED
     if (!isLoggedIn) {
-      // 1. First-time Device Experience
+      _splashEntryTime = null;
+
       if (!isDeviceOnboardingDone) {
         if (matchedLocation != '/onboarding') return '/onboarding';
         return null;
       }
 
-      // 2. Allow guest access to public auth screens
       final bool isPublicAuthRoute = 
           matchedLocation == '/login' ||
           matchedLocation == '/register' ||
@@ -248,50 +244,41 @@ class RouterNotifier extends ChangeNotifier {
           matchedLocation == '/forgot-password' ||
           matchedLocation == '/account-deleted';
 
-      // Reset stack and move to Welcome if trying to access protected routes
       if (isSplash || !isPublicAuthRoute) return '/welcome';
       return null;
     }
 
     // D. PATHWAY: AUTHENTICATED
-    // We have a Firebase User. Now we must coordinate with Profile and Guards.
-    
-    // 1. Transition Stabilizer: Hold on Splash until logic is final
-    // This prevents "flashing" the home screen before profile data is fetched.
+    // 1. Transition Stabilizer
     final bool isProfileMissing = appUser == null;
     final bool isProfileFetching = appUserAsync.isLoading || appUserAsync.isRefreshing;
     
     if (isLoggedIn) {
-      // If we are on an auth screen (Login/Welcome) but now authenticated, 
-      // move to Splash to manage the transition to Home.
-      if (isAuthRoute && !isSplash && isProfileMissing) {
+      final isAuthRoute = matchedLocation == '/login' || matchedLocation == '/register' || matchedLocation == '/welcome';
+      if (isAuthRoute && isProfileMissing) {
         return '/splash';
       }
 
       if (isSplash) {
-        final now = DateTime.now();
-        final elapsed = _splashEntryTime != null ? now.difference(_splashEntryTime!).inMilliseconds : 0;
-            
-        // AUDIT 1.3: Stabilizer reduced to 300ms for faster "feel" while maintaining smoothness.
+        final elapsed = _splashEntryTime != null ? DateTime.now().difference(_splashEntryTime!).inMilliseconds : 0;
         if (isProfileFetching || isProfileMissing || elapsed < 300) {
           if (!isProfileFetching && !isProfileMissing && elapsed < 300) {
             Future.delayed(Duration(milliseconds: 305 - elapsed), () => _safeNotify());
           }
-          return null; // Hold on Splash
+          return null;
         }
       }
     }
 
-    // 2. Error Recovery (Scenario 6)
+    // 2. Error Recovery
     if (appUserAsync.hasError) {
       if (matchedLocation != '/connection-error') return '/connection-error';
       return null;
     }
 
-    // 3. System Constraints (Maintenance/Security)
+    // 3. System Constraints
     final isAdmin = appUser?.isAdmin ?? false;
-    final settings = settingsAsync.valueOrNull;
-    if (settings?.maintenanceMode == true && !isAdmin) {
+    if (settingsAsync.valueOrNull?.maintenanceMode == true && !isAdmin) {
       if (matchedLocation != '/maintenance') return '/maintenance';
       return null;
     }
@@ -304,25 +291,21 @@ class RouterNotifier extends ChangeNotifier {
 
     // 5. Mandatory Profile Setup Guard
     final name = appUser?.fullName.trim().toLowerCase() ?? '';
-    final isDefaultName = name == 'ulify user' || name == 'ulifyuser' || 
-                          name == 'unihub user' || name == 'unihubuser' ||
-                          name == 'a student';
-    
     final bool isProfileIncomplete = appUser == null ||
         appUser.university == null || 
         appUser.course == null || 
-        isDefaultName ||
+        name == 'ulify user' || name == 'ulifyuser' || 
+        name == 'unihub user' || name == 'unihubuser' ||
+        name == 'a student' ||
         appUser.fullName.length < 3;
 
     if (isProfileIncomplete) {
-      if (appUserAsync.isLoading || appUserAsync.isRefreshing) {
-        return isSplash ? null : '/splash';
-      }
+      if (isProfileFetching) return isSplash ? null : '/splash';
       if (matchedLocation != '/complete-profile') return '/complete-profile';
       return null;
     }
 
-    // 6. First-Login Onboarding (User-level)
+    // 6. User Onboarding Guard
     final bool isReturningUser = appUser.createdAt == null || 
         DateTime.now().difference(appUser.createdAt!).inMinutes > 2;
 
@@ -331,18 +314,13 @@ class RouterNotifier extends ChangeNotifier {
       return null;
     }
 
-    // 7. FINAL DESTINATION: HOME (Stack Reset)
-    // If user is currently on any Auth/Splash screen, we are done with the journey.
-    if (isAuthRoute) {
-      return '/main';
-    }
+    // 7. FINAL DESTINATION
+    final isAuthRoute = matchedLocation == '/login' || matchedLocation == '/register' || matchedLocation == '/welcome' || matchedLocation == '/complete-profile' || matchedLocation == '/onboarding' || isSplash;
+    if (isAuthRoute) return '/main';
 
-    // 8. Admin Security Guard
-    if (matchedLocation.startsWith('/admin')) {
-      if (!appUser.isAdmin) return '/main';
-    }
+    if (matchedLocation.startsWith('/admin') && !isAdmin) return '/main';
 
-    return null; // Maintain current position
+    return null;
   }
 }
 

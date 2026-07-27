@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:unihub_mobile/core/constants/campus_constants.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
@@ -13,6 +12,8 @@ import 'package:unihub_mobile/features/trust/domain/models/professional_role.dar
 import 'package:unihub_mobile/features/trust/domain/models/verification_application.dart';
 import 'package:unihub_mobile/features/trust/presentation/providers/trust_providers.dart';
 import 'package:unihub_mobile/widgets/notification_badge.dart';
+import 'package:unihub_mobile/core/widgets/authorization_guard.dart';
+import 'package:unihub_mobile/core/services/authorization_service.dart';
 
 class PlugDashboardScreen extends ConsumerWidget {
   const PlugDashboardScreen({super.key});
@@ -66,6 +67,8 @@ class PlugDashboardScreen extends ConsumerWidget {
           children: [
             _buildProfileSummary(context, user),
             const SizedBox(height: 16),
+            _buildCreateVacancyCTA(context, ref),
+            const SizedBox(height: 12),
             _buildViewingRequestsCard(context, ref, user.uid),
             const SizedBox(height: 16),
             applicationAsync.when(
@@ -90,15 +93,72 @@ class PlugDashboardScreen extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('My Listings', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-                TextButton.icon(
-                  onPressed: () => context.push('/add-housing'),
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Add New'),
-                ),
               ],
             ),
             const SizedBox(height: 16),
             _buildListingsList(context, listingsAsync, ref),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCreateVacancyCTA(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: () => AuthorizationGuard.run(
+        context, 
+        ref, 
+        feature: UlifyFeature.housingPost, 
+        action: () => context.push('/add-housing'),
+      ),
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [theme.colorScheme.primary, theme.colorScheme.primary.withValues(alpha: 0.8)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: theme.colorScheme.primary.withValues(alpha: 0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.add_home_work_rounded, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 16),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Create New Vacancy',
+                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'List a new hostel or house',
+                    style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 16),
           ],
         ),
       ),
@@ -119,9 +179,9 @@ class PlugDashboardScreen extends ConsumerWidget {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.warning.withOpacity(0.1),
+              color: AppColors.warning.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+              border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [
@@ -166,7 +226,7 @@ class PlugDashboardScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: (isRejected ? AppColors.error : theme.colorScheme.primary).withOpacity(0.1),
+              color: (isRejected ? AppColors.error : theme.colorScheme.primary).withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -237,46 +297,46 @@ class PlugDashboardScreen extends ConsumerWidget {
   Widget _buildProfileSummary(BuildContext context, dynamic user) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 20, offset: const Offset(0, 10))
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 5))
         ],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(3),
+            padding: const EdgeInsets.all(2),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2), width: 2),
+              border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2), width: 1.5),
             ),
             child: CircleAvatar(
-              radius: 32,
+              radius: 24,
               backgroundImage: user.photoUrl != null ? NetworkImage(user.photoUrl!) : null,
-              child: user.photoUrl == null ? Text(user.fullName[0], style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)) : null,
+              child: user.photoUrl == null ? Text(user.fullName[0], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)) : null,
             ),
           ),
-          const SizedBox(width: 20),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(user.fullName, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface)),
-                const SizedBox(height: 6),
+                Text(user.fullName, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface)),
+                const SizedBox(height: 4),
                 Row(
                   children: [
                     if (user.isVerified)
-                      Icon(Icons.verified_rounded, color: theme.colorScheme.primary, size: 16),
+                      Icon(Icons.verified_rounded, color: theme.colorScheme.primary, size: 14),
                     const SizedBox(width: 4),
                     Text(
                       user.isHousingPlug ? 'HOUSING PLUG' : 'HOUSING PARTNER', 
                       style: TextStyle(
                         color: user.isVerified ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant, 
-                        fontSize: 10, 
+                        fontSize: 9, 
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.5,
                       )
@@ -329,12 +389,12 @@ class PlugDashboardScreen extends ConsumerWidget {
     return GestureDetector(
       onTap: () => context.push('/opportunities'),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: theme.colorScheme.primary,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
-            BoxShadow(color: theme.colorScheme.primary.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))
+            BoxShadow(color: theme.colorScheme.primary.withOpacity(0.1), blurRadius: 6, offset: const Offset(0, 2))
           ],
         ),
         child: Row(
@@ -345,17 +405,17 @@ class PlugDashboardScreen extends ConsumerWidget {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.bolt_rounded, color: Colors.amber, size: 20),
-                      const SizedBox(width: 8),
-                      Text('Opportunity Feed', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+                      const Icon(Icons.bolt_rounded, color: Colors.amber, size: 16),
+                      const SizedBox(width: 6),
+                      Text('Opportunity Feed', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w800)),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text('Discover new vacancy leads reported by students and landlords.', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12)),
+                  const SizedBox(height: 4),
+                  Text('Discover new vacancy leads reported by students and landlords.', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11)),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 32),
+            const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 24),
           ],
         ),
       ),
@@ -416,7 +476,7 @@ class PlugDashboardScreen extends ConsumerWidget {
       VerificationStatus.pending || VerificationStatus.underReview => Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: theme.colorScheme.outlineVariant),
           ),
@@ -588,8 +648,14 @@ class PlugDashboardScreen extends ConsumerWidget {
                 _buildStatCard(context, 'Active', active.toString(), theme.colorScheme.primary),
                 const SizedBox(width: 12),
                 _buildStatCard(context, 'Total Views', views.toString(), theme.colorScheme.secondary),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _buildStatCard(context, 'Total Saves', saves.toString(), Colors.orange),
                 const SizedBox(width: 12),
-                _buildStatCard(context, 'Chats', chats.toString(), AppColors.success),
+                _buildStatCard(context, 'Active Chats', chats.toString(), AppColors.success),
               ],
             ),
           ],
@@ -604,20 +670,20 @@ class PlugDashboardScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: color.withOpacity(0.1)),
           boxShadow: [
-            BoxShadow(color: color.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))
+            BoxShadow(color: color.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 2))
           ],
         ),
         child: Column(
           children: [
-            Text(value, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: color)),
-            const SizedBox(height: 4),
-            Text(label, style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w800, letterSpacing: 0.2)),
+            Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: color)),
+            const SizedBox(height: 2),
+            Text(label, style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w800, letterSpacing: 0.2)),
           ],
         ),
       ),
@@ -681,31 +747,31 @@ class PlugDashboardScreen extends ConsumerWidget {
     final statusLabel = listing.status.name.replaceAll(RegExp(r'(?=[A-Z])'), ' ').toUpperCase();
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6)],
       ),
       child: Row(
         children: [
           OptimizedImage(
             imageUrl: listing.images.isNotEmpty ? listing.images.first : 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=2070&auto=format&fit=crop',
-            width: 85,
-            height: 85,
-            borderRadius: BorderRadius.circular(16),
+            width: 70,
+            height: 70,
+            borderRadius: BorderRadius.circular(12),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(listing.title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: theme.colorScheme.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 4),
-                Text('KES ${listing.rent.toInt()}', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 8),
+                Text(listing.title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 2),
+                Text('KES ${listing.rent.toInt()}', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w800, fontSize: 13)),
+                const SizedBox(height: 6),
                 Row(
                   children: [
                     _buildSmallBadge(statusLabel, statusColor),

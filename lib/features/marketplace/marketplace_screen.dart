@@ -28,6 +28,8 @@ import 'package:unihub_mobile/features/announcements/presentation/widgets/announ
 import 'package:unihub_mobile/features/ads/ads_module.dart';
 
 import 'presentation/controllers/paginated_listings_controller.dart';
+import '../../core/widgets/authorization_guard.dart';
+import '../../core/services/authorization_service.dart';
 import '../../core/widgets/error_view.dart';
 import '../../core/widgets/empty_state.dart';
 
@@ -92,7 +94,12 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
         actions: [
           // 1. New "Sell" Action in AppBar
           TextButton.icon(
-            onPressed: () => context.push('/add-listing'),
+            onPressed: () => AuthorizationGuard.run(
+              context, 
+              ref, 
+              feature: UlifyFeature.marketplacePost, 
+              action: () => context.push('/add-listing'),
+            ),
             icon: const Icon(Icons.add_circle_outline_rounded, size: 20, color: AppColors.secondary),
             label: const Text(
               'Sell', 

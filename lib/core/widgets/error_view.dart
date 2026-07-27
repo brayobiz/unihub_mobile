@@ -4,6 +4,7 @@ import '../error/error_handler.dart';
 class ErrorView extends StatelessWidget {
   final dynamic error;
   final VoidCallback? onRetry;
+  final Widget? action;
   final String? message;
   final bool isFullPage;
 
@@ -11,6 +12,7 @@ class ErrorView extends StatelessWidget {
     super.key,
     this.error,
     this.onRetry,
+    this.action,
     this.message,
     this.isFullPage = true,
   });
@@ -53,16 +55,21 @@ class ErrorView extends StatelessWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            if (onRetry != null) ...[
+            if (onRetry != null || action != null) ...[
               const SizedBox(height: 32),
-              SizedBox(
-                width: 200,
-                child: FilledButton.icon(
-                  onPressed: onRetry,
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Try Again'),
+              if (onRetry != null)
+                SizedBox(
+                  width: 200,
+                  child: FilledButton.icon(
+                    onPressed: onRetry,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Try Again'),
+                  ),
                 ),
-              ),
+              if (action != null) ...[
+                const SizedBox(height: 12),
+                action!,
+              ],
             ],
           ],
         ),

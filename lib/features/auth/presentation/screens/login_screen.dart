@@ -252,16 +252,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                   const SizedBox(height: 28),
 
-                  if (isLoading)
-                    const Center(child: Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: CircularProgressIndicator(),
-                    ))
-                  else
-                    AuthButton(
-                      text: 'Sign In',
-                      onPressed: _isFormValid ? _onSignIn : null,
-                    ),
+                  AuthButton(
+                    text: 'Sign In',
+                    isLoading: isLoading,
+                    onPressed: _isFormValid ? _onSignIn : null,
+                  ),
 
                   const SizedBox(height: 32),
 
@@ -270,7 +265,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 32),
 
                   GoogleSignInButton(
-                    onPressed: isLoading ? null : () async {
+                    isLoading: isLoading,
+                    onPressed: () async {
                       final connectivity = ref.read(connectivityServiceProvider);
                       if (connectivity == ConnectivityStatus.isDisconnected) {
                         _showErrorSnackBar('No internet connection. Please check your network and try again.');

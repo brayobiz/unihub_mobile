@@ -23,15 +23,13 @@ import '../../core/widgets/optimized_image.dart';
 import 'controllers/smart_feed_controller.dart';
 import '../../services/notification_service.dart';
 import '../../services/history_service.dart';
-import '../shared/add_feed_item_screen.dart';
-import '../shared/global_search_screen.dart';
-import '../shared/campus_pulse_screen.dart';
 import '../announcements/presentation/widgets/announcement_display.dart';
 import '../campus_filter/presentation/widgets/campus_filter_selector.dart';
 import '../events/presentation/widgets/homepage_event_sections.dart';
 import '../ads/ads_module.dart';
+import '../../core/widgets/authorization_guard.dart';
+import '../../core/services/authorization_service.dart';
 import '../../core/widgets/error_view.dart';
-import '../../core/widgets/empty_state.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -146,6 +144,7 @@ class _DashboardAppBar extends ConsumerWidget {
       return (
         fullName: user.fullName,
         photoUrl: user.photoUrl,
+        isEmailVerified: user.isEmailVerified,
       );
     }));
 
@@ -212,13 +211,59 @@ class _DashboardAppBar extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Text(
-                  '${getGreeting()}, ${userData?.fullName.split(' ').first ?? 'Student'}! 🎓',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${getGreeting()}, ${userData?.fullName.split(' ').first ?? 'Student'}! 🎓',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (userData != null && !userData.isEmailVerified)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 12),
+                        child: GestureDetector(
+                          onTap: () => context.push('/verify-email'),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade400,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.mark_email_unread_rounded, color: Colors.black87, size: 16),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Verify Email',
+                                  style: TextStyle(
+                                    color: Colors.black.withOpacity(0.8), 
+                                    fontSize: 11, 
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.5,
+                                  )
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -238,12 +283,15 @@ class _DashboardAppBar extends ConsumerWidget {
   }
 }
 
-class _QuickActions extends StatelessWidget {
+class _QuickActions extends ConsumerWidget {
   const _QuickActions();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final user = ref.watch(appUserProvider).valueOrNull;
+    final bool canUploadNotes = user != null && (user.isAdmin || user.roles.contains('class_rep'));
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       child: Column(
@@ -261,29 +309,50 @@ class _QuickActions extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _ActionItem(
-                icon: CategoryUtils.getIcon(FeedType.notes),
-                label: 'Upload Notes',
-                color: CategoryUtils.getColor(FeedType.notes),
-                onTap: () => context.push('/add-note'),
-              ),
+              if (canUploadNotes)
+                _ActionItem(
+                  icon: CategoryUtils.getIcon(FeedType.notes),
+                  label: 'Upload Notes',
+                  color: CategoryUtils.getColor(FeedType.notes),
+                  onTap: () => AuthorizationGuard.run(
+                    context, 
+                    ref, 
+                    feature: UlifyFeature.notesUpload, 
+                    action: () => context.push('/add-note'),
+                  ),
+                ),
               _ActionItem(
                 icon: CategoryUtils.getIcon(FeedType.marketplace),
                 label: 'Create Listing',
                 color: CategoryUtils.getColor(FeedType.marketplace),
-                onTap: () => context.push('/add-listing'),
+                onTap: () => AuthorizationGuard.run(
+                  context, 
+                  ref, 
+                  feature: UlifyFeature.marketplacePost, 
+                  action: () => context.push('/add-listing'),
+                ),
               ),
               _ActionItem(
                 icon: CategoryUtils.getIcon(FeedType.housing),
                 label: 'Create Vacancy',
                 color: CategoryUtils.getColor(FeedType.housing),
-                onTap: () => context.push('/submit-vacancy'),
+                onTap: () => AuthorizationGuard.run(
+                  context, 
+                  ref, 
+                  feature: UlifyFeature.housingPost, 
+                  action: () => context.push('/submit-vacancy'),
+                ),
               ),
               _ActionItem(
                 icon: CategoryUtils.getIcon(FeedType.gig),
                 label: 'Create Gig',
                 color: CategoryUtils.getColor(FeedType.gig),
-                onTap: () => context.push('/add-feed-item', extra: FeedType.gig),
+                onTap: () => AuthorizationGuard.run(
+                  context, 
+                  ref, 
+                  feature: UlifyFeature.gigsPost, 
+                  action: () => context.push('/add-feed-item', extra: FeedType.gig),
+                ),
               ),
             ],
           ),
@@ -1231,15 +1300,6 @@ class _SavedItemsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    // Optimization: watch specific user properties to prevent unnecessary rebuilds
-    final userData = ref.watch(appUserProvider.select((u) {
-      final user = u.valueOrNull;
-      if (user == null) return null;
-      return (
-        uid: user.uid,
-        accountType: user.accountType,
-      );
-    }));
 
     final allSavedListings = ref.watch(savedListingsProvider).valueOrNull ?? [];
     final savedListings = allSavedListings.where((l) => l.status == ListingStatus.active).toList();

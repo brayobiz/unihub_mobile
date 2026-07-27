@@ -13,6 +13,8 @@ import '../../shared/providers.dart';
 import '../../../../widgets/skeleton_loader.dart';
 import '../../../../widgets/notification_badge.dart';
 import '../../../../widgets/app_drawer.dart';
+import 'package:unihub_mobile/core/widgets/authorization_guard.dart';
+import 'package:unihub_mobile/core/services/authorization_service.dart';
 import '../../../../core/widgets/error_view.dart';
 import '../../../../core/widgets/empty_state.dart';
 
@@ -164,7 +166,12 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/user-search'),
+        onPressed: () => AuthorizationGuard.run(
+          context, 
+          ref, 
+          feature: UlifyFeature.chatStart, 
+          action: () => context.push('/user-search'),
+        ),
         backgroundColor: theme.colorScheme.primary,
         child: const Icon(Icons.message_outlined, color: Colors.white),
       ),

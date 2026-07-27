@@ -23,6 +23,8 @@ import '../../../chat/shared/providers.dart';
 import '../widgets/marketplace_card.dart';
 import '../../../../services/history_service.dart';
 import 'package:uuid/uuid.dart';
+import '../../../../core/widgets/authorization_guard.dart';
+import '../../../../core/services/authorization_service.dart';
 import '../../../../core/widgets/error_view.dart';
 import '../../../../core/widgets/empty_state.dart';
 
@@ -1831,60 +1833,72 @@ class _StickyActionBar extends StatelessWidget {
       left: 0,
       right: 0,
       child: RepaintBoundary(
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08), 
-                blurRadius: 24, 
-                offset: const Offset(0, -8),
-              ),
-            ],
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                height: 56,
-                width: 56,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        child: Consumer(
+          builder: (context, ref, _) => Container(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08), 
+                  blurRadius: 24, 
+                  offset: const Offset(0, -8),
                 ),
-                child: isStartingChat 
-                  ? const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : IconButton(
-                      icon: Icon(Icons.chat_bubble_outline_rounded, color: isSold ? AppColors.grey : AppColors.primary),
-                      onPressed: (isOwner || isSold) ? null : onStartChat,
-                      tooltip: 'Chat with seller',
-                    ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: SizedBox(
+              ],
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Row(
+              children: [
+                Container(
                   height: 56,
-                  child: FilledButton(
-                    onPressed: (isOwner || isSold || isStartingChat) ? null : onMakeOffer,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: isSold ? AppColors.grey : AppColors.primary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      isSold ? 'Item Sold' : (isOwner ? 'Your Listing' : 'Make an Offer'), 
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 0.5)
+                  width: 56,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                  ),
+                  child: isStartingChat 
+                    ? const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : IconButton(
+                        icon: Icon(Icons.chat_bubble_outline_rounded, color: isSold ? AppColors.grey : AppColors.primary),
+                        onPressed: (isOwner || isSold) ? null : () => AuthorizationGuard.run(
+                          context, 
+                          ref, 
+                          feature: UlifyFeature.marketplaceContact, 
+                          action: onStartChat,
+                        ),
+                        tooltip: 'Chat with seller',
+                      ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 56,
+                    child: FilledButton(
+                      onPressed: (isOwner || isSold || isStartingChat) ? null : () => AuthorizationGuard.run(
+                        context, 
+                        ref, 
+                        feature: UlifyFeature.marketplaceContact, // Make offer also requires verification
+                        action: onMakeOffer,
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: isSold ? AppColors.grey : AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        isSold ? 'Item Sold' : (isOwner ? 'Your Listing' : 'Make an Offer'), 
+                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 0.5)
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

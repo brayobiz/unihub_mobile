@@ -13,6 +13,8 @@ import '../../../../services/download_service.dart';
 import 'package:path/path.dart' as p;
 import 'package:unihub_mobile/features/chat/domain/models/chat_context.dart';
 import 'package:unihub_mobile/features/chat/shared/providers.dart';
+import '../../../../core/widgets/authorization_guard.dart';
+import '../../../../core/services/authorization_service.dart';
 import 'package:open_filex/open_filex.dart';
 
 class NoteDetailScreen extends ConsumerStatefulWidget {
@@ -481,7 +483,12 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
           width: double.infinity,
           height: 60,
           child: FilledButton.icon(
-            onPressed: () => _openFile(context, ref, note),
+            onPressed: () => AuthorizationGuard.run(
+              context, 
+              ref, 
+              feature: UlifyFeature.notesDownload, 
+              action: () => _openFile(context, ref, note),
+            ),
             icon: Icon(progress > 0 ? Icons.play_arrow_rounded : Icons.menu_book_rounded),
             label: Text(
               progress > 0 ? 'Resume Studying' : (note.price == 0 ? 'Start Studying' : 'Buy & Study'), 

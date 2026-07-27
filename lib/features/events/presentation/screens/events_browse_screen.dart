@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
+import 'package:unihub_mobile/core/widgets/authorization_guard.dart';
+import 'package:unihub_mobile/core/services/authorization_service.dart';
+import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import 'package:unihub_mobile/features/ads/widgets/banner_ad_widget.dart';
 import 'package:unihub_mobile/features/campus_filter/presentation/widgets/campus_filter_selector.dart';
 import 'package:unihub_mobile/features/events/shared/providers.dart';
@@ -49,7 +52,7 @@ class EventsBrowseScreen extends ConsumerWidget {
           ref.invalidate(userManagedOrganizersProvider);
         },
         child: discoveryDataAsync.when(
-          data: (data) => _buildDiscoveryContent(context, data, managedAsync.valueOrNull ?? [], theme),
+          data: (data) => _buildDiscoveryContent(context, ref, data, managedAsync.valueOrNull ?? [], theme),
           loading: () => _buildLoadingState(),
           error: (err, _) => _buildErrorState(err),
         ),
@@ -61,14 +64,9 @@ class EventsBrowseScreen extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 24),
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Container(
-            height: 18,
-            width: 100,
-            color: Colors.grey.withValues(alpha: 0.1), // Fallback if SkeletonLoader fails
-            child: const SkeletonLoader(width: 100, height: 18),
-          ),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24),
+          child: SkeletonLoader(width: 100, height: 18),
         ),
         const SizedBox(height: 16),
         SizedBox(
@@ -87,8 +85,8 @@ class EventsBrowseScreen extends ConsumerWidget {
         ...List.generate(3, (index) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
               child: SkeletonLoader(width: 150, height: 18),
             ),
             const SizedBox(height: 16),
@@ -108,7 +106,7 @@ class EventsBrowseScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHostEventCTA(BuildContext context, List<Organizer> orgs) {
+  Widget _buildHostEventCTA(BuildContext context, WidgetRef ref, List<Organizer> orgs) {
     final theme = Theme.of(context);
 
     // Only show the top CTA if there's an approved Organizer Profile
@@ -152,13 +150,18 @@ class EventsBrowseScreen extends ConsumerWidget {
             ),
             const SizedBox(width: 16),
             ElevatedButton(
-              onPressed: () {
-                if (approvedOrgs.length == 1) {
-                  context.push('/organizers/${approvedOrgs.first.id}/dashboard');
-                } else {
-                  _showOrganizerPicker(context, approvedOrgs);
-                }
-              },
+              onPressed: () => AuthorizationGuard.run(
+                context, 
+                ref, 
+                feature: UlifyFeature.eventsOrganize, 
+                action: () {
+                  if (approvedOrgs.length == 1) {
+                    context.push('/organizers/${approvedOrgs.first.id}/dashboard');
+                  } else {
+                    _showOrganizerPicker(context, approvedOrgs);
+                  }
+                },
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: theme.colorScheme.primary,
@@ -205,7 +208,7 @@ class EventsBrowseScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildDiscoveryContent(BuildContext context, EventDiscoveryData data, List<Organizer> orgs, ThemeData theme) {
+  Widget _buildDiscoveryContent(BuildContext context, WidgetRef ref, EventDiscoveryData data, List<Organizer> orgs, ThemeData theme) {
     final hasNoEvents = data.featured.isEmpty && 
                      data.live.isEmpty && 
                      data.today.isEmpty && 
@@ -214,7 +217,7 @@ class EventsBrowseScreen extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 24),
       children: [
-        _buildHostEventCTA(context, orgs),
+        _buildHostEventCTA(context, ref, orgs),
         
         // Show pending events to the organizer for immediate feedback
         if (orgs.isNotEmpty) _buildPendingEventsSection(context, orgs),
@@ -225,9 +228,9 @@ class EventsBrowseScreen extends ConsumerWidget {
         ],
         
         if (hasNoEvents && data.categories.isEmpty)
-           _buildEmptyState(context, orgs)
+           _buildEmptyState(context, ref, orgs)
         else if (hasNoEvents)
-           _buildNoEventsCTA(context, orgs)
+           _buildNoEventsCTA(context, ref, orgs)
         else ...[
           if (data.live.isNotEmpty) ...[
             _buildHorizontalSection(context, 'Happening Now ⚡', data.live, EventListFilter.live),
@@ -240,8 +243,8 @@ class EventsBrowseScreen extends ConsumerWidget {
           if (data.today.isNotEmpty) ...[
             _buildHorizontalSection(context, 'Today on Campus', data.today, EventListFilter.today),
             const SizedBox(height: 32),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
               child: BannerAdWidget(),
             ),
             const SizedBox(height: 32),
@@ -253,7 +256,7 @@ class EventsBrowseScreen extends ConsumerWidget {
         ],
         
         const SizedBox(height: 16),
-        _buildSecondaryHostCTA(context, orgs),
+        _buildSecondaryHostCTA(context, ref, orgs),
         const SizedBox(height: 48),
       ],
     );
@@ -330,9 +333,9 @@ class EventsBrowseScreen extends ConsumerWidget {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: event.imageUrls.isNotEmpty
-                                  ? ClipRRect(
+                                  ? OptimizedImage(
+                                      imageUrl: event.imageUrls.first,
                                       borderRadius: BorderRadius.circular(8),
-                                      child: Image.network(event.imageUrls.first, fit: BoxFit.cover),
                                     )
                                   : const Icon(Icons.event_note, color: Colors.grey, size: 20),
                             ),
@@ -370,7 +373,7 @@ class EventsBrowseScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildNoEventsCTA(BuildContext context, List<Organizer> orgs) {
+  Widget _buildNoEventsCTA(BuildContext context, WidgetRef ref, List<Organizer> orgs) {
     final theme = Theme.of(context);
     
     // Check for approved organizers first
@@ -407,13 +410,18 @@ class EventsBrowseScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 40),
             ElevatedButton.icon(
-              onPressed: () {
-                if (approvedOrgs.length == 1) {
-                  context.push('/organizers/${approvedOrgs.first.id}/dashboard');
-                } else {
-                  _showOrganizerPicker(context, approvedOrgs);
-                }
-              },
+              onPressed: () => AuthorizationGuard.run(
+                context, 
+                ref, 
+                feature: UlifyFeature.eventsOrganize, 
+                action: () {
+                  if (approvedOrgs.length == 1) {
+                    context.push('/organizers/${approvedOrgs.first.id}/dashboard');
+                  } else {
+                    _showOrganizerPicker(context, approvedOrgs);
+                  }
+                },
+              ),
               icon: const Icon(Icons.dashboard_outlined),
               label: const Text('Go to Dashboard', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               style: ElevatedButton.styleFrom(
@@ -478,7 +486,12 @@ class EventsBrowseScreen extends ConsumerWidget {
           const SizedBox(height: 40),
           if (!hasActiveApp)
             ElevatedButton(
-              onPressed: () => context.pushNamed('organizer-onboarding'),
+              onPressed: () => AuthorizationGuard.run(
+                context, 
+                ref, 
+                feature: UlifyFeature.eventsOrganize, 
+                action: () => context.pushNamed('organizer-onboarding'),
+              ),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -487,7 +500,12 @@ class EventsBrowseScreen extends ConsumerWidget {
             )
           else if (isRejected)
             ElevatedButton(
-              onPressed: () => context.pushNamed('become-organizer', extra: activeApp),
+              onPressed: () => AuthorizationGuard.run(
+                context, 
+                ref, 
+                feature: UlifyFeature.eventsOrganize, 
+                action: () => context.pushNamed('become-organizer', extra: activeApp),
+              ),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -496,7 +514,12 @@ class EventsBrowseScreen extends ConsumerWidget {
             )
           else
             ElevatedButton(
-              onPressed: () => context.push('/organizers/${activeApp.id}/dashboard'),
+              onPressed: () => AuthorizationGuard.run(
+                context, 
+                ref, 
+                feature: UlifyFeature.eventsOrganize, 
+                action: () => context.push('/organizers/${activeApp.id}/dashboard'),
+              ),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -513,7 +536,7 @@ class EventsBrowseScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSecondaryHostCTA(BuildContext context, List<Organizer> orgs) {
+  Widget _buildSecondaryHostCTA(BuildContext context, WidgetRef ref, List<Organizer> orgs) {
     final theme = Theme.of(context);
     
     if (orgs.isNotEmpty) return const SizedBox.shrink();
@@ -536,7 +559,12 @@ class EventsBrowseScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           OutlinedButton(
-            onPressed: () => context.pushNamed('organizer-onboarding'),
+            onPressed: () => AuthorizationGuard.run(
+              context, 
+              ref, 
+              feature: UlifyFeature.eventsOrganize, 
+              action: () => context.pushNamed('organizer-onboarding'),
+            ),
             style: OutlinedButton.styleFrom(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -642,8 +670,8 @@ class EventsBrowseScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildEmptyState(BuildContext context, List<Organizer> orgs) {
-    return _buildNoEventsCTA(context, orgs);
+  Widget _buildEmptyState(BuildContext context, WidgetRef ref, List<Organizer> orgs) {
+    return _buildNoEventsCTA(context, ref, orgs);
   }
 
   Widget _buildErrorState(Object err) {

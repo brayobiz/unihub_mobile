@@ -14,6 +14,8 @@ import '../campus_filter/presentation/widgets/campus_filter_selector.dart';
 import '../campus_filter/shared/providers.dart';
 import '../campus_filter/domain/models/browsing_scope.dart';
 import 'package:unihub_mobile/core/utils/category_utils.dart';
+import 'package:unihub_mobile/core/widgets/authorization_guard.dart';
+import 'package:unihub_mobile/core/services/authorization_service.dart';
 import 'package:unihub_mobile/features/announcements/presentation/widgets/announcement_display.dart';
 import 'package:unihub_mobile/features/ads/ads_module.dart';
 import 'shared/providers.dart';
@@ -179,7 +181,12 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
                     return Padding(
                       padding: const EdgeInsets.only(top: 8.0),
                       child: GestureDetector(
-                        onTap: () => context.push('/gig-detail/${item.id}', extra: item),
+                        onTap: () => AuthorizationGuard.run(
+                          context, 
+                          ref, 
+                          feature: UlifyFeature.gigsApply, 
+                          action: () => context.push('/gig-detail/${item.id}', extra: item),
+                        ),
                         child: FeedCard(
                           item: _truncateGigDescription(item),
                           isLiked: isLiked,
@@ -206,7 +213,12 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'gigs_fab',
-        onPressed: () => context.push('/add-feed-item', extra: FeedType.gig),
+        onPressed: () => AuthorizationGuard.run(
+          context, 
+          ref, 
+          feature: UlifyFeature.gigsPost, 
+          action: () => context.push('/add-feed-item', extra: FeedType.gig),
+        ),
         label: const Text('Create Gig', style: TextStyle(fontWeight: FontWeight.bold)),
         icon: const Icon(Icons.add_task_rounded),
         backgroundColor: theme.colorScheme.primary,

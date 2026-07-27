@@ -13,6 +13,7 @@ import '../../domain/models/chat_context.dart';
 import '../../domain/models/message.dart';
 import '../../shared/providers.dart';
 import '../../../../widgets/skeleton_loader.dart';
+import '../../../../core/widgets/optimized_image.dart';
 
 class ShareToChatScreen extends ConsumerStatefulWidget {
   final ChatContext shareContext;
@@ -98,9 +99,11 @@ class _ShareToChatScreenState extends ConsumerState<ShareToChatScreen> {
               child: Row(
                 children: [
                   if (widget.shareContext.thumbnail != null)
-                    ClipRRect(
+                    OptimizedImage(
+                      imageUrl: widget.shareContext.thumbnail!,
+                      width: 40,
+                      height: 40,
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.network(widget.shareContext.thumbnail!, width: 40, height: 40, fit: BoxFit.cover),
                     )
                   else
                     Icon(Icons.share, color: theme.colorScheme.primary),

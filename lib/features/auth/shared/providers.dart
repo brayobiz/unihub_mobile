@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:unihub_mobile/core/utils/app_logger.dart';
 import '../data/repositories/auth_repository_impl.dart';
 import 'package:unihub_mobile/features/auth/domain/models/app_user.dart';
 import '../domain/repositories/auth_repository.dart';
@@ -31,18 +33,29 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 });
 
 final authStateProvider = StreamProvider<User?>((ref) {
-  return ref.watch(authRepositoryProvider).authStateChanges;
+  final repo = ref.watch(authRepositoryProvider);
+  return repo.userChanges.map((user) {
+    // Audit Phase 3.1: If user exists but document doesn't, this might be handled by Router
+    return user;
+  }).handleError((error) {
+    AppLogger.error('Auth State Error', error, null, 'AUTH');
+    if (error is FirebaseAuthException) {
+       // Force sign-out on critical auth errors
+       if (error.code == 'user-disabled' || error.code == 'user-not-found') {
+          repo.signOut();
+       }
+    }
+  });
 });
 
 final appUserProvider = StreamProvider<AppUser?>((ref) {
-  final authState = ref.watch(authStateProvider);
-  final uid = authState.valueOrNull?.uid;
+  // Audit Phase 3.5: Optimize to only re-subscribe when UID changes.
+  // Using .select prevents stream reconstruction on minor user property changes.
+  final uid = ref.watch(authStateProvider.select((user) => user.valueOrNull?.uid));
+  
   if (uid == null) return Stream.value(null);
   
   return ref.watch(authRepositoryProvider).watchUser(uid).map((user) {
-    if (user != null) {
-      // debugPrint('👤 Current User: ${user.fullName}, Photo: ${user.photoUrl}');
-    }
     return user;
   });
 });
@@ -52,10 +65,20 @@ final userByIdProvider = StreamProvider.autoDispose.family<AppUser?, String>((re
 });
 
 /// A secure provider for fetching other users' profiles.
-/// Automatically strips sensitive PII (Email, Phone, FCM Token) and 
-/// respects the target user's privacy settings.
+/// Audit Phase 3.5: Added cache duration to reduce Firestore reads on navigation.
 final publicUserProvider = StreamProvider.autoDispose.family<AppUser, String>((ref, userId) {
   if (userId.isEmpty) return Stream.error('Invalid User ID');
+  
+  // keep profile in memory for 2 minutes after last usage
+  final link = ref.keepAlive();
+  Timer? timer;
+  ref.onDispose(() => timer?.cancel());
+  ref.onCancel(() {
+    timer = Timer(const Duration(minutes: 2), () {
+      link.close();
+    });
+  });
+  ref.onResume(() => timer?.cancel());
 
   final currentUser = ref.watch(appUserProvider).valueOrNull;
   final authRepo = ref.watch(authRepositoryProvider);

@@ -112,13 +112,11 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               enabled: !isLoading,
             ),
             const SizedBox(height: 32),
-            if (isLoading)
-              Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
-            else
-              AuthButton(
-                text: 'Send Link',
-                onPressed: _onResetPassword,
-              ),
+            AuthButton(
+              text: 'Send Link',
+              isLoading: isLoading,
+              onPressed: _onResetPassword,
+            ),
           ],
         ),
       ),

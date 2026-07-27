@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import '../../domain/models/housing_listing.dart';
-import '../../../../core/location/services/location_service.dart';
-import '../../../../core/constants/campus_constants.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -55,16 +53,16 @@ class HousingCard extends ConsumerWidget {
         child: GestureDetector(
           onTap: onTap,
           child: Container(
-            margin: margin ?? const EdgeInsets.only(bottom: 20),
+            margin: margin ?? const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
               color: theme.colorScheme.surface,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
@@ -81,7 +79,7 @@ class HousingCard extends ConsumerWidget {
                           imageUrl: listing.images.isNotEmpty 
                               ? listing.images.first 
                               : 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=2070&auto=format&fit=crop',
-                          height: 180,
+                          height: 155,
                           width: double.infinity,
                           borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                           thumbnailWidth: 600,
@@ -90,9 +88,9 @@ class HousingCard extends ConsumerWidget {
                     ),
                     // Badges Row
                     Positioned(
-                      top: 12,
-                      left: 12,
-                      right: 12,
+                      top: 10,
+                      left: 10,
+                      right: 10,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -100,10 +98,10 @@ class HousingCard extends ConsumerWidget {
                             Semantics(
                               label: 'Verified trusted plug',
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                                 decoration: BoxDecoration(
                                   color: AppColors.success,
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(6),
                                   boxShadow: [
                                     BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4)
                                   ],
@@ -111,37 +109,13 @@ class HousingCard extends ConsumerWidget {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.verified_user_rounded, color: Colors.white, size: 10),
+                                    const Icon(Icons.verified_user_rounded, color: Colors.white, size: 9),
                                     const SizedBox(width: 4),
-                                    Text('TRUSTED ${trustScore.toInt()}%', style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                                    Text('TRUSTED ${trustScore.toInt()}%', style: const TextStyle(color: Colors.white, fontSize: 7, fontWeight: FontWeight.w900, letterSpacing: 0.4)),
                                   ],
                                 ),
                               ),
                             ),
-                          if (listing.videoUrl != null) ...[
-                            const SizedBox(width: 8),
-                            Semantics(
-                              label: 'Includes virtual video tour',
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.primary,
-                                  borderRadius: BorderRadius.circular(8),
-                                  boxShadow: [
-                                    BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4)
-                                  ],
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 10),
-                                    const SizedBox(width: 4),
-                                    Text('VIRTUAL TOUR', style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
                           const Spacer(),
                           Semantics(
                             label: 'Share property details',
@@ -149,8 +123,8 @@ class HousingCard extends ConsumerWidget {
                             child: GestureDetector(
                               onTap: () => _shareListing(context, ref),
                               child: Container(
-                                height: 48,
-                                width: 48,
+                                height: 36,
+                                width: 36,
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
                                   color: theme.colorScheme.surface.withValues(alpha: 0.9),
@@ -158,21 +132,21 @@ class HousingCard extends ConsumerWidget {
                                 ),
                                 child: Icon(
                                   Icons.share_outlined, 
-                                  size: 20, 
+                                  size: 16, 
                                   color: theme.colorScheme.onSurfaceVariant
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           Semantics(
                             label: isSaved ? 'Remove from favorites' : 'Save to favorites',
                             button: true,
                             child: GestureDetector(
                               onTap: onFavoriteTap,
                               child: Container(
-                                height: 48,
-                                width: 48,
+                                height: 36,
+                                width: 36,
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
                                   color: theme.colorScheme.surface.withValues(alpha: 0.9),
@@ -180,7 +154,7 @@ class HousingCard extends ConsumerWidget {
                                 ),
                                 child: Icon(
                                   isSaved ? Icons.favorite : Icons.favorite_border, 
-                                  size: 20, 
+                                  size: 16, 
                                   color: isSaved ? AppColors.error : theme.colorScheme.primary
                                 ),
                               ),
@@ -191,21 +165,21 @@ class HousingCard extends ConsumerWidget {
                     ),
                     // Availability Badge
                     Positioned(
-                      bottom: 12,
-                      left: 12,
-                      right: 12,
+                      bottom: 10,
+                      left: 10,
+                      right: 10,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: isTaken ? theme.colorScheme.error.withValues(alpha: 0.9) : Colors.black.withValues(alpha: 0.7),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
                               isTaken ? 'TAKEN' : listing.type.name.replaceAll(RegExp(r'(?=[A-Z])'), ' ').toUpperCase(),
-                              style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                              style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 0.5),
                             ),
                           ),
                           if (!isTaken)
@@ -216,7 +190,7 @@ class HousingCard extends ConsumerWidget {
                   ],
                 ),
                 Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -230,29 +204,24 @@ class HousingCard extends ConsumerWidget {
                                 Text(
                                   listing.title,
                                   style: theme.textTheme.titleLarge?.copyWith(
-                                    fontSize: 16,
+                                    fontSize: 15,
                                     fontWeight: FontWeight.w800,
                                     color: theme.colorScheme.onSurface,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 2),
                                 Row(
                                   children: [
-                                    Icon(Icons.location_on_rounded, size: 12, color: theme.colorScheme.primary),
+                                    Icon(Icons.location_on_rounded, size: 11, color: theme.colorScheme.primary),
                                     const SizedBox(width: 4),
                                     Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '${CampusConstants.getDisplayName(listing.university)} • ${listing.location}',
-                                            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w500),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
+                                      child: Text(
+                                        listing.location,
+                                        style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w500),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                   ],
@@ -264,42 +233,30 @@ class HousingCard extends ConsumerWidget {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              if (listing.previousRent != null && listing.previousRent! > listing.rent)
-                                Text(
-                                  currencyFormat.format(listing.previousRent),
-                                  style: TextStyle(
-                                    decoration: TextDecoration.lineThrough,
-                                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
                               Text(
                                 currencyFormat.format(listing.rent),
                                 style: theme.textTheme.titleLarge?.copyWith(
-                                  fontSize: 16,
+                                  fontSize: 15,
                                   fontWeight: FontWeight.w900,
-                                  color: (listing.previousRent != null && listing.previousRent! > listing.rent) 
-                                    ? AppColors.success 
-                                    : theme.colorScheme.primary,
+                                  color: theme.colorScheme.primary,
                                 ),
                               ),
                               Text(
                                 '/month',
-                                style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 10, fontWeight: FontWeight.w600),
+                                style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 9, fontWeight: FontWeight.w600),
                               ),
                             ],
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      Divider(height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
+                      Divider(height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4)),
+                      const SizedBox(height: 8),
                       Row(
                         children: [
                           Container(
-                            width: 24,
-                            height: 24,
+                            width: 20,
+                            height: 20,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: theme.colorScheme.surfaceContainerHighest,
@@ -311,32 +268,32 @@ class HousingCard extends ConsumerWidget {
                                   : null,
                             ),
                             child: listing.plugPhotoUrl == null 
-                                ? Center(child: Text(listing.plugName.isNotEmpty ? listing.plugName[0] : '?', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant))) 
+                                ? Center(child: Text(listing.plugName.isNotEmpty ? listing.plugName[0] : '?', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant))) 
                                 : null,
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               listing.plugName,
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                              borderRadius: BorderRadius.circular(6),
+                              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                              borderRadius: BorderRadius.circular(4),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.directions_walk_rounded, size: 10, color: theme.colorScheme.onSurfaceVariant),
+                                Icon(Icons.directions_walk_rounded, size: 9, color: theme.colorScheme.onSurfaceVariant),
                                 const SizedBox(width: 4),
                                 Text(
                                   listing.distance,
-                                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.w700),
+                                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, fontWeight: FontWeight.w700),
                                 ),
                               ],
                             ),

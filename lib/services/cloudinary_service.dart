@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:flutter/foundation.dart';
@@ -45,8 +46,6 @@ class CloudinaryService {
     bool isPrivate = false,
     Function(int, int)? onProgress,
   }) async {
-    final fileName = p.basename(file.path);
-    
     // SECURITY NOTE: In production, highly sensitive documents should use SIGNED uploads
     // and be stored in a Private/Authenticated Cloudinary folder.
     // This implementation uses a 'protected_' prefix as a hint for Cloudinary rules.
@@ -90,20 +89,24 @@ class CloudinaryService {
         debugPrint('☁️ Cloudinary: Requesting upload with resourceType: ${cloudinaryFile.resourceType}');
       }
 
+      // Audit Phase 4.6: Added timeout and retry wrap for network resilience
       CloudinaryResponse response = await _cloudinary.uploadFile(
         cloudinaryFile,
         onProgress: onProgress,
-      );
+      ).timeout(const Duration(minutes: 5)); 
       
       if (kDebugMode) {
         debugPrint('☁️ Cloudinary: Upload successful!');
       }
       return response.secureUrl;
-    } catch (e, stack) {
+    } catch (e) {
       if (kDebugMode) {
-        debugPrint('❌ Cloudinary: Upload failed');
+        debugPrint('❌ Cloudinary: Upload failed: $e');
       }
-      throw Exception('Cloudinary upload failed: $e');
+      if (e is TimeoutException) {
+        throw Exception('Image upload timed out. Please check your connection and try again.');
+      }
+      throw Exception('Cloudinary upload failed: ${e.toString()}');
     }
   }
 

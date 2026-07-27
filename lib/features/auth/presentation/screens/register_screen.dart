@@ -303,16 +303,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   const SizedBox(height: 20),
 
                   // Create Account Button
-                  if (isLoading)
-                    const Center(child: Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: CircularProgressIndicator(),
-                    ))
-                  else
-                    AuthButton(
-                      text: 'Create My Account',
-                      onPressed: _isFormValid ? _onSignUp : null,
-                    ),
+                  AuthButton(
+                    text: 'Create My Account',
+                    isLoading: isLoading,
+                    onPressed: _isFormValid ? _onSignUp : null,
+                  ),
 
                   const SizedBox(height: 20),
 
@@ -322,7 +317,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                   // Google Sign In
                   GoogleSignInButton(
-                    onPressed: (isLoading || !_isAgreed) ? null : () async {
+                    isLoading: isLoading,
+                    onPressed: () async {
                       final connectivity = ref.read(connectivityServiceProvider);
                       if (connectivity == ConnectivityStatus.isDisconnected) {
                         _showErrorSnackBar('No internet connection. Please check your network and try again.');

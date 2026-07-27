@@ -111,49 +111,72 @@ class HousingListing {
 
   factory HousingListing.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
+
+    // Audit Phase 4.9: Robust Parsing
+    double safeDouble(dynamic value, double defaultValue) {
+      if (value == null) return defaultValue;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      return double.tryParse(value.toString()) ?? defaultValue;
+    }
+
+    int safeInt(dynamic value, int defaultValue) {
+      if (value == null) return defaultValue;
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      return int.tryParse(value.toString()) ?? defaultValue;
+    }
+
+    DateTime parseDate(dynamic value) {
+      if (value is Timestamp) return value.toDate();
+      if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+      if (value is String) return DateTime.tryParse(value) ?? DateTime.now();
+      return DateTime.now();
+    }
+
     return HousingListing(
       id: doc.id,
       title: (data['title'] ?? '').toString(),
       description: (data['description'] ?? '').toString(),
-      rent: (data['rent'] ?? 0).toDouble(),
-      previousRent: data['previousRent'] != null ? (data['previousRent'] as num).toDouble() : null,
-      deposit: (data['deposit'] ?? 0).toDouble(),
+      rent: safeDouble(data['rent'], 0.0),
+      previousRent: data['previousRent'] != null ? safeDouble(data['previousRent'], 0.0) : null,
+      deposit: safeDouble(data['deposit'], 0.0),
       type: HousingType.values.firstWhere(
-        (e) => e.name == data['type'],
+        (e) => e.name == data['type']?.toString(),
         orElse: () => HousingType.hostel,
       ),
       university: CampusConstants.resolveToId(data['university']?.toString()) ?? (data['university'] ?? '').toString(),
       campus: CampusConstants.resolveToId(data['campus']?.toString()) ?? (data['campus'] ?? '').toString(),
       location: (data['location'] ?? '').toString(),
       distance: (data['distance'] ?? '').toString(),
-      images: List<String>.from(data['images'] ?? <String>[]),
+      images: List<String>.from((data['images'] as List?)?.map((e) => e.toString()) ?? <String>[]),
       videoUrl: data['videoUrl']?.toString(),
-      amenities: List<String>.from(data['amenities'] ?? <String>[]),
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
-      lastVerifiedAt: (data['lastVerifiedAt'] as Timestamp?)?.toDate(),
+      amenities: List<String>.from((data['amenities'] as List?)?.map((e) => e.toString()) ?? <String>[]),
+      createdAt: parseDate(data['createdAt']),
+      updatedAt: data['updatedAt'] != null ? parseDate(data['updatedAt']) : null,
+      lastVerifiedAt: data['lastVerifiedAt'] != null ? parseDate(data['lastVerifiedAt']) : null,
       status: HousingStatus.values.firstWhere(
-        (e) => e.name == data['status'],
+        (e) => e.name == data['status']?.toString(),
         orElse: () => HousingStatus.available,
       ),
       source: PropertySource.values.firstWhere(
-        (e) => e.name == (data['source'] ?? ''),
+        (e) => e.name == data['source']?.toString(),
         orElse: () => PropertySource.plugDiscovery,
       ),
       plugId: (data['plugId'] ?? '').toString(),
       plugName: (data['plugName'] ?? '').toString(),
       plugPhotoUrl: data['plugPhotoUrl']?.toString(),
-      isFurnished: data['isFurnished'] ?? false,
+      isFurnished: data['isFurnished'] == true,
       genderRestriction: GenderRestriction.values.firstWhere(
-        (e) => e.name == data['genderRestriction'],
+        (e) => e.name == data['genderRestriction']?.toString(),
         orElse: () => GenderRestriction.mixed,
       ),
-      latitude: (data['latitude'] as num?)?.toDouble(),
-      longitude: (data['longitude'] as num?)?.toDouble(),
-      views: data['views'] ?? 0,
-      saves: data['saves'] ?? 0,
-      chatCount: data['chatCount'] ?? 0,
-      callCount: data['callCount'] ?? 0,
+      latitude: data['latitude'] != null ? safeDouble(data['latitude'], 0.0) : null,
+      longitude: data['longitude'] != null ? safeDouble(data['longitude'], 0.0) : null,
+      views: safeInt(data['views'], 0),
+      saves: safeInt(data['saves'], 0),
+      chatCount: safeInt(data['chatCount'], 0),
+      callCount: safeInt(data['callCount'], 0),
     );
   }
 

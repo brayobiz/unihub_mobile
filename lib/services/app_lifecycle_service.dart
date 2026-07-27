@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unihub_mobile/core/utils/app_logger.dart';
+import '../features/auth/presentation/controllers/auth_controller.dart';
+import '../features/auth/shared/providers.dart';
 
 /// Provides the current application lifecycle state.
 /// Centralizes lifecycle tracking to prevent redundant WidgetsBindingObservers.
@@ -53,6 +55,13 @@ class AppLifecycleService with WidgetsBindingObserver {
 
   void _handleResumed() {
     // Perform any necessary refresh logic when app returns to foreground
+    
+    // Automatic Email Verification Detection (Phase 2.2)
+    final user = _ref.read(firebaseAuthProvider).currentUser;
+    if (user != null && !user.emailVerified) {
+      AppLogger.info('App Resumed: Checking verification status...', 'AUTH');
+      _ref.read(authControllerProvider.notifier).checkVerificationStatus();
+    }
   }
 
   void _handlePaused() {

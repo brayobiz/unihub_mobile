@@ -39,15 +39,29 @@ class Message {
   }
 
   factory Message.fromJson(Map<String, dynamic> json) {
+    // Audit Phase 4.9: Robust Parsing
+    DateTime parseDate(dynamic value) {
+      if (value is Timestamp) return value.toDate();
+      if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+      if (value is String) return DateTime.tryParse(value) ?? DateTime.now();
+      return DateTime.now();
+    }
+
     return Message(
-      id: json['id'] ?? '',
-      senderId: json['senderId'] ?? '',
-      content: json['content'] ?? '',
-      type: MessageType.values.firstWhere((e) => e.name == json['type'], orElse: () => MessageType.text),
-      status: MessageStatus.values.firstWhere((e) => e.name == json['status'], orElse: () => MessageStatus.sent),
-      timestamp: (json['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      metadata: json['metadata'],
-      context: json['context'] != null ? ChatContext.fromJson(json['context']) : null,
+      id: json['id']?.toString() ?? '',
+      senderId: json['senderId']?.toString() ?? '',
+      content: json['content']?.toString() ?? '',
+      type: MessageType.values.firstWhere(
+        (e) => e.name == json['type'].toString(), 
+        orElse: () => MessageType.text
+      ),
+      status: MessageStatus.values.firstWhere(
+        (e) => e.name == json['status'].toString(), 
+        orElse: () => MessageStatus.sent
+      ),
+      timestamp: parseDate(json['timestamp']),
+      metadata: (json['metadata'] as Map?)?.map((k, v) => MapEntry(k.toString(), v)),
+      context: json['context'] != null ? ChatContext.fromJson(json['context'] as Map<String, dynamic>) : null,
     );
   }
 

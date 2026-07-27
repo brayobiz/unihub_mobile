@@ -19,9 +19,9 @@ class AppDrawer extends ConsumerWidget {
     final theme = Theme.of(context);
 
     // Optimization: only watch isAdmin to avoid reloads on presence updates
-    final isAdmin =
-        ref.watch(appUserProvider.select((u) => u.valueOrNull?.isAdmin)) ??
-        false;
+    final appUser = ref.watch(appUserProvider).valueOrNull;
+    final isAdmin = appUser?.isAdmin ?? false;
+    final isEmailVerified = appUser?.isEmailVerified ?? true;
 
     return Drawer(
       backgroundColor: theme.colorScheme.surface,
@@ -42,7 +42,33 @@ class AppDrawer extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.hub_rounded, color: Colors.white, size: 40),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.hub_rounded, color: Colors.white, size: 40),
+                    if (!isEmailVerified)
+                      GestureDetector(
+                        onTap: () => context.push('/verify-email'),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.white.withOpacity(0.3)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.warning_amber_rounded, color: Colors.white, size: 14),
+                              SizedBox(width: 6),
+                              Text('Verify Email', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
                 const SizedBox(height: 12),
                 Text(
                   'Ulify Services',
@@ -113,6 +139,16 @@ class AppDrawer extends ConsumerWidget {
                   'Events & Clubs',
                   onTap: () => context.push('/events'),
                 ),
+                if (appUser?.verifiedRoles.contains('housePlug') ?? false)
+                  _drawerItem(
+                    context,
+                    Icons.home_work_outlined,
+                    'Plug Dashboard',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.push('/plug-dashboard');
+                    },
+                  ),
                 Consumer(
                   builder: (context, ref, _) {
                     final managedAsync = ref.watch(

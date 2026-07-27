@@ -8,6 +8,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isEmailVerified() {
+      return isAuthenticated() && request.auth.token.email_verified == true;
+    }
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
@@ -89,7 +93,7 @@ service cloud.firestore {
         isOwner(userId) && (
           // Case 1: Standard profile update (No protected keys)
           (!request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['isAdmin', 'roles', 'isIdentityVerified', 'isStudentVerified', 'isEmailVerified', 'isPhoneVerified', 'isBanned', 'suspendedUntil', 'accountType', 'businessSubscriptionStatus', 'subscriptionExpiry', 'hasActiveWarning', 'warningReason', 'lastWarningAt', 'isDeleted'])) ||
+            .hasAny(['isAdmin', 'roles', 'isIdentityVerified', 'isStudentVerified', 'isEmailVerified', 'isPhoneVerified', 'isBanned', 'suspendedUntil', 'accountType', 'businessSubscriptionStatus', 'subscriptionExpiry', 'hasActiveWarning', 'warningReason', 'lastWarningAt', 'isDeleted', 'averageRating', 'ratingsCount', 'trustScore', 'completedSalesCount', 'activeListingsCount'])) ||
 
           // Case 2: Spark Plan Self-Healing (Owner clears restriction AFTER expiry)
           (resource.data.get('suspendedUntil', request.time) <= request.time &&
@@ -111,7 +115,11 @@ service cloud.firestore {
           )
         )
       ) || (
+        // Case 5: External Data Sync (Growth Phase Compatibility)
+        // Allows updating only reputation/activity fields.
+        // MUST NOT BE THE OWNER to prevent self-manipulation.
         isAuthenticated() &&
+        !isOwner(userId) &&
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['averageRating', 'ratingsCount', 'trustScore', 'completedSalesCount', 'activeListingsCount'])
       );
@@ -121,7 +129,7 @@ service cloud.firestore {
       match /notifications/{notificationId} {
         // Allow recipient, admin, or the sender (actor) to read/update for aggregation
         allow read: if isOwner(userId) || isAdmin() || (isAuthenticated() && resource.data.actorId == request.auth.uid);
-        allow create: if isAuthenticated();
+        allow create: if isEmailVerified() && request.resource.data.actorId == request.auth.uid;
         allow update: if isOwner(userId) || isAdmin() || (isAuthenticated() && resource.data.actorId == request.auth.uid);
         allow delete: if isOwner(userId) || isAdmin();
       }
@@ -145,19 +153,19 @@ service cloud.firestore {
       match /reviews/{reviewId} {
         allow read: if true;
         allow create: if isAuthenticated() && request.resource.data.reviewerId == request.auth.uid;
-        allow update: if isAuthenticated() && resource.data.reviewerId == request.auth.uid;
-        allow delete: if isAdmin() || (isAuthenticated() && resource.data.reviewerId == request.auth.uid);
+        allow update: if isAuthenticated() && request.resource.data.reviewerId == request.auth.uid;
+        allow delete: if isAdmin() || (isAuthenticated() && request.resource.data.reviewerId == request.auth.uid);
       }
     }
 
     // --- Marketplace ---
     match /listings/{listingId} {
       allow read: if true;
-      allow create: if isAuthenticated() && request.resource.data.sellerId == request.auth.uid;
+      allow create: if isEmailVerified() && request.resource.data.sellerId == request.auth.uid;
       allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewsCount', 'savesCount', 'sharesCount', 'chatsStartedCount'])) ||
                     (isAuthenticated() && (
                       isAdmin() ||
-                      (resource.data.get("sellerId", "") == request.auth.uid && (
+                      (isEmailVerified() && resource.data.get("sellerId", "") == request.auth.uid && (
                         // Case A: Spark Plan Self-Healing Restoration
                         (getUserData(request.auth.uid).get('suspendedUntil', request.time) <= request.time &&
                          getUserData(request.auth.uid).get('isBanned', false) == false &&
@@ -188,14 +196,14 @@ service cloud.firestore {
 
     match /offers/{offerId} {
       allow read: if isAuthenticated() && (isAdmin() || resource.data.get("buyerId", "") == request.auth.uid || resource.data.get("sellerId", "") == request.auth.uid);
-      allow create: if isAuthenticated() && request.resource.data.get("buyerId", "") == request.auth.uid;
+      allow create: if isEmailVerified() && request.resource.data.get("buyerId", "") == request.auth.uid;
       allow update: if isAuthenticated() && (isAdmin() || resource.data.get("buyerId", "") == request.auth.uid || resource.data.get("sellerId", "") == request.auth.uid);
     }
 
     // --- Events ---
     match /events/{eventId} {
       allow read: if true;
-      allow create: if isAuthenticated() && (isMemberOfOrganizer(request.resource.data.organizerId) || isAdmin());
+      allow create: if isEmailVerified() && (isMemberOfOrganizer(request.resource.data.organizerId) || isAdmin());
 
       allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewsCount', 'sharesCount', 'savesCount', 'currentAttendeeCount'])) ||
                     (isAdmin() || (
@@ -228,7 +236,7 @@ service cloud.firestore {
                    exists(/databases/$(database)/documents/events/$(resource.data.eventId)) &&
                    canManageOrganizer(get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.get("organizerId", ""));
 
-      allow create: if isAuthenticated() &&
+      allow create: if isEmailVerified() &&
                       request.resource.data.userId == request.auth.uid; // Growth Phase: All can join events
       allow update: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
       allow delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
@@ -241,7 +249,7 @@ service cloud.firestore {
 
     match /organizers/{organizerId} {
       allow read: if true;
-      allow create: if isAuthenticated(); // Growth Phase: Open creation
+      allow create: if isEmailVerified(); // Growth Phase: Open creation for verified students
 
       allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followerCount', 'sharesCount'])) ||
                     (isAdmin() || (
@@ -277,7 +285,7 @@ service cloud.firestore {
     // --- Housing ---
     match /housing_listings/{listingId} {
       allow read: if true;
-      allow create: if isAuthenticated() && request.resource.data.plugId == request.auth.uid;
+      allow create: if isEmailVerified() && request.resource.data.plugId == request.auth.uid;
       allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'saves', 'sharesCount', 'chatCount', 'callCount'])) ||
                     (isAdmin() || (
                       isAuthenticated() &&
@@ -304,15 +312,15 @@ service cloud.firestore {
 
     match /roommates/{profileId} {
       allow read: if true;
-      allow create: if isAuthenticated() && request.resource.data.get("userId", "") == request.auth.uid;
+      allow create: if isEmailVerified() && request.resource.data.get("userId", "") == request.auth.uid;
       allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.get("userId", "") == request.auth.uid);
     }
 
     match /housing_reviews/{reviewId} {
       allow read: if true;
       allow create: if isAuthenticated() && request.resource.data.reviewerId == request.auth.uid;
-      allow update: if isAuthenticated() && resource.data.reviewerId == request.auth.uid;
-      allow delete: if isAdmin() || (isAuthenticated() && resource.data.reviewerId == request.auth.uid);
+      allow update: if isAuthenticated() && request.resource.data.reviewerId == request.auth.uid;
+      allow delete: if isAdmin() || (isAuthenticated() && request.resource.data.reviewerId == request.auth.uid);
     }
 
     match /housing_vacancy_requests/{requestId} {
@@ -331,7 +339,7 @@ service cloud.firestore {
 
     match /housing_viewing_requests/{requestId} {
       allow read: if isAuthenticated() && (resource.data.studentId == request.auth.uid || resource.data.plugId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && request.resource.data.studentId == request.auth.uid;
+      allow create: if isEmailVerified() && request.resource.data.studentId == request.auth.uid;
       allow update: if isAuthenticated() && (resource.data.plugId == request.auth.uid || resource.data.studentId == request.auth.uid || isAdmin());
       allow delete: if isAdmin();
     }
@@ -339,7 +347,11 @@ service cloud.firestore {
     // --- Notes ---
     match /notes/{noteId} {
       allow read: if true;
-      allow create: if isAdmin();
+      allow create: if isEmailVerified() && (
+        request.resource.data.authorId == request.auth.uid && (
+          isAdmin() || "class_rep" in getUserData(request.auth.uid).get("roles", [])
+        )
+      );
       allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'saves', 'sharesCount', 'downloadsCount'])) ||
                     (isAdmin() || (
                       isAuthenticated() &&
@@ -432,7 +444,7 @@ service cloud.firestore {
 
     match /organizer_verification_requests/{docId} {
       allow read: if (isAuthenticated() && resource.data.ownerId == request.auth.uid) || isAdmin();
-      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
+      allow create: if isEmailVerified() && request.resource.data.ownerId == request.auth.uid;
       allow update: if isAdmin();
       allow delete: if (isAuthenticated() && resource.data.ownerId == request.auth.uid) || isAdmin();
     }
@@ -469,8 +481,10 @@ service cloud.firestore {
     // --- Background Tasks ---
     match /notifications_queue/{queueId} {
       allow read: if isAdmin();
-      allow create: if isAuthenticated() && (
-        request.resource.data.get('isBroadcast', false) == false || isAdmin()
+      allow create: if isEmailVerified() && (
+        (request.resource.data.get('isBroadcast', false) == false &&
+         request.resource.data.get('actorId', '') == request.auth.uid) ||
+        isAdmin()
       );
       allow update, delete: if isAdmin();
     }
@@ -478,18 +492,18 @@ service cloud.firestore {
     // --- Community Feed & Gigs ---
     match /feed/{itemId} {
       allow read: if true;
-      allow create: if isAuthenticated() && request.resource.data.authorId == request.auth.uid;
+      allow create: if isEmailVerified() && request.resource.data.authorId == request.auth.uid;
       allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'likedBy', 'sharesCount', 'viewsCount', 'commentsCount'])) ||
                     (isAuthenticated() && (
                       isAdmin() ||
-                      (resource.data.get("authorId", "") == request.auth.uid &&
+                      (isEmailVerified() && resource.data.get("authorId", "") == request.auth.uid &&
                        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isPinned', 'status']))
                     ));
-      allow delete: if isAdmin() || (isAuthenticated() && resource.data.get("authorId", "") == request.auth.uid);
+      allow delete: if isAdmin() || (isAuthenticated() && request.resource.data.get("authorId", "") == request.auth.uid);
 
       match /comments/{commentId} {
         allow read: if true;
-        allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+        allow create: if isEmailVerified() && request.resource.data.userId == request.auth.uid;
         allow update, delete: if isAdmin() || (isAuthenticated() && request.resource.data.userId == request.auth.uid);
       }
     }
@@ -497,34 +511,26 @@ service cloud.firestore {
     // --- Student Gigs ---
     match /gigs/{gigId} {
       allow read: if true;
-      allow create: if isAuthenticated();
+      allow create: if isEmailVerified();
       allow update: if isAdmin() || (isAuthenticated() && resource.data.employerId == request.auth.uid);
       allow delete: if isAdmin() || (isAuthenticated() && resource.data.employerId == request.auth.uid);
     }
 
     match /gig_applications/{appId} {
       allow read: if isAuthenticated() && (resource.data.freelancerId == request.auth.uid || resource.data.employerId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && request.resource.data.freelancerId == request.auth.uid;
+      allow create: if isEmailVerified() && request.resource.data.freelancerId == request.auth.uid;
       allow update: if isAuthenticated() && (resource.data.employerId == request.auth.uid || resource.data.freelancerId == request.auth.uid || isAdmin());
       allow delete: if isAdmin();
     }
 
     match /gig_disputes/{disputeId} {
-      allow read: if isAdmin() || (isAuthenticated() && (resource.data.reporterId == request.auth.uid || resource.data.targetUserId == request.auth.uid));
+      allow read: if isAdmin() || (isAuthenticated() && (request.auth.uid == resource.data.reporterId || request.auth.uid == resource.data.targetUserId));
       allow create: if isAuthenticated() && request.resource.data.reporterId == request.auth.uid;
       allow update: if isAdmin();
     }
 
     // --- Collection Groups ---
     match /{path=**}/members/{memberId} {
-      allow read: if isAuthenticated();
-    }
-
-    match /{path=**}/saved_housing/{docId} {
-      allow read: if isAuthenticated();
-    }
-
-    match /{path=**}/saved_listings/{docId} {
       allow read: if isAuthenticated();
     }
   }

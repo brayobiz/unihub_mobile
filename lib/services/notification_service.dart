@@ -183,6 +183,13 @@ class NotificationService implements NotificationSender {
   Future<void> deleteToken() async {
     try {
       final user = _ref.read(authStateProvider).valueOrNull;
+      
+      // Cleanup topics
+      try {
+        await _messaging.unsubscribeFromTopic('all_users');
+        await _messaging.unsubscribeFromTopic('admins');
+      } catch (_) {}
+
       String? token;
       try {
         token = await _messaging.getToken().timeout(const Duration(seconds: 2));

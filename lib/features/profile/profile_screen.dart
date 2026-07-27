@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -347,8 +346,10 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
         const SizedBox(height: 8),
         _buildActionButton(Icons.assignment_ind_outlined, 'Employer Dashboard', () => context.push('/employer-dashboard')),
         const SizedBox(height: 8),
-        _buildActionButton(Icons.menu_book_outlined, 'My Uploaded Notes', () => context.push('/notes?tab=1'), subtitle: 'Manage in Library tab'),
-        const SizedBox(height: 8),
+        if (widget.user.isAdmin || widget.user.isClassRep) ...[
+          _buildActionButton(Icons.menu_book_outlined, 'My Uploaded Notes', () => context.push('/notes?tab=1'), subtitle: 'Manage in Library tab'),
+          const SizedBox(height: 8),
+        ],
         _buildActionButton(Icons.favorite_outline_rounded, 'Saved Vacancies', () => context.push('/saved-housing')),
         const SizedBox(height: 8),
         _buildActionButton(Icons.bookmarks_outlined, 'Saved Items', () => context.push('/saved')),
@@ -434,22 +435,6 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
           ),
           // Removed redundant verified badge from avatar as it is now more prominently placed next to the name
         ],
-      ),
-    );
-  }
-
-  Widget _buildEditButton(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-      ),
-      child: IconButton(
-        icon: Icon(Icons.edit_rounded, color: theme.colorScheme.onSurface, size: 20),
-        onPressed: () => context.push('/edit-profile'),
-        visualDensity: VisualDensity.compact,
       ),
     );
   }
@@ -627,8 +612,10 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
             _buildStatItem(Icons.shield_outlined, '${user.displayTrustScore.toInt()}%', 'Trust Score'),
             _buildVerticalDivider(),
             _buildStatItem(Icons.star_outline_rounded, user.averageRating.toStringAsFixed(1), 'Reputation'),
-            _buildVerticalDivider(),
-            _buildStatItem(Icons.menu_book_outlined, user.resourcesSharedCount.toString(), 'Notes Shared'),
+            if (user.isAdmin || user.isClassRep) ...[
+              _buildVerticalDivider(),
+              _buildStatItem(Icons.menu_book_outlined, user.resourcesSharedCount.toString(), 'Notes Shared'),
+            ],
             _buildVerticalDivider(),
             _buildStatItem(Icons.handshake_outlined, user.completedSalesCount.toString(), 'Deals Closed'),
           ],

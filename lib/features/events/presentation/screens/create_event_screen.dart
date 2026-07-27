@@ -12,6 +12,7 @@ import '../../shared/providers.dart';
 import '../controllers/create_event_controller.dart';
 import '../widgets/event_card.dart';
 import 'event_detail_screen.dart';
+import 'package:unihub_mobile/core/widgets/optimized_image.dart';
 import 'package:unihub_mobile/features/ads/ads_module.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -266,9 +267,9 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                       child: Image.file(state.selectedImages.first, fit: BoxFit.cover),
                     )
                   : state.existingImageUrls.isNotEmpty
-                      ? ClipRRect(
+                      ? OptimizedImage(
+                          imageUrl: state.existingImageUrls.first,
                           borderRadius: BorderRadius.circular(16),
-                          child: Image.network(state.existingImageUrls.first, fit: BoxFit.cover),
                         )
                       : const Center(
                           child: Column(

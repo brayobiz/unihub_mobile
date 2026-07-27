@@ -44,6 +44,9 @@ class DismissedAnnouncementsNotifier extends StateNotifier<Set<String>> {
 /// Tracks which announcements have already been shown as a modal in the current app session
 final sessionShownModalsProvider = StateProvider<Set<String>>((ref) => {});
 
+/// Tracks if an announcement modal is currently active on screen to prevent stacking
+final isAnnouncementModalActiveProvider = StateProvider<bool>((ref) => false);
+
 /// Filtered announcements based on the current user's profile and the specified feature
 final relevantAnnouncementsProvider = Provider.autoDispose.family<List<Announcement>, String?>((ref, feature) {
   final activeAsync = ref.watch(activeAnnouncementsProvider);
