@@ -401,12 +401,17 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<void> updateVerificationStatus(String uid, {bool? emailVerified, bool? phoneVerified}) async {
-    final Map<String, dynamic> data = {};
+    final Map<String, dynamic> data = {
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
     if (emailVerified != null) data['isEmailVerified'] = emailVerified;
     if (phoneVerified != null) data['isPhoneVerified'] = phoneVerified;
     
-    if (data.isNotEmpty) {
-      await _firestore.collection('users').doc(uid).update(data).catchError((_) => null);
+    if (data.length > 1) { // More than just updatedAt
+      await _firestore.collection('users').doc(uid).update(data).catchError((e) {
+        AppLogger.warning('Auth: Failed to sync verification status to Firestore: $e', 'AUTH');
+        return null;
+      });
     }
   }
 

@@ -5,8 +5,12 @@ import 'package:path/path.dart' as p;
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import '../../shared/providers.dart';
 import '../../../auth/shared/providers.dart';
+import '../../../auth/domain/models/app_user.dart';
 import '../../domain/models/study_progress.dart';
 import '../../domain/models/note.dart';
+import '../../../trust/domain/models/professional_role.dart';
+import '../../../trust/domain/models/verification_application.dart';
+import '../../../trust/presentation/providers/trust_providers.dart';
 import '../../../../services/download_service.dart';
 import '../../../../core/widgets/authorization_guard.dart';
 import '../../../../core/services/authorization_service.dart';
@@ -42,65 +46,18 @@ class _LibraryTabState extends ConsumerState<LibraryTab> {
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 20),
       children: [
-        // Contributor Action Card
+        // Contributor / Community Action Card
         ref.watch(appUserProvider).when(
           data: (user) {
-            final bool isContributor = user != null && (user.isAdmin || user.roles.contains('class_rep'));
-            if (!isContributor) return const SizedBox.shrink();
+            final bool isContributor = user != null && (user.isAdmin || user.roles.contains('class_rep') || user.verifiedRoles.contains('notesContributor'));
+            final applicationAsync = ref.watch(applicationByRoleProvider(ProfessionalRole.notesContributor));
             
             return Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-              child: InkWell(
-                onTap: () => AuthorizationGuard.run(
-                  context, 
-                  ref, 
-                  feature: UlifyFeature.notesUpload, 
-                  action: () => context.push('/add-note'),
-                ),
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Icon(Icons.upload_file_rounded, color: Colors.white, size: 24),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Upload New Material',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                            Text(
-                              'Share notes with your campus community',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.add_circle_outline_rounded, color: AppColors.primary),
-                    ],
-                  ),
-                ),
+              child: applicationAsync.when(
+                data: (app) => _buildContributorBanner(context, ref, user, isContributor, app),
+                loading: () => const SizedBox(height: 100, child: Center(child: CircularProgressIndicator())),
+                error: (_, __) => _buildContributorBanner(context, ref, user, isContributor, null),
               ),
             );
           },
@@ -507,6 +464,145 @@ class _LibraryTabState extends ConsumerState<LibraryTab> {
       },
       loading: () => const SizedBox(height: 100, child: Center(child: CircularProgressIndicator())),
       error: (e, _) => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildContributorBanner(
+    BuildContext context, 
+    WidgetRef ref, 
+    AppUser? user, 
+    bool isContributor, 
+    VerificationApplication? app
+  ) {
+    final theme = Theme.of(context);
+    
+    // Status Logic
+    final bool isPending = app?.status == VerificationStatus.pending || app?.status == VerificationStatus.underReview;
+    final bool isRejected = app?.status == VerificationStatus.rejected;
+    
+    Color baseColor = theme.colorScheme.primary;
+    IconData icon = Icons.upload_file_rounded;
+    String title = 'Upload New Material';
+    String message = 'Share notes with your campus';
+    String buttonText = 'Upload';
+
+    if (isContributor) {
+      baseColor = theme.colorScheme.primary;
+      icon = Icons.upload_file_rounded;
+      title = 'Upload New Material';
+      message = 'Share notes with your campus';
+    } else if (isPending) {
+      baseColor = Colors.orange;
+      icon = Icons.hourglass_top_rounded;
+      title = 'Application Pending';
+      message = 'Admin is reviewing your contributor request.';
+      buttonText = ''; 
+    } else if (isRejected) {
+      baseColor = theme.colorScheme.error;
+      icon = Icons.gavel_rounded;
+      title = 'Contributor Update';
+      message = 'Your previous application was not approved. Tap to review.';
+      buttonText = 'Review';
+    } else {
+      baseColor = theme.colorScheme.secondary;
+      icon = Icons.school_rounded;
+      title = 'Become a Contributor';
+      message = 'Join the community library team';
+      buttonText = 'Apply';
+    }
+
+    return InkWell(
+      onTap: () {
+        if (isContributor) {
+          AuthorizationGuard.run(
+            context, 
+            ref, 
+            feature: UlifyFeature.notesUpload, 
+            action: () => context.push('/add-note'),
+          );
+        } else if (isPending) {
+          // Do nothing or show info
+        } else {
+          context.push('/verify-professional/notesContributor');
+        }
+      },
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [baseColor, baseColor.withValues(alpha: 0.8)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: baseColor.withValues(alpha: 0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -10,
+              bottom: -10,
+              child: Icon(
+                icon,
+                size: 80,
+                color: Colors.white.withValues(alpha: 0.1),
+              ),
+            ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          fontSize: 16,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      Text(
+                        message,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withValues(alpha: 0.8),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (isPending)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                else
+                  const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 16),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 

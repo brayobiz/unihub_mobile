@@ -24,16 +24,16 @@ class ProfileScreen extends ConsumerWidget {
     final authState = ref.watch(authControllerProvider);
 
     // Listen for auth errors (like sign out failure)
-    ref.listen<AsyncValue<void>>(authControllerProvider, (previous, next) {
-      next.whenOrNull(
-        error: (err, _) => ScaffoldMessenger.of(context).showSnackBar(
+    ref.listen<AuthControllerState>(authControllerProvider, (previous, next) {
+      if (next.hasError && !next.isLoading) {
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(err.toString()),
+            content: Text(next.error.toString()),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
           ),
-        ),
-      );
+        );
+      }
     });
 
     return Stack(

@@ -8,38 +8,88 @@ import '../../../../app/providers/app_restart_provider.dart';
 
 import '../../../../core/constants/campus_constants.dart';
 
-class AuthController extends StateNotifier<AsyncValue<void>> {
+enum AuthOperation {
+  none,
+  emailSignIn,
+  googleSignIn,
+  emailSignUp,
+  signOut,
+  resetPassword,
+  deleteAccount,
+  updateProfile,
+  completeOnboarding,
+}
+
+class AuthControllerState {
+  final AsyncValue<void> status;
+  final AuthOperation operation;
+
+  AuthControllerState({
+    this.status = const AsyncValue.data(null),
+    this.operation = AuthOperation.none,
+  });
+
+  bool get isLoading => status.isLoading;
+  bool get hasError => status.hasError;
+  Object? get error => status.error;
+
+  AuthControllerState copyWith({
+    AsyncValue<void>? status,
+    AuthOperation? operation,
+  }) {
+    return AuthControllerState(
+      status: status ?? this.status,
+      operation: operation ?? this.operation,
+    );
+  }
+}
+
+class AuthController extends StateNotifier<AuthControllerState> {
   final AuthRepository _authRepository;
   final Ref _ref;
 
   AuthController({required AuthRepository authRepository, required Ref ref})
       : _authRepository = authRepository,
         _ref = ref,
-        super(const AsyncValue.data(null));
+        super(AuthControllerState());
 
   void resetState() {
-    state = const AsyncValue.data(null);
+    state = AuthControllerState();
   }
 
   Future<void> signIn(String email, String password) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
+    state = state.copyWith(
+      status: const AsyncValue.loading(),
+      operation: AuthOperation.emailSignIn,
+    );
+    final result = await AsyncValue.guard(() async {
       await _authRepository.signInWithEmailAndPassword(email, password);
       await _ref.read(notificationServiceProvider).init(); // Refresh token/permission
     });
-    if (!state.hasError) {
-      resetState();
+    
+    if (mounted) {
+      state = state.copyWith(status: result);
+      if (!result.hasError) {
+        resetState();
+      }
     }
   }
 
   Future<void> signInWithGoogle() async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
+    state = state.copyWith(
+      status: const AsyncValue.loading(),
+      operation: AuthOperation.googleSignIn,
+    );
+    final result = await AsyncValue.guard(() async {
       await _authRepository.signInWithGoogle();
       await _ref.read(notificationServiceProvider).init(); // Refresh token/permission
     });
-    if (!state.hasError) {
-      resetState();
+    
+    if (mounted) {
+      state = state.copyWith(status: result);
+      if (!result.hasError) {
+        resetState();
+      }
     }
   }
 
@@ -48,8 +98,11 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
     required String password, 
     required String fullName,
   }) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
+    state = state.copyWith(
+      status: const AsyncValue.loading(),
+      operation: AuthOperation.emailSignUp,
+    );
+    final result = await AsyncValue.guard(() async {
       await _authRepository.signUpWithEmailAndPassword(
         email: email,
         password: password,
@@ -57,14 +110,20 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
       );
       await _ref.read(notificationServiceProvider).init(); // Refresh token/permission
     });
-    // Reset state after a short delay or upon completion to prevent "sticky" loading states on next screen
-    if (!state.hasError) {
-      resetState();
+    
+    if (mounted) {
+      state = state.copyWith(status: result);
+      if (!result.hasError) {
+        resetState();
+      }
     }
   }
 
   Future<void> signOut() async {
-    state = const AsyncValue.loading();
+    state = state.copyWith(
+      status: const AsyncValue.loading(),
+      operation: AuthOperation.signOut,
+    );
     try {
       // 1. Audit Phase 3.3: Immediate Background Cleanup
       // Stop presence tracking before auth is gone
@@ -88,7 +147,7 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
     });
 
     if (mounted) {
-      state = result;
+      state = state.copyWith(status: result);
       if (!result.hasError) {
         resetState();
       }
@@ -96,21 +155,33 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
   }
 
   Future<void> resetPassword(String email) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _authRepository.resetPassword(email));
+    state = state.copyWith(
+      status: const AsyncValue.loading(),
+      operation: AuthOperation.resetPassword,
+    );
+    final result = await AsyncValue.guard(() => _authRepository.resetPassword(email));
+    if (mounted) {
+      state = state.copyWith(status: result);
+    }
   }
 
   Future<void> sendEmailVerification() async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _authRepository.sendEmailVerification());
-    if (!state.hasError) {
-      resetState();
+    state = state.copyWith(
+      status: const AsyncValue.loading(),
+      operation: AuthOperation.none, // Generic operation
+    );
+    final result = await AsyncValue.guard(() => _authRepository.sendEmailVerification());
+    if (mounted) {
+      state = state.copyWith(status: result);
+      if (!result.hasError) {
+        resetState();
+      }
     }
   }
 
   Future<void> checkVerificationStatus() async {
     final user = _ref.read(firebaseAuthProvider).currentUser;
-    if (user == null || user.emailVerified) return;
+    if (user == null) return;
 
     // Use a lighter operation if we're polling
     await AsyncValue.guard(() async {
@@ -121,9 +192,9 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
         // Sync to Firestore for security rules and global state
         await _authRepository.updateVerificationStatus(updatedUser!.uid, emailVerified: true);
         
-        // No need to invalidate authStateProvider manually if we use userChanges stream,
-        // but it doesn't hurt and ensures immediate UI update.
+        // Audit Fix: Force invalidation of user providers to ensure UI updates immediately
         _ref.invalidate(authStateProvider);
+        _ref.invalidate(appUserProvider);
       }
     });
   }
@@ -143,8 +214,11 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
     // Resolve university to canonical ID if possible
     final String? resolvedUniversity = CampusConstants.resolveToId(university) ?? university;
 
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _authRepository.updateProfile(
+    state = state.copyWith(
+      status: const AsyncValue.loading(),
+      operation: AuthOperation.updateProfile,
+    );
+    final result = await AsyncValue.guard(() => _authRepository.updateProfile(
       uid: user.uid,
       university: resolvedUniversity,
       campus: campus,
@@ -154,8 +228,12 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
       whatsappNumber: whatsappNumber,
       photoUrl: photoUrl,
     ));
-    if (!state.hasError) {
-      resetState();
+    
+    if (mounted) {
+      state = state.copyWith(status: result);
+      if (!result.hasError) {
+        resetState();
+      }
     }
   }
 
@@ -168,22 +246,36 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
       return;
     }
 
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _authRepository.updateOnboardingStatus(user.uid, true));
-    if (!state.hasError) {
-      resetState();
+    state = state.copyWith(
+      status: const AsyncValue.loading(),
+      operation: AuthOperation.completeOnboarding,
+    );
+    final result = await AsyncValue.guard(() => _authRepository.updateOnboardingStatus(user.uid, true));
+    
+    if (mounted) {
+      state = state.copyWith(status: result);
+      if (!result.hasError) {
+        resetState();
+      }
     }
   }
 
   Future<void> deleteAccount() async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
+    state = state.copyWith(
+      status: const AsyncValue.loading(),
+      operation: AuthOperation.deleteAccount,
+    );
+    final result = await AsyncValue.guard(() async {
       await _ref.read(notificationServiceProvider).deleteToken();
       await _authRepository.deleteAccount();
     });
-    if (!state.hasError) {
-      _ref.read(accountDeletedProvider.notifier).state = true;
-      resetState();
+    
+    if (mounted) {
+      state = state.copyWith(status: result);
+      if (!result.hasError) {
+        _ref.read(accountDeletedProvider.notifier).state = true;
+        resetState();
+      }
     }
   }
 
@@ -191,13 +283,20 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
     final user = _ref.read(firebaseAuthProvider).currentUser;
     if (user == null) return;
 
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _authRepository.updateProfile(
+    state = state.copyWith(
+      status: const AsyncValue.loading(),
+      operation: AuthOperation.updateProfile,
+    );
+    final result = await AsyncValue.guard(() => _authRepository.updateProfile(
       uid: user.uid,
       privacySettings: settings,
     ));
-    if (!state.hasError) {
-      resetState();
+    
+    if (mounted) {
+      state = state.copyWith(status: result);
+      if (!result.hasError) {
+        resetState();
+      }
     }
   }
 
@@ -205,40 +304,64 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
     final user = _ref.read(firebaseAuthProvider).currentUser;
     if (user == null) return;
 
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _authRepository.updateProfile(
+    state = state.copyWith(
+      status: const AsyncValue.loading(),
+      operation: AuthOperation.updateProfile,
+    );
+    final result = await AsyncValue.guard(() => _authRepository.updateProfile(
       uid: user.uid,
       notificationSettings: settings,
     ));
-    if (!state.hasError) {
-      resetState();
+    
+    if (mounted) {
+      state = state.copyWith(status: result);
+      if (!result.hasError) {
+        resetState();
+      }
     }
   }
 
   Future<void> blockUser(String blockedUid) async {
     final user = _ref.read(firebaseAuthProvider).currentUser;
     if (user == null) return;
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _authRepository.blockUser(user.uid, blockedUid));
-    if (!state.hasError) {
-      resetState();
+    
+    state = state.copyWith(
+      status: const AsyncValue.loading(),
+      operation: AuthOperation.none,
+    );
+    final result = await AsyncValue.guard(() => _authRepository.blockUser(user.uid, blockedUid));
+    
+    if (mounted) {
+      state = state.copyWith(status: result);
+      if (!result.hasError) {
+        resetState();
+      }
     }
   }
 
   Future<void> unblockUser(String blockedUid) async {
     final user = _ref.read(firebaseAuthProvider).currentUser;
     if (user == null) return;
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _authRepository.unblockUser(user.uid, blockedUid));
-    if (!state.hasError) {
-      resetState();
+    
+    state = state.copyWith(
+      status: const AsyncValue.loading(),
+      operation: AuthOperation.none,
+    );
+    final result = await AsyncValue.guard(() => _authRepository.unblockUser(user.uid, blockedUid));
+    
+    if (mounted) {
+      state = state.copyWith(status: result);
+      if (!result.hasError) {
+        resetState();
+      }
     }
   }
 }
 
-final authControllerProvider = StateNotifierProvider<AuthController, AsyncValue<void>>((ref) {
+final authControllerProvider = StateNotifierProvider<AuthController, AuthControllerState>((ref) {
   return AuthController(
     authRepository: ref.watch(authRepositoryProvider),
     ref: ref,
   );
 });
+

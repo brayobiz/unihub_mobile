@@ -110,6 +110,11 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
         message: widget.listing != null 
             ? 'Your property details have been successfully updated.'
             : 'Your property is now live on UniHub. Students can now view and contact you.',
+        onDone: () {
+          if (mounted) {
+            context.pop();
+          }
+        },
       );
     } else if (state.error != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${state.error}')));

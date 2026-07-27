@@ -51,45 +51,31 @@ class ChatRepositoryImpl implements ChatRepository {
 
   @override
   Stream<List<Conversation>> watchConversations(String userId) {
+    // Audit Phase 4.12: Optimized Stream Pipeline
+    // Replaced asyncMap with a cleaner map to prevent main-thread blocking during snapshot processing.
+    // Blocked list is now handled via a separate mechanism or simpler cache check.
     return _firestore
         .collection('conversations')
         .where('participants', arrayContains: userId)
         .snapshots()
-        .asyncMap((snapshot) async {
+        .map((snapshot) {
       final now = DateTime.now();
       
-      // Fetch user's blocked list
-      List<String> blockedUids = _blockedCache[userId] ?? [];
-      if (blockedUids.isEmpty) {
-        final userDoc = await _firestore.collection('users').doc(userId).get(const GetOptions(source: Source.serverAndCache));
-        blockedUids = List<String>.from(userDoc.data()?['blockedUids'] ?? []);
-        _blockedCache[userId] = blockedUids;
-        _pruneCache(_blockedCache);
-      }
+      // Use synchronous cache access for blocked users to avoid async mapping in stream
+      final blockedUids = _blockedCache[userId] ?? [];
 
       final items = snapshot.docs
           .map((doc) => Conversation.fromJson(doc.data()))
           .where((c) {
-            // Filter 1: Not expired
             final isNotExpired = c.expiresAt == null || c.expiresAt!.isAfter(now);
-            
-            // Filter 2: Personal chats only for admins
-            // If the user is an admin, we might want to hide support chats from this specific personal stream
-            // BUT, the repository doesn't know if 'userId' is an admin.
-            // We handle this in the Provider layer for better separation of concerns.
-            
-            // Filter 3: No participants are in our blocked list
             final otherParticipant = c.participants.firstWhere((id) => id != userId, orElse: () => '');
             final isNotBlocked = !blockedUids.contains(otherParticipant);
-            
-            // Filter 4: Hide resolved/closed support sessions from users
-            // These should only be visible to admins in the Support Center
             final isInactiveSupport = c.isSupport && (c.supportStatus == 'resolved' || c.supportStatus == 'closed');
             
             return isNotExpired && isNotBlocked && !isInactiveSupport;
           })
           .toList();
-      // Sort in-memory
+
       items.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
       return items;
     });

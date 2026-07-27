@@ -125,7 +125,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final authState = ref.watch(authControllerProvider);
-    final isLoading = authState.isLoading;
+    
+    final isEmailSignUpLoading = authState.isLoading && authState.operation == AuthOperation.emailSignUp;
+    final isGoogleSignInLoading = authState.isLoading && authState.operation == AuthOperation.googleSignIn;
+    final isAnyLoading = authState.isLoading;
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -242,7 +245,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           controller: fullNameController,
                           hintText: 'Full Name',
                           icon: Icons.person_outline,
-                          enabled: !isLoading,
+                          enabled: !isAnyLoading,
                         ),
                         Divider(height: 1, color: theme.dividerColor.withValues(alpha: 0.4), indent: 50),
                         AuthTextField(
@@ -250,19 +253,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           hintText: 'Email Address',
                           icon: Icons.email_outlined,
                           keyboardType: TextInputType.emailAddress,
-                          enabled: !isLoading,
+                          enabled: !isAnyLoading,
                         ),
                         Divider(height: 1, color: theme.dividerColor.withValues(alpha: 0.4), indent: 50),
                         PasswordField(
                           controller: passwordController,
                           hintText: 'Password',
-                          enabled: !isLoading,
+                          enabled: !isAnyLoading,
                         ),
                         Divider(height: 1, color: theme.dividerColor.withValues(alpha: 0.4), indent: 50),
                         PasswordField(
                           controller: confirmPasswordController,
                           hintText: 'Confirm Password',
-                          enabled: !isLoading,
+                          enabled: !isAnyLoading,
                         ),
                       ],
                     ),
@@ -278,7 +281,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         width: 24,
                         child: Checkbox(
                           value: _isAgreed,
-                          onChanged: isLoading ? null : (val) => setState(() => _isAgreed = val ?? false),
+                          onChanged: isAnyLoading ? null : (val) => setState(() => _isAgreed = val ?? false),
                           activeColor: AppColors.primary,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                         ),
@@ -305,8 +308,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   // Create Account Button
                   AuthButton(
                     text: 'Create My Account',
-                    isLoading: isLoading,
-                    onPressed: _isFormValid ? _onSignUp : null,
+                    isLoading: isEmailSignUpLoading,
+                    onPressed: (_isFormValid && !isAnyLoading) ? _onSignUp : null,
                   ),
 
                   const SizedBox(height: 20),
@@ -317,8 +320,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                   // Google Sign In
                   GoogleSignInButton(
-                    isLoading: isLoading,
-                    onPressed: () async {
+                    isLoading: isGoogleSignInLoading,
+                    onPressed: isAnyLoading ? null : () async {
                       final connectivity = ref.read(connectivityServiceProvider);
                       if (connectivity == ConnectivityStatus.isDisconnected) {
                         _showErrorSnackBar('No internet connection. Please check your network and try again.');
@@ -369,7 +372,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               ),
                             ),
                             TextButton(
-                              onPressed: isLoading ? null : () {
+                              onPressed: isAnyLoading ? null : () {
                                 context.pushReplacement('/login');
                               },
                               child: Text(

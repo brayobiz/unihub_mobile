@@ -578,6 +578,7 @@ class _ProfessionalVerificationScreenState extends ConsumerState<ProfessionalVer
       case ProfessionalRole.serviceProvider: return Icons.handyman_rounded;
       case ProfessionalRole.technician: return Icons.memory_rounded;
       case ProfessionalRole.business: return Icons.business_center_rounded;
+      case ProfessionalRole.notesContributor: return Icons.school_rounded;
     }
   }
 }

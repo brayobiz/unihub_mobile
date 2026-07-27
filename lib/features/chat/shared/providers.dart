@@ -42,8 +42,10 @@ final messagesStreamProvider = StreamProvider.autoDispose.family<List<Message>, 
   return ref.watch(chatRepositoryProvider).watchMessages(conversationId);
 });
 
-final totalUnreadChatCountProvider = StreamProvider.autoDispose.family<int, String>((ref, userId) {
-  return ref.watch(conversationsProvider(userId).stream).map((conversations) {
+final totalUnreadChatCountProvider = Provider.autoDispose.family<AsyncValue<int>, String>((ref, userId) {
+  final conversationsAsync = ref.watch(conversationsProvider(userId));
+  
+  return conversationsAsync.whenData((conversations) {
     return conversations.fold(0, (sum, conv) => sum + (conv.unreadCounts[userId] ?? 0));
   });
 });

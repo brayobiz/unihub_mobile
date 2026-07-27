@@ -93,7 +93,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final authState = ref.watch(authControllerProvider);
-    final isLoading = authState.isLoading;
+    
+    final isEmailSignInLoading = authState.isLoading && authState.operation == AuthOperation.emailSignIn;
+    final isGoogleSignInLoading = authState.isLoading && authState.operation == AuthOperation.googleSignIn;
+    final isAnyLoading = authState.isLoading;
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -216,13 +219,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           hintText: 'Email',
                           icon: Icons.email_outlined,
                           keyboardType: TextInputType.emailAddress,
-                          enabled: !isLoading,
+                          enabled: !isAnyLoading,
                         ),
                         Divider(height: 1, color: theme.dividerColor.withValues(alpha: 0.5), indent: 50),
                         PasswordField(
                           controller: passwordController,
                           hintText: 'Password',
-                          enabled: !isLoading,
+                          enabled: !isAnyLoading,
                         ),
                       ],
                     ),
@@ -233,7 +236,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: isLoading ? null : () {
+                      onPressed: isAnyLoading ? null : () {
                         context.push('/forgot-password');
                       },
                       style: TextButton.styleFrom(
@@ -254,8 +257,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                   AuthButton(
                     text: 'Sign In',
-                    isLoading: isLoading,
-                    onPressed: _isFormValid ? _onSignIn : null,
+                    isLoading: isEmailSignInLoading,
+                    onPressed: (_isFormValid && !isAnyLoading) ? _onSignIn : null,
                   ),
 
                   const SizedBox(height: 32),
@@ -265,8 +268,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 32),
 
                   GoogleSignInButton(
-                    isLoading: isLoading,
-                    onPressed: () async {
+                    isLoading: isGoogleSignInLoading,
+                    onPressed: isAnyLoading ? null : () async {
                       final connectivity = ref.read(connectivityServiceProvider);
                       if (connectivity == ConnectivityStatus.isDisconnected) {
                         _showErrorSnackBar('No internet connection. Please check your network and try again.');
@@ -318,7 +321,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
                       TextButton(
-                        onPressed: isLoading ? null : () {
+                        onPressed: isAnyLoading ? null : () {
                           context.pushReplacement('/register');
                         },
                         child: Text(

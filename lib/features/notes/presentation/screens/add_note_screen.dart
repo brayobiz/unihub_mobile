@@ -10,7 +10,7 @@ import 'package:unihub_mobile/core/widgets/creation_success_dialog.dart';
 import '../../../auth/shared/providers.dart';
 import '../../domain/models/note.dart';
 import '../../shared/providers.dart';
-import '../../../shared/storage_repository.dart';
+import '../controllers/note_upload_controller.dart';
 
 class AddNoteScreen extends ConsumerStatefulWidget {
   final NoteListing? note;
@@ -38,8 +38,6 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
   File? _selectedFile;
   String? _fileName;
   String? _fileSize;
-  bool _isLoading = false;
-  double _uploadProgress = 0;
 
   @override
   void initState() {
@@ -58,8 +56,8 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     
     if (widget.note != null) {
       _tags.addAll(widget.note!.tags);
-      final ext = p.extension(widget.note!.fileUrl).toUpperCase();
-      _fileName = 'Existing Document ${ext.isNotEmpty ? '($ext)' : ''}';
+      final ext = p.extension(widget.note!.fileUrl).toUpperCase().replaceAll('.', '');
+      _fileName = 'Existing Document ${ext.isNotEmpty ? "($ext)" : ""}';
     }
   }
 
@@ -97,18 +95,18 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['docx'],
+      allowedExtensions: ['docx', 'pdf'],
     );
 
     if (result != null && result.files.single.path != null) {
       final file = File(result.files.single.path!);
       final extension = p.extension(file.path).toLowerCase();
       
-      if (extension != '.docx') {
+      if (extension != '.docx' && extension != '.pdf') {
         if (mounted) {
            ScaffoldMessenger.of(context).showSnackBar(
              const SnackBar(
-               content: Text('Only Microsoft Word (.docx) documents are supported.'),
+               content: Text('Supported formats: PDF (.pdf) and Microsoft Word (.docx).'),
                backgroundColor: Colors.orange,
              )
            );
@@ -169,7 +167,7 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedFile == null && widget.note == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a document file (.docx)')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a document file (.pdf or .docx)')));
       return;
     }
     if (_tags.isEmpty) {
@@ -180,60 +178,44 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     final user = ref.read(appUserProvider).valueOrNull;
     if (user == null) return;
 
-    setState(() {
-      _isLoading = true;
-      _uploadProgress = 0;
-    });
+    final noteId = widget.note?.id ?? const Uuid().v4();
+    final note = NoteListing(
+      id: noteId,
+      authorId: widget.note?.authorId ?? user.uid,
+      authorName: widget.note?.authorName ?? user.fullName,
+      university: widget.note?.university ?? user.university ?? 'Unknown',
+      course: _courseController.text.trim(),
+      unitCode: _unitCodeController.text.trim().toUpperCase(),
+      unitName: _unitNameController.text.trim(),
+      subjectCategory: _selectedCategory,
+      tags: _tags,
+      title: _titleController.text.trim(),
+      description: _descriptionController.text.trim(),
+      fileUrl: widget.note?.fileUrl ?? '',
+      noteType: _selectedNoteType,
+      yearOfStudy: _selectedYear,
+      price: double.tryParse(_priceController.text) ?? 0.0,
+      createdAt: widget.note?.createdAt ?? DateTime.now(),
+    );
 
-    try {
-      final noteId = widget.note?.id ?? const Uuid().v4();
-      String fileUrl = widget.note?.fileUrl ?? '';
+    final success = await ref.read(noteUploadControllerProvider.notifier).uploadNote(
+      baseNote: note,
+      selectedFile: _selectedFile,
+    );
       
-      if (_selectedFile != null) {
-        fileUrl = await ref.read(storageRepositoryProvider).uploadFile(
-          path: 'notes/$noteId',
-          id: 'document',
-          file: _selectedFile!,
-          onProgress: (sent, total) {
-            setState(() => _uploadProgress = sent / total);
-          },
-        );
-      }
-
-      final note = NoteListing(
-        id: noteId,
-        authorId: widget.note?.authorId ?? user.uid,
-        authorName: widget.note?.authorName ?? user.fullName,
-        university: widget.note?.university ?? user.university ?? 'Unknown',
-        course: _courseController.text.trim(),
-        unitCode: _unitCodeController.text.trim().toUpperCase(),
-        unitName: _unitNameController.text.trim(),
-        subjectCategory: _selectedCategory,
-        tags: _tags,
-        title: _titleController.text.trim(),
-        description: _descriptionController.text.trim(),
-        fileUrl: fileUrl,
-        noteType: _selectedNoteType,
-        yearOfStudy: _selectedYear,
-        price: double.tryParse(_priceController.text) ?? 0.0,
-        createdAt: widget.note?.createdAt ?? DateTime.now(),
+    if (success && mounted) {
+      CreationSuccessDialog.show(
+        context,
+        title: widget.note == null ? 'Study Material Shared!' : 'Note Updated!',
+        message: widget.note == null
+            ? '🚀 Awesome! Your study material has been added to the library.'
+            : 'Your study material has been updated successfully.',
+        onDone: () {
+          if (mounted) {
+            context.pop();
+          }
+        },
       );
-
-      await ref.read(notesRepositoryProvider).createNote(note);
-      
-      if (mounted) {
-        CreationSuccessDialog.show(
-          context,
-          title: widget.note == null ? 'Study Material Listed!' : 'Note Updated!',
-          message: widget.note == null
-              ? 'Your study notes have been successfully shared with fellow students.'
-              : 'Your study material has been updated successfully.',
-        );
-      }
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -241,6 +223,8 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final userAsync = ref.watch(appUserProvider);
+    final uploadState = ref.watch(noteUploadControllerProvider);
+    final bool isLoading = uploadState.status.isLoading;
 
     return userAsync.when(
       data: (user) {
@@ -248,14 +232,36 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
         
         if (!canUpload) {
           return Scaffold(
-            appBar: AppBar(title: const Text('Access Denied')),
-            body: const Center(
+            appBar: AppBar(title: const Text('Contribution Access')),
+            body: Center(
               child: Padding(
-                padding: EdgeInsets.all(24.0),
-                child: Text(
-                  'Only Class Representatives and Administrators can upload study materials to the global library.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
+                      child: Icon(Icons.school_rounded, size: 64, color: theme.colorScheme.primary),
+                    ),
+                    const SizedBox(height: 24),
+                    Text('Global Library Access', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Currently, only Class Representatives and verified contributors can upload study materials to ensure quality and academic integrity.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 15, height: 1.5, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 40),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () => context.push('/help'), 
+                        icon: const Icon(Icons.verified_user_outlined),
+                        label: const Text('Apply for Contributor Status'),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -295,15 +301,15 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                         children: [
                           _buildSectionHeader(context, 'Document File', Icons.upload_file_rounded),
                           const SizedBox(height: 16),
-                          _buildFileSelector(context),
+                          _buildFileSelector(context, isLoading),
                           const SizedBox(height: 32),
                           
-                          _buildSectionHeader(context, 'Note Details', Icons.description_outlined),
+                          _buildSectionHeader(context, 'Core Details', Icons.description_outlined),
                           const SizedBox(height: 16),
                           _buildTextField(
                             context,
                             controller: _titleController,
-                            label: 'Title',
+                            label: 'Resource Title',
                             hint: 'e.g. Introduction to Database Systems',
                             validator: (v) => v!.isEmpty ? 'Please enter a title' : null,
                           ),
@@ -311,7 +317,7 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                           _buildTextField(
                             context,
                             controller: _descriptionController,
-                            label: 'Brief Description',
+                            label: 'Overview (Optional)',
                             hint: 'Help others understand what is covered...',
                             maxLines: 3,
                           ),
@@ -381,28 +387,41 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                           _buildTagsInput(context),
                           
                           const SizedBox(height: 32),
-                          _buildSectionHeader(context, 'Access & Pricing', Icons.payments_outlined),
+                          _buildSectionHeader(context, 'Access Mode', Icons.payments_outlined),
                           const SizedBox(height: 16),
                           _buildTextField(
                             context,
                             controller: _priceController,
-                            label: 'Price (KES)',
-                            hint: 'Leave empty or 0 for FREE',
+                            label: 'Premium Price (Optional)',
+                            hint: 'Leave at 0 to share for FREE',
                             keyboardType: TextInputType.number,
                             prefixIcon: Icons.payments_outlined,
                           ),
                           
                           const SizedBox(height: 48),
-                          if (_isLoading)
+                          if (isLoading)
                             Column(
                               children: [
-                                LinearProgressIndicator(value: _uploadProgress, color: theme.colorScheme.primary, minHeight: 6, borderRadius: BorderRadius.circular(4)),
-                                const SizedBox(height: 8),
-                                Text('Uploading material... ${(_uploadProgress * 100).toInt()}%', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 12)),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: LinearProgressIndicator(
+                                    value: uploadState.uploadProgress, 
+                                    color: theme.colorScheme.primary, 
+                                    minHeight: 8,
+                                    backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  uploadState.uploadProgress < 0.99 
+                                    ? 'Uploading material... ${(uploadState.uploadProgress * 100).toInt()}%'
+                                    : 'Finalizing shared resource...', 
+                                  style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13)
+                                ),
                                 const SizedBox(height: 24),
                               ],
                             ),
-                          _buildSubmitButton(context),
+                          _buildSubmitButton(context, isLoading),
                           const SizedBox(height: 40),
                         ],
                       ),
@@ -423,16 +442,23 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      color: theme.colorScheme.primary.withValues(alpha: 0.05),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.05),
+        border: Border(bottom: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.1))),
+      ),
       child: Row(
         children: [
-          Icon(Icons.info_outline, size: 18, color: theme.colorScheme.primary),
-          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
+            child: Icon(Icons.tips_and_updates_outlined, size: 18, color: theme.colorScheme.primary),
+          ),
+          const SizedBox(width: 16),
           Expanded(
             child: Text(
-              'Help your fellow students by sharing high-quality study notes (.docx).',
-              style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface, fontWeight: FontWeight.w500),
+              'High-quality notes help your community grow. Please ensure all documents are legible and accurate.',
+              style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface, fontWeight: FontWeight.w500, height: 1.4),
             ),
           ),
         ],
@@ -444,17 +470,21 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     final theme = Theme.of(context);
     return Row(
       children: [
-        Icon(icon, size: 20, color: theme.colorScheme.primary),
-        const SizedBox(width: 10),
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+          child: Icon(icon, size: 16, color: theme.colorScheme.primary),
+        ),
+        const SizedBox(width: 12),
         Text(
-          title,
-          style: theme.textTheme.titleMedium?.copyWith(fontSize: 15, fontWeight: FontWeight.w800, color: theme.colorScheme.onSurface),
+          title.toUpperCase(),
+          style: theme.textTheme.labelSmall?.copyWith(fontSize: 11, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurfaceVariant, letterSpacing: 1.2),
         ),
       ],
     );
   }
 
-  Widget _buildFileSelector(BuildContext context) {
+  Widget _buildFileSelector(BuildContext context, bool isLoading) {
     final theme = Theme.of(context);
     final bool hasFile = _selectedFile != null || widget.note != null;
     
@@ -463,13 +493,14 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
       fileExt = p.extension(_selectedFile!.path).toUpperCase().replaceAll('.', '');
     } else if (widget.note != null) {
       final url = widget.note!.fileUrl.toLowerCase();
-      if (url.contains('.docx')) fileExt = 'DOCX';
+      if (url.contains('.pdf')) fileExt = 'PDF';
+      else if (url.contains('.docx')) fileExt = 'DOCX';
       else if (url.contains('.doc')) fileExt = 'DOC';
-      else fileExt = 'PDF';
+      else fileExt = 'FILE';
     }
 
     return InkWell(
-      onTap: _isLoading ? null : _pickFile,
+      onTap: isLoading ? null : _pickFile,
       borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
@@ -492,19 +523,26 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
-                child: Icon(Icons.upload_file_rounded, size: 32, color: theme.colorScheme.primary),
+                child: Icon(Icons.cloud_upload_outlined, size: 40, color: theme.colorScheme.primary),
               ),
               const SizedBox(height: 16),
-              Text('Select Study Document', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: theme.colorScheme.onSurface)),
-              const SizedBox(height: 4),
-              Text('.docx files are supported', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
+              Text('Drop your study document here', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: theme.colorScheme.onSurface)),
+              const SizedBox(height: 6),
+              Text('PDF and DOCX are supported', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
             ] else ...[
               Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                    child: const Icon(Icons.check_circle_outline_rounded, color: AppColors.success, size: 24),
+                    decoration: BoxDecoration(
+                      color: (fileExt == 'PDF' ? Colors.red : Colors.blue).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      fileExt == 'PDF' ? Icons.picture_as_pdf_rounded : Icons.description_rounded, 
+                      color: fileExt == 'PDF' ? Colors.red : Colors.blue, 
+                      size: 28,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -516,7 +554,14 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface)),
                         Row(
                           children: [
-                            Text(fileExt, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold)),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(fileExt, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.w900)),
+                            ),
                             if (_fileSize != null) ...[
                               const SizedBox(width: 8),
                               CircleAvatar(radius: 2, backgroundColor: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
@@ -528,9 +573,9 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                       ],
                     ),
                   ),
-                  TextButton(
-                    onPressed: _isLoading ? null : _pickFile,
-                    child: Text('Change', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+                  IconButton(
+                    onPressed: isLoading ? null : _pickFile,
+                    icon: Icon(Icons.sync_rounded, color: theme.colorScheme.primary),
                   ),
                 ],
               ),
@@ -558,7 +603,7 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
                   hintText: 'Add a topic (e.g. Java, DBMS)...',
                   hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
                   filled: true,
-                  fillColor: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
+                  fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                   enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
                 ),
@@ -606,7 +651,7 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
           onChanged: onChanged,
           decoration: InputDecoration(
             filled: true,
-            fillColor: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
+            fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
             contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
@@ -634,7 +679,7 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
             hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontWeight: FontWeight.normal, fontSize: 13),
             prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20, color: theme.colorScheme.primary.withValues(alpha: 0.5)) : null,
             filled: true,
-            fillColor: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
+            fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
             contentPadding: const EdgeInsets.all(18),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
@@ -646,20 +691,20 @@ class _AddNoteScreenState extends ConsumerState<AddNoteScreen> {
     );
   }
 
-  Widget _buildSubmitButton(BuildContext context) {
+  Widget _buildSubmitButton(BuildContext context, bool isLoading) {
     final theme = Theme.of(context);
     return SizedBox(
       width: double.infinity,
       height: 60,
       child: FilledButton(
-        onPressed: _isLoading ? null : _submit,
+        onPressed: isLoading ? null : _submit,
         style: FilledButton.styleFrom(
           backgroundColor: theme.colorScheme.primary, 
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           elevation: 0,
         ),
-        child: Text(widget.note == null ? 'Upload Notes' : 'Save Changes',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+        child: Text(widget.note == null ? 'Complete Upload' : 'Save Changes',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5)),
       ),
     );
   }

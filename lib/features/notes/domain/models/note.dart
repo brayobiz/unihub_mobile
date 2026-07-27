@@ -89,4 +89,46 @@ class NoteListing {
           : DateTime.now(),
     );
   }
+
+  NoteListing copyWith({
+    String? id,
+    String? authorId,
+    String? authorName,
+    String? university,
+    String? course,
+    String? unitCode,
+    String? unitName,
+    String? subjectCategory,
+    List<String>? tags,
+    String? title,
+    String? description,
+    String? fileUrl,
+    String? noteType,
+    String? yearOfStudy,
+    double? price,
+    int? downloadsCount,
+    String? status,
+    DateTime? createdAt,
+  }) {
+    return NoteListing(
+      id: id ?? this.id,
+      authorId: authorId ?? this.authorId,
+      authorName: authorName ?? this.authorName,
+      university: university ?? this.university,
+      course: course ?? this.course,
+      unitCode: unitCode ?? this.unitCode,
+      unitName: unitName ?? this.unitName,
+      subjectCategory: subjectCategory ?? this.subjectCategory,
+      tags: tags ?? this.tags,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      fileUrl: fileUrl ?? this.fileUrl,
+      noteType: noteType ?? this.noteType,
+      yearOfStudy: yearOfStudy ?? this.yearOfStudy,
+      price: price ?? this.price,
+      downloadsCount: downloadsCount ?? this.downloadsCount,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 }

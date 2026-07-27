@@ -329,13 +329,13 @@ final routerNotifierProvider = Provider<RouterNotifier>((ref) {
 });
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final notifier = ref.watch(routerNotifierProvider);
+  final notifier = ref.read(routerNotifierProvider);
 
   return GoRouter(
     initialLocation: '/splash',
     refreshListenable: notifier,
     debugLogDiagnostics: kDebugMode,
-    redirect: notifier.redirect,
+    redirect: (context, state) => notifier.redirect(context, state),
     routes: [
       GoRoute(
         path: '/splash',

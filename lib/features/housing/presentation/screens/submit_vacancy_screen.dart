@@ -107,6 +107,11 @@ class _SubmitVacancyScreenState extends ConsumerState<SubmitVacancyScreen> {
           context,
           title: 'Vacancy Reported!',
           message: 'Thank you! A verified Housing Plug will verify these details and list them for other students.',
+          onDone: () {
+            if (mounted) {
+              context.pop();
+            }
+          },
         );
       }
     } catch (e) {

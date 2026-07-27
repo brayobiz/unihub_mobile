@@ -112,10 +112,17 @@ service cloud.firestore {
           (request.resource.data.diff(resource.data).affectedKeys().hasAny(['isDeleted']) &&
            request.resource.data.get('isDeleted', false) == true &&
            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isDeleted', 'deletedAt', 'updatedAt'])
+          ) ||
+
+          // Case 5: Sync email verification status from Auth token
+          (request.resource.data.diff(resource.data).affectedKeys().hasAny(['isEmailVerified']) &&
+           request.auth.token.email_verified == true &&
+           request.resource.data.isEmailVerified == true &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isEmailVerified', 'updatedAt'])
           )
         )
       ) || (
-        // Case 5: External Data Sync (Growth Phase Compatibility)
+        // Case 6: External Data Sync (Growth Phase Compatibility)
         // Allows updating only reputation/activity fields.
         // MUST NOT BE THE OWNER to prevent self-manipulation.
         isAuthenticated() &&

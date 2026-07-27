@@ -31,22 +31,30 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 Future<void> main() async {
+  // Ensure the binding is initialized before anything else
+  final binding = WidgetsFlutterBinding.ensureInitialized();
+  
+  // Show a basic splash immediately to prevent ANR during heavy init
+  // (In a real app, the native splash handles this, but Flutter needs to start ASAP)
+  
+  ErrorWidget.builder = buildGlobalErrorWidget;
+
   try {
-    WidgetsFlutterBinding.ensureInitialized();
-    ErrorWidget.builder = buildGlobalErrorWidget;
+    // 1. Initialize core async dependencies with individual timeouts
+    // This prevents one hanging service from blocking the whole app launch
     
-    // Audit Phase 3.5: Parallel Initialization of core dependencies
-    final results = await Future.wait([
-      Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
-      SharedPreferences.getInstance(),
-    ]).timeout(const Duration(seconds: 15));
+    AppLogger.info('Starting Ulify Bootstrap...');
 
-    final SharedPreferences sharedPreferences = results[1] as SharedPreferences;
+    final SharedPreferences sharedPreferences = await SharedPreferences.getInstance()
+        .timeout(const Duration(seconds: 5), onTimeout: () => throw TimeoutException('SharedPreferences init timed out'));
 
-    // Optimized Firebase configuration
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)
+        .timeout(const Duration(seconds: 10), onTimeout: () => throw TimeoutException('Firebase init timed out'));
+
+    // 2. Optimized Firebase configuration
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: true,
-      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+      cacheSizeBytes: 100 * 1024 * 1024, // 100 MB limit (Resilient against huge cache ANRs)
     );
 
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -58,11 +66,13 @@ Future<void> main() async {
       ],
     );
 
-    // Parallelize background service initialization
+    // 3. Kick off background services (DO NOT AWAIT)
+    // These will initialize while the app starts rendering the first frame
     container.read(appLifecycleServiceProvider).init();
-    await container.read(notificationServiceProvider).init().catchError((e) {
-      AppLogger.error('Main: Background service init failed', e);
-    });
+    
+    unawaited(container.read(notificationServiceProvider).init().catchError((e) {
+      AppLogger.error('Main: Background notif service init failed', e);
+    }));
 
     container.read(aiAssistantServiceProvider).config(
       apiKey: EnvConfig.aiApiKey,
@@ -71,21 +81,62 @@ Future<void> main() async {
     
     unawaited(container.read(adInitializationProvider.future));
 
+    // 4. Launch the application
     runApp(
       UncontrolledProviderScope(
         container: container,
         child: const AppErrorBoundary(child: UlifyApp()),
       ),
     );
+    
+    AppLogger.info('🚀 Ulify Bootstrap Complete');
   } catch (e, stack) {
     AppLogger.error('FATAL Startup Error', e, stack);
-    // Emergency launch to prevent "Launching Forever" screen
+    
+    // Recovery path for critical failures
     runApp(
       MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData.light(useMaterial3: true),
         home: Scaffold(
-          body: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Center(child: Text('App failed to start: $e\nPlease restart the app.')),
+          body: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(32.0),
+            color: const Color(0xFF1677F2), // Primary Brand Color
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline_rounded, color: Colors.white, size: 64),
+                const SizedBox(height: 32),
+                const Text(
+                  'Initialization Error',
+                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Ulify encountered a problem during startup. This is usually due to a temporary connection issue.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 16, height: 1.5),
+                ),
+                const SizedBox(height: 48),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: FilledButton(
+                    onPressed: () {
+                      // Attempt to restart bootstrap
+                      main();
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF1677F2),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: const Text('Retry Launch', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -98,15 +149,14 @@ class UlifyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Initialize services when user is logged in (Scenario 4 & 5)
+    // Initialize services when user is logged in
     ref.listen(appUserProvider.select((user) => user.valueOrNull?.uid), (previous, next) {
       if (next != null && previous == null) {
-        // First login or session restoration after cold start
+        // Session restoration or login
         ref.read(presenceServiceProvider).init();
-        // Spark Plan Workaround: Self-heal restriction status if it has expired
         ref.read(authRepositoryProvider).checkAndRestoreRestrictedContent(next);
       } else if (next == null && previous != null) {
-        // User logged out
+        // Logout
         ref.read(presenceServiceProvider).dispose();
       }
     });
@@ -153,7 +203,7 @@ class UlifyApp extends ConsumerWidget {
               const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 16),
               const SizedBox(width: 8),
               Text(
-                'You are currently offline. Some features may be limited.',
+                'No internet connection. Some features may be offline.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
               ),
             ],
@@ -164,19 +214,13 @@ class UlifyApp extends ConsumerWidget {
   }
 }
 
-// RC-3 Production Diagnostic Initializer
 void _initProductionDiagnostics() {
   if (kReleaseMode) {
     AppLogger.info('🚀 Ulify Production Build Initialized');
-    
-    // Pass all uncaught errors from the framework to Crashlytics.
     FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
-    
-    // Pass all uncaught asynchronous errors that aren't handled by the Flutter framework to Crashlytics.
     PlatformDispatcher.instance.onError = (error, stack) {
       FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
       return true;
     };
   }
 }
-

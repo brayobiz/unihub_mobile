@@ -116,6 +116,11 @@ class _AddRoommateScreenState extends ConsumerState<AddRoommateScreen> {
           context,
           title: 'Profile Posted!',
           message: 'Your roommate profile is now visible to other students looking for houses.',
+          onDone: () {
+            if (mounted) {
+              context.pop();
+            }
+          },
         );
       }
     } catch (e) {

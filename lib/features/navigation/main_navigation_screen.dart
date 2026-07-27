@@ -27,45 +27,52 @@ class MainNavigationScreen extends ConsumerStatefulWidget {
 }
 
 class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
+  // Audit Phase 4.15: Lazy Page Initialization
+  // Prevent all main screens from initializing Firestore queries at once.
+  late final Set<int> _initializedPages;
+
   @override
   void initState() {
     super.initState();
+    _initializedPages = {ref.read(mainNavigationIndexProvider)};
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(notificationServiceProvider).requestPermission();
     });
   }
 
-  final List<Widget> pages = const [
-    DashboardScreen(),
-    MarketplaceScreen(),
-    HousingScreen(),
-    NotesScreen(),
-    ConversationsListScreen(),
-  ];
+  Widget _getPage(int index) {
+    if (!_initializedPages.contains(index)) {
+      return const _LazyPagePlaceholder();
+    }
+
+    switch (index) {
+      case 0: return const DashboardScreen();
+      case 1: return const MarketplaceScreen();
+      case 2: return const HousingScreen();
+      case 3: return const NotesScreen();
+      case 4: return const ConversationsListScreen();
+      default: return const DashboardScreen();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final currentIndex = ref.watch(mainNavigationIndexProvider);
     
-    // Optimization: watch specific auth properties to prevent unnecessary rebuilds
-    final authState = ref.watch(authStateProvider);
-    final user = authState.valueOrNull;
-    final userId = user?.uid;
-    final isEmailVerified = user?.emailVerified ?? true;
-
-    // GLOBAL DELIVERY TRACKER:
-    if (userId != null) {
-      ref.listen(conversationsProvider(userId), (previous, next) {
-        if (next.hasValue) {
-          for (final conv in next.value!) {
-            if (conv.lastMessageSenderId != userId &&
-                conv.lastMessageStatus == MessageStatus.sent) {
-              ref.read(chatRepositoryProvider).markAsDelivered(conv.id, userId);
-            }
-          }
+    // Mark current page as initialized
+    if (!_initializedPages.contains(currentIndex)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _initializedPages.add(currentIndex);
+          });
         }
       });
     }
+
+    final appUserAsync = ref.watch(appUserProvider);
+    final userId = appUserAsync.valueOrNull?.uid;
+    final isEmailVerified = appUserAsync.valueOrNull?.isEmailVerified ?? true;
 
     return Stack(
       children: [
@@ -75,7 +82,7 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
             children: [
               IndexedStack(
                 index: currentIndex,
-                children: pages,
+                children: List.generate(5, (index) => _getPage(index)),
               ),
               const AnnouncementModalOrchestrator(),
             ],
@@ -197,3 +204,17 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
     );
   }
 }
+
+class _LazyPagePlaceholder extends StatelessWidget {
+  const _LazyPagePlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+  }
+}
+

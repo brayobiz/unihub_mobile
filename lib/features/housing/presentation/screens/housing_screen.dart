@@ -286,6 +286,7 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
       onTap: () => context.push('/plug-dashboard'),
       borderRadius: BorderRadius.circular(16),
       child: Container(
+        width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: theme.colorScheme.primary.withValues(alpha: 0.1),
@@ -320,51 +321,135 @@ class _HousingScreenState extends ConsumerState<HousingScreen> {
     final theme = Theme.of(context);
     final user = ref.watch(appUserProvider).valueOrNull;
     final isVerified = user?.isVerified ?? false;
-    final hasPendingApp = application?.status == VerificationStatus.pending;
+    final hasPendingApp = application?.status == VerificationStatus.pending || application?.status == VerificationStatus.underReview;
     final isRejected = application?.status == VerificationStatus.rejected;
 
+    // Professional Banner Configuration
+    Color baseColor = theme.colorScheme.primary;
+    IconData icon = Icons.home_work_rounded;
+    String title = 'Join Plug Network';
+    String message = 'List hostels and houses as a trusted Housing Plug.';
+    String buttonText = 'Get Started';
+
+    if (!isVerified) {
+      baseColor = theme.colorScheme.primary;
+      icon = Icons.verified_user_rounded;
+      title = 'Verification Required';
+      message = 'Verify your platform identity to join the network.';
+      buttonText = 'Verify Identity';
+    } else if (isRejected) {
+      baseColor = AppColors.error;
+      icon = Icons.gavel_rounded;
+      title = 'Application Update';
+      message = 'Your application was not approved. Tap to review and update.';
+      buttonText = 'Review';
+    } else if (hasPendingApp) {
+      baseColor = theme.colorScheme.secondary;
+      icon = Icons.hourglass_top_rounded;
+      title = 'Application Pending';
+      message = 'Our team is currently reviewing your application.';
+      buttonText = 'Pending';
+    }
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      width: double.infinity,
       decoration: BoxDecoration(
-        color: isRejected 
-            ? AppColors.error
-            : hasPendingApp 
-                ? theme.colorScheme.secondary
-                : theme.colorScheme.primary,
-        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          colors: [baseColor, baseColor.withValues(alpha: 0.8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: baseColor.withValues(alpha: 0.2),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
         children: [
-          Text(
-            !isVerified ? 'Verification Required' : (isRejected ? 'Application Update' : (hasPendingApp ? 'Application Pending' : 'Join Plug Network')),
-            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            !isVerified 
-                ? 'Verify identity to join.'
-                : (isRejected
-                    ? 'Application not approved. Tap to review.'
-                    : (hasPendingApp
-                        ? 'Your application is under review.'
-                        : 'List hostels and houses as a trusted Housing Plug.')),
-            style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 12, height: 1.3),
-          ),
-          const SizedBox(height: 12),
-          ElevatedButton(
-            onPressed: hasPendingApp ? null : () => context.push('/become-plug'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: isRejected ? AppColors.error : theme.colorScheme.primary,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          // Background Decorative Icon
+          Positioned(
+            right: -10,
+            bottom: -10,
+            child: Icon(
+              icon,
+              size: 100,
+              color: Colors.white.withValues(alpha: 0.1),
             ),
-            child: Text(
-              hasPendingApp ? 'Pending' : (isRejected ? 'Review' : 'Get Started'),
-              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(icon, color: Colors.white, size: 20),
+                          const SizedBox(width: 10),
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              color: Colors.white, 
+                              fontSize: 16, 
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 30),
+                        child: Text(
+                          message,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.9), 
+                            fontSize: 12, 
+                            fontWeight: FontWeight.w500,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 30),
+                        child: ElevatedButton(
+                          onPressed: hasPendingApp ? null : () => context.push('/become-plug'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: baseColor,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            buttonText,
+                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (hasPendingApp)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 12),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],

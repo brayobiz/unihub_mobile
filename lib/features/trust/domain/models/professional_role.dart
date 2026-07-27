@@ -4,7 +4,8 @@ enum ProfessionalRole {
   tutor,
   serviceProvider,
   technician,
-  business;
+  business,
+  notesContributor;
 
   String get label {
     switch (this) {
@@ -14,6 +15,7 @@ enum ProfessionalRole {
       case ProfessionalRole.serviceProvider: return 'Verified Service Provider';
       case ProfessionalRole.technician: return 'Verified Technician';
       case ProfessionalRole.business: return 'Verified Business';
+      case ProfessionalRole.notesContributor: return 'Notes Contributor';
     }
   }
 }

@@ -320,16 +320,17 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
     final isProcessing = authState.isLoading || _localLoading;
 
     // Listen for auth errors
-    ref.listen<AsyncValue<void>>(authControllerProvider, (previous, next) {
-      next.whenOrNull(
-        error: (err, _) => ScaffoldMessenger.of(context).showSnackBar(
+    ref.listen<AuthControllerState>(authControllerProvider, (previous, next) {
+      if (next.hasError && !next.isLoading) {
+        final err = next.error;
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(err.toString().replaceAll('Exception: ', '')),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
           ),
-        ),
-      );
+        );
+      }
     });
 
     return Scaffold(

@@ -104,7 +104,9 @@ class AuthorizationService {
       case UlifyFeature.notesUpload:
         if (user.isAdmin) return AccessStatus.granted;
         if (!user.isEmailVerified) return AccessStatus.needsEmailVerification;
-        return user.roles.contains('class_rep') ? AccessStatus.granted : AccessStatus.needsRole;
+        return (user.roles.contains('class_rep') || user.verifiedRoles.contains('notesContributor')) 
+            ? AccessStatus.granted 
+            : AccessStatus.needsRole;
 
       case UlifyFeature.housingPost:
         // Must be a verified plug OR a business
