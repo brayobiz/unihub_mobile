@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/utils/category_utils.dart';
 import '../auth/shared/providers.dart';
@@ -54,8 +55,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   void _scrollListener() {
     if (_scrollController.hasClients) {
-      // Threshold for collapse (expandedHeight is 110)
-      final isCollapsed = _scrollController.offset > 60;
+      // Threshold for collapse (expandedHeight is 120)
+      final isCollapsed = _scrollController.offset > 70;
       if (isCollapsed != _isCollapsed) {
         setState(() {
           _isCollapsed = isCollapsed;
@@ -137,7 +138,9 @@ class _DashboardAppBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Optimization: only watch necessary user properties to avoid reloads on presence updates
+    final theme = Theme.of(context);
+    
+    // Optimization: only watch necessary user properties
     final userData = ref.watch(appUserProvider.select((u) {
       final user = u.valueOrNull;
       if (user == null) return null;
@@ -155,15 +158,16 @@ class _DashboardAppBar extends ConsumerWidget {
       return 'Good Evening';
     }
 
-    final theme = Theme.of(context);
+    final String greetingText = '${getGreeting()}, ${userData?.fullName.split(' ').first ?? 'Student'}! 🎓';
     final contentColor = isCollapsed ? theme.colorScheme.onSurface : Colors.white;
 
     return SliverAppBar(
-      expandedHeight: 110,
+      expandedHeight: 120,
       pinned: true,
       backgroundColor: theme.colorScheme.surface,
       elevation: 0,
       scrolledUnderElevation: 0,
+      surfaceTintColor: Colors.transparent,
       leading: Builder(
         builder: (context) => IconButton(
           icon: Icon(Icons.menu_rounded, color: contentColor),
@@ -187,7 +191,7 @@ class _DashboardAppBar extends ConsumerWidget {
               padding: const EdgeInsets.only(right: 16),
               child: CircleAvatar(
                 radius: 16,
-                backgroundColor: isCollapsed ? theme.colorScheme.primary.withOpacity(0.1) : Colors.white24,
+                backgroundColor: isCollapsed ? theme.colorScheme.primary.withValues(alpha: 0.1) : Colors.white24,
                 backgroundImage: userData?.photoUrl != null ? NetworkImage(userData!.photoUrl!) : null,
                 child: userData?.photoUrl == null 
                     ? Text(
@@ -201,6 +205,19 @@ class _DashboardAppBar extends ConsumerWidget {
         ),
       ],
       flexibleSpace: FlexibleSpaceBar(
+        centerTitle: false,
+        titlePadding: EdgeInsetsDirectional.only(
+          start: isCollapsed ? 52 : 20,
+          bottom: isCollapsed ? 16 : 36,
+        ),
+        title: Text(
+          greetingText,
+          style: GoogleFonts.plusJakartaSans(
+            color: contentColor,
+            fontSize: isCollapsed ? 15 : 19,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
         background: Container(
           decoration: const BoxDecoration(
             color: AppColors.primary,
@@ -211,65 +228,21 @@ class _DashboardAppBar extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${getGreeting()}, ${userData?.fullName.split(' ').first ?? 'Student'}! 🎓',
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                // The Row with Verify button
+                if (userData != null && !userData.isEmailVerified)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 24), // Leave room for title
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        _buildVerifyEmailButton(context),
+                      ],
                     ),
-                    if (userData != null && !userData.isEmailVerified)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 12),
-                        child: GestureDetector(
-                          onTap: () => context.push('/verify-email'),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.amber.shade400,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.mark_email_unread_rounded, color: Colors.black87, size: 16),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Verify Email',
-                                  style: TextStyle(
-                                    color: Colors.black.withOpacity(0.8), 
-                                    fontSize: 11, 
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.5,
-                                  )
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 2),
+                  ),
                 Text(
                   'Explore your campus ecosystem',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
@@ -277,6 +250,42 @@ class _DashboardAppBar extends ConsumerWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVerifyEmailButton(BuildContext context) {
+    return GestureDetector(
+      onTap: () => context.push('/verify-email'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.amber.shade400,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.mark_email_unread_rounded, color: Colors.black87, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              'Verify Email',
+              style: TextStyle(
+                color: Colors.black.withValues(alpha: 0.8), 
+                fontSize: 11, 
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
+              )
+            ),
+          ],
         ),
       ),
     );
