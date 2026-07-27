@@ -164,7 +164,7 @@ class _AddHousingScreenState extends ConsumerState<AddHousingScreen> {
               ),
               const SizedBox(height: 16),
               Text(
-                !isVerified 
+                !isVerified
                     ? 'To list properties on UniHub, you must first verify your platform identity via the Trust Center.'
                     : 'To list properties on UniHub, you must activate the Housing Plug role for your account.',
                 style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 16, height: 1.5),

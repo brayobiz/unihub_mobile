@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:unihub_mobile/features/trust/domain/models/professional_role.dart';
-import 'package:unihub_mobile/features/trust/domain/models/verification_application.dart';
-import 'package:unihub_mobile/features/trust/presentation/providers/trust_providers.dart';
 import '../../models/feed_type.dart';
 import '../shared/feed_repository.dart';
 import '../../widgets/feed/feed_card.dart';
 import '../auth/shared/providers.dart';
-import '../shared/add_feed_item_screen.dart';
 import '../../widgets/notification_badge.dart';
 import '../campus_filter/presentation/widgets/campus_filter_selector.dart';
 import '../campus_filter/shared/providers.dart';
@@ -54,9 +50,22 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
             color: theme.colorScheme.onSurface,
           )),
         iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
-        actions: const [
-          NotificationBadge(module: 'gig'),
-          SizedBox(width: 8),
+        actions: [
+          TextButton.icon(
+            onPressed: () => AuthorizationGuard.run(
+              context, 
+              ref, 
+              feature: UlifyFeature.gigsPost, 
+              action: () => context.push('/add-feed-item', extra: FeedType.gig),
+            ),
+            icon: Icon(Icons.add_circle_outline_rounded, size: 20, color: theme.colorScheme.primary),
+            label: Text(
+              'Post Gig', 
+              style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+          ),
+          const NotificationBadge(module: 'gig'),
+          const SizedBox(width: 8),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(70),
@@ -105,7 +114,7 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
                           Container(
                             padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
@@ -159,7 +168,7 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
 
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: filteredItems.length + (filteredItems.length > 0 ? (filteredItems.length ~/ adInterval) : 0),
+                  itemCount: filteredItems.length + (filteredItems.isNotEmpty ? (filteredItems.length ~/ adInterval) : 0),
                   itemBuilder: (context, index) {
                     // If it's an ad position
                     if ((index + 1) % (adInterval + 1) == 0) {
@@ -211,148 +220,151 @@ class _GigsScreenState extends ConsumerState<GigsScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'gigs_fab',
-        onPressed: () => AuthorizationGuard.run(
-          context, 
-          ref, 
-          feature: UlifyFeature.gigsPost, 
-          action: () => context.push('/add-feed-item', extra: FeedType.gig),
-        ),
-        label: const Text('Create Gig', style: TextStyle(fontWeight: FontWeight.bold)),
-        icon: const Icon(Icons.add_task_rounded),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: Colors.white,
-      ),
     );
   }
 
   Widget _buildRoleApplicationBanner(BuildContext context, WidgetRef ref) {
+    // Optimization: watch only verification-relevant properties
+    final userData = ref.watch(appUserProvider.select((u) {
+      final user = u.valueOrNull;
+      if (user == null) return null;
+      return (
+        isVerified: user.isVerified,
+        identityStatus: user.identityStatus,
+      );
+    }));
+
+    final bool isVerified = userData?.isVerified ?? false;
+    
+    // If user is already identity verified, we remove the suggestion completely
+    if (isVerified) return const SizedBox.shrink();
+
+    final bool isIdentityPending = userData?.identityStatus == 'pending';
+    final bool isIdentityRejected = userData?.identityStatus == 'rejected';
+
     final theme = Theme.of(context);
-    final user = ref.watch(appUserProvider).valueOrNull;
-    if (user == null) return const SizedBox.shrink();
-
-    final isVerified = user.isVerified;
-    final isIdentityPending = user.identityStatus == 'pending';
-    final isIdentityRejected = user.identityStatus == 'rejected';
-
-    // Roles most relevant to Gigs
-    final roles = [
-      ProfessionalRole.tutor,
-      ProfessionalRole.serviceProvider,
-      ProfessionalRole.technician,
-    ];
-
-    // Filter to roles not yet verified
-    final pendingRoles = roles.where((r) => !user.verifiedRoles.contains(r.name)).toList();
-    if (pendingRoles.isEmpty) return const SizedBox.shrink();
+    
+    // Banner Configuration - Reusing Marketplace Style
+    Color baseColor = theme.colorScheme.primary;
+    IconData icon = Icons.verified_user_rounded;
+    String title = 'Identity Required';
+    String message = 'Verify your platform identity to unlock all student gig features.';
+    String buttonText = 'Verify Identity';
+    
+    if (isIdentityRejected) {
+      baseColor = theme.colorScheme.error;
+      icon = Icons.error_outline_rounded;
+      title = 'Identity Rejected';
+      message = 'Your platform identity was not approved. Please update it to continue.';
+      buttonText = 'Trust Center';
+    } else if (isIdentityPending) {
+      baseColor = Colors.orange;
+      icon = Icons.auto_awesome_rounded;
+      title = 'Verification Pending';
+      message = 'Our team is reviewing your profile. You\'ll receive a notification once approved.';
+      buttonText = ''; // Hide button during pending state
+    } else if (!isVerified) {
+      baseColor = theme.colorScheme.primary;
+      icon = Icons.security_rounded;
+      title = 'Identity Required';
+      message = 'Verify your platform identity to unlock all student gig features.';
+      buttonText = 'Verify Identity';
+    }
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      color: (isIdentityRejected) 
-          ? theme.colorScheme.errorContainer.withValues(alpha: 0.1) 
-          : theme.colorScheme.primaryContainer.withValues(alpha: 0.1),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                isIdentityRejected ? Icons.error_outline_rounded : (!isVerified ? Icons.lock_outline_rounded : Icons.verified_user_outlined), 
-                size: 20, 
-                color: isIdentityRejected ? theme.colorScheme.error : theme.colorScheme.primary
-              ),
-              const SizedBox(width: 8),
-              Text(
-                isIdentityRejected ? 'Identity Rejected' : (!isVerified ? 'Verification Required' : 'Professional Profiles'),
-                style: TextStyle(
-                  fontWeight: FontWeight.w800, 
-                  color: isIdentityRejected ? theme.colorScheme.error : theme.colorScheme.primary, 
-                  fontSize: 13
-                ),
-              ),
-            ],
+      margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [baseColor, baseColor.withValues(alpha: 0.8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: baseColor.withValues(alpha: 0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
-          if (!isVerified || isIdentityPending || isIdentityRejected) ...[
-            const SizedBox(height: 8),
-            Text(
-              isIdentityRejected 
-                ? 'Your identity verification was not approved. Please fix it in the Trust Center.'
-                : (isIdentityPending 
-                    ? 'Your identity is under review. You can apply for these roles once approved.'
-                    : 'Verify your platform identity to apply for professional badges.'),
-              style: TextStyle(
-                fontSize: 12, 
-                color: isIdentityRejected ? theme.colorScheme.error : theme.colorScheme.onSurfaceVariant
-              ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          // Background Decorative Icon
+          Positioned(
+            right: -15,
+            bottom: -15,
+            child: Icon(
+              icon,
+              size: 100,
+              color: Colors.white.withValues(alpha: 0.1),
             ),
-            if (!isIdentityPending) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => context.push(isIdentityRejected ? '/trust-center' : '/verify-identity'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: isIdentityRejected ? theme.colorScheme.error : theme.colorScheme.primary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: Text(isIdentityRejected ? 'Fix Identity Issues' : 'Verify Identity'),
-                ),
-              ),
-            ],
-          ] else ...[
-            const SizedBox(height: 12),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: pendingRoles.map((role) {
-                  final appAsync = ref.watch(applicationByRoleProvider(role));
-                  
-                  return appAsync.when(
-                    data: (app) {
-                      final isPending = app?.status == VerificationStatus.pending;
-                      final isRejected = app?.status == VerificationStatus.rejected;
-                      
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 10),
-                        child: ActionChip(
-                          onPressed: isPending ? null : () => context.push('/verify-professional/${role.name}'),
-                          backgroundColor: isRejected 
-                              ? theme.colorScheme.errorContainer.withValues(alpha: 0.2) 
-                              : (isPending ? theme.colorScheme.surfaceContainerHighest : theme.colorScheme.surface),
-                          side: BorderSide(
-                            color: isRejected 
-                                ? theme.colorScheme.error.withValues(alpha: 0.2) 
-                                : theme.colorScheme.outlineVariant
-                          ),
-                          label: Text(
-                            isRejected ? 'Apply ${role.label} (Rejected)' : (isPending ? '${role.label} (Pending)' : 'Apply as ${role.label}'),
-                            style: TextStyle(
-                              fontSize: 12, 
-                              fontWeight: FontWeight.bold,
-                              color: isRejected 
-                                  ? theme.colorScheme.error 
-                                  : (isPending ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.primary),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(icon, color: Colors.white, size: 20),
+                          const SizedBox(width: 10),
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
                             ),
                           ),
-                          avatar: Icon(
-                            isRejected ? Icons.error_outline : (isPending ? Icons.access_time : Icons.add_circle_outline),
-                            size: 14,
-                            color: isRejected 
-                                ? theme.colorScheme.error 
-                                : (isPending ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.primary),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 30),
+                        child: Text(
+                          message,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            height: 1.4,
                           ),
                         ),
-                      );
-                    },
-                    loading: () => const SizedBox.shrink(),
-                    error: (_, __) => const SizedBox.shrink(),
-                  );
-                }).toList(),
-              ),
+                      ),
+                      if (buttonText.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 30),
+                          child: ElevatedButton(
+                            onPressed: () => context.push(isIdentityRejected ? '/trust-center' : '/verify-identity'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: baseColor,
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              elevation: 0,
+                            ),
+                            child: Text(
+                              buttonText, 
+                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );

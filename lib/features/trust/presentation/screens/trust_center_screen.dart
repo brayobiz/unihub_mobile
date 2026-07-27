@@ -115,57 +115,6 @@ class TrustCenterScreen extends ConsumerWidget {
                 ),
               ),
 
-              // 3.5 Professional Roles
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 32, 16, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Professional Status',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          color: theme.colorScheme.onSurface,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Roles you can apply for to unlock specialized features.',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: userApplicationsAsync.when(
-                    data: (apps) => Column(
-                      children: ProfessionalRole.values.map((role) {
-                        final app = apps.where((a) => a.role == role).firstOrNull;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _buildRoleCard(context, user, role, app),
-                        );
-                      }).toList(),
-                    ),
-                    loading: () => const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Center(child: CircularProgressIndicator()),
-                    ),
-                    error: (e, _) => _buildErrorCard(context, 'Roles Error: $e'),
-                  ),
-                ),
-              ),
-
               // 4. Educational Section
               SliverToBoxAdapter(
                 child: Padding(
@@ -873,102 +822,10 @@ class TrustCenterScreen extends ConsumerWidget {
             Divider(height: 32, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
             _buildBreakdownItem(context, Icons.school_rounded, 'Student Verification', user.isStudentVerified ? 'Verified (+20%)' : 'Not Verified', user.isStudentVerified),
             Divider(height: 32, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-            _buildBreakdownItem(context, Icons.verified_user_rounded, 'Professional Roles', user.verifiedRoles.isNotEmpty ? '${user.verifiedRoles.length} Roles (+${(user.verifiedRoles.length.clamp(0, 3) * 5).toInt()}%)' : 'No verified roles', user.verifiedRoles.isNotEmpty),
-            Divider(height: 32, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
             _buildBreakdownItem(context, Icons.person_outline_rounded, 'Profile Completion', '${(user.profileCompletion * 100).toInt()}% (+${(user.profileCompletion * 10).toInt()}%)', user.profileCompletion > 0),
             const SizedBox(height: 40),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildRoleCard(BuildContext context, AppUser user, ProfessionalRole role, VerificationApplication? app) {
-    final theme = Theme.of(context);
-    final bool isVerified = user.verifiedRoles.contains(role.name);
-    final bool isPending = app?.status == VerificationStatus.pending;
-    final bool isRejected = app?.status == VerificationStatus.rejected;
-    
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: isVerified ? const Color(0xFF10B981) : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: (isVerified ? const Color(0xFF10B981) : theme.colorScheme.primary).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  _getRoleIcon(role),
-                  color: isVerified ? const Color(0xFF10B981) : theme.colorScheme.primary,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      role.label,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                    Text(
-                      isVerified 
-                        ? 'Professional status active' 
-                        : isPending 
-                          ? 'Application under review' 
-                          : isRejected 
-                            ? 'Application rejected'
-                            : 'Click to apply for this role',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: isRejected ? theme.colorScheme.error : theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (isVerified)
-                const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981))
-              else if (isPending)
-                _buildStatusBadge(context, 'Pending', Colors.orange)
-              else if (isRejected)
-                _buildStatusBadge(context, 'Rejected', theme.colorScheme.error)
-            ],
-          ),
-          if (!isVerified && !isPending) ...[
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () => context.push('/verify-professional/${role.name}'),
-                style: OutlinedButton.styleFrom(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                child: Text(isRejected ? 'Re-apply as ${role.label}' : 'Apply as ${role.label}', 
-                  style: const TextStyle(fontWeight: FontWeight.w700)),
-              ),
-            ),
-          ],
-        ],
       ),
     );
   }

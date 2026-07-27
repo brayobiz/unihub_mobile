@@ -1,7 +1,9 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/utils/category_utils.dart';
 import '../auth/shared/providers.dart';
@@ -41,7 +43,7 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   final ScrollController _scrollController = ScrollController();
-  bool _isCollapsed = false;
+  double _collapseFactor = 0.0;
 
   @override
   void initState() {
@@ -55,11 +57,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   void _scrollListener() {
     if (_scrollController.hasClients) {
-      // Threshold for collapse (expandedHeight is 120)
-      final isCollapsed = _scrollController.offset > 70;
-      if (isCollapsed != _isCollapsed) {
+      // Threshold for collapse transition is roughly 70 pixels
+      final double factor = (_scrollController.offset / 70.0).clamp(0.0, 1.0);
+      if ((factor - _collapseFactor).abs() > 0.005) {
         setState(() {
-          _isCollapsed = isCollapsed;
+          _collapseFactor = factor;
         });
       }
     }
@@ -90,7 +92,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           controller: _scrollController,
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           slivers: [
-            _DashboardAppBar(isCollapsed: _isCollapsed),
+            _DashboardAppBar(collapseFactor: _collapseFactor),
             const SliverToBoxAdapter(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -133,8 +135,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 }
 
 class _DashboardAppBar extends ConsumerWidget {
-  final bool isCollapsed;
-  const _DashboardAppBar({required this.isCollapsed});
+  final double collapseFactor;
+  const _DashboardAppBar({required this.collapseFactor});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -158,11 +160,33 @@ class _DashboardAppBar extends ConsumerWidget {
       return 'Good Evening';
     }
 
-    final String greetingText = '${getGreeting()}, ${userData?.fullName.split(' ').first ?? 'Student'}! 🎓';
-    final contentColor = isCollapsed ? theme.colorScheme.onSurface : Colors.white;
+    IconData getGreetingIcon() {
+      final hour = DateTime.now().hour;
+      if (hour < 6) return Icons.nights_stay_rounded;
+      if (hour < 12) return Icons.wb_sunny_rounded;
+      if (hour < 17) return Icons.wb_cloudy_rounded;
+      if (hour < 20) return Icons.wb_twilight_rounded;
+      return Icons.nightlight_round;
+    }
+
+    Color getGreetingIconColor() {
+      final hour = DateTime.now().hour;
+      if (hour < 6) return Colors.indigoAccent.shade100;
+      if (hour < 12) return Colors.amber;
+      if (hour < 17) return Colors.lightBlueAccent.shade100;
+      if (hour < 20) return Colors.orangeAccent;
+      return Colors.yellow.shade200;
+    }
+
+    final String greetingText = '${getGreeting()}, ${userData?.fullName.split(' ').first ?? 'Student'}!';
+    
+    // Interpolate colors and dimensions based on collapseFactor
+    final contentColor = Color.lerp(Colors.white, theme.colorScheme.onSurface, collapseFactor)!;
+    final avatarBgColor = Color.lerp(Colors.white24, theme.colorScheme.primary.withValues(alpha: 0.1), collapseFactor);
+    final avatarTextColor = Color.lerp(Colors.white, theme.colorScheme.primary, collapseFactor);
 
     return SliverAppBar(
-      expandedHeight: 120,
+      expandedHeight: 100,
       pinned: true,
       backgroundColor: theme.colorScheme.surface,
       elevation: 0,
@@ -191,12 +215,12 @@ class _DashboardAppBar extends ConsumerWidget {
               padding: const EdgeInsets.only(right: 16),
               child: CircleAvatar(
                 radius: 16,
-                backgroundColor: isCollapsed ? theme.colorScheme.primary.withValues(alpha: 0.1) : Colors.white24,
-                backgroundImage: userData?.photoUrl != null ? NetworkImage(userData!.photoUrl!) : null,
+                backgroundColor: avatarBgColor,
+                backgroundImage: userData?.photoUrl != null ? CachedNetworkImageProvider(userData!.photoUrl!) : null,
                 child: userData?.photoUrl == null 
                     ? Text(
                         userData?.fullName.isNotEmpty == true ? userData!.fullName[0].toUpperCase() : 'U',
-                        style: TextStyle(color: isCollapsed ? theme.colorScheme.primary : Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: avatarTextColor, fontSize: 12, fontWeight: FontWeight.bold),
                       )
                     : null,
               ),
@@ -206,47 +230,59 @@ class _DashboardAppBar extends ConsumerWidget {
       ],
       flexibleSpace: FlexibleSpaceBar(
         centerTitle: false,
+        expandedTitleScale: 1.0, // We handle scaling manually via fontSize for more control
         titlePadding: EdgeInsetsDirectional.only(
-          start: isCollapsed ? 52 : 20,
-          bottom: isCollapsed ? 16 : 36,
+          start: lerpDouble(20, 52, collapseFactor)!,
+          bottom: lerpDouble(20, 16, collapseFactor)!,
         ),
-        title: Text(
-          greetingText,
-          style: GoogleFonts.plusJakartaSans(
-            color: contentColor,
-            fontSize: isCollapsed ? 15 : 19,
-            fontWeight: FontWeight.w800,
-          ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      greetingText,
+                      style: GoogleFonts.plusJakartaSans(
+                        color: contentColor,
+                        fontSize: lerpDouble(19, 15, collapseFactor)!,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    getGreetingIcon(),
+                    color: getGreetingIconColor(),
+                    size: lerpDouble(20, 16, collapseFactor),
+                  ),
+                ],
+              ),
+            ),
+            if (userData != null && !userData.isEmailVerified)
+              Opacity(
+                opacity: (1.0 - (collapseFactor * 2)).clamp(0.0, 1.0),
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: _buildVerifyEmailButton(context),
+                ),
+              ),
+          ],
         ),
         background: Container(
           decoration: const BoxDecoration(
             color: AppColors.primary,
           ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+          child: const Padding(
+            padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                // The Row with Verify button
-                if (userData != null && !userData.isEmailVerified)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 24), // Leave room for title
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        _buildVerifyEmailButton(context),
-                      ],
-                    ),
-                  ),
-                Text(
-                  'Explore your campus ecosystem',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                SizedBox(height: 40), // Tighter space for the title
               ],
             ),
           ),

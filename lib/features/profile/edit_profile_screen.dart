@@ -298,7 +298,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -310,16 +310,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     color: theme.colorScheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(icon, size: 20, color: theme.colorScheme.primary),
+                  child: Icon(icon, size: 18, color: theme.colorScheme.primary),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Text(
                   title,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface, letterSpacing: -0.5),
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface, letterSpacing: -0.5),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             ...children,
           ],
         ),
@@ -424,7 +424,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               fillColor: readOnly ? theme.colorScheme.surfaceVariant.withValues(alpha: 0.2) : theme.colorScheme.surface,
               hintText: 'Enter $label',
               hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontWeight: FontWeight.normal),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),

@@ -1,7 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import '../../features/shared/feed_repository.dart';
@@ -78,7 +80,7 @@ class FeedCard extends ConsumerWidget {
                       Text(
                         item.type == FeedType.confession ? 'Anonymous' : item.authorName,
                         style: TextStyle(
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w600,
                           color: theme.colorScheme.onSurface,
                         ),
                       ),
@@ -139,7 +141,7 @@ class FeedCard extends ConsumerWidget {
               Text(
                 item.title,
                 style: TextStyle(
-                  fontWeight: FontWeight.bold, 
+                  fontWeight: FontWeight.w600, 
                   fontSize: 16,
                   color: theme.colorScheme.onSurface,
                 ),
@@ -171,7 +173,7 @@ class FeedCard extends ConsumerWidget {
                     'Read More...',
                     style: TextStyle(
                       color: color,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
@@ -180,7 +182,7 @@ class FeedCard extends ConsumerWidget {
               const SizedBox(height: 8),
               Text(
                 item.price!,
-                style: TextStyle(color: color, fontWeight: FontWeight.bold),
+                style: TextStyle(color: color, fontWeight: FontWeight.w600),
               ),
             ],
             
@@ -213,15 +215,21 @@ class FeedCard extends ConsumerWidget {
                   icon: isLiked ? Icons.favorite : Icons.favorite_border,
                   label: item.likesCount.toString(),
                   color: isLiked ? Colors.red : theme.colorScheme.onSurfaceVariant,
-                  onTap: onLike,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    if (onLike != null) onLike!();
+                  },
                 ),
                 const SizedBox(width: 16),
                 _InteractionButton(
                   context: context,
                   icon: Icons.chat_bubble_outline,
-                  label: 'Comment',
+                  label: item.commentsCount.toString(),
                   color: theme.colorScheme.onSurfaceVariant,
-                  onTap: () => _showComments(context, ref),
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    context.push('/feed-detail/${item.id}', extra: item);
+                  },
                 ),
                 const SizedBox(width: 16),
                 _InteractionButton(
@@ -229,7 +237,14 @@ class FeedCard extends ConsumerWidget {
                   icon: Icons.share_outlined,
                   label: 'Share',
                   color: theme.colorScheme.onSurfaceVariant,
-                  onTap: () => _shareItem(context, ref),
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    ref.read(feedRepositoryProvider).incrementShareCount(item.id);
+                    Share.share(
+                      'Check out this post on Ulify:\n\n"${item.title.isNotEmpty ? item.title : item.subtitle}"\n\nJoin the campus community on Ulify!',
+                      subject: item.title.isNotEmpty ? item.title : 'Campus Post',
+                    );
+                  },
                 ),
                 const Spacer(),
                 Icon(icon, size: 16, color: color.withValues(alpha: 0.5)),
@@ -345,144 +360,6 @@ class FeedCard extends ConsumerWidget {
               );
             }, 
             child: const Text('Block', style: TextStyle(color: AppColors.error))
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showComments(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _CommentsSheet(item: item),
-    );
-  }
-}
-
-class _CommentsSheet extends ConsumerStatefulWidget {
-  final FeedItem item;
-  const _CommentsSheet({required this.item});
-
-  @override
-  ConsumerState<_CommentsSheet> createState() => _CommentsSheetState();
-}
-
-class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
-  final _commentController = TextEditingController();
-
-  @override
-  void dispose() {
-    _commentController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final commentsAsync = ref.watch(commentsStreamProvider(widget.item.id));
-    final user = ref.watch(appUserProvider).valueOrNull;
-
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.75,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 40, 
-            height: 4, 
-            decoration: BoxDecoration(
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), 
-              borderRadius: BorderRadius.circular(2)
-            )
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text('Comments', 
-              style: TextStyle(
-                fontSize: 18, 
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onSurface,
-              )
-            ),
-          ),
-          Expanded(
-            child: commentsAsync.when(
-              data: (comments) => comments.isEmpty
-                  ? Center(
-                      child: Text('No comments yet.', 
-                        style: TextStyle(color: theme.colorScheme.onSurfaceVariant)
-                      )
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: comments.length,
-                      itemBuilder: (context, index) {
-                        final comment = comments[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(comment['userName'] ?? 'User', 
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold, 
-                                  fontSize: 13,
-                                  color: theme.colorScheme.onSurface,
-                                )
-                              ),
-                              const SizedBox(height: 2),
-                              Text(comment['text'] ?? '',
-                                style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-              loading: () => Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
-              error: (err, _) => Center(child: Text('Error: $err', style: TextStyle(color: theme.colorScheme.error))),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 16, left: 16, right: 16, top: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _commentController,
-                    style: TextStyle(color: theme.colorScheme.onSurface),
-                    decoration: InputDecoration(
-                      hintText: 'Add a comment...',
-                      hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
-                      filled: true,
-                      fillColor: theme.colorScheme.surfaceContainerHighest,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.send, color: theme.colorScheme.primary),
-                  onPressed: () {
-                    if (_commentController.text.isNotEmpty && user != null) {
-                      ref.read(feedRepositoryProvider).addComment(
-                        itemId: widget.item.id,
-                        userId: user.uid,
-                        userName: user.fullName,
-                        text: _commentController.text.trim(),
-                      );
-                      _commentController.clear();
-                    }
-                  },
-                ),
-              ],
-            ),
           ),
         ],
       ),

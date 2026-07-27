@@ -357,16 +357,16 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
         _buildActionButton(Icons.history_rounded, 'Activity History', () => context.push('/activity-history')),
         
         if (widget.user.accountType != 'business') ...[
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           _buildBusinessUpgradeBanner(context),
         ],
 
-        const SizedBox(height: 32),
+        const SizedBox(height: 24),
         Text(
           'Preferences',
           style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface, letterSpacing: -0.5),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         _buildActionButton(Icons.settings_outlined, 'App Settings', () => context.push('/settings')),
       ],
     );
@@ -381,14 +381,14 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
           'Support',
           style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface, letterSpacing: -0.5),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         _buildActionButton(Icons.help_outline, 'Help Center', () => context.push('/help')),
-        const SizedBox(height: 32),
+        const SizedBox(height: 24),
         Text(
           'Account',
           style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface, letterSpacing: -0.5),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         _buildActionButton(
           Icons.logout_rounded, 
           'Sign Out', 
@@ -813,16 +813,18 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
         clipBehavior: Clip.antiAlias,
         child: ListTile(
           leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: (isDestructive ? AppColors.error : theme.colorScheme.primary).withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12)),
-            child: Icon(icon, color: isDestructive ? AppColors.error : theme.colorScheme.primary, size: 20),
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(color: (isDestructive ? AppColors.error : theme.colorScheme.primary).withValues(alpha: 0.05), borderRadius: BorderRadius.circular(10)),
+            child: Icon(icon, color: isDestructive ? AppColors.error : theme.colorScheme.primary, size: 18),
           ),
-          title: Text(title, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: isDestructive ? AppColors.error : theme.colorScheme.onSurface)),
+          title: Text(title, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: isDestructive ? AppColors.error : theme.colorScheme.onSurface)),
           subtitle: subtitle != null ? Text(subtitle, style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)) : null,
-          trailing: Icon(Icons.chevron_right_rounded, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), size: 20),
+          trailing: Icon(Icons.chevron_right_rounded, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), size: 18),
           onTap: onTap,
+          dense: subtitle == null,
+          visualDensity: VisualDensity.compact,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
         ),
       ),
     );

@@ -40,6 +40,7 @@ class FeedItem {
   final List<String> images;
   final int likesCount;
   final List<String> likedBy;
+  final int commentsCount;
   final String? category;
 
   FeedItem({
@@ -57,6 +58,7 @@ class FeedItem {
     this.images = const [],
     this.likesCount = 0,
     this.likedBy = const [],
+    this.commentsCount = 0,
     this.category,
   });
 
@@ -80,8 +82,9 @@ class FeedItem {
       createdAt: parseDate(json['createdAt']),
       deadline: json['deadline'] != null ? parseDate(json['deadline']) : null,
       images: List<String>.from(json['images'] ?? <String>[]),
-      likesCount: json['likesCount'] ?? 0,
+      likesCount: (json['likesCount'] as num?)?.toInt() ?? 0,
       likedBy: List<String>.from(json['likedBy'] ?? <String>[]),
+      commentsCount: (json['commentsCount'] as num?)?.toInt() ?? 0,
       category: json['category'],
     );
   }
@@ -101,6 +104,7 @@ class FeedItem {
     'images': images,
     'likesCount': likesCount,
     'likedBy': likedBy,
+    'commentsCount': commentsCount,
     'category': category,
   };
 }
@@ -258,15 +262,29 @@ class FeedRepository {
     required String itemId,
     required String userId,
     required String userName,
+    String? userPhotoUrl,
     required String text,
   }) async {
     try {
-      await _firestore.collection('feed').doc(itemId).collection('comments').add({
+      final batch = _firestore.batch();
+      
+      // 1. Add comment to subcollection
+      final commentRef = _firestore.collection('feed').doc(itemId).collection('comments').doc();
+      batch.set(commentRef, {
         'userId': userId,
         'userName': userName,
+        'userPhotoUrl': userPhotoUrl,
         'text': text,
         'createdAt': FieldValue.serverTimestamp(),
       });
+
+      // 2. Increment comment count on main document
+      final feedRef = _firestore.collection('feed').doc(itemId);
+      batch.update(feedRef, {
+        'commentsCount': FieldValue.increment(1),
+      });
+
+      await batch.commit();
     } catch (e) {
       throw Exception(AppErrorHandler.mapError(e));
     }
@@ -304,4 +322,35 @@ class FeedRepository {
       throw Exception(AppErrorHandler.mapError(e));
     }
   }
+
+  Future<void> toggleSaveFeedItem(String userId, String itemId) async {
+    try {
+      final docRef = _firestore.collection('users').doc(userId).collection('saved_feed_items').doc(itemId);
+      final doc = await docRef.get();
+
+      if (doc.exists) {
+        await docRef.delete();
+      } else {
+        await docRef.set({
+          'itemId': itemId,
+          'savedAt': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      throw Exception(AppErrorHandler.mapError(e));
+    }
+  }
+
+  Stream<List<String>> watchSavedFeedItemIds(String userId) {
+    return _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('saved_feed_items')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => doc.id).toList());
+  }
 }
+
+final savedFeedItemIdsProvider = StreamProvider.autoDispose.family<List<String>, String>((ref, userId) {
+  return ref.watch(feedRepositoryProvider).watchSavedFeedItemIds(userId);
+});

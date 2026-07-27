@@ -1,17 +1,21 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:uuid/uuid.dart';
+import '../../app/theme/app_colors.dart';
 import '../../models/feed_type.dart';
 import '../auth/shared/providers.dart';
 import 'feed_repository.dart';
-import 'storage_repository.dart';
+import 'add_feed_item_controller.dart';
 import 'package:unihub_mobile/core/widgets/creation_success_dialog.dart';
 import '../marketplace/domain/models/marketplace_categories.dart';
 import '../gigs/domain/models/gig_categories.dart';
+import '../confessions/domain/models/confession_categories.dart';
+import '../community/domain/models/community_categories.dart';
 
 class AddFeedItemScreen extends ConsumerStatefulWidget {
   final FeedType type;
@@ -28,8 +32,6 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
   final _priceController = TextEditingController();
   DateTime? _selectedDeadline;
   final List<XFile> _selectedImages = [];
-  bool _isLoading = false;
-  double _uploadProgress = 0;
   String? _selectedCategory;
 
   @override
@@ -75,97 +77,87 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-
+    
+    final isConfession = widget.type == FeedType.confession;
     final content = _contentController.text.trim();
-    final user = ref.read(appUserProvider).valueOrNull;
-    if (user == null) return;
 
-    setState(() {
-      _isLoading = true;
-      _uploadProgress = 0;
-    });
+    // Harden Validation: Minimum length for quality content
+    if (content.length < (isConfession ? 10 : 3)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(isConfession ? 'Confession too short. Please express yourself a bit more.' : 'Post content too short.'))
+      );
+      return;
+    }
 
-    try {
-      final itemId = const Uuid().v4();
-      final imageUrls = <String>[];
+    if (widget.type == FeedType.gig && _selectedCategory == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a category.'))
+      );
+      return;
+    }
+
+    final success = await ref.read(addFeedItemControllerProvider.notifier).submit(
+      type: widget.type,
+      title: _titleController.text.trim(),
+      content: content,
+      price: _priceController.text.trim(),
+      deadline: _selectedDeadline,
+      images: _selectedImages.map((e) => File(e.path)).toList(),
+      category: _selectedCategory,
+    );
       
-      // Upload images if any
-      for (var i = 0; i < _selectedImages.length; i++) {
-        final url = await ref.read(storageRepositoryProvider).uploadFile(
-          path: 'feed/$itemId',
-          id: 'img_$i',
-          file: File(_selectedImages[i].path),
-          onProgress: (sent, total) {
-            // Since we have multiple images, we approximate the total progress
-            setState(() {
-              _uploadProgress = (i / _selectedImages.length) + 
-                               ((sent / total) / _selectedImages.length);
-            });
-          },
-        );
-        imageUrls.add(url);
+    if (success && mounted) {
+      String successTitle = 'Post Shared!';
+      String successMsg = 'Your post is now visible in the community feed.';
+      
+      if (widget.type == FeedType.gig) {
+        successTitle = 'Gig Listed!';
+        successMsg = 'Your student gig is now live. Interested students can now apply.';
+      } else if (widget.type == FeedType.confession) {
+        successTitle = 'Confession Shared!';
+        successMsg = 'Your secret is safe with us. It has been posted anonymously to the community.';
       }
 
-      setState(() => _uploadProgress = 1.0);
-
-      final item = FeedItem(
-        id: itemId,
-        authorId: user.uid,
-        authorName: user.fullName,
-        authorPhotoUrl: user.photoUrl,
-        title: _titleController.text.trim(),
-        subtitle: content,
-        price: _priceController.text.isNotEmpty ? 'KES ${_priceController.text.trim()}' : null,
-        type: widget.type,
-        university: user.university,
-        createdAt: DateTime.now(),
-        deadline: _selectedDeadline,
-        images: imageUrls,
-        category: _selectedCategory,
-      );
-
-      await ref.read(feedRepositoryProvider).postToFeed(item);
-      if (mounted) {
-        String successTitle = 'Post Shared!';
-        String successMsg = 'Your post is now visible in the community feed.';
-        
-        if (widget.type == FeedType.gig) {
-          successTitle = 'Gig Listed!';
-          successMsg = 'Your student gig is now live. Interested students can now apply.';
-        } else if (widget.type == FeedType.confession) {
-          successTitle = 'Confession Shared!';
-          successMsg = 'Your anonymous confession has been posted to the feed.';
-        }
-
-        CreationSuccessDialog.show(
-          context,
-          title: successTitle,
-          message: successMsg,
-          onDone: () {
-            if (mounted) {
+      CreationSuccessDialog.show(
+        context,
+        title: successTitle,
+        message: successMsg,
+        onDone: () {
+          if (mounted) {
+            if (isConfession) {
+              context.go('/confessions');
+            } else if (widget.type == FeedType.community) {
+              context.go('/community');
+            } else if (widget.type == FeedType.gig) {
+              context.go('/gigs');
+            } else {
               context.pop();
             }
-          },
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+          }
+        },
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final state = ref.watch(addFeedItemControllerProvider);
+    
     final isGig = widget.type == FeedType.gig;
     final isConfession = widget.type == FeedType.confession;
     
     String title = 'Post to Community';
     if (isGig) title = 'Create Gig';
     if (isConfession) title = 'Share Confession';
+
+    ref.listen(addFeedItemControllerProvider, (previous, next) {
+      if (next.error != null && next.error != previous?.error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(next.error!), backgroundColor: AppColors.error),
+        );
+      }
+    });
 
     return PopScope(
       canPop: false,
@@ -179,9 +171,9 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
           backgroundColor: theme.colorScheme.surface,
           elevation: 0,
           title: Text(title, 
-            style: theme.textTheme.titleLarge?.copyWith(
+            style: GoogleFonts.plusJakartaSans(
               color: theme.colorScheme.onSurface, 
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w700,
               fontSize: 18,
             )),
           centerTitle: true,
@@ -197,7 +189,12 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (isGig) ...[
+                if (isConfession) ...[
+                  _buildConfessionHeader(context),
+                  const SizedBox(height: 32),
+                  _buildSectionLabel(context, 'Your Confession', Icons.favorite_rounded),
+                  const SizedBox(height: 16),
+                ] else if (isGig) ...[
                   _buildSectionLabel(context, 'Gig Details', Icons.work_outline),
                   const SizedBox(height: 16),
                   _buildModernField(
@@ -310,7 +307,7 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
                   const SizedBox(height: 32),
                   _buildSectionLabel(context, 'Description', Icons.description_outlined),
                   const SizedBox(height: 16),
-                ] else if (!isConfession) ...[
+                ] else ...[
                   _buildSectionLabel(context, 'Post Details', Icons.title_rounded),
                   const SizedBox(height: 16),
                   _buildModernField(
@@ -318,10 +315,7 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
                     controller: _titleController,
                     hint: 'Title (optional)',
                   ),
-                  const SizedBox(height: 20),
-                ] else ...[
-                  _buildSectionLabel(context, 'Confession', Icons.favorite_rounded),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
                 ],
                 
                 _buildModernField(
@@ -329,12 +323,44 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
                   controller: _contentController,
                   hint: isGig 
                       ? 'Describe the work, requirements, and what you expect...' 
-                      : (isConfession ? 'Share your secret anonymously...' : 'What\'s on your mind?'),
-                  maxLines: 12,
-                  maxLength: 10000,
-                  validator: (v) => v!.isEmpty ? 'Content cannot be empty' : null,
+                      : (isConfession ? 'What\'s your secret? No one will ever know it was you.' : 'What\'s on your mind?'),
+                  maxLines: isConfession ? 8 : 12,
+                  maxLength: 2000,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Content cannot be empty';
+                    if (isConfession && v.trim().length < 10) return 'Please write at least 10 characters';
+                    return null;
+                  },
                 ),
                 
+                if (isConfession) ...[
+                   const SizedBox(height: 24),
+                   Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.shield_outlined, color: AppColors.primary, size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Strictly Anonymous: Your profile, name, and location are never attached to confessions.',
+                            style: GoogleFonts.plusJakartaSans(
+                              color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 if (isGig) ...[
                   const SizedBox(height: 32),
                   Container(
@@ -359,12 +385,12 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
                   ),
                 ],
                 const SizedBox(height: 40),
-                if (_isLoading)
+                if (state.isLoading)
                   Column(
                     children: [
-                      LinearProgressIndicator(value: _uploadProgress, color: theme.colorScheme.primary, minHeight: 6, borderRadius: BorderRadius.circular(4)),
+                      LinearProgressIndicator(value: state.uploadProgress, color: theme.colorScheme.primary, minHeight: 6, borderRadius: BorderRadius.circular(4)),
                       const SizedBox(height: 8),
-                      Text('Sharing your post... ${(_uploadProgress * 100).toInt()}%', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 12)),
+                      Text('Sharing your post... ${(state.uploadProgress * 100).toInt()}%', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600, fontSize: 12)),
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -372,18 +398,220 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
                   width: double.infinity,
                   height: 58,
                   child: FilledButton(
-                    onPressed: _isLoading ? null : _submit,
+                    onPressed: state.isLoading ? null : _submit,
                     style: FilledButton.styleFrom(
-                      backgroundColor: isGig ? theme.colorScheme.primary : (isConfession ? theme.colorScheme.error : theme.colorScheme.secondary),
+                      backgroundColor: isConfession ? AppColors.primary : (isGig ? theme.colorScheme.primary : theme.colorScheme.secondary),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: Text(isGig ? 'Create Gig' : 'Post Now', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                    child: Text(
+                      isConfession ? 'Post Anonymously' : (isGig ? 'Create Gig' : 'Post Now'), 
+                      style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)
+                    ),
                   ),
                 ),
                 const SizedBox(height: 40),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConfessionHeader(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Speak freely.',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            color: Theme.of(context).colorScheme.onSurface,
+            letterSpacing: -0.5,
+          ),
+        ),
+        Text(
+          'Share your thoughts without revealing your identity.',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 13,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
+
+  Widget _buildCommunityCategoryPicker(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: () => _showCommunityCategorySheet(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              _selectedCategory != null 
+                  ? CommunityCategories.getIcon(_selectedCategory!) 
+                  : Icons.category_outlined, 
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              _selectedCategory ?? 'Select a category',
+              style: TextStyle(
+                fontSize: 14,
+                color: _selectedCategory == null 
+                    ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5) 
+                    : theme.colorScheme.onSurface,
+              ),
+            ),
+            const Spacer(),
+            Icon(Icons.expand_more_rounded, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7), size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCommunityCategorySheet() {
+    final theme = Theme.of(context);
+    final categories = CommunityCategories.all;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) => Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+        padding: const EdgeInsets.symmetric(vertical: 30),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Select Category', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: theme.colorScheme.onSurface)),
+            const SizedBox(height: 10),
+            Text('Where does this post fit best?', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+            const SizedBox(height: 20),
+            Expanded(
+              child: ListView.builder(
+                itemCount: categories.length,
+                itemBuilder: (context, index) {
+                  final cat = categories[index];
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 30, vertical: 4),
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(CommunityCategories.getIcon(cat), color: theme.colorScheme.primary, size: 20),
+                    ),
+                    title: Text(cat, style: TextStyle(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
+                    trailing: _selectedCategory == cat ? Icon(Icons.check_circle, color: theme.colorScheme.primary) : null,
+                    onTap: () {
+                      setState(() => _selectedCategory = cat);
+                      Navigator.pop(context);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConfessionCategoryPicker(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: () => _showConfessionCategorySheet(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              _selectedCategory != null 
+                  ? ConfessionCategories.getIcon(_selectedCategory!) 
+                  : Icons.category_outlined, 
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              _selectedCategory ?? 'Select a category',
+              style: TextStyle(
+                fontSize: 14,
+                color: _selectedCategory == null 
+                    ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5) 
+                    : theme.colorScheme.onSurface,
+              ),
+            ),
+            const Spacer(),
+            Icon(Icons.expand_more_rounded, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7), size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showConfessionCategorySheet() {
+    final theme = Theme.of(context);
+    final categories = ConfessionCategories.all;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) => Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+        padding: const EdgeInsets.symmetric(vertical: 30),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Select Category', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: theme.colorScheme.onSurface)),
+            const SizedBox(height: 10),
+            Text('Tag your confession for better discoverability.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+            const SizedBox(height: 20),
+            Expanded(
+              child: ListView.builder(
+                itemCount: categories.length,
+                itemBuilder: (context, index) {
+                  final cat = categories[index];
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 30, vertical: 4),
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: ConfessionCategories.getColor(cat).withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(ConfessionCategories.getIcon(cat), color: ConfessionCategories.getColor(cat), size: 20),
+                    ),
+                    title: Text(cat, style: TextStyle(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
+                    trailing: _selectedCategory == cat ? Icon(Icons.check_circle, color: theme.colorScheme.primary) : null,
+                    onTap: () {
+                      setState(() => _selectedCategory = cat);
+                      Navigator.pop(context);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -401,7 +629,7 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
             GestureDetector(
               onTap: () => _showMarketplaceDifferentiator(),
               child: Text('Selling an item?', 
-                style: TextStyle(fontSize: 11, color: theme.colorScheme.primary, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
+                style: TextStyle(fontSize: 11, color: theme.colorScheme.primary, fontWeight: FontWeight.w600, decoration: TextDecoration.underline)),
             ),
           ],
         ),
@@ -450,7 +678,7 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Select Gig Category', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+            Text('Select Gig Category', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: theme.colorScheme.onSurface)),
             const SizedBox(height: 10),
             Text('Services and tasks only. Selling items? Go to Marketplace.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
             const SizedBox(height: 20),
@@ -542,7 +770,7 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface)),
+              Text(title, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: theme.colorScheme.onSurface)),
               const SizedBox(height: 2),
               Text(desc, style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
             ],
@@ -561,8 +789,8 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
         Text(
           label,
           style: theme.textTheme.titleMedium?.copyWith(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
             color: theme.colorScheme.onSurface,
           ),
         ),
@@ -588,13 +816,13 @@ class _AddFeedItemScreenState extends ConsumerState<AddFeedItemScreen> {
       maxLength: maxLength,
       keyboardType: keyboardType,
       validator: validator,
-      style: TextStyle(color: theme.colorScheme.onSurface),
+      style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 15, fontWeight: FontWeight.w500),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+        hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontWeight: FontWeight.w400),
         prefixIcon: icon != null ? Icon(icon, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7)) : null,
         prefixText: prefixText,
-        prefixStyle: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+        prefixStyle: TextStyle(fontWeight: FontWeight.w500, color: theme.colorScheme.onSurface),
         filled: true,
         fillColor: theme.colorScheme.surfaceContainerHighest,
         contentPadding: const EdgeInsets.all(16),

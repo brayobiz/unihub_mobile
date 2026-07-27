@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:unihub_mobile/app/theme/app_colors.dart';
 import 'package:unihub_mobile/features/trust/domain/models/professional_role.dart';
 import 'package:unihub_mobile/features/trust/domain/models/verification_application.dart';
@@ -138,7 +139,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> with Sing
                   return CircleAvatar(
                     radius: 16,
                     backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                    backgroundImage: userData?.photoUrl != null ? NetworkImage(userData!.photoUrl!) : null,
+                    backgroundImage: userData?.photoUrl != null ? CachedNetworkImageProvider(userData!.photoUrl!) : null,
                     child: userData?.photoUrl == null 
                         ? Text(
                             userData?.fullName.isNotEmpty == true ? userData!.fullName[0].toUpperCase() : 'U',
